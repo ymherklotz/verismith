@@ -7,6 +7,7 @@ import Data.Graph.Inductive.Example (clr479, dag4)
 import Data.Text.Lazy
 import Data.GraphViz.Printing
 import Data.Graph.Inductive.Graph
+import Data.Graph.Inductive.PatriciaTree
 
 type Input = Bool
 
@@ -39,7 +40,7 @@ eval (Node Xor c1 c2) = eval c1 `xor` eval c2
 eval (Node Nand c1 c2) = complement $ eval c1 .&. eval c2
 eval (Node Nor c1 c2) = complement $ eval c1 .|. eval c2
 
-visualize :: (Graph g, Show a) => Circuit a -> g String ()
+visualize :: (Show a) => Circuit a -> Gr String ()
 visualize circ =
   uncurry mkGraph $ graph Nothing 0 ([], []) circ
   where
