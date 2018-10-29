@@ -4,18 +4,12 @@ import Data.Bits
 import Test.QuickCheck hiding ((.&.))
 import Data.GraphViz
 import Data.Graph.Inductive.Example (clr479, dag4)
-import Data.Text.Lazy
-import Data.GraphViz.Printing
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 
 type Input = Bool
 
-data Gate = And
-          | Or
-          | Xor
-          | Nand
-          | Nor
+data Gate = Nand
           deriving (Show)
 
 data Circuit a = In a
@@ -23,7 +17,7 @@ data Circuit a = In a
                deriving (Show)
 
 instance Arbitrary Gate where
-  arbitrary = elements [And, Or, Xor, Nand, Nor]
+  arbitrary = return Nand
 
 instance (Arbitrary a) => Arbitrary (Circuit a) where
   arbitrary = do
@@ -34,24 +28,19 @@ instance (Arbitrary a) => Arbitrary (Circuit a) where
 
 eval :: (Bits a) => Circuit a -> a
 eval (In val) = val
-eval (Node And c1 c2) = eval c1 .&. eval c2
-eval (Node Or c1 c2) = eval c1 .|. eval c2
-eval (Node Xor c1 c2) = eval c1 `xor` eval c2
 eval (Node Nand c1 c2) = complement $ eval c1 .&. eval c2
-eval (Node Nor c1 c2) = complement $ eval c1 .|. eval c2
 
 visualize :: (Show a) => Circuit a -> Gr String String
 visualize circ =
-  uncurry mkGraph $ graph Nothing 0 ([], []) circ
+  graph Nothing 0 (empty :: Gr String String) circ
   where
-    graph parent nl (l, e) circ =
+    graph parent nl graph circ =
+      let newNode str graph = (head $ newNodes 1 graph, str) in
       case (parent, circ) of
         (Nothing, (In val)) ->
-          ((nl, "In: " ++ show val) : l, e)
-        (Just par, (In val)) ->
-          ((nl, "In: " ++ show val) : l, (par, nl, "") : e) 
+          insNode (newNode "IN" graph) graph
         _ ->
-          ([], [])
+          graph
 
 main :: IO ()
 --main = sample (arbitrary :: Gen (Circuit Input))
