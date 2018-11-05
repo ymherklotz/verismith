@@ -22,3 +22,5 @@ executable verifuzz
                      , graphviz
                      , fgl
                      , text
+                     , graph-generators
+                     , mwc-random

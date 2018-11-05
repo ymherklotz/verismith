@@ -1,4 +1,6 @@
 resolver: lts-12.15
 packages:
   - .
-extra-deps: []
+extra-deps:
+  - graph-generators-0.1.3.0
+  - multiset-0.3.4.1
