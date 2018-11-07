@@ -1,0 +1,23 @@
+module and_comb(in1, in2, out);
+   input in1;
+   input in2;
+   output out;
+
+   assign out = in1 & in2;
+endmodule
+
+module main;
+   reg a, b;
+   wire c;
+
+   and_comb gate(.in1(a), .in2(b), .out(c));
+
+   initial
+     begin
+        a = 1'b1;
+        b = 1'b1;
+        #1
+        $display("%d & %d = %d", a, b, c);
+        $finish;
+     end
+endmodule

@@ -34,5 +34,5 @@ main :: IO FilePath
 --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
   gen <- withSystemRandom . asGenIO $ return
-  gr <- wattsStrogatzGraph gen 50 3 0.6
+  gr <- wattsStrogatzGraph gen 100 2 0.6
   runGraphviz (graphToDot nonClusteredParams (graphInfoToUGr gr)) Png "output.png"
