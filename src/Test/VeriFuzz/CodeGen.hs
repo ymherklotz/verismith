@@ -22,7 +22,7 @@ generate graph =
   <> ");\n"
   <> fromList (imap "  input wire " ";\n" inp)
   <> fromList (imap "  output wire " ";\n" out)
-  <> "endmodule\n"
+  <> "endmodule\n\nmodule main;\n  initial\n    begin\n      $display(\"Hello, world\");\n      $finish;\n    end\nendmodule"
   where
     and a b c = a == b && a /= c
     inputs n = indeg graph n == 0 && outdeg graph n /= 0
