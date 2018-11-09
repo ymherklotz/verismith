@@ -1,1 +1,1 @@
-module VeriFuzz.CodeGen where
+module Test.VeriFuzz.CodeGen where
