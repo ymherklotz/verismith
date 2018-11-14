@@ -1,9 +1,11 @@
 module Test.VeriFuzz.Graph.Random where
 
-import Data.Graph.Inductive (Graph, LNode, LEdge, mkGraph)
-import Test.QuickCheck (Arbitrary, Gen, arbitrary, generate, infiniteListOf, suchThat, listOf, scale, resize)
+import           Data.Graph.Inductive (Graph, LEdge, LNode, mkGraph)
+import           Test.QuickCheck      (Arbitrary, Gen, arbitrary, generate,
+                                       infiniteListOf, listOf, resize, scale,
+                                       suchThat)
 
-import Test.VeriFuzz.Types
+import           Test.VeriFuzz.Types
 
 arbitraryEdge :: (Arbitrary e) => Int -> Gen (LEdge e)
 arbitraryEdge n = do
@@ -21,6 +23,6 @@ randomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
 randomDAG n = do
   list <- generate . infiniteListOf $ arbitrary
   l <- generate . infiniteListOf $ arbitraryEdge n
-  return . mkGraph (nodes list) $ take (2*n) l
+  return . mkGraph (nodes list) $ take (5*n) l
     where
       nodes l = (zip [0..n] $ take n l)

@@ -2,10 +2,9 @@
 
 module Test.VeriFuzz.CodeGen where
 
-import Data.Text (Text, empty, pack)
-import Data.Graph.Inductive (Graph, Node, indeg, outdeg, nodes)
-
-import Test.VeriFuzz.Types
+import           Data.Graph.Inductive (Graph, Node, indeg, nodes, outdeg)
+import           Data.Text            (Text, empty, pack)
+import           Test.VeriFuzz.Types
 
 fromNode :: Node -> Text
 fromNode node = pack $ "w" <> show node

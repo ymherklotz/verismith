@@ -1,14 +1,14 @@
 module Test.VeriFuzz.Types where
 
-import Test.QuickCheck
-import System.Random
+import           System.Random
+import           Test.QuickCheck
 
 data Gate = And
           | Or
           | Xor
           | Nor
           | Nand
-          deriving (Show, Eq, Enum, Bounded)
+          deriving (Show, Eq, Enum, Bounded, Ord)
 
 instance Random Gate where
   randomR (a, b) g =

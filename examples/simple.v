@@ -3,7 +3,7 @@ module and_comb(in1, in2, out);
    input in2;
    output out;
 
-   assign out = in1 & in2;
+   and and1(out, in1, in2);
 endmodule
 
 module main;

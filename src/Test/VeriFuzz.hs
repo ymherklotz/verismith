@@ -8,6 +8,6 @@ module Test.VeriFuzz
   , module Test.VeriFuzz.Graph.Random
   ) where
 
-import Test.VeriFuzz.Types
-import Test.VeriFuzz.Graph.Random
-import Test.VeriFuzz.CodeGen
+import           Test.VeriFuzz.CodeGen
+import           Test.VeriFuzz.Graph.Random
+import           Test.VeriFuzz.Types
