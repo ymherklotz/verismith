@@ -15,29 +15,29 @@ filterGr :: (Graph gr) => gr n e -> (Node -> Bool) -> [Node]
 filterGr graph f =
   filter f $ nodes graph
 
-fromList :: [Text] -> Text
-fromList = foldl mappend empty
+fromList :: (Foldable t, Monoid a) => t a -> a
+fromList = foldl mappend mempty
 
-safeTail :: [a] -> Maybe [a]
-safeTail [] = Nothing
-safeTail l  = Just $ tail l
-
-safeHead :: [a] -> Maybe a
-safeHead [] = Nothing
-safeHead l  = Just $ head l
+safe :: ([a] -> b) -> [a] -> Maybe b
+safe _ [] = Nothing
+safe f l  = Just $ f l
 
 toOperator :: Gate -> Text
 toOperator And = " & "
 toOperator Or  = " | "
 toOperator Xor = " ^ "
 
+sep :: (Monoid a) => a -> [a] -> a
+sep el l = fromMaybe mempty $
+  (fromList . map (<>el) <$> safe init l) <> safe last l
+
 statList :: Gate -> [Node] -> Maybe Text
-statList g n = toStr <$> safeTail n
+statList g n = toStr <$> safe tail n
   where
     toStr = fromList . map ((<> toOperator g) . fromNode)
 
 lastEl :: [Node] -> Maybe Text
-lastEl n = fromNode <$> safeHead n
+lastEl n = fromNode <$> safe head n
 
 toStatement :: (Graph gr) => gr Gate e -> LNode Gate -> Text
 toStatement graph (n, g) =
@@ -49,14 +49,14 @@ generate :: (Graph gr) => gr Gate e -> Text
 generate graph =
   "module generated_module(\n"
   <> fromList (imap "  input wire " ",\n" inp)
-  <> fromList (imap "  output wire " ",\n" out)
+  <> sep ",\n" (imap "  output wire " "" out)
   <> ");\n"
   <> fromList (map (toStatement graph) (labNodes graph))
   <> "endmodule\n\nmodule main;\n  initial\n    begin\n      "
   <> "$display(\"Hello, world\");\n      $finish;\n    "
   <> "end\nendmodule"
   where
-    zero fun = (==0) . fun graph
-    inp = filterGr graph $ zero indeg
-    out = filterGr graph $ zero outdeg
+    zero fun1 fun2 n = fun1 graph n == 0 && fun2 graph n /= 0
+    inp = filterGr graph $ zero indeg outdeg
+    out = filterGr graph $ zero outdeg indeg
     imap b e = map ((\s -> b <> s <> e) . fromNode)
