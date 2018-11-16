@@ -15,5 +15,5 @@ main :: IO ()
 --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
   gr <- randomDAG 100 :: IO (Gr Gate ())
-  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png"
+--  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png"
   T.putStrLn $ generate gr

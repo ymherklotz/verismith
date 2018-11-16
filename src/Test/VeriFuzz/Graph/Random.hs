@@ -20,6 +20,6 @@ randomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
 randomDAG n = do
   list <- generate . infiniteListOf $ arbitrary
   l <- generate . infiniteListOf $ arbitraryEdge n
-  return . mkGraph (nodes list) $ take (5*n) l
+  return . mkGraph (nodes list) $ take (10*n) l
     where
       nodes l = zip [0..n] $ take n l
