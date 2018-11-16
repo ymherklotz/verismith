@@ -2,7 +2,8 @@
 
 module Test.VeriFuzz.CodeGen where
 
-import           Data.Graph.Inductive (Graph, Node, indeg, nodes, outdeg)
+import           Data.Graph.Inductive (Graph, LNode, Node, indeg, nodes, outdeg,
+                                       pre)
 import           Data.Text            (Text, empty, pack)
 import           Test.VeriFuzz.Types
 
@@ -13,20 +14,31 @@ filterGr :: (Graph gr) => gr n e -> (Node -> Bool) -> [Node]
 filterGr graph f =
   filter f $ nodes graph
 
+fromList :: [Text] -> Text
+fromList = foldl mappend empty
+
+toOperator :: Gate -> Text
+toOperator And = " & "
+toOperator Or  = " | "
+toOperator Xor = " ^ "
+
+toStatement :: (Graph gr) => gr Gate e -> LNode Gate -> Text
+toStatement graph (n, g) =
+  fromNode n <> " = " <> connNodes <> ";\n"
+  where
+    connNodes = fromList . map ((<> toOperator g) . fromNode) $ pre graph n
+
 generate :: (Graph gr) => gr Gate e -> Text
 generate graph =
   "module generated_module(\n"
-  <> fromList (imap "  " ",\n" inp)
-  <> fromList (imap "  " ",\n" out)
+  <> fromList (imap "  input wire " ",\n" inp)
+  <> fromList (imap "  output wire " ",\n" out)
   <> ");\n"
-  <> fromList (imap "  input wire " ";\n" inp)
-  <> fromList (imap "  output wire " ";\n" out)
-  <> "endmodule\n\nmodule main;\n  initial\n    begin\n      $display(\"Hello, world\");\n      $finish;\n    end\nendmodule"
+  <> "endmodule\n\nmodule main;\n  initial\n    begin\n      "
+  <> "$display(\"Hello, world\");\n      $finish;\n    "
+  <> "end\nendmodule"
   where
-    and a b c = a == b && a /= c
-    inputs n = indeg graph n == 0 && outdeg graph n /= 0
-    outputs n = indeg graph n /= 0 && outdeg graph n == 0
-    fromList = foldl mappend empty
-    inp = filterGr graph inputs
-    out = filterGr graph outputs
+    zero fun = (==0) . fun graph
+    inp = filterGr graph $ zero indeg
+    out = filterGr graph $ zero outdeg
     imap b e = map ((\s -> b <> s <> e) . fromNode)
