@@ -29,19 +29,20 @@ toOperator Xor = " ^ "
 
 sep :: (Monoid a) => a -> [a] -> a
 sep el l = fromMaybe mempty $
-  (fromList . map (<>el) <$> safe init l) <> safe last l
+  (fromList . fmap (<>el) <$> safe init l) <> safe last l
 
 statList :: Gate -> [Node] -> Maybe Text
 statList g n = toStr <$> safe tail n
   where
-    toStr = fromList . map ((<> toOperator g) . fromNode)
+    toStr = fromList . fmap ((<> toOperator g) . fromNode)
 
 lastEl :: [Node] -> Maybe Text
 lastEl n = fromNode <$> safe head n
 
 toStatement :: (Graph gr) => gr Gate e -> LNode Gate -> Text
 toStatement graph (n, g) =
-  fromMaybe empty $ Just "  assign " <> Just (fromNode n) <> Just " = " <> statList g nodeL <> lastEl nodeL <> Just ";\n"
+  fromMaybe empty $ Just "  assign " <> Just (fromNode n)
+  <> Just " = " <> statList g nodeL <> lastEl nodeL <> Just ";\n"
   where
     nodeL = pre graph n
 
@@ -51,7 +52,7 @@ generate graph =
   <> fromList (imap "  input wire " ",\n" inp)
   <> sep ",\n" (imap "  output wire " "" out)
   <> ");\n"
-  <> fromList (map (toStatement graph) (labNodes graph))
+  <> fromList (toStatement graph <$> labNodes graph)
   <> "endmodule\n\nmodule main;\n  initial\n    begin\n      "
   <> "$display(\"Hello, world\");\n      $finish;\n    "
   <> "end\nendmodule"
@@ -59,4 +60,4 @@ generate graph =
     zero fun1 fun2 n = fun1 graph n == 0 && fun2 graph n /= 0
     inp = filterGr graph $ zero indeg outdeg
     out = filterGr graph $ zero outdeg indeg
-    imap b e = map ((\s -> b <> s <> e) . fromNode)
+    imap b e = fmap ((\s -> b <> s <> e) . fromNode)
