@@ -4,28 +4,35 @@ module Test.VeriFuzz.VerilogAST where
 
 import           Control.Lens
 import           Data.Text    (Text)
-import qualified Data.Text    as T
 
-type NetLVal = Text
+newtype NetLVal = NetLVal { _getNetLVal :: Text }
+                deriving (Show)
+makeLenses ''NetLVal
 
-type Identifier = Text
+newtype Identifier = Identifier { _getIdentifier :: Text }
+                   deriving (Show)
+makeLenses ''Identifier
 
 data Number = Number { _numSize :: Int
                      , _numVal  :: Int
                      } deriving (Show)
+makeLenses ''Number
 
 data BinaryOperator = BinAnd
                     | BinOr
                     | BinXor
                     deriving (Show)
+makeLenses ''BinaryOperator
 
 data UnaryOperator = UnNot
                    | UnMinus
                    deriving (Show)
+makeLenses ''UnaryOperator
 
 data Primary = PrimNum Number
              | PrimId Identifier
              deriving (Show)
+makeLenses ''Primary
 
 data Expression = PrimExpr Primary
                 | UnPrimExpr { _exprUnOp :: UnaryOperator
@@ -40,34 +47,40 @@ data Expression = PrimExpr Primary
                            , _exprFalse :: Expression
                            }
                 deriving (Show)
+makeLenses ''Expression
 
 data ContAssign = ContAssign { _contAssignNetLVal :: NetLVal
                              , _contAssignExpr    :: Expression
                              } deriving (Show)
+makeLenses ''ContAssign
 
 data PortDir = Input
              | Output
              | InOut
              deriving (Show)
+makeLenses ''PortDir
 
 data Port = Port { _portName :: Identifier
                  , _portDir  :: PortDir
                  } deriving (Show)
+makeLenses ''Port
 
-type ModuleItem = Text
+newtype ModuleItem = ModuleItem { _getModuleItem :: Text }
+                   deriving (Show)
+makeLenses ''ModuleItem
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModuleDecl = ModuleDecl { _moduleId   :: Identifier
                              , _modPorts   :: [Port]
                              , _moduleItem :: ModuleItem
                              } deriving (Show)
-
-type Description = ModuleDecl
-
-type SourceText = [Description]
-
-makeLenses ''Number
-makeLenses ''Expression
-makeLenses ''ContAssign
-makeLenses ''Port
 makeLenses ''ModuleDecl
+
+newtype Description = Description { _getDescription :: ModuleDecl }
+                    deriving (Show)
+makeLenses ''Description
+
+newtype SourceText = SourceText { _getSourceText :: [Description] }
+                   deriving (Show
+                            )
+makeLenses ''SourceText
