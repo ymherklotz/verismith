@@ -20,21 +20,20 @@ library
                      , Test.VeriFuzz.Types
                      , Test.VeriFuzz.CodeGen
                      , Test.VeriFuzz.Graph.Random
+                     , Test.VeriFuzz.VerilogAST
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck
                      , fgl
                      , text
                      , mwc-random
                      , random
+                     , lens
 
 executable verifuzz
   hs-source-dirs:      src
   main-is:             Main.hs
   default-language:    Haskell2010
   other-modules:       Test.VeriFuzz
-                     , Test.VeriFuzz.Types
-                     , Test.VeriFuzz.CodeGen
-                     , Test.VeriFuzz.Graph.Random
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck
                      , graphviz
