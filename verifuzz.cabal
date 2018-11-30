@@ -1,17 +1,17 @@
-name:                verifuzz
-version:             0.1.0.0
+name:                  verifuzz
+version:               0.1.0.0
 -- synopsis:
 -- description:
-homepage:            https://github.com/githubuser/verifuzz#readme
-license:             BSD3
-license-file:        LICENSE
-author:              Yann Herklotz
-maintainer:          ymherklotz@gmail.com
-copyright:           2018 Yann Herklotz
-category:            Web
-build-type:          Simple
-cabal-version:       >=1.10
-extra-source-files:  README.md
+homepage:              https://github.com/githubuser/verifuzz#readme
+license:               BSD3
+license-file:          LICENSE
+author:                Yann Herklotz
+maintainer:            ymherklotz@gmail.com
+copyright:             2018 Yann Herklotz
+category:              Web
+build-type:            Simple
+cabal-version:         >=1.10
+extra-source-files:    README.md
 
 library
   hs-source-dirs:      src
@@ -43,7 +43,6 @@ test-suite verifuzz-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   main-is:             test.hs
-  other-modules:       Test.VeriFuzz
   build-depends:       base >= 4 && < 5
                      , verifuzz
                      , tasty >= 0.7
