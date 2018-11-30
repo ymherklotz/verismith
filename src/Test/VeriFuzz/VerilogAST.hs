@@ -65,7 +65,7 @@ data Port = Port { _portName :: Identifier
                  } deriving (Show)
 makeLenses ''Port
 
-newtype ModuleItem = ModuleItem { _getModuleItem :: Text }
+data ModuleItem = Assign ContAssign
                    deriving (Show)
 makeLenses ''ModuleItem
 
@@ -81,6 +81,5 @@ newtype Description = Description { _getDescription :: ModuleDecl }
 makeLenses ''Description
 
 newtype SourceText = SourceText { _getSourceText :: [Description] }
-                   deriving (Show
-                            )
+                   deriving (Show)
 makeLenses ''SourceText
