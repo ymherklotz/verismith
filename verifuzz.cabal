@@ -43,8 +43,11 @@ test-suite verifuzz-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   main-is:             Test.hs
+  other-modules:       Unit
+                     , Property
   build-depends:       base >= 4 && < 5
                      , verifuzz
+                     , fgl
                      , tasty >= 0.7
                      , tasty-hunit >= 0.10
                      , tasty-quickcheck >= 0.10
