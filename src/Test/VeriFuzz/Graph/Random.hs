@@ -14,12 +14,17 @@ arbitraryEdge n = do
       with = suchThat . resize n $ arbitrary
 
 randomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
-          => Int         -- ^ The number of nodes
-          -> IO (gr l e) -- ^ The generated graph. It uses Arbitrary to
-                         -- generate random instances of each node
+          => Int          -- ^ The number of nodes
+          -> Gen (gr l e) -- ^ The generated graph. It uses Arbitrary to
+                          -- generate random instances of each node
 randomDAG n = do
-  list <- generate . infiniteListOf $ arbitrary
-  l <- generate . infiniteListOf $ arbitraryEdge n
+  list <- infiniteListOf $ arbitrary
+  l <- infiniteListOf $ arbitraryEdge n
   return . mkGraph (nodes list) $ take (10*n) l
     where
       nodes l = zip [0..n] $ take n l
+
+genRandomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
+             => Int
+             -> IO (gr l e)
+genRandomDAG = generate . randomDAG
