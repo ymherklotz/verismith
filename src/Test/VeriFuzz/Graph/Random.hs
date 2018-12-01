@@ -18,7 +18,7 @@ randomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
           -> Gen (gr l e) -- ^ The generated graph. It uses Arbitrary to
                           -- generate random instances of each node
 randomDAG n = do
-  list <- infiniteListOf $ arbitrary
+  list <- infiniteListOf arbitrary
   l <- infiniteListOf $ arbitraryEdge n
   return . mkGraph (nodes list) $ take (10*n) l
     where
