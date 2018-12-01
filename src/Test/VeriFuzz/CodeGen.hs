@@ -22,7 +22,7 @@ genModuleDecl mod =
   "module " <> mod ^. moduleId . getIdentifier
   <> "(\n" <> ports <> "\n);\n"
   <> modItems
-  <> "endomodule\n"
+  <> "endmodule\n"
   where
     ports = sep ",\n" $ genPort <$> mod ^. modPorts
     modItems = fromList $ genModuleItem <$> mod ^. moduleItems
