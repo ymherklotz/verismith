@@ -12,7 +12,7 @@ instance QC.Arbitrary TestGraph where
   arbitrary = TestGraph <$> randomDAG 100
 
 simpleGraph = QC.testProperty "simple graph generation" $
-  \graph -> simp (graph :: TestGraph) == True
+  \graph -> simp (graph :: TestGraph)
   where simp = isSimple . getGraph
 
 propertyTests :: TestTree
