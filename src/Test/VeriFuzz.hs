@@ -8,9 +8,11 @@ module Test.VeriFuzz
   , module Test.VeriFuzz.VerilogAST
     -- * Graphs
   , module Test.VeriFuzz.Graph.Random
+  , module Test.VeriFuzz.Graph.CodeGen
   ) where
 
 import           Test.VeriFuzz.CodeGen
+import           Test.VeriFuzz.Graph.CodeGen
 import           Test.VeriFuzz.Graph.Random
 import           Test.VeriFuzz.Types
 import           Test.VeriFuzz.VerilogAST
