@@ -63,14 +63,14 @@ data Port = Port { _portName :: Identifier
                  } deriving (Show)
 makeLenses ''Port
 
-data ModuleItem = Assign ContAssign
+newtype ModuleItem = Assign ContAssign
                    deriving (Show)
 makeLenses ''ModuleItem
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
-data ModuleDecl = ModuleDecl { _moduleId   :: Identifier
-                             , _modPorts   :: [Port]
-                             , _moduleItem :: ModuleItem
+data ModuleDecl = ModuleDecl { _moduleId    :: Identifier
+                             , _modPorts    :: [Port]
+                             , _moduleItems :: [ModuleItem]
                              } deriving (Show)
 makeLenses ''ModuleDecl
 
@@ -86,9 +86,7 @@ numExpr :: Int -> Int -> Expression
 numExpr = ((PrimExpr . PrimNum) .) . Number
 
 emptyMod :: ModuleDecl
-emptyMod =
-  ModuleDecl (Identifier "") [] $ Assign $ ContAssign (Identifier "") $
-  OpExpr (numExpr 32 0) BinAnd (numExpr 32 0)
+emptyMod = ModuleDecl (Identifier "") [] []
 
 setModName :: Text -> ModuleDecl -> ModuleDecl
-setModName str = moduleId .~ (Identifier str)
+setModName str = moduleId .~ Identifier str
