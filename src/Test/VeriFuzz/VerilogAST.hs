@@ -90,3 +90,6 @@ emptyMod = ModuleDecl (Identifier "") [] []
 
 setModName :: Text -> ModuleDecl -> ModuleDecl
 setModName str = moduleId .~ Identifier str
+
+addModPort :: Port -> ModuleDecl -> ModuleDecl
+addModPort port = modPorts %~ ((:) port)
