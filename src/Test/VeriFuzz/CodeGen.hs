@@ -20,9 +20,12 @@ genDescription desc =
 genModuleDecl :: ModuleDecl -> Text
 genModuleDecl mod =
   "module " <> mod ^. moduleId . getIdentifier
-  <> "(\n" <> ports <> "\n);\nendomodule"
+  <> "(\n" <> ports <> "\n);"
+  <> modItems
+  <> "endomodule\n"
   where
     ports = sep ",\n" $ genPort <$> mod ^. modPorts
+    modItems = fromList $ genModuleItem <$> mod ^. moduleItems
 
 genPort :: Port -> Text
 genPort port =
@@ -49,7 +52,16 @@ genContAssign assign =
 genExpr :: Expression -> Text
 genExpr (OpExpr exprRhs bin exprLhs) =
   genExpr exprRhs <> genBinaryOperator bin <> genExpr exprLhs
+genExpr (PrimExpr prim) =
+  genPrimary prim
 genExpr _ = "TODO"
+
+genPrimary :: Primary -> Text
+genPrimary (PrimNum num) =
+  sh (num ^. numSize) <> "'d" <> sh (num ^. numVal)
+  where
+    sh = T.pack . show
+genPrimary (PrimId ident) = ident ^. getIdentifier
 
 genBinaryOperator :: BinaryOperator -> Text
 genBinaryOperator BinAnd = " & "
