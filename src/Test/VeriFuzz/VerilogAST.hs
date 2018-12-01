@@ -1,13 +1,11 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Test.VeriFuzz.VerilogAST where
 
 import           Control.Lens
+import           Data.Text    as T
 import           Data.Text    (Text)
-
-newtype NetLVal = NetLVal { _getNetLVal :: Text }
-                deriving (Show)
-makeLenses ''NetLVal
 
 newtype Identifier = Identifier { _getIdentifier :: Text }
                    deriving (Show)
@@ -49,7 +47,7 @@ data Expression = PrimExpr Primary
                 deriving (Show)
 makeLenses ''Expression
 
-data ContAssign = ContAssign { _contAssignNetLVal :: NetLVal
+data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expression
                              } deriving (Show)
 makeLenses ''ContAssign
@@ -83,3 +81,14 @@ makeLenses ''Description
 newtype SourceText = SourceText { _getSourceText :: [Description] }
                    deriving (Show)
 makeLenses ''SourceText
+
+numExpr :: Int -> Int -> Expression
+numExpr = ((PrimExpr . PrimNum) .) . Number
+
+emptyMod :: ModuleDecl
+emptyMod =
+  ModuleDecl (Identifier "") [] $ Assign $ ContAssign (Identifier "") $
+  OpExpr (numExpr 32 0) BinAnd (numExpr 32 0)
+
+setModName :: Text -> ModuleDecl -> ModuleDecl
+setModName str = moduleId .~ (Identifier str)
