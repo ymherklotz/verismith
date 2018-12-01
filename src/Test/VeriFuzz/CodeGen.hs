@@ -20,7 +20,7 @@ genDescription desc =
 genModuleDecl :: ModuleDecl -> Text
 genModuleDecl mod =
   "module " <> mod ^. moduleId . getIdentifier
-  <> "(\n" <> ports <> "\n);"
+  <> "(\n" <> ports <> "\n);\n"
   <> modItems
   <> "endomodule\n"
   where
