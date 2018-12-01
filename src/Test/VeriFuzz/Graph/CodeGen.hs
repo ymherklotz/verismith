@@ -2,10 +2,11 @@
 
 module Test.VeriFuzz.Graph.CodeGen where
 
-import           Data.Graph.Inductive (Graph, LNode, Node, indeg, labNodes,
-                                       nodes, outdeg, pre)
-import           Data.Maybe           (fromMaybe)
-import           Data.Text            (Text, empty, pack)
+import           Data.Graph.Inductive          (Graph, LNode, Node, indeg,
+                                                labNodes, nodes, outdeg, pre)
+import           Data.Maybe                    (fromMaybe)
+import           Data.Text                     (Text, empty, pack)
+import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Types
 
 fromNode :: Node -> Text
@@ -15,21 +16,10 @@ filterGr :: (Graph gr) => gr n e -> (Node -> Bool) -> [Node]
 filterGr graph f =
   filter f $ nodes graph
 
-fromList :: (Foldable t, Monoid a) => t a -> a
-fromList = foldl mappend mempty
-
-safe :: ([a] -> b) -> [a] -> Maybe b
-safe _ [] = Nothing
-safe f l  = Just $ f l
-
 toOperator :: Gate -> Text
 toOperator And = " & "
 toOperator Or  = " | "
 toOperator Xor = " ^ "
-
-sep :: (Monoid a) => a -> [a] -> a
-sep el l = fromMaybe mempty $
-  (fromList . fmap (<>el) <$> safe init l) <> safe last l
 
 statList :: Gate -> [Node] -> Maybe Text
 statList g n = toStr <$> safe tail n
