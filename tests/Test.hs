@@ -8,3 +8,4 @@ tests :: TestTree
 tests = testGroup "Tests" [unitTests, propertyTests]
 
 main = defaultMain tests
+
