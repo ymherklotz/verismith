@@ -39,6 +39,7 @@ executable verifuzz
                      , graphviz
                      , fgl
                      , text
+                     , QuickCheck
 
 test-suite verifuzz-test
   default-language:    Haskell2010

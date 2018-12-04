@@ -5,6 +5,7 @@ import           Data.GraphViz
 import           Data.GraphViz.Attributes.Complete
 import           Data.Text.IO                      as T
 import           Data.Text.Lazy
+import qualified Test.QuickCheck                   as QC
 
 import           Test.VeriFuzz
 
@@ -17,3 +18,5 @@ main = do
   gr <- genRandomDAG 100 :: IO (Gr Gate ())
 --  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png"
   T.putStrLn $ generate gr
+  g <- QC.generate (QC.arbitrary :: QC.Gen SourceText)
+  render $ genSourceText g
