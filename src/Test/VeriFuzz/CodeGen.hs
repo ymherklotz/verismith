@@ -58,9 +58,12 @@ genExpr _ = "TODO"
 
 genPrimary :: Primary -> Text
 genPrimary (PrimNum num) =
-  sh (num ^. numSize) <> "'d" <> sh (num ^. numVal)
+  neg <> sh (num ^. numSize) <> "'d" <> (sh . abs) n
   where
     sh = T.pack . show
+    abs x = if x <= 0 then -x else x
+    n = num ^. numVal
+    neg = if n <= 0 then "-" else ""
 genPrimary (PrimId ident) = ident ^. getIdentifier
 
 genBinaryOperator :: BinaryOperator -> Text
