@@ -1,18 +1,20 @@
 module Test.VeriFuzz
   (
     -- * Definitions
-    module Test.VeriFuzz.Types
+    module Test.VeriFuzz.Circuit
     -- * Code Generation
   , module Test.VeriFuzz.CodeGen
     -- * Verilog AST Data Types
   , module Test.VeriFuzz.VerilogAST
     -- * Graphs
-  , module Test.VeriFuzz.Graph.Random
+  , module Test.VeriFuzz.Graph.ASTGen
   , module Test.VeriFuzz.Graph.CodeGen
+  , module Test.VeriFuzz.Graph.Random
   ) where
 
+import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.CodeGen
+import           Test.VeriFuzz.Graph.ASTGen
 import           Test.VeriFuzz.Graph.CodeGen
 import           Test.VeriFuzz.Graph.Random
-import           Test.VeriFuzz.Types
 import           Test.VeriFuzz.VerilogAST
