@@ -1,3 +1,15 @@
+{-|
+Module      : Test.VeriFuzz.VerilogAST
+Description : Definition of the Verilog AST types.
+Copyright   : (c) Yann Herklotz Grave 2018
+License     : GPL-3
+Maintainer  : ymherklotz@gmail.com
+Stability   : experimental
+Portability : POSIX
+
+Defines the types to build a Verilog AST.
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
@@ -8,26 +20,35 @@ import           Data.Text       as T
 import           Data.Text       (Text)
 import           Test.QuickCheck as QC
 
+-- | Identifier in Verilog. This is just a string of characters that can either
+-- be lowercase and uppercase for now. This might change in the future though,
+-- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { _getIdentifier :: Text }
                    deriving (Show)
 
+-- | A number in Verilog which contains a size and a value.
 data Number = Number { _numSize :: Int
                      , _numVal  :: Int
                      } deriving (Show)
 
-data BinaryOperator = BinAnd
-                    | BinOr
-                    | BinXor
+-- | Binary operators that are currently supported in the verilog generation.
+data BinaryOperator = BinAnd -- ^ Binary And (&).
+                    | BinOr  -- ^ Binary Or (|).
+                    | BinXor -- ^ Binary Xor (^).
                     deriving (Show)
 
-data UnaryOperator = UnNot
-                   | UnMinus
+-- | Unary operators that are currently supported by the generator.
+data UnaryOperator = UnNot   -- ^ Not (!).
+                   | UnMinus -- ^ Minus (-).
                    deriving (Show)
 
-data Primary = PrimNum Number
-             | PrimId Identifier
+-- | A primary expression which can either be a number or an identifier.
+data Primary = PrimNum Number    -- ^ Number in primary expression.
+             | PrimId Identifier -- ^ Identifier in primary expression.
              deriving (Show)
 
+-- | Verilog expression, which can either be a primary expression, unary
+-- expression, binary operator expression or a conditional expression.
 data Expression = PrimExpr Primary
                 | UnPrimExpr { _exprUnOp :: UnaryOperator
                              , _exprPrim :: Primary
@@ -42,19 +63,23 @@ data Expression = PrimExpr Primary
                            }
                 deriving (Show)
 
+-- | Continuous assignment which can be in the body of a statement.
 data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expression
                              } deriving (Show)
 
-data PortDir = Input
-             | Output
-             | InOut
+-- | Different port direction that are supported in Verilog.
+data PortDir = Input  -- ^ Input direction for port (@input@).
+             | Output -- ^ Output direction for port (@output@).
+             | InOut  -- ^ Inout direction for port (@inout@).
              deriving (Show)
 
-data Port = Port { _portName :: Identifier
-                 , _portDir  :: PortDir
+-- | Port declaration.
+data Port = Port { _portDir  :: PortDir
+                 , _portName :: Identifier
                  } deriving (Show)
 
+-- | Module item which is the body of the module expression.
 newtype ModuleItem = Assign ContAssign
                    deriving (Show)
 
@@ -64,9 +89,11 @@ data ModuleDecl = ModuleDecl { _moduleId    :: Identifier
                              , _moduleItems :: [ModuleItem]
                              } deriving (Show)
 
+-- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModuleDecl }
                     deriving (Show)
 
+-- | The complete sourcetext for the Verilog module.
 newtype SourceText = SourceText { _getSourceText :: [Description] }
                    deriving (Show)
 
@@ -77,7 +104,7 @@ instance QC.Arbitrary Identifier where
     (QC.shuffle (['a'..'z'] <> ['A'..'Z']) >>= QC.sublistOf)
 
 instance QC.Arbitrary Number where
-  arbitrary = Number <$> (suchThat QC.arbitrary (>=0)) <*> QC.arbitrary
+  arbitrary = Number <$> (suchThat QC.arbitrary (>0)) <*> QC.arbitrary
 
 instance QC.Arbitrary BinaryOperator where
   arbitrary = QC.elements [BinAnd, BinOr, BinXor]
@@ -132,14 +159,18 @@ makeLenses ''ContAssign
 
 -- Helper functions for the AST
 
+-- | Create a number expression which will be stored in a primary expression.
 numExpr :: Int -> Int -> Expression
 numExpr = ((PrimExpr . PrimNum) .) . Number
 
+-- | Create an empty module.
 emptyMod :: ModuleDecl
 emptyMod = ModuleDecl (Identifier "") [] []
 
+-- | Set a module name for a module declaration.
 setModName :: Text -> ModuleDecl -> ModuleDecl
 setModName str = moduleId .~ Identifier str
 
+-- | Add a port to the module declaration.
 addModPort :: Port -> ModuleDecl -> ModuleDecl
 addModPort port = modPorts %~ (:) port

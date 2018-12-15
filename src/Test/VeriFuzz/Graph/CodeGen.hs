@@ -1,13 +1,27 @@
+{-|
+Module      : Test.VeriFuzz.Graph.Random
+Description : Code generation directly from DAG.
+Copyright   : (c) Yann Herklotz Grave 2018
+License     : GPL-3
+Maintainer  : ymherklotz@gmail.com
+Stability   : experimental
+Portability : POSIX
+
+Define the code generation directly from the random DAG.
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.VeriFuzz.Graph.CodeGen where
+module Test.VeriFuzz.Graph.CodeGen
+  ( generate
+  ) where
 
 import           Data.Graph.Inductive          (Graph, LNode, Node, indeg,
                                                 labNodes, nodes, outdeg, pre)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Text                     (Text, empty, pack)
+import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Internal.Shared
-import           Test.VeriFuzz.Types
 
 fromNode :: Node -> Text
 fromNode node = pack $ "w" <> show node
