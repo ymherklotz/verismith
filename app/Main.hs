@@ -1,22 +1,21 @@
 module Main where
 
-import           Data.Graph.Inductive
-import           Data.GraphViz
-import           Data.GraphViz.Attributes.Complete
-import           Data.Text.IO                      as T
-import           Data.Text.Lazy
+import qualified Data.Graph.Inductive              as G
+import qualified Data.GraphViz                     as Gviz
+import qualified Data.GraphViz.Attributes.Complete as Gviz
+import qualified Data.Text.IO                      as T
+import qualified Data.Text.Lazy                    as T
 import qualified Test.QuickCheck                   as QC
-
 import           Test.VeriFuzz
 
-instance Labellable Gate where
-  toLabelValue gate = StrLabel . pack $ show gate
+instance Gviz.Labellable Gate where
+  toLabelValue gate = Gviz.StrLabel . T.pack $ show gate
 
 main :: IO ()
 --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
-  gr <- genRandomDAG 100 :: IO (Gr Gate ())
---  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png"
-  T.putStrLn $ generate gr
-  g <- QC.generate (QC.arbitrary :: QC.Gen SourceText)
-  render $ genSourceText g
+  gr <- genRandomDAG 100 :: IO (G.Gr Gate ())
+--  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png",
+--  T.putStrLn $ generate gr
+  --g <- QC.generate (QC.arbitrary :: QC.Gen SourceText)
+  render . genSourceText . generateAST $ Circuit gr
