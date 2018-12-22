@@ -6,6 +6,8 @@ module Test.VeriFuzz
   , module Test.VeriFuzz.CodeGen
     -- * Verilog AST Data Types
   , module Test.VeriFuzz.VerilogAST
+    -- * AST Mutation
+  , module Test.VeriFuzz.Mutate
     -- * Graphs
   , module Test.VeriFuzz.Graph.ASTGen
   , module Test.VeriFuzz.Graph.CodeGen
