@@ -14,36 +14,39 @@ Generates the AST from the graph directly.
 
 module Test.VeriFuzz.Graph.ASTGen where
 
-import qualified Data.Graph.Inductive     as G
-import qualified Data.Text                as T
+import qualified Data.Graph.Inductive       (LNode, Node)
+import qualified Data.Graph.Inductive       as G
+import qualified Data.Text                  as T
 import           Test.VeriFuzz.Circuit
+import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.VerilogAST
 
-fromNode :: G.Node -> Identifier
-fromNode node = Identifier . T.pack $ "w" <> show node
+frNode :: Node -> Identifier
+frNode = Identifier . fromNode
 
 fromGate :: Gate -> BinaryOperator
 fromGate And = BinAnd
 fromGate Or  = BinOr
 fromGate Xor = BinXor
 
-filterGr :: (G.Graph gr) => gr n e -> (G.Node -> Bool) -> [G.Node]
-filterGr graph f =
-  filter f $ G.nodes graph
-
 genPortsAST :: Circuit -> [Port]
-genPortsAST c = ((Port Input . fromNode) <$> inp) ++ ((Port Output) . fromNode <$> out)
+genPortsAST c =
+  ((Port Input . frNode) <$> inp) ++ ((Port Output) . frNode <$> out)
   where
-    zero fun1 fun2 n = fun1 graph n == 0 && fun2 graph n /= 0
-    inp = filterGr graph $ zero G.indeg G.outdeg
-    out = filterGr graph $ zero G.outdeg G.indeg
+    inp = inputs graph
+    out = outputs graph
     graph = getCircuit c
 
-genContAssignAST :: Circuit -> G.LNode Gate -> ContAssign
-genContAssignAST c g =
+genAssignExpr :: Gate -> [Node] -> Expression
+genAssignExpr g ns = (error "FIXME: Not yet done")
+
+genContAssignAST :: Circuit -> LNode Gate -> ContAssign
+genContAssignAST c (n, g) =
+  ContAssign name $ genAssignExpr g nodes
   where
     gr = getCircuit c
-    nodes = pre gr $ fst g
+    nodes = G.pre gr n
+    name = frNode n
 
 genAssignAST :: Circuit -> [ContAssign]
 genAssignAST c =

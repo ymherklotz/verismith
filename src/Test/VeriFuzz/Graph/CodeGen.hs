@@ -21,14 +21,8 @@ import           Data.Graph.Inductive          (Graph, LNode, Node, indeg,
 import           Data.Maybe                    (fromMaybe)
 import           Data.Text                     (Text, empty, pack)
 import           Test.VeriFuzz.Circuit
+import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.Internal.Shared
-
-fromNode :: Node -> Text
-fromNode node = pack $ "w" <> show node
-
-filterGr :: (Graph gr) => gr n e -> (Node -> Bool) -> [Node]
-filterGr graph f =
-  filter f $ nodes graph
 
 toOperator :: Gate -> Text
 toOperator And = " & "
@@ -61,7 +55,6 @@ generate graph =
   <> "$display(\"Hello, world\");\n      $finish;\n    "
   <> "end\nendmodule"
   where
-    zero fun1 fun2 n = fun1 graph n == 0 && fun2 graph n /= 0
-    inp = filterGr graph $ zero indeg outdeg
-    out = filterGr graph $ zero outdeg indeg
+    inp = inputs graph
+    out = outputs graph
     imap b e = fmap ((\s -> b <> s <> e) . fromNode)
