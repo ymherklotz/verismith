@@ -12,7 +12,7 @@ Definition of the circuit graph.
 
 module Test.VeriFuzz.Circuit where
 
-import           Data.Graph.Inductive
+import           Data.Graph.Inductive (Gr, LNode)
 import           System.Random
 import           Test.QuickCheck
 
@@ -24,6 +24,8 @@ data Gate = And
 
 -- | Newtype for the Circuit which implements a Graph from fgl.
 newtype Circuit = Circuit { getCircuit :: Gr Gate () }
+
+newtype CNode = CNode { getCNode :: LNode Gate }
 
 instance Random Gate where
   randomR (a, b) g =

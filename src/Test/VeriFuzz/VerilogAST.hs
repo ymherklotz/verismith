@@ -104,7 +104,7 @@ instance QC.Arbitrary Identifier where
     (QC.shuffle (['a'..'z'] <> ['A'..'Z']) >>= QC.sublistOf)
 
 instance QC.Arbitrary Number where
-  arbitrary = Number <$> (suchThat QC.arbitrary (>0)) <*> QC.arbitrary
+  arbitrary = Number <$> suchThat QC.arbitrary (>0) <*> QC.arbitrary
 
 instance QC.Arbitrary BinaryOperator where
   arbitrary = QC.elements [BinAnd, BinOr, BinXor]
