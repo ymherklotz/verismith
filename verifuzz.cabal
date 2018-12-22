@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   other-modules:       Test.VeriFuzz.Internal.Shared
+                     , Test.VeriFuzz.Internal.Gen
   exposed-modules:     Test.VeriFuzz
                      , Test.VeriFuzz.Circuit
                      , Test.VeriFuzz.CodeGen
