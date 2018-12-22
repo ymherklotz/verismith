@@ -24,28 +24,28 @@ import           Test.QuickCheck as QC
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { _getIdentifier :: Text }
-                   deriving (Show)
+                   deriving (Show, Eq)
 
 -- | A number in Verilog which contains a size and a value.
 data Number = Number { _numSize :: Int
                      , _numVal  :: Int
-                     } deriving (Show)
+                     } deriving (Show, Eq)
 
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinAnd -- ^ Binary And (&).
                     | BinOr  -- ^ Binary Or (|).
                     | BinXor -- ^ Binary Xor (^).
-                    deriving (Show)
+                    deriving (Show, Eq)
 
 -- | Unary operators that are currently supported by the generator.
 data UnaryOperator = UnNot   -- ^ Not (!).
                    | UnMinus -- ^ Minus (-).
-                   deriving (Show)
+                   deriving (Show, Eq)
 
 -- | A primary expression which can either be a number or an identifier.
 data Primary = PrimNum Number    -- ^ Number in primary expression.
              | PrimId Identifier -- ^ Identifier in primary expression.
-             deriving (Show)
+             deriving (Show, Eq)
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
@@ -61,41 +61,41 @@ data Expression = PrimExpr Primary
                            , _exprTrue  :: Expression
                            , _exprFalse :: Expression
                            }
-                deriving (Show)
+                deriving (Show, Eq)
 
 -- | Continuous assignment which can be in the body of a statement.
 data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expression
-                             } deriving (Show)
+                             } deriving (Show, Eq)
 
 -- | Different port direction that are supported in Verilog.
 data PortDir = Input  -- ^ Input direction for port (@input@).
              | Output -- ^ Output direction for port (@output@).
              | InOut  -- ^ Inout direction for port (@inout@).
-             deriving (Show)
+             deriving (Show, Eq)
 
 -- | Port declaration.
 data Port = Port { _portDir  :: PortDir
                  , _portName :: Identifier
-                 } deriving (Show)
+                 } deriving (Show, Eq)
 
 -- | Module item which is the body of the module expression.
 newtype ModuleItem = Assign ContAssign
-                   deriving (Show)
+                   deriving (Show, Eq)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModuleDecl = ModuleDecl { _moduleId    :: Identifier
                              , _modPorts    :: [Port]
                              , _moduleItems :: [ModuleItem]
-                             } deriving (Show)
+                             } deriving (Show, Eq)
 
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModuleDecl }
-                    deriving (Show)
+                    deriving (Show, Eq)
 
 -- | The complete sourcetext for the Verilog module.
 newtype SourceText = SourceText { _getSourceText :: [Description] }
-                   deriving (Show)
+                   deriving (Show, Eq)
 
 -- Generate Arbitrary instances for the AST
 

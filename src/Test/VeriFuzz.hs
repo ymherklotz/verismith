@@ -19,4 +19,5 @@ import           Test.VeriFuzz.CodeGen
 import           Test.VeriFuzz.Graph.ASTGen
 import           Test.VeriFuzz.Graph.CodeGen
 import           Test.VeriFuzz.Graph.Random
+import           Test.VeriFuzz.Mutate
 import           Test.VeriFuzz.VerilogAST
