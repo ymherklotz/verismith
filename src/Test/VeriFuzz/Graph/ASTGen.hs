@@ -62,20 +62,17 @@ genContAssignAST c (n, g) = ContAssign name <$> genAssignExpr g nodes
     name = frNode n
 
 genAssignAST :: Circuit -> [ContAssign]
-genAssignAST c =
-  catMaybes $ genContAssignAST c <$> nodes
+genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
   where
     gr = getCircuit c
     nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModuleDecl
-genModuleDeclAST c =
-  ModuleDecl id ports items
+genModuleDeclAST c = ModuleDecl id ports items
   where
     id = Identifier "gen_module"
     ports = genPortsAST c
     items = Assign <$> genAssignAST c
 
 generateAST :: Circuit -> SourceText
-generateAST c =
-  SourceText [Description $ genModuleDeclAST c]
+generateAST c = SourceText [Description $ genModuleDeclAST c]
