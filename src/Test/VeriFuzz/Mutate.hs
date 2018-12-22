@@ -13,3 +13,7 @@ more random patterns, such as nesting wires instead of creating new ones.
 
 module Test.VeriFuzz.Mutate where
 
+import           Test.VeriFuzz.VerilogAST
+
+nestId :: ModuleDecl -> Identifier -> ModuleDecl
+nestId mod id = (error "FIXME: nestId")
