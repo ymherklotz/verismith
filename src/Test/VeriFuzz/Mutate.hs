@@ -13,7 +13,28 @@ more random patterns, such as nesting wires instead of creating new ones.
 
 module Test.VeriFuzz.Mutate where
 
+import           Control.Lens
+import           Data.Maybe                    (catMaybes)
+import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.VerilogAST
 
-nestId :: ModuleDecl -> Identifier -> ModuleDecl
-nestId mod id = (error "FIXME: nestId")
+-- | Return if the 'Identifier' is in a 'ModuleDecl'.
+inPort :: Identifier -> ModuleDecl -> Bool
+inPort id mod = any (\a -> a ^. portName == id) $ mod ^. modPorts
+
+-- | Find the last assignment of a specific wire/reg to an expression, and
+-- returns that expression.
+findAssign :: Identifier -> [ModuleItem] -> Maybe Expression
+findAssign id items =
+  safe last . catMaybes $ isAssign <$> items
+  where
+    isAssign (Assign ca)
+      | ca ^. contAssignNetLVal == id = Just $ ca ^. contAssignExpr
+      | otherwise = Nothing
+
+-- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not found,
+-- the AST is not changed.
+nestId :: Identifier -> ModuleDecl -> ModuleDecl
+nestId id mod
+  | not $ inPort id mod = mod
+  | otherwise = mod
