@@ -16,7 +16,7 @@ more random patterns, such as nesting wires instead of creating new ones.
 module Test.VeriFuzz.Mutate where
 
 import           Control.Lens
-import           Data.Maybe                    (catMaybes)
+import           Data.Maybe                    (catMaybes, fromMaybe)
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.VerilogAST
 
@@ -34,22 +34,36 @@ findAssign id items =
       | ca ^. contAssignNetLVal == id = Just $ ca ^. contAssignExpr
       | otherwise = Nothing
 
+-- | Transforms an expression by replacing an Identifier with an
+-- expression. This is used inside 'transformOf' and 'traverseExpr' to replace
+-- the 'Identifier' recursively.
 idTrans :: Identifier -> Expression -> Expression -> Expression
 idTrans i expr (PrimExpr (PrimId id))
   | id == i = expr
   | otherwise = (PrimExpr (PrimId id))
 idTrans _ _ e = e
 
+-- | Replaces the identifier recursively in an expression.
+replace :: Identifier -> Expression -> Expression -> Expression
+replace = (transformOf traverseExpr .) . idTrans
+
 -- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not found,
 -- the AST is not changed.
+--
+-- This could be improved by instead of only using the last assignment to the
+-- wire that one finds, to use the assignment to the wire before the current
+-- expression. This would require a different approach though.
 nestId :: Identifier -> ModuleDecl -> ModuleDecl
 nestId id mod
-  | not $ inPort id mod = mod & get %~ trans
+  | not $ inPort id mod =
+      let expr = fromMaybe def . findAssign id $ mod ^. moduleItems
+      in mod & get %~ replace id expr
   | otherwise = mod
   where
     get = moduleItems . traverse . _Assign . contAssignExpr
-    trans = transformOf traverseExpr . idTrans id . PrimExpr . PrimId $ Identifier "RANDOM"
+    def = PrimExpr $ PrimId id
 
+-- | Replaces an identifier by a expression in all the module declaration.
 nestSource :: Identifier -> SourceText -> SourceText
 nestSource id src =
   src & getSourceText . traverse . getDescription %~ nestId id
