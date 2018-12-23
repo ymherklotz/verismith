@@ -57,3 +57,5 @@ test-suite verifuzz-test
                      , tasty >= 0.7
                      , tasty-hunit >= 0.10
                      , tasty-quickcheck >= 0.10
+                     , lens
+                     , text

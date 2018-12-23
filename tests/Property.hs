@@ -9,7 +9,7 @@ newtype TestGraph = TestGraph { getGraph :: Gr Gate () }
                   deriving (Show)
 
 instance QC.Arbitrary TestGraph where
-  arbitrary = TestGraph <$> randomDAG 100
+  arbitrary = TestGraph <$> randomDAG 30
 
 simpleGraph = QC.testProperty "simple graph generation" $
   \graph -> simp (graph :: TestGraph)
