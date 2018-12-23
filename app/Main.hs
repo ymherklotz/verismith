@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import qualified Data.Graph.Inductive              as G
@@ -18,4 +20,4 @@ main = do
 --  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png",
 --  T.putStrLn $ generate gr
   --g <- QC.generate (QC.arbitrary :: QC.Gen SourceText)
-  render . genSourceText . generateAST $ Circuit gr
+  render . genSourceText . nestSource (Identifier "w96") . generateAST $ Circuit gr

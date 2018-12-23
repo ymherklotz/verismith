@@ -11,6 +11,8 @@ Functions to mutate the Verilog AST from "Test.VeriFuzz.VerilogAST" to generate
 more random patterns, such as nesting wires instead of creating new ones.
 -}
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module Test.VeriFuzz.Mutate where
 
 import           Control.Lens
@@ -32,9 +34,22 @@ findAssign id items =
       | ca ^. contAssignNetLVal == id = Just $ ca ^. contAssignExpr
       | otherwise = Nothing
 
+idTrans :: Identifier -> Expression -> Expression -> Expression
+idTrans i expr (PrimExpr (PrimId id))
+  | id == i = expr
+  | otherwise = (PrimExpr (PrimId id))
+idTrans _ _ e = e
+
 -- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not found,
 -- the AST is not changed.
 nestId :: Identifier -> ModuleDecl -> ModuleDecl
 nestId id mod
-  | not $ inPort id mod = mod
+  | not $ inPort id mod = mod & get %~ trans
   | otherwise = mod
+  where
+    get = moduleItems . traverse . _Assign . contAssignExpr
+    trans = transformOf traverseExpr . idTrans id . PrimExpr . PrimId $ Identifier "RANDOM"
+
+nestSource :: Identifier -> SourceText -> SourceText
+nestSource id src =
+  src & getSourceText . traverse . getDescription %~ nestId id
