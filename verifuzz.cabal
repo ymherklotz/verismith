@@ -22,6 +22,7 @@ library
                      , Test.VeriFuzz.Circuit
                      , Test.VeriFuzz.CodeGen
                      , Test.VeriFuzz.Mutate
+                     , Test.VeriFuzz.Helpers
                      , Test.VeriFuzz.Graph.ASTGen
                      , Test.VeriFuzz.Graph.CodeGen
                      , Test.VeriFuzz.Graph.Random
