@@ -17,22 +17,24 @@ module Test.VeriFuzz.Mutate where
 
 import           Control.Lens
 import           Data.Maybe                    (catMaybes, fromMaybe)
+import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.VerilogAST
 
--- | Return if the 'Identifier' is in a 'ModuleDecl'.
-inPort :: Identifier -> ModuleDecl -> Bool
+-- | Return if the 'Identifier' is in a 'ModDecl'.
+inPort :: Identifier -> ModDecl -> Bool
 inPort id mod = any (\a -> a ^. portName == id) $ mod ^. modPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
-findAssign :: Identifier -> [ModuleItem] -> Maybe Expression
+findAssign :: Identifier -> [ModItem] -> Maybe Expression
 findAssign id items =
   safe last . catMaybes $ isAssign <$> items
   where
-    isAssign (Assign ca)
-      | ca ^. contAssignNetLVal == id = Just $ ca ^. contAssignExpr
+    isAssign (ModCA (ContAssign val expr))
+      | val == id = Just $ expr
       | otherwise = Nothing
+    isAssign _ = Nothing
 
 -- | Transforms an expression by replacing an Identifier with an
 -- expression. This is used inside 'transformOf' and 'traverseExpr' to replace
@@ -53,17 +55,21 @@ replace = (transformOf traverseExpr .) . idTrans
 -- This could be improved by instead of only using the last assignment to the
 -- wire that one finds, to use the assignment to the wire before the current
 -- expression. This would require a different approach though.
-nestId :: Identifier -> ModuleDecl -> ModuleDecl
+nestId :: Identifier -> ModDecl -> ModDecl
 nestId id mod
   | not $ inPort id mod =
       let expr = fromMaybe def . findAssign id $ mod ^. moduleItems
       in mod & get %~ replace id expr
   | otherwise = mod
   where
-    get = moduleItems . traverse . _Assign . contAssignExpr
+    get = moduleItems . traverse . _ModCA . contAssignExpr
     def = PrimExpr $ PrimId id
 
 -- | Replaces an identifier by a expression in all the module declaration.
 nestSource :: Identifier -> SourceText -> SourceText
 nestSource id src =
   src & getSourceText . traverse . getDescription %~ nestId id
+
+nestUpTo :: Int -> SourceText -> SourceText
+nestUpTo i src =
+  foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
