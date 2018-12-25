@@ -16,7 +16,7 @@ import           Data.Graph.Inductive (Graph, Node)
 import qualified Data.Graph.Inductive as G
 import qualified Data.Text            as T
 
-fromNode :: Node -> T.Text
+fromNode :: Int -> T.Text
 fromNode node = T.pack $ "w" <> show node
 
 filterGr :: (Graph gr) => gr n e -> (Node -> Bool) -> [Node]
