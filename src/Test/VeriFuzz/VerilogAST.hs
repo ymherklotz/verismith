@@ -17,6 +17,7 @@ module Test.VeriFuzz.VerilogAST where
 
 import           Control.Lens
 import qualified Data.Graph.Inductive       as G
+import           Data.String
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Test.QuickCheck            as QC
@@ -34,15 +35,75 @@ data Number = Number { _numSize :: Int
                      , _numVal  :: Int
                      } deriving (Show, Eq, Ord)
 
+newtype Delay = Delay { _delay :: Int }
+                deriving (Show, Eq, Ord)
+
+data Event = EId Identifier
+           | EExpr Expression
+           | EAll
+           deriving (Show, Eq, Ord)
+
+data Net = Wire
+         | Tri
+         | Tri1
+         | Supply0
+         | Wand
+         | TriAnd
+         | Tri0
+         | Supply1
+         | Wor
+         | Trior
+         deriving (Show, Eq, Ord)
+
+data RegLVal = RegId Identifier
+             | RegExpr { _regExprId :: Identifier
+                       , _regExpr   :: Expression
+                       }
+             | RegSize { _regSizeId  :: Identifier
+                       , _regSizeMSB :: ConstExpr
+                       , _regSizeLSB :: ConstExpr
+                       }
+             deriving (Show, Eq, Ord)
+
 -- | Binary operators that are currently supported in the verilog generation.
-data BinaryOperator = BinAnd -- ^ Binary And (&).
-                    | BinOr  -- ^ Binary Or (|).
-                    | BinXor -- ^ Binary Xor (^).
+data BinaryOperator = BinPlus    -- ^ @+@
+                    | BinMinus   -- ^ @-@
+                    | BinTimes   -- ^ @*@
+                    | BinDiv     -- ^ @/@
+                    | BinMod     -- ^ @%@
+                    | BinEq      -- ^ @==@
+                    | BinNEq     -- ^ @!=@
+                    | BinCEq     -- ^ @===@
+                    | BinCNEq    -- ^ @!==@
+                    | BinLAnd    -- ^ @&&@
+                    | BinLOr     -- ^ @||@
+                    | BinLT      -- ^ @<@
+                    | BinLEq     -- ^ @<=@
+                    | BinGT      -- ^ @>@
+                    | BinGEq     -- ^ @>=@
+                    | BinAnd     -- ^ @&@
+                    | BinOr      -- ^ @|@
+                    | BinXor     -- ^ @^@
+                    | BinXNor    -- ^ @^~@
+                    | BinXNorInv -- ^ @~^@
+                    | BinPower   -- ^ @**@
+                    | BinLSL     -- ^ @<<@
+                    | BinLSR     -- ^ @>>@
+                    | BinASL     -- ^ @<<<@
+                    | BinASR     -- ^ @>>>@
                     deriving (Show, Eq, Ord)
 
 -- | Unary operators that are currently supported by the generator.
-data UnaryOperator = UnNot   -- ^ Not (!).
-                   | UnMinus -- ^ Minus (-).
+data UnaryOperator = UnPlus    -- ^ @+@
+                   | UnMinus   -- ^ @-@
+                   | UnNot     -- ^ @!@
+                   | UnAnd     -- ^ @&@
+                   | UnNand    -- ^ @~&@
+                   | UnOr      -- ^ @|@
+                   | UnNor     -- ^ @~|@
+                   | UnXor     -- ^ @^@
+                   | UnNxor    -- ^ @~^@
+                   | UnNxorInv -- ^ @^~@
                    deriving (Show, Eq, Ord)
 
 -- | A primary expression which can either be a number or an identifier.
@@ -64,12 +125,11 @@ data Expression = PrimExpr Primary
                            , _exprTrue  :: Expression
                            , _exprFalse :: Expression
                            }
+                | ExprStr Text
                 deriving (Show, Eq, Ord)
 
--- | Continuous assignment which can be in the body of a statement.
-data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
-                             , _contAssignExpr    :: Expression
-                             } deriving (Show, Eq, Ord)
+newtype ConstExpr = ConstExpr { _constNum :: Int }
+                  deriving (Show, Eq, Ord)
 
 -- | Different port direction that are supported in Verilog.
 data PortDir = Input  -- ^ Input direction for port (@input@).
@@ -77,23 +137,66 @@ data PortDir = Input  -- ^ Input direction for port (@input@).
              | InOut  -- ^ Inout direction for port (@inout@).
              deriving (Show, Eq, Ord)
 
+data PortType = PortNet Net
+              | Reg { _regSigned :: Bool }
+              deriving (Show, Eq, Ord)
+
 -- | Port declaration.
-data Port = Port { _portDir  :: PortDir
+data Port = Port { _portDir  :: Maybe PortDir
+                 , _portType :: Maybe PortType
                  , _portName :: Identifier
                  } deriving (Show, Eq, Ord)
 
--- | Module item which is the body of the module expression.
-newtype ModuleItem = Assign ContAssign
-                   deriving (Show, Eq, Ord)
+newtype ModConn = ModConn { _modConn :: Expression }
+                deriving (Show, Eq, Ord)
 
--- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
-data ModuleDecl = ModuleDecl { _moduleId    :: Identifier
-                             , _modPorts    :: [Port]
-                             , _moduleItems :: [ModuleItem]
+data Assign = Assign { _assignReg   :: RegLVal
+                     , _assignDelay :: Maybe Delay
+                     , _assignExpr  :: Expression
+                     } deriving (Show, Eq, Ord)
+
+data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
+                             , _contAssignExpr    :: Expression
                              } deriving (Show, Eq, Ord)
 
+-- | Statements in Verilog.
+data Statement = TimeCtrl { _statDelay :: Delay
+                          , _statDStat :: Maybe Statement
+                          }                              -- ^ Time control (@#NUM@)
+               | EventCtrl { _statEvent :: Event
+                           , _statEStat :: Maybe Statement
+                           }
+               | SeqBlock { _statements :: [Statement] } -- ^ Sequential block (@begin ... end@)
+               | BlockAssign Assign                      -- ^ blocking assignment (@=@)
+               | NonBlockAssign Assign                   -- ^ Non blocking assignment (@<=@)
+               | StatCA ContAssign                       -- ^ Statement continuous assignment
+               | TaskEnable Task
+               | SysTaskEnable Task
+               deriving (Show, Eq, Ord)
+
+data Task = Task { _taskName :: Identifier
+                 , _taskExpr :: [Expression]
+                 } deriving (Show, Eq, Ord)
+
+-- | Module item which is the body of the module expression.
+data ModItem = ModCA ContAssign
+             | ModInst { _modInstId    :: Identifier
+                       , _modInstName  :: Identifier
+                       , _modInstConns :: [ModConn]
+                       }
+             | Initial Statement
+             | Always Statement
+             | Decl Port
+             deriving (Show, Eq, Ord)
+
+-- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
+data ModDecl = ModDecl { _moduleId    :: Identifier
+                       , _modPorts    :: [Port]
+                       , _moduleItems :: [ModItem]
+                       } deriving (Show, Eq, Ord)
+
 -- | Description of the Verilog module.
-newtype Description = Description { _getDescription :: ModuleDecl }
+newtype Description = Description { _getDescription :: ModDecl }
                     deriving (Show, Eq, Ord)
 
 -- | The complete sourcetext for the Verilog module.
@@ -109,6 +212,9 @@ instance QC.Arbitrary Identifier where
 instance QC.Arbitrary Number where
   arbitrary = Number <$> QC.suchThat QC.arbitrary (>0) <*> QC.arbitrary
 
+instance QC.Arbitrary Net where
+  arbitrary = QC.elements [Wire, Tri]
+
 instance QC.Arbitrary BinaryOperator where
   arbitrary = QC.elements [BinAnd, BinOr, BinXor]
 
@@ -121,22 +227,65 @@ instance QC.Arbitrary Primary where
 instance QC.Arbitrary PortDir where
   arbitrary = QC.elements [Input, Output, InOut]
 
+instance QC.Arbitrary PortType where
+  arbitrary = QC.oneof [PortNet <$> QC.arbitrary, Reg <$> QC.arbitrary]
+
 instance QC.Arbitrary Port where
-  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary
+  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+
+instance QC.Arbitrary Delay where
+  arbitrary = Delay <$> QC.arbitrary
+
+instance QC.Arbitrary Event where
+  arbitrary = EId <$> QC.arbitrary
+
+instance QC.Arbitrary ModConn where
+  arbitrary = ModConn <$> QC.arbitrary
+
+instance QC.Arbitrary ConstExpr where
+  arbitrary = ConstExpr <$> QC.arbitrary
+
+instance QC.Arbitrary RegLVal where
+  arbitrary = QC.oneof [ RegId <$> QC.arbitrary
+                       , RegExpr <$> QC.arbitrary <*> QC.arbitrary
+                       , RegSize <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+                       ]
+
+instance QC.Arbitrary Assign where
+  arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary Expression where
   arbitrary = QC.frequency [ (1, OpExpr <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary)
                            , (2, PrimExpr <$> QC.arbitrary)
                            ]
 
+instance QC.Arbitrary Statement where
+  arbitrary = QC.oneof [ TimeCtrl <$> QC.arbitrary <*> QC.arbitrary
+                       , EventCtrl <$> QC.arbitrary <*> QC.arbitrary
+                       , SeqBlock <$> QC.arbitrary
+                       , BlockAssign <$> QC.arbitrary
+                       , NonBlockAssign <$> QC.arbitrary
+                       , StatCA <$> QC.arbitrary
+                       , TaskEnable <$> QC.arbitrary
+                       , SysTaskEnable <$> QC.arbitrary
+                       ]
+
 instance QC.Arbitrary ContAssign where
   arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
 
-instance QC.Arbitrary ModuleItem where
-  arbitrary = Assign <$> QC.arbitrary
+instance QC.Arbitrary Task where
+  arbitrary = Task <$> QC.arbitrary <*> QC.arbitrary
 
-instance QC.Arbitrary ModuleDecl where
-  arbitrary = ModuleDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+instance QC.Arbitrary ModItem where
+  arbitrary = QC.oneof [ ModCA <$> QC.arbitrary
+                       , ModInst <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+                       , Initial <$> QC.arbitrary
+                       , Always <$> QC.arbitrary
+                       , Decl <$> QC.arbitrary
+                       ]
+
+instance QC.Arbitrary ModDecl where
+  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary Description where
   arbitrary = Description <$> QC.arbitrary
@@ -158,8 +307,8 @@ makeLenses ''Identifier
 makeLenses ''Number
 makeLenses ''SourceText
 makeLenses ''Description
-makeLenses ''ModuleDecl
-makeLenses ''ModuleItem
+makeLenses ''ModDecl
+makeLenses ''ModItem
 makeLenses ''Port
 makeLenses ''PortDir
 makeLenses ''BinaryOperator
@@ -167,24 +316,15 @@ makeLenses ''UnaryOperator
 makeLenses ''Primary
 makeLenses ''Expression
 makeLenses ''ContAssign
+makeLenses ''PortType
+
+-- Make all the necessary prisms
 
 makePrisms ''Expression
-makePrisms ''ModuleItem
+makePrisms ''ModItem
+makePrisms ''ModConn
 
--- Helper functions for the AST
+-- Other Instances
 
--- | Create a number expression which will be stored in a primary expression.
-numExpr :: Int -> Int -> Expression
-numExpr = ((PrimExpr . PrimNum) .) . Number
-
--- | Create an empty module.
-emptyMod :: ModuleDecl
-emptyMod = ModuleDecl (Identifier "") [] []
-
--- | Set a module name for a module declaration.
-setModName :: Text -> ModuleDecl -> ModuleDecl
-setModName str = moduleId .~ Identifier str
-
--- | Add a port to the module declaration.
-addModPort :: Port -> ModuleDecl -> ModuleDecl
-addModPort port = modPorts %~ (:) port
+instance IsString Identifier where
+  fromString = Identifier . T.pack
