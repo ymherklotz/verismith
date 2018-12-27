@@ -11,8 +11,6 @@ This module generates the code from the Verilog AST defined in
 "Test.VeriFuzz.VerilogAST".
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Test.VeriFuzz.CodeGen where
 
 import           Control.Lens

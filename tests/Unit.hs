@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Unit (unitTests) where
 
 import           Control.Lens

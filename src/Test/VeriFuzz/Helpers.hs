@@ -10,8 +10,6 @@ Portability : POSIX
 Defaults and common functions.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Test.VeriFuzz.Helpers where
 
 import           Control.Lens

@@ -10,8 +10,6 @@ Portability : POSIX
 Generates the AST from the graph directly.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Test.VeriFuzz.Graph.ASTGen where
 
 import           Data.Graph.Inductive       (LNode, Node)

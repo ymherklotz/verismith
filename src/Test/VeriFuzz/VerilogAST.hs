@@ -10,8 +10,7 @@ Portability : POSIX
 Defines the types to build a Verilog AST.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Test.VeriFuzz.VerilogAST where
 

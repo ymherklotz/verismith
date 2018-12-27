@@ -10,8 +10,6 @@ Portability : POSIX
 Define the code generation directly from the random DAG.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Test.VeriFuzz.Graph.CodeGen
   ( generate
   ) where
