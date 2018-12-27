@@ -25,7 +25,7 @@ arbitraryEdge n = do
   z <- arbitrary
   return (x, y, z)
     where
-      with = suchThat . resize n $ arbitrary
+      with = suchThat $ resize n arbitrary
 
 -- | Gen instance for a random acyclic DAG.
 randomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
