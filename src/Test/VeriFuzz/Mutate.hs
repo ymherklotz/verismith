@@ -11,8 +11,6 @@ Functions to mutate the Verilog AST from "Test.VeriFuzz.VerilogAST" to generate
 more random patterns, such as nesting wires instead of creating new ones.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Test.VeriFuzz.Mutate where
 
 import           Control.Lens
@@ -70,6 +68,13 @@ nestSource :: Identifier -> SourceText -> SourceText
 nestSource id src =
   src & getSourceText . traverse . getDescription %~ nestId id
 
+-- | Nest variables in the format @w[0-9]*@ up to a certain number.
 nestUpTo :: Int -> SourceText -> SourceText
 nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
+
+-- | Add a Module Instantiation using 'ModInst' from the first module passed to
+-- it to the body of the second module.
+instantiateMod :: ModDecl -> ModDecl -> ModDecl
+instantiateMod mod main =
+  main
