@@ -27,7 +27,7 @@ showT :: (Show a) => a -> Text
 showT = T.pack . show
 
 defMap :: Maybe Statement -> Text
-defMap stat = fromMaybe ";" $ genStatement <$> stat
+defMap stat = fromMaybe ";\n" $ genStatement <$> stat
 
 -- | Convert the 'SourceText' type to 'Text' so that it can be rendered.
 genSourceText :: SourceText -> Text
@@ -55,10 +55,10 @@ genModuleDecl mod =
 -- | Generate the 'Port' description.
 genPort :: Port -> Text
 genPort port =
-  "  " <> dir <> " " <> t <> " " <> name
+  dir <> t <> name
   where
-    dir = fromMaybe "" $ genPortDir <$> port ^. portDir
-    t = fromMaybe "" $ genPortType <$> port ^. portType
+    dir = fromMaybe "" $ (<>" ") . genPortDir <$> port ^. portDir
+    t = fromMaybe "wire " $ (<>" ") . genPortType <$> port ^. portType
     name = port ^. portName . getIdentifier
 
 -- | Convert the 'PortDir' type to 'Text'.
@@ -72,8 +72,8 @@ genModuleItem :: ModItem -> Text
 genModuleItem (ModCA ca) = genContAssign ca
 genModuleItem (ModInst (Identifier id) (Identifier name) conn) =
   id <> " " <> name <> "(" <> sep ", " (genExpr . _modConn <$> conn) <> ")" <> ";\n"
-genModuleItem (Initial stat) = "initial\n" <> genStatement stat
-genModuleItem (Always stat) = "always\n" <> genStatement stat
+genModuleItem (Initial stat) = "initial " <> genStatement stat
+genModuleItem (Always stat) = "always " <> genStatement stat
 genModuleItem (Decl port) = genPort port <> ";\n"
 
 -- | Generate continuous assignment
@@ -92,13 +92,13 @@ genExpr (PrimExpr prim) = genPrimary prim
 genExpr (UnPrimExpr u e) =
   "(" <> genUnaryOperator u <> genPrimary e <> ")"
 genExpr (CondExpr l t f) =
-  "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f
+  "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
 genExpr (ExprStr t) = "\"" <> t <> "\""
 
 -- | Generate a 'PrimaryExpression' to 'Text'.
 genPrimary :: Primary -> Text
 genPrimary (PrimNum num) =
-  neg <> sh (num ^. numSize) <> "'d" <> (sh . abs) n
+  "(" <> neg <> sh (num ^. numSize) <> "'d" <> (sh . abs) n <> ")"
   where
     sh = T.pack . show
     abs x = if x <= 0 then -x else x
@@ -135,16 +135,16 @@ genBinaryOperator BinASL     = " <<< "
 genBinaryOperator BinASR     = " >>> "
 
 genUnaryOperator :: UnaryOperator -> Text
-genUnaryOperator UnPlus    = " + "
-genUnaryOperator UnMinus   = " - "
-genUnaryOperator UnNot     = " ! "
-genUnaryOperator UnAnd     = " & "
-genUnaryOperator UnNand    = " ~& "
-genUnaryOperator UnOr      = " | "
-genUnaryOperator UnNor     = " ~| "
-genUnaryOperator UnXor     = " ^ "
-genUnaryOperator UnNxor    = " ~^ "
-genUnaryOperator UnNxorInv = " ^~ "
+genUnaryOperator UnPlus    = "+"
+genUnaryOperator UnMinus   = "-"
+genUnaryOperator UnNot     = "!"
+genUnaryOperator UnAnd     = "&"
+genUnaryOperator UnNand    = "~&"
+genUnaryOperator UnOr      = "|"
+genUnaryOperator UnNor     = "~|"
+genUnaryOperator UnXor     = "^"
+genUnaryOperator UnNxor    = "~^"
+genUnaryOperator UnNxorInv = "^~"
 
 genNet :: Net -> Text
 genNet Wire    = "wire"
@@ -159,8 +159,8 @@ genNet Wor     = "wor"
 genNet Trior   = "trior"
 
 genEvent :: Event -> Text
-genEvent (EId id)     = "@" <> id ^. getIdentifier
-genEvent (EExpr expr) = "@" <> genExpr expr
+genEvent (EId id)     = "@(" <> id ^. getIdentifier <> ")"
+genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
 genEvent EAll         = "@*"
 
 genDelay :: Delay -> Text
