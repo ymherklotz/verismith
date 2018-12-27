@@ -47,5 +47,5 @@ runMain = do
 --  T.putStrLn $ generate gr
   --g <- QC.generate (QC.arbitrary :: QC.Gen SourceText)
   let x = generateAST $ Circuit gr
-  let y = head . reverse $ x ^.. getSourceText . traverse . getDescription . moduleItems . traverse . _ContAssign . contAssignExpr
+  let y = head . reverse $ x ^.. getSourceText . traverse . getDescription . moduleItems . traverse . _ModCA . contAssignExpr
   print $ transformOf traverseExpr trans y
