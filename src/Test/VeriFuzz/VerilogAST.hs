@@ -169,7 +169,7 @@ data Statement = TimeCtrl { _statDelay :: Delay
                | SeqBlock { _statements :: [Statement] } -- ^ Sequential block (@begin ... end@)
                | BlockAssign Assign                      -- ^ blocking assignment (@=@)
                | NonBlockAssign Assign                   -- ^ Non blocking assignment (@<=@)
-               | StatCA ContAssign                       -- ^ Statement continuous assignment
+               | StatCA ContAssign                       -- ^ Statement continuous assignment. May not be correct.
                | TaskEnable Task
                | SysTaskEnable Task
                deriving (Show, Eq, Ord)
@@ -205,6 +205,55 @@ newtype SourceText = SourceText { _getSourceText :: [Description] }
 
 -- Generate Arbitrary instances for the AST
 
+expr :: Int -> QC.Gen Expression
+expr 0 = QC.oneof
+  [ PrimExpr <$> QC.arbitrary
+  , UnPrimExpr <$> QC.arbitrary <*> QC.arbitrary
+  -- , ExprStr <$> QC.arbitrary
+  ]
+expr n
+  | n > 0 = QC.oneof
+    [ PrimExpr <$> QC.arbitrary
+    , UnPrimExpr <$> QC.arbitrary <*> QC.arbitrary
+    -- , ExprStr <$> QC.arbitrary
+    , OpExpr <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
+    , CondExpr <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+    ]
+  | otherwise = expr 0
+  where
+    subexpr y = expr (n `div` y)
+
+statement :: Int -> QC.Gen Statement
+statement 0 = QC.oneof
+  [ BlockAssign <$> QC.arbitrary
+  , NonBlockAssign <$> QC.arbitrary
+  -- , StatCA <$> QC.arbitrary
+  , TaskEnable <$> QC.arbitrary
+  , SysTaskEnable <$> QC.arbitrary
+  ]
+statement n
+  | n > 0 = QC.oneof
+    [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
+    , SeqBlock <$> QC.listOf1 (substat 4)
+    , BlockAssign <$> QC.arbitrary
+    , NonBlockAssign <$> QC.arbitrary
+    -- , StatCA <$> QC.arbitrary
+    , TaskEnable <$> QC.arbitrary
+    , SysTaskEnable <$> QC.arbitrary
+    ]
+  | otherwise = statement 0
+  where
+    substat y = statement (n `div` y)
+
+modPortGen :: QC.Gen Port
+modPortGen = QC.oneof
+  [ Port (Just Input) Nothing <$> QC.arbitrary
+  , Port (Just Output) <$> (Just . Reg <$> QC.arbitrary) <*> QC.arbitrary
+  ]
+
+instance QC.Arbitrary Text where
+  arbitrary = T.pack <$> QC.arbitrary
+
 instance QC.Arbitrary Identifier where
   arbitrary = Identifier . T.pack <$>
     (QC.shuffle (['a'..'z'] <> ['A'..'Z']) >>= QC.sublistOf)
@@ -213,13 +262,50 @@ instance QC.Arbitrary Number where
   arbitrary = Number <$> QC.suchThat QC.arbitrary (>0) <*> QC.arbitrary
 
 instance QC.Arbitrary Net where
-  arbitrary = QC.elements [Wire, Tri]
+  arbitrary = pure Wire
 
 instance QC.Arbitrary BinaryOperator where
-  arbitrary = QC.elements [BinAnd, BinOr, BinXor]
+  arbitrary = QC.elements
+    [ BinPlus
+    , BinMinus
+    , BinTimes
+    , BinDiv
+    , BinMod
+    , BinEq
+    , BinNEq
+    , BinCEq
+    , BinCNEq
+    , BinLAnd
+    , BinLOr
+    , BinLT
+    , BinLEq
+    , BinGT
+    , BinGEq
+    , BinAnd
+    , BinOr
+    , BinXor
+    , BinXNor
+    , BinXNorInv
+    , BinPower
+    , BinLSL
+    , BinLSR
+    , BinASL
+    , BinASR
+    ]
 
 instance QC.Arbitrary UnaryOperator where
-  arbitrary = QC.elements [UnNot, UnMinus]
+  arbitrary = QC.elements
+    [ UnPlus
+    , UnMinus
+    , UnNot
+    , UnAnd
+    , UnNand
+    , UnOr
+    , UnNor
+    , UnXor
+    , UnNxor
+    , UnNxorInv
+    ]
 
 instance QC.Arbitrary Primary where
   arbitrary = PrimNum <$> QC.arbitrary
@@ -231,10 +317,10 @@ instance QC.Arbitrary PortType where
   arbitrary = QC.oneof [PortNet <$> QC.arbitrary, Reg <$> QC.arbitrary]
 
 instance QC.Arbitrary Port where
-  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+  arbitrary = Port Nothing <$> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary Delay where
-  arbitrary = Delay <$> QC.arbitrary
+  arbitrary = Delay <$> QC.suchThat QC.arbitrary (\x -> x > 0)
 
 instance QC.Arbitrary Event where
   arbitrary = EId <$> QC.arbitrary
@@ -255,20 +341,10 @@ instance QC.Arbitrary Assign where
   arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary Expression where
-  arbitrary = QC.frequency [ (1, OpExpr <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary)
-                           , (2, PrimExpr <$> QC.arbitrary)
-                           ]
+  arbitrary = QC.sized expr
 
 instance QC.Arbitrary Statement where
-  arbitrary = QC.oneof [ TimeCtrl <$> QC.arbitrary <*> QC.arbitrary
-                       , EventCtrl <$> QC.arbitrary <*> QC.arbitrary
-                       , SeqBlock <$> QC.arbitrary
-                       , BlockAssign <$> QC.arbitrary
-                       , NonBlockAssign <$> QC.arbitrary
-                       , StatCA <$> QC.arbitrary
-                       , TaskEnable <$> QC.arbitrary
-                       , SysTaskEnable <$> QC.arbitrary
-                       ]
+  arbitrary = QC.sized statement
 
 instance QC.Arbitrary ContAssign where
   arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
@@ -280,12 +356,12 @@ instance QC.Arbitrary ModItem where
   arbitrary = QC.oneof [ ModCA <$> QC.arbitrary
                        , ModInst <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
                        , Initial <$> QC.arbitrary
-                       , Always <$> QC.arbitrary
+                       , Always <$> (EventCtrl <$> QC.arbitrary <*> QC.arbitrary)
                        , Decl <$> QC.arbitrary
                        ]
 
 instance QC.Arbitrary ModDecl where
-  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+  arbitrary = ModDecl <$> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary
 
 instance QC.Arbitrary Description where
   arbitrary = Description <$> QC.arbitrary
