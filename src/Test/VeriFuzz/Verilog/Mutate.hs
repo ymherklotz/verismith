@@ -1,9 +1,9 @@
 {-|
 Module      : Test.VeriFuzz.Verilog.Mutation
 Description : Functions to mutate the Verilog AST.
-Copyright   : (c) Yann Herklotz Grave 2018
-License     : GPL-3
-Maintainer  : ymherklotz@gmail.com
+Copyright   : (c) 2018-2019, Yann Herklotz Grave
+License     : BSD-3
+Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 

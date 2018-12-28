@@ -1,9 +1,9 @@
 {-|
 Module      : Test.VeriFuzz.Internal.Shared
 Description : Shared high level code used in the other modules internally.
-Copyright   : (c) Yann Herklotz Grave 2018
-License     : GPL-3
-Maintainer  : ymherklotz@gmail.com
+Copyright   : (c) 2018-2019, Yann Herklotz Grave
+License     : BSD-3
+Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 

@@ -1,9 +1,9 @@
 {-|
 Module      : Test.VeriFuzz.Graph.ASTGen
 Description : Generates the AST from the graph directly.
-Copyright   : (c) Yann Herklotz Grave 2018
-License     : GPL-3
-Maintainer  : ymherklotz@gmail.com
+Copyright   : (c) 2018-2019, Yann Herklotz Grave
+License     : BSD-3
+Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 
