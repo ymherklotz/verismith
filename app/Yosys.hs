@@ -12,6 +12,7 @@ Main Yosys runner
 
 module Main where
 
+import           Prelude hiding (FilePath)
 import           Shelly
 
 main :: IO ()
