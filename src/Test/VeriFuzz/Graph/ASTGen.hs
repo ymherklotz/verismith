@@ -18,7 +18,7 @@ import           Data.Maybe                 (catMaybes)
 import qualified Data.Text                  as T
 import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Internal.Gen
-import           Test.VeriFuzz.VerilogAST
+import           Test.VeriFuzz.Verilog.AST
 
 -- | Converts a 'Node' to an 'Identifier'.
 frNode :: Node -> Identifier
@@ -73,5 +73,5 @@ genModuleDeclAST c = ModDecl id ports items
     ports = genPortsAST c
     items = genAssignAST c
 
-generateAST :: Circuit -> SourceText
-generateAST c = SourceText [Description $ genModuleDeclAST c]
+generateAST :: Circuit -> VerilogSrc
+generateAST c = VerilogSrc [Description $ genModuleDeclAST c]

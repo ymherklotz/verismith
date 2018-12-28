@@ -20,19 +20,27 @@ library
                      , Test.VeriFuzz.Internal.Gen
   exposed-modules:     Test.VeriFuzz
                      , Test.VeriFuzz.Circuit
-                     , Test.VeriFuzz.CodeGen
-                     , Test.VeriFuzz.Mutate
-                     , Test.VeriFuzz.Helpers
                      , Test.VeriFuzz.Graph.ASTGen
                      , Test.VeriFuzz.Graph.CodeGen
                      , Test.VeriFuzz.Graph.Random
-                     , Test.VeriFuzz.VerilogAST
+                     , Test.VeriFuzz.Helpers
+                     , Test.VeriFuzz.Simulator
+                     , Test.VeriFuzz.Simulator.General
+                     , Test.VeriFuzz.Simulator.Icarus
+                     , Test.VeriFuzz.Simulator.Xst
+                     , Test.VeriFuzz.Simulator.Yosys
+                     , Test.VeriFuzz.Verilog
+                     , Test.VeriFuzz.Verilog.AST
+                     , Test.VeriFuzz.Verilog.CodeGen
+                     , Test.VeriFuzz.Verilog.Mutate
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck
                      , fgl
-                     , text
-                     , random
                      , lens
+                     , random
+                     , shakespeare
+                     , shelly
+                     , text
   extensions:          OverloadedStrings
 
 executable yosys

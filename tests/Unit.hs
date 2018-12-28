@@ -43,7 +43,7 @@ runMain = do
   gr <- genRandomDAG 100 :: IO (G.Gr Gate ())
 --  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png",
 --  T.putStrLn $ generate gr
-  --g <- QC.generate (QC.arbitrary :: QC.Gen SourceText)
+  --g <- QC.generate (QC.arbitrary :: QC.Gen VerilogSrc)
   let x = generateAST $ Circuit gr
-  let y = head . reverse $ x ^.. getSourceText . traverse . getDescription . moduleItems . traverse . _ModCA . contAssignExpr
+  let y = head . reverse $ x ^.. getVerilogSrc . traverse . getDescription . moduleItems . traverse . _ModCA . contAssignExpr
   print $ transformOf traverseExpr trans y

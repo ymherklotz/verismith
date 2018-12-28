@@ -13,9 +13,9 @@ Defaults and common functions.
 module Test.VeriFuzz.Helpers where
 
 import           Control.Lens
-import           Data.Text                (Text)
+import           Data.Text                 (Text)
 import qualified Data.Text
-import           Test.VeriFuzz.VerilogAST
+import           Test.VeriFuzz.Verilog.AST
 
 regDecl :: Text -> ModItem
 regDecl = Decl . Port Nothing (Just $ Reg False) . Identifier
@@ -42,8 +42,8 @@ setModName str = moduleId .~ Identifier str
 addModPort :: Port -> ModDecl -> ModDecl
 addModPort port = modPorts %~ (:) port
 
-addDescription :: Description -> SourceText -> SourceText
-addDescription desc = getSourceText %~ (:) desc
+addDescription :: Description -> VerilogSrc -> VerilogSrc
+addDescription desc = getVerilogSrc %~ (:) desc
 
 testBench :: ModDecl
 testBench =
@@ -69,5 +69,5 @@ testBench =
     ]
   ]
 
-addTestBench :: SourceText -> SourceText
+addTestBench :: VerilogSrc -> VerilogSrc
 addTestBench = addDescription $ Description testBench

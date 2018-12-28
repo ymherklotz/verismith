@@ -12,25 +12,22 @@ module Test.VeriFuzz
   (
     -- * Definitions
     module Test.VeriFuzz.Circuit
-    -- * Code Generation
-  , module Test.VeriFuzz.CodeGen
     -- * Verilog AST Data Types
-  , module Test.VeriFuzz.VerilogAST
-    -- * AST Mutation
-  , module Test.VeriFuzz.Mutate
+  , module Test.VeriFuzz.Verilog
     -- * Helpers
   , module Test.VeriFuzz.Helpers
     -- * Graphs
   , module Test.VeriFuzz.Graph.ASTGen
   , module Test.VeriFuzz.Graph.CodeGen
   , module Test.VeriFuzz.Graph.Random
+    -- * Simulator
+  , module Test.VeriFuzz.Simulator
   ) where
 
 import           Test.VeriFuzz.Circuit
-import           Test.VeriFuzz.CodeGen
 import           Test.VeriFuzz.Graph.ASTGen
 import           Test.VeriFuzz.Graph.CodeGen
 import           Test.VeriFuzz.Graph.Random
 import           Test.VeriFuzz.Helpers
-import           Test.VeriFuzz.Mutate
-import           Test.VeriFuzz.VerilogAST
+import           Test.VeriFuzz.Simulator
+import           Test.VeriFuzz.Verilog
