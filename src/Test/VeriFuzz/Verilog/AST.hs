@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.VerilogAST
+Module      : Test.VeriFuzz.Verilog.AST
 Description : Definition of the Verilog AST types.
 Copyright   : (c) Yann Herklotz Grave 2018
 License     : GPL-3
@@ -12,7 +12,7 @@ Defines the types to build a Verilog AST.
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module Test.VeriFuzz.VerilogAST where
+module Test.VeriFuzz.Verilog.AST where
 
 import           Control.Lens
 import qualified Data.Graph.Inductive       as G
@@ -22,6 +22,9 @@ import qualified Data.Text                  as T
 import qualified Test.QuickCheck            as QC
 import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Graph.Random
+
+class Source a where
+  genSource :: a -> Text
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -199,7 +202,7 @@ newtype Description = Description { _getDescription :: ModDecl }
                     deriving (Show, Eq, Ord)
 
 -- | The complete sourcetext for the Verilog module.
-newtype SourceText = SourceText { _getSourceText :: [Description] }
+newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
                    deriving (Show, Eq, Ord)
 
 -- Generate Arbitrary instances for the AST
@@ -365,8 +368,8 @@ instance QC.Arbitrary ModDecl where
 instance QC.Arbitrary Description where
   arbitrary = Description <$> QC.arbitrary
 
-instance QC.Arbitrary SourceText where
-  arbitrary = SourceText <$> QC.arbitrary
+instance QC.Arbitrary VerilogSrc where
+  arbitrary = VerilogSrc <$> QC.arbitrary
 
 -- Traversal Instance
 
@@ -380,7 +383,7 @@ traverseExpr f (CondExpr c l r)  = CondExpr <$> f c <*> f l <*> f r
 
 makeLenses ''Identifier
 makeLenses ''Number
-makeLenses ''SourceText
+makeLenses ''VerilogSrc
 makeLenses ''Description
 makeLenses ''ModDecl
 makeLenses ''ModItem

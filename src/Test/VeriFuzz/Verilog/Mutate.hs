@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Mutation
+Module      : Test.VeriFuzz.Verilog.Mutation
 Description : Functions to mutate the Verilog AST.
 Copyright   : (c) Yann Herklotz Grave 2018
 License     : GPL-3
@@ -7,17 +7,17 @@ Maintainer  : ymherklotz@gmail.com
 Stability   : experimental
 Portability : POSIX
 
-Functions to mutate the Verilog AST from "Test.VeriFuzz.VerilogAST" to generate
+Functions to mutate the Verilog AST from "Test.VeriFuzz.Verilog.AST" to generate
 more random patterns, such as nesting wires instead of creating new ones.
 -}
 
-module Test.VeriFuzz.Mutate where
+module Test.VeriFuzz.Verilog.Mutate where
 
 import           Control.Lens
 import           Data.Maybe                    (catMaybes, fromMaybe)
 import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.Internal.Shared
-import           Test.VeriFuzz.VerilogAST
+import           Test.VeriFuzz.Verilog.AST
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
@@ -64,12 +64,12 @@ nestId id mod
     def = PrimExpr $ PrimId id
 
 -- | Replaces an identifier by a expression in all the module declaration.
-nestSource :: Identifier -> SourceText -> SourceText
+nestSource :: Identifier -> VerilogSrc -> VerilogSrc
 nestSource id src =
-  src & getSourceText . traverse . getDescription %~ nestId id
+  src & getVerilogSrc . traverse . getDescription %~ nestId id
 
 -- | Nest variables in the format @w[0-9]*@ up to a certain number.
-nestUpTo :: Int -> SourceText -> SourceText
+nestUpTo :: Int -> VerilogSrc -> VerilogSrc
 nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
 

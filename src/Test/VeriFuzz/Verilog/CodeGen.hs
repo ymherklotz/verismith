@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.CodeGen
+Module      : Test.VeriFuzz.Verilog.CodeGen
 Description : Code generation for Verilog AST.
 Copyright   : (c) Yann Herklotz Grave 2018
 License     : GPL-3
@@ -8,10 +8,10 @@ Stability   : experimental
 Portability : POSIX
 
 This module generates the code from the Verilog AST defined in
-"Test.VeriFuzz.VerilogAST".
+"Test.VeriFuzz.Verilog.AST".
 -}
 
-module Test.VeriFuzz.CodeGen where
+module Test.VeriFuzz.Verilog.CodeGen where
 
 import           Control.Lens
 import           Data.Maybe                    (fromMaybe)
@@ -19,7 +19,7 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import           Test.VeriFuzz.Internal.Shared
-import           Test.VeriFuzz.VerilogAST
+import           Test.VeriFuzz.Verilog.AST
 
 showT :: (Show a) => a -> Text
 showT = T.pack . show
@@ -27,10 +27,10 @@ showT = T.pack . show
 defMap :: Maybe Statement -> Text
 defMap stat = fromMaybe ";\n" $ genStatement <$> stat
 
--- | Convert the 'SourceText' type to 'Text' so that it can be rendered.
-genSourceText :: SourceText -> Text
-genSourceText source =
-  fromList $ genDescription <$> source ^. getSourceText
+-- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
+genVerilogSrc :: VerilogSrc -> Text
+genVerilogSrc source =
+  fromList $ genDescription <$> source ^. getVerilogSrc
 
 -- | Generate the 'Description' to 'Text'.
 genDescription :: Description -> Text
@@ -205,3 +205,59 @@ genTask (Task name expr)
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: Text -> IO ()
 render = T.putStrLn
+
+-- Instances
+
+instance Source Task where
+  genSource = genTask
+
+instance Source Statement where
+  genSource = genStatement
+
+instance Source PortType where
+  genSource = genPortType
+
+instance Source ConstExpr where
+  genSource = genConstExpr
+
+instance Source RegLVal where
+  genSource = genRegLVal
+
+instance Source Delay where
+  genSource = genDelay
+
+instance Source Event where
+  genSource = genEvent
+
+instance Source Net where
+  genSource = genNet
+
+instance Source UnaryOperator where
+  genSource = genUnaryOperator
+
+instance Source Primary where
+  genSource = genPrimary
+
+instance Source Expression where
+  genSource = genExpr
+
+instance Source ContAssign where
+  genSource = genContAssign
+
+instance Source ModItem where
+  genSource = genModuleItem
+
+instance Source PortDir where
+  genSource = genPortDir
+
+instance Source Port where
+  genSource = genPort
+
+instance Source ModDecl where
+  genSource = genModuleDecl
+
+instance Source Description where
+  genSource = genDescription
+
+instance Source VerilogSrc where
+  genSource = genVerilogSrc
