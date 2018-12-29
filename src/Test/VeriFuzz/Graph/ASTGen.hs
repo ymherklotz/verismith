@@ -73,11 +73,11 @@ genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
     nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModDecl
-genModuleDeclAST c = ModDecl id Nothing ports items
+genModuleDeclAST c = ModDecl id output ports items
   where
     id = Identifier "gen_module"
     ports = genPortsAST inputsC c
-    outPut = safe head $ genPortsAST inputsC c
+    output = Just $ Port (PortNet Wire) "y"
     items = genAssignAST c
 
 generateAST :: Circuit -> VerilogSrc

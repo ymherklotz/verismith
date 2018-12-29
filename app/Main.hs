@@ -17,12 +17,12 @@ instance Gviz.Labellable Gate where
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
-  gr <- QC.generate $ QC.resize 100 (V.randomDAG :: QC.Gen (G.Gr Gate ()))
+  gr <- QC.generate $ rDups <$> QC.resize 15 (randomDAG :: QC.Gen (G.Gr Gate ()))
   let dot = Gviz.graphToDot Gviz.nonClusteredParams . G.emap (const "") $ gr
   _ <- Gviz.runGraphviz dot Gviz.Png "output.png"
   return ()
   -- T.putStrLn $ generate gr
   -- g <- QC.generate (QC.resize 5 (QC.arbitrary :: QC.Gen VerilogSrc))
-  -- render . genVerilogSrc . addTestBench . nestUpTo 20 . generateAST $ Circuit gr
+  render . genVerilogSrc . addTestBench . nestUpTo 5 . generateAST $ Circuit gr
 
   -- render . genVerilogSrc . addTestBench $ g
