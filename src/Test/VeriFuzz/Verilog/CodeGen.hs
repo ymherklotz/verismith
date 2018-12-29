@@ -47,7 +47,7 @@ genModuleDecl mod =
   where
     ports
       | noIn && noOut = ""
-      | otherwise = "(" <> out <> (sep ", " $ genModPort <$> mod ^. modInPorts) <> ")"
+      | otherwise = "(" <> out <> (sep_ ", " $ genModPort <$> mod ^. modInPorts) <> ")"
     modItems = fromList $ genModuleItem <$> mod ^. moduleItems
     noOut = isNothing $ mod ^. modOutPort
     noIn = null $ mod ^. modInPorts
