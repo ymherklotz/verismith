@@ -1,5 +1,4 @@
 sudo: false
-language: minimal
 
 # Caching so the next build will be fast too.
 cache:
