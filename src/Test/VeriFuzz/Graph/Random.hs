@@ -12,9 +12,10 @@ Define the random generation for the directed acyclic graph.
 
 module Test.VeriFuzz.Graph.Random where
 
-import           Data.Graph.Inductive (Graph, LEdge, mkGraph)
-import           Test.QuickCheck      (Arbitrary, Gen)
-import qualified Test.QuickCheck      as QC
+import           Data.Graph.Inductive              (Graph, LEdge, mkGraph)
+import           Data.Graph.Inductive.PatriciaTree (Gr)
+import           Test.QuickCheck                   (Arbitrary, Gen)
+import qualified Test.QuickCheck                   as QC
 
 -- | Gen instance to create an arbitrary edge, where the edges are limited by
 -- `n` that is passed to it.
@@ -28,19 +29,18 @@ arbitraryEdge n = do
       with = QC.suchThat $ QC.resize n QC.arbitrary
 
 -- | Gen instance for a random acyclic DAG.
-randomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
-          => Int          -- ^ The number of nodes
-          -> Gen (gr l e) -- ^ The generated graph. It uses Arbitrary to
+randomDAG :: (Arbitrary l, Arbitrary e)
+          => Gen (Gr l e) -- ^ The generated graph. It uses Arbitrary to
                           -- generate random instances of each node
-randomDAG n = do
+randomDAG = do
   list <- QC.infiniteListOf QC.arbitrary
-  l <- QC.infiniteListOf $ arbitraryEdge n
-  return . mkGraph (nodes list) $ take (10*n) l
+  l <- QC.infiniteListOf $ aE
+  QC.sized (\n -> return . mkGraph (nodes list n) $ take (10*n) l)
     where
-      nodes l = zip [0..n] $ take n l
+      nodes l n = zip [0..n] $ take n l
+      aE = QC.sized arbitraryEdge
 
 -- | Generate a random acyclic DAG with an IO instance.
-genRandomDAG :: (Arbitrary l, Arbitrary e, Graph gr)
-             => Int
-             -> IO (gr l e)
-genRandomDAG = QC.generate . randomDAG
+genRandomDAG :: (Arbitrary l, Arbitrary e)
+             => IO (Gr l e)
+genRandomDAG = QC.generate randomDAG
