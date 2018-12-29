@@ -25,6 +25,12 @@ sep :: (Monoid a) => a -> [a] -> a
 sep el l = fromMaybe mempty $
   (fromList . fmap (<>el) <$> safe init l) <> safe last l
 
+-- | Alternative sep which returns the pattern if the list is empty.
+sep_ :: (Monoid a) => a -> [a] -> a
+sep_ el l
+  | null l = mempty
+  | otherwise = el <> sep el l
+
 -- | Converts unsafe list functions in the Prelude to a safe version.
 safe :: ([a] -> b) -> [a] -> Maybe b
 safe _ [] = Nothing
