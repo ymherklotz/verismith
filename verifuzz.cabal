@@ -41,6 +41,8 @@ library
                      , shakespeare
                      , shelly
                      , text
+                     , bytestring
+                     , hashable
   extensions:          OverloadedStrings
 
 executable yosys
@@ -62,6 +64,8 @@ executable verifuzz
                      , fgl
                      , text
                      , QuickCheck
+                     , DRBG
+                     , bytestring
   extensions:          OverloadedStrings
 
 test-suite verifuzz-test

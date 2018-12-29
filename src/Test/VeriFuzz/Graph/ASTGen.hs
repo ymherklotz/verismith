@@ -12,15 +12,16 @@ Generates the AST from the graph directly.
 
 module Test.VeriFuzz.Graph.ASTGen where
 
-import           Data.Graph.Inductive       (LNode, Node)
-import qualified Data.Graph.Inductive       as G
-import           Data.Maybe                 (catMaybes)
-import qualified Data.Text                  as T
+import           Data.Graph.Inductive          (LNode, Node)
+import qualified Data.Graph.Inductive          as G
+import           Data.Maybe                    (catMaybes)
+import qualified Data.Text                     as T
 import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Internal.Gen
+import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
 
--- | Converts a 'Node' to an 'Identifier'.
+-- | Converts a 'CNode' to an 'Identifier'.
 frNode :: Node -> Identifier
 frNode = Identifier . fromNode
 
@@ -31,14 +32,19 @@ fromGate And = BinAnd
 fromGate Or  = BinOr
 fromGate Xor = BinXor
 
-genPortsAST :: Circuit -> [Port]
-genPortsAST c =
-  (port Input . frNode <$> inp) ++ (port Output . frNode <$> out)
+inputsC :: Circuit -> [Node]
+inputsC c =
+  inputs (getCircuit c)
+
+outputsC :: Circuit -> [Node]
+outputsC c =
+  outputs (getCircuit c)
+
+genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
+genPortsAST f c =
+  (port . frNode <$> f c)
   where
-    inp = inputs graph
-    out = outputs graph
-    graph = getCircuit c
-    port x = Port (Just x) Nothing
+    port = Port $ PortNet Wire
 
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
@@ -67,10 +73,11 @@ genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
     nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModDecl
-genModuleDeclAST c = ModDecl id ports items
+genModuleDeclAST c = ModDecl id Nothing ports items
   where
     id = Identifier "gen_module"
-    ports = genPortsAST c
+    ports = genPortsAST inputsC c
+    outPut = safe head $ genPortsAST inputsC c
     items = genAssignAST c
 
 generateAST :: Circuit -> VerilogSrc

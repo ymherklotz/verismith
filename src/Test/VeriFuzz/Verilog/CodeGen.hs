@@ -14,7 +14,7 @@ This module generates the code from the Verilog AST defined in
 module Test.VeriFuzz.Verilog.CodeGen where
 
 import           Control.Lens
-import           Data.Maybe                    (fromMaybe)
+import           Data.Maybe                    (fromMaybe, isNothing)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
@@ -46,24 +46,29 @@ genModuleDecl mod =
   <> "endmodule\n"
   where
     ports
-      | null $ mod ^. modPorts = ""
-      | otherwise = "(\n" <> (sep ",\n" $ genPort <$> mod ^. modPorts) <> "\n)"
+      | noIn && noOut = ""
+      | otherwise = "(" <> out <> (sep ", " $ genModPort <$> mod ^. modInPorts) <> ")"
     modItems = fromList $ genModuleItem <$> mod ^. moduleItems
+    noOut = isNothing $ mod ^. modOutPort
+    noIn = null $ mod ^. modInPorts
+    out = fromMaybe "" . safe head $ mod ^.. modOutPort . _Just . portName . getIdentifier
+
+genModPort :: Port -> Text
+genModPort port = port ^. portName . getIdentifier
 
 -- | Generate the 'Port' description.
 genPort :: Port -> Text
 genPort port =
-  dir <> t <> name
+  t <> name
   where
-    dir = fromMaybe "" $ (<>" ") . genPortDir <$> port ^. portDir
-    t = fromMaybe "wire " $ (<>" ") . genPortType <$> port ^. portType
+    t = (<>" ") . genPortType $ port ^. portType
     name = port ^. portName . getIdentifier
 
 -- | Convert the 'PortDir' type to 'Text'.
 genPortDir :: PortDir -> Text
-genPortDir Input  = "input"
-genPortDir Output = "output"
-genPortDir InOut  = "inout"
+genPortDir PortIn    = "input"
+genPortDir PortOut   = "output"
+genPortDir PortInOut = "inout"
 
 -- | Generate a 'ModItem'.
 genModuleItem :: ModItem -> Text

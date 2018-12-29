@@ -5,7 +5,7 @@ Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
-Portability : POSIX
+Poratbility : POSIX
 
 Defines the types to build a Verilog AST.
 -}
@@ -134,9 +134,9 @@ newtype ConstExpr = ConstExpr { _constNum :: Int }
                   deriving (Show, Eq, Ord)
 
 -- | Different port direction that are supported in Verilog.
-data PortDir = Input  -- ^ Input direction for port (@input@).
-             | Output -- ^ Output direction for port (@output@).
-             | InOut  -- ^ Inout direction for port (@inout@).
+data PortDir = PortIn    -- ^ Input direction for port (@input@).
+             | PortOut   -- ^ Output direction for port (@output@).
+             | PortInOut -- ^ Inout direction for port (@inout@).
              deriving (Show, Eq, Ord)
 
 data PortType = PortNet Net
@@ -144,8 +144,7 @@ data PortType = PortNet Net
               deriving (Show, Eq, Ord)
 
 -- | Port declaration.
-data Port = Port { _portDir  :: Maybe PortDir
-                 , _portType :: Maybe PortType
+data Port = Port { _portType :: PortType
                  , _portName :: Identifier
                  } deriving (Show, Eq, Ord)
 
@@ -193,7 +192,8 @@ data ModItem = ModCA ContAssign
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _moduleId    :: Identifier
-                       , _modPorts    :: [Port]
+                       , _modOutPort  :: Maybe Port
+                       , _modInPorts  :: [Port]
                        , _moduleItems :: [ModItem]
                        } deriving (Show, Eq, Ord)
 
@@ -249,8 +249,8 @@ statement n
 
 modPortGen :: QC.Gen Port
 modPortGen = QC.oneof
-  [ Port (Just Input) Nothing <$> QC.arbitrary
-  , Port (Just Output) <$> (Just . Reg <$> QC.arbitrary) <*> QC.arbitrary
+  [ Port (PortNet Wire) <$> QC.arbitrary
+  , Port <$> (Reg <$> QC.arbitrary) <*> QC.arbitrary
   ]
 
 instance QC.Arbitrary Text where
@@ -313,13 +313,13 @@ instance QC.Arbitrary Primary where
   arbitrary = PrimNum <$> QC.arbitrary
 
 instance QC.Arbitrary PortDir where
-  arbitrary = QC.elements [Input, Output, InOut]
+  arbitrary = QC.elements [PortIn, PortOut, PortInOut]
 
 instance QC.Arbitrary PortType where
   arbitrary = QC.oneof [PortNet <$> QC.arbitrary, Reg <$> QC.arbitrary]
 
 instance QC.Arbitrary Port where
-  arbitrary = Port Nothing <$> QC.arbitrary <*> QC.arbitrary
+  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary Delay where
   arbitrary = Delay <$> QC.suchThat QC.arbitrary (\x -> x > 0)
@@ -331,7 +331,7 @@ instance QC.Arbitrary ModConn where
   arbitrary = ModConn <$> QC.arbitrary
 
 instance QC.Arbitrary ConstExpr where
-  arbitrary = ConstExpr <$> QC.arbitrary
+  arbitrary = ConstExpr <$> QC.suchThat QC.arbitrary (\x -> x > 0)
 
 instance QC.Arbitrary RegLVal where
   arbitrary = QC.oneof [ RegId <$> QC.arbitrary
@@ -363,7 +363,8 @@ instance QC.Arbitrary ModItem where
                        ]
 
 instance QC.Arbitrary ModDecl where
-  arbitrary = ModDecl <$> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary
+  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary
+              <*> QC.listOf1 modPortGen <*> QC.arbitrary
 
 instance QC.Arbitrary Description where
   arbitrary = Description <$> QC.arbitrary

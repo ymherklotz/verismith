@@ -21,7 +21,11 @@ import           Test.VeriFuzz.Verilog.AST
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
-inPort id mod = any (\a -> a ^. portName == id) $ mod ^. modPorts
+inPort id mod = inInput || inOutput
+  where
+    inInput = any (\a -> a ^. portName == id) $ mod ^. modInPorts
+    inOutput = fromMaybe False . safe head $ (==id) <$>
+      mod ^.. modOutPort . _Just . portName
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.

@@ -18,10 +18,10 @@ import qualified Data.Text
 import           Test.VeriFuzz.Verilog.AST
 
 regDecl :: Text -> ModItem
-regDecl = Decl . Port Nothing (Just $ Reg False) . Identifier
+regDecl = Decl . Port (Reg False) . Identifier
 
 wireDecl :: Text -> ModItem
-wireDecl = Decl . Port Nothing (Just $ PortNet Wire) . Identifier
+wireDecl = Decl . Port (PortNet Wire) . Identifier
 
 modConn :: Text -> ModConn
 modConn = ModConn . PrimExpr . PrimId . Identifier
@@ -32,22 +32,22 @@ numExpr = ((PrimExpr . PrimNum) .) . Number
 
 -- | Create an empty module.
 emptyMod :: ModDecl
-emptyMod = ModDecl (Identifier "") [] []
+emptyMod = ModDecl "" Nothing [] []
 
 -- | Set a module name for a module declaration.
 setModName :: Text -> ModDecl -> ModDecl
 setModName str = moduleId .~ Identifier str
 
--- | Add a port to the module declaration.
+-- | Add a input port to the module declaration.
 addModPort :: Port -> ModDecl -> ModDecl
-addModPort port = modPorts %~ (:) port
+addModPort port = modInPorts %~ (:) port
 
 addDescription :: Description -> VerilogSrc -> VerilogSrc
 addDescription desc = getVerilogSrc %~ (:) desc
 
 testBench :: ModDecl
 testBench =
-  ModDecl "main" []
+  ModDecl "main" Nothing []
   [ regDecl "a"
   , regDecl "b"
   , wireDecl "c"
