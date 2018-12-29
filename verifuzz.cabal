@@ -23,6 +23,7 @@ library
                      , Test.VeriFuzz.Graph.ASTGen
                      , Test.VeriFuzz.Graph.CodeGen
                      , Test.VeriFuzz.Graph.Random
+                     , Test.VeriFuzz.Graph.RandomAlt
                      , Test.VeriFuzz.Helpers
                      , Test.VeriFuzz.Simulator
                      , Test.VeriFuzz.Simulator.General
@@ -34,8 +35,9 @@ library
                      , Test.VeriFuzz.Verilog.CodeGen
                      , Test.VeriFuzz.Verilog.Mutate
   build-depends:       base >= 4.7 && < 5
-                     , QuickCheck
+                     , QuickCheck >=2.3 && <2.10
                      , fgl
+                     , fgl-arbitrary
                      , lens
                      , random
                      , shakespeare
@@ -43,7 +45,7 @@ library
                      , text
                      , bytestring
                      , hashable
-  extensions:          OverloadedStrings
+  default-extensions:  OverloadedStrings
 
 executable yosys
   main-is:             app/Yosys.hs
@@ -53,7 +55,7 @@ executable yosys
                      , text
                      , shakespeare
                      , shelly
-  extensions:          OverloadedStrings
+  default-extensions:  OverloadedStrings
 
 executable verifuzz
   main-is:             app/Main.hs
@@ -62,11 +64,12 @@ executable verifuzz
                      , verifuzz
                      , graphviz
                      , fgl
+                     , fgl-arbitrary
                      , text
                      , QuickCheck
                      , DRBG
                      , bytestring
-  extensions:          OverloadedStrings
+  default-extensions:  OverloadedStrings
 
 test-suite verifuzz-test
   default-language:    Haskell2010
@@ -83,4 +86,4 @@ test-suite verifuzz-test
                      , tasty-quickcheck >= 0.10
                      , lens
                      , text
-  extensions:          OverloadedStrings
+  default-extensions:  OverloadedStrings

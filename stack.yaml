@@ -1,5 +1,7 @@
 flags: {}
 packages:
-- .
-extra-deps: []
+  - .
+extra-deps:
+  - QuickCheck-2.9.2@sha256:93cebf9f9c55e8a941bd3166272680d67b80d9b5d95bd836765e3d4a4ef278d0
+  - fgl-arbitrary-0.2.0.3@sha256:d80598d16963ba151bf5dfaed5cfb8bb1cf441ce9b60bccce82367cc575c1622
 resolver: lts-12.20
