@@ -1,10 +1,11 @@
 module Property (propertyTests) where
 
-import           Data.Graph.Inductive
+import qualified Data.Graph.Inductive              as G
+import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Test.Tasty
-import qualified Test.Tasty.QuickCheck         as QC
+import qualified Test.Tasty.QuickCheck             as QC
 import           Test.VeriFuzz
-import qualified Test.VeriFuzz.Graph.RandomAlt as V
+import qualified Test.VeriFuzz.Graph.RandomAlt     as V
 
 newtype TestGraph = TestGraph { getGraph :: Gr Gate () }
                   deriving (Show)
@@ -20,11 +21,11 @@ instance QC.Arbitrary AltTestGraph where
 
 simpleGraph = QC.testProperty "simple graph generation check" $
   \graph -> simp graph
-  where simp = isSimple . getGraph
+  where simp = G.isSimple . getGraph
 
 simpleAltGraph = QC.testProperty "simple alternative graph generation check" $
   \graph -> simp graph
-  where simp = isSimple . getAltGraph
+  where simp = G.isSimple . getAltGraph
 
 propertyTests :: TestTree
 propertyTests = testGroup "Property Tests"
