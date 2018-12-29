@@ -14,6 +14,8 @@ Icarus verilog module.
 
 module Test.VeriFuzz.Simulator.Icarus where
 
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as B
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Prelude                         hiding (FilePath)
@@ -31,5 +33,5 @@ instance Simulator Icarus where
 instance Simulate Icarus where
   runSim = runSimIcarus
 
-runSimIcarus :: Icarus -> ModDecl -> [Int] -> Sh Int
+runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh Int
 runSimIcarus sim mod inp = return 0

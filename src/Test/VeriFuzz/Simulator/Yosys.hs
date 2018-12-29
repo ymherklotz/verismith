@@ -14,6 +14,8 @@ Yosys simulator implementation.
 
 module Test.VeriFuzz.Simulator.Yosys where
 
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as B
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Prelude                         hiding (FilePath)
@@ -44,7 +46,7 @@ writeSimFile sim mod file = do
 rename mod mod_rtl
 |]
 
-runSimYosys :: Yosys -> ModDecl -> [Int] -> Sh Int
+runSimYosys :: Yosys -> ModDecl -> [ByteString] -> Sh Int
 runSimYosys sim ver tb = return 0
 
 runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
