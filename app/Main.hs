@@ -12,12 +12,12 @@ instance Gviz.Labellable Gate where
   toLabelValue gate = Gviz.StrLabel . T.pack $ show gate
 
 main :: IO ()
---main = sample (arbitrary :: Gen (Circuit Input))
+ --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
-  --gr <- genRandomDAG 100 :: IO (G.Gr Gate ())
---  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png",
---  T.putStrLn $ generate gr
-  g <- QC.generate (QC.arbitrary :: QC.Gen VerilogSrc)
-  --render . genVerilogSrc . addTestBench . nestUpTo 20 . generateAST $ Circuit gr
+ --gr <- genRandomDAG 100 :: IO (G.Gr Gate ())
+ --  _ <- runGraphviz (graphToDot quickParams $ emap (const "") gr) Png "output.png",
+ --  T.putStrLn $ generate gr
+  g <- QC.generate (QC.resize 5 (QC.arbitrary :: QC.Gen VerilogSrc))
+ --render . genVerilogSrc . addTestBench . nestUpTo 20 . generateAST $ Circuit gr
 
   render . genVerilogSrc . addTestBench $ g

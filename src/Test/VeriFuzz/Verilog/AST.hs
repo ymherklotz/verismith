@@ -15,6 +15,7 @@ Defines the types to build a Verilog AST.
 module Test.VeriFuzz.Verilog.AST where
 
 import           Control.Lens
+import           Control.Monad              (replicateM)
 import qualified Data.Graph.Inductive       as G
 import           Data.String
 import           Data.Text                  (Text)
@@ -257,8 +258,9 @@ instance QC.Arbitrary Text where
   arbitrary = T.pack <$> QC.arbitrary
 
 instance QC.Arbitrary Identifier where
-  arbitrary = Identifier . T.pack <$>
-    (QC.shuffle (['a'..'z'] <> ['A'..'Z']) >>= QC.sublistOf)
+  arbitrary = do
+    l <- QC.choose (2, 10)
+    Identifier . T.pack <$> replicateM l (QC.elements ['a'..'z'])
 
 instance QC.Arbitrary Number where
   arbitrary = Number <$> QC.suchThat QC.arbitrary (>0) <*> QC.arbitrary
