@@ -372,6 +372,11 @@ instance QC.Arbitrary Description where
 instance QC.Arbitrary VerilogSrc where
   arbitrary = VerilogSrc <$> QC.arbitrary
 
+-- Other Instances
+
+instance IsString Identifier where
+  fromString = Identifier . T.pack
+
 -- Traversal Instance
 
 traverseExpr :: Traversal' Expression Expression
@@ -402,8 +407,3 @@ makeLenses ''PortType
 makePrisms ''Expression
 makePrisms ''ModItem
 makePrisms ''ModConn
-
--- Other Instances
-
-instance IsString Identifier where
-  fromString = Identifier . T.pack
