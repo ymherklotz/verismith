@@ -1,6 +1,5 @@
-resolver: lts-12.20
+flags: {}
 packages:
-  - .
-extra-deps:
-  - graph-generators-0.1.3.0
-  - multiset-0.3.4.1
+- .
+extra-deps: []
+resolver: lts-12.20
