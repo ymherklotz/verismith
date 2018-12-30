@@ -47,11 +47,11 @@ genModuleDecl mod =
   where
     ports
       | noIn && noOut = ""
-      | otherwise = "(" <> out <> (sep_ ", " $ genModPort <$> mod ^. modInPorts) <> ")"
+      | otherwise = "(" <> (sep_ ", " $ genModPort <$> outIn) <> ")"
     modItems = fromList $ genModuleItem <$> mod ^. moduleItems
-    noOut = isNothing $ mod ^. modOutPort
+    noOut = null $ mod ^. modOutPorts
     noIn = null $ mod ^. modInPorts
-    out = fromMaybe "" . safe head $ mod ^.. modOutPort . _Just . portName . getIdentifier
+    outIn = (mod ^. modOutPorts) ++ (mod ^. modInPorts)
 
 genModPort :: Port -> Text
 genModPort port = port ^. portName . getIdentifier

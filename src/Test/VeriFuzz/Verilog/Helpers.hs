@@ -32,7 +32,7 @@ numExpr = ((PrimExpr . PrimNum) .) . Number
 
 -- | Create an empty module.
 emptyMod :: ModDecl
-emptyMod = ModDecl "" Nothing [] []
+emptyMod = ModDecl "" [] [] []
 
 -- | Set a module name for a module declaration.
 setModName :: Text -> ModDecl -> ModDecl
@@ -47,7 +47,7 @@ addDescription desc = getVerilogSrc %~ (:) desc
 
 testBench :: ModDecl
 testBench =
-  ModDecl "main" Nothing []
+  ModDecl "main" [] []
   [ regDecl "a"
   , regDecl "b"
   , wireDecl "c"

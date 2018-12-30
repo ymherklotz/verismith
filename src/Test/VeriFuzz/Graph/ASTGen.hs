@@ -77,7 +77,7 @@ genModuleDeclAST c = ModDecl id output ports items
   where
     id = Identifier "gen_module"
     ports = genPortsAST inputsC c
-    output = Just $ Port (PortNet Wire) 1 "y"
+    output = [Port (PortNet Wire) 1 "y"]
     items = genAssignAST c
 
 generateAST :: Circuit -> VerilogSrc

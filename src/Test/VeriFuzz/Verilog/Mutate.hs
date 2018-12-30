@@ -21,11 +21,9 @@ import           Test.VeriFuzz.Verilog.AST
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
-inPort id mod = inInput || inOutput
+inPort id mod = inInput
   where
-    inInput = any (\a -> a ^. portName == id) $ mod ^. modInPorts
-    inOutput = fromMaybe False . safe head $ (==id) <$>
-      mod ^.. modOutPort . _Just . portName
+    inInput = any (\a -> a ^. portName == id) $ mod ^. modInPorts ++ mod ^. modOutPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
@@ -78,12 +76,17 @@ nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
 
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
--- it to the body of the second module.
+-- it to the body of the second module. It first has to make all the inputs into
+-- @reg@.
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod mod main =
-  main
+  main & moduleItems %~ ((out ++ regIn)++)
+  where
+    out = Decl <$> mod ^. modOutPorts
+    regIn = Decl <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
 
 -- | Initialise all the inputs and outputs to a module.
 initMod :: ModDecl -> ModDecl
-initMod mod =
-  mod
+initMod mod = mod & moduleItems %~ (inOut++)
+  where
+    inOut = Decl <$> (mod ^. modOutPorts) ++ (mod ^. modInPorts)
