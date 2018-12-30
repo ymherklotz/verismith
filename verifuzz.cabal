@@ -24,7 +24,6 @@ library
                      , Test.VeriFuzz.Graph.CodeGen
                      , Test.VeriFuzz.Graph.Random
                      , Test.VeriFuzz.Graph.RandomAlt
-                     , Test.VeriFuzz.Helpers
                      , Test.VeriFuzz.Simulator
                      , Test.VeriFuzz.Simulator.General
                      , Test.VeriFuzz.Simulator.Icarus
@@ -33,6 +32,7 @@ library
                      , Test.VeriFuzz.Verilog
                      , Test.VeriFuzz.Verilog.AST
                      , Test.VeriFuzz.Verilog.CodeGen
+                     , Test.VeriFuzz.Verilog.Helpers
                      , Test.VeriFuzz.Verilog.Mutate
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck >=2.3 && <2.10

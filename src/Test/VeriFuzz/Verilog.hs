@@ -17,8 +17,10 @@ module Test.VeriFuzz.Verilog
   , module Test.VeriFuzz.Verilog.CodeGen
     -- * Verilog mutations
   , module Test.VeriFuzz.Verilog.Mutate
+  , module Test.VeriFuzz.Verilog.Helpers
   ) where
 
 import           Test.VeriFuzz.Verilog.AST
 import           Test.VeriFuzz.Verilog.CodeGen
+import           Test.VeriFuzz.Verilog.Helpers
 import           Test.VeriFuzz.Verilog.Mutate

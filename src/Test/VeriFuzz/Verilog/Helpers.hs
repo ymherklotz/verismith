@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Default
+Module      : Test.VeriFuzz.VeriFuzz.Helpers
 Description : Defaults and common functions.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Defaults and common functions.
 -}
 
-module Test.VeriFuzz.Helpers where
+module Test.VeriFuzz.VeriFuzz.Helpers where
 
 import           Control.Lens
 import           Data.Text                 (Text)
@@ -71,3 +71,6 @@ testBench =
 
 addTestBench :: VerilogSrc -> VerilogSrc
 addTestBench = addDescription $ Description testBench
+
+defaultPort :: Identifier -> Port
+defaultPort = Port (PortNet Wire) 1

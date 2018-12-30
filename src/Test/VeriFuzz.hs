@@ -14,8 +14,6 @@ module Test.VeriFuzz
     module Test.VeriFuzz.Circuit
     -- * Verilog AST Data Types
   , module Test.VeriFuzz.Verilog
-    -- * Helpers
-  , module Test.VeriFuzz.Helpers
     -- * Graphs
   , module Test.VeriFuzz.Graph.ASTGen
   , module Test.VeriFuzz.Graph.CodeGen
@@ -28,6 +26,5 @@ import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Graph.ASTGen
 import           Test.VeriFuzz.Graph.CodeGen
 import           Test.VeriFuzz.Graph.Random
-import           Test.VeriFuzz.Helpers
 import           Test.VeriFuzz.Simulator
 import           Test.VeriFuzz.Verilog
