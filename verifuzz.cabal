@@ -45,6 +45,7 @@ library
                      , text
                      , bytestring
                      , hashable
+                     , DRBG
   default-extensions:  OverloadedStrings
 
 executable yosys
@@ -62,12 +63,11 @@ executable verifuzz
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
                      , verifuzz
-                     , graphviz
                      , fgl
                      , fgl-arbitrary
+                     , fgl-visualize
                      , text
                      , QuickCheck
-                     , DRBG
                      , bytestring
   default-extensions:  OverloadedStrings
 
