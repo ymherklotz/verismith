@@ -146,6 +146,7 @@ data PortType = PortNet Net
 
 -- | Port declaration.
 data Port = Port { _portType :: PortType
+                 , _portSize :: Int
                  , _portName :: Identifier
                  } deriving (Show, Eq, Ord)
 
@@ -208,6 +209,9 @@ newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
 
 -- Generate Arbitrary instances for the AST
 
+positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
+positiveArb = QC.suchThat QC.arbitrary (>0)
+
 expr :: Int -> QC.Gen Expression
 expr 0 = QC.oneof
   [ PrimExpr <$> QC.arbitrary
@@ -250,8 +254,8 @@ statement n
 
 modPortGen :: QC.Gen Port
 modPortGen = QC.oneof
-  [ Port (PortNet Wire) <$> QC.arbitrary
-  , Port <$> (Reg <$> QC.arbitrary) <*> QC.arbitrary
+  [ Port (PortNet Wire) <$> positiveArb <*> QC.arbitrary
+  , Port <$> (Reg <$> QC.arbitrary) <*> positiveArb <*> QC.arbitrary
   ]
 
 instance QC.Arbitrary Text where
@@ -263,7 +267,7 @@ instance QC.Arbitrary Identifier where
     Identifier . T.pack <$> replicateM l (QC.elements ['a'..'z'])
 
 instance QC.Arbitrary Number where
-  arbitrary = Number <$> QC.suchThat QC.arbitrary (>0) <*> QC.arbitrary
+  arbitrary = Number <$> positiveArb <*> QC.arbitrary
 
 instance QC.Arbitrary Net where
   arbitrary = pure Wire
@@ -321,10 +325,10 @@ instance QC.Arbitrary PortType where
   arbitrary = QC.oneof [PortNet <$> QC.arbitrary, Reg <$> QC.arbitrary]
 
 instance QC.Arbitrary Port where
-  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary
+  arbitrary = Port <$> QC.arbitrary <*> positiveArb <*> QC.arbitrary
 
 instance QC.Arbitrary Delay where
-  arbitrary = Delay <$> QC.suchThat QC.arbitrary (\x -> x > 0)
+  arbitrary = Delay <$> positiveArb
 
 instance QC.Arbitrary Event where
   arbitrary = EId <$> QC.arbitrary
@@ -333,7 +337,7 @@ instance QC.Arbitrary ModConn where
   arbitrary = ModConn <$> QC.arbitrary
 
 instance QC.Arbitrary ConstExpr where
-  arbitrary = ConstExpr <$> QC.suchThat QC.arbitrary (\x -> x > 0)
+  arbitrary = ConstExpr <$> positiveArb
 
 instance QC.Arbitrary RegLVal where
   arbitrary = QC.oneof [ RegId <$> QC.arbitrary

@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.VeriFuzz.Helpers
+Module      : Test.VeriFuzz.Verilog.Helpers
 Description : Defaults and common functions.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,18 +10,18 @@ Portability : POSIX
 Defaults and common functions.
 -}
 
-module Test.VeriFuzz.VeriFuzz.Helpers where
+module Test.VeriFuzz.Verilog.Helpers where
 
 import           Control.Lens
 import           Data.Text                 (Text)
 import qualified Data.Text
 import           Test.VeriFuzz.Verilog.AST
 
-regDecl :: Text -> ModItem
-regDecl = Decl . Port (Reg False) . Identifier
+regDecl :: Identifier -> ModItem
+regDecl = Decl . Port (Reg False) 1
 
-wireDecl :: Text -> ModItem
-wireDecl = Decl . Port (PortNet Wire) . Identifier
+wireDecl :: Identifier -> ModItem
+wireDecl = Decl . Port (PortNet Wire) 1
 
 modConn :: Text -> ModConn
 modConn = ModConn . PrimExpr . PrimId . Identifier

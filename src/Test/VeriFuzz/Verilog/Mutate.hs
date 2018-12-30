@@ -82,3 +82,8 @@ nestUpTo i src =
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod mod main =
   main
+
+-- | Initialise all the inputs and outputs to a module.
+initMod :: ModDecl -> ModDecl
+initMod mod =
+  mod

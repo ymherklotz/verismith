@@ -44,7 +44,7 @@ genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
 genPortsAST f c =
   (port . frNode <$> f c)
   where
-    port = Port $ PortNet Wire
+    port = Port (PortNet Wire) 1
 
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
@@ -77,7 +77,7 @@ genModuleDeclAST c = ModDecl id output ports items
   where
     id = Identifier "gen_module"
     ports = genPortsAST inputsC c
-    output = Just $ Port (PortNet Wire) "y"
+    output = Just $ Port (PortNet Wire) 1 "y"
     items = genAssignAST c
 
 generateAST :: Circuit -> VerilogSrc
