@@ -194,7 +194,7 @@ data ModItem = ModCA ContAssign
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _moduleId    :: Identifier
-                       , _modOutPort  :: Maybe Port
+                       , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
                        , _moduleItems :: [ModItem]
                        } deriving (Show, Eq, Ord)
