@@ -18,10 +18,10 @@ import qualified Data.Text
 import           Test.VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem
-regDecl = Decl . Port (Reg False) 1
+regDecl = Decl Nothing . Port (Reg False) 1
 
 wireDecl :: Identifier -> ModItem
-wireDecl = Decl . Port (PortNet Wire) 1
+wireDecl = Decl Nothing . Port (PortNet Wire) 1
 
 modConn :: Text -> ModConn
 modConn = ModConn . PrimExpr . PrimId . Identifier

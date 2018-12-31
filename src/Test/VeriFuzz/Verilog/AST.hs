@@ -189,7 +189,9 @@ data ModItem = ModCA ContAssign
                        }
              | Initial Statement
              | Always Statement
-             | Decl Port
+             | Decl { declDir  :: Maybe PortDir
+                    , declPort :: Port
+                    }
              deriving (Show, Eq, Ord)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
@@ -365,7 +367,7 @@ instance QC.Arbitrary ModItem where
                        , ModInst <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
                        , Initial <$> QC.arbitrary
                        , Always <$> (EventCtrl <$> QC.arbitrary <*> QC.arbitrary)
-                       , Decl <$> QC.arbitrary
+                       , Decl <$> pure Nothing <*> QC.arbitrary
                        ]
 
 instance QC.Arbitrary ModDecl where

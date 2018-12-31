@@ -20,6 +20,10 @@ import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
 import           Test.VeriFuzz.Verilog.CodeGen
 
+-- $setup
+-- >>> let mod = (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] [])
+-- >>> let main = (ModDecl "main" [] [] [])
+
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
 inPort id mod = inInput
@@ -80,7 +84,7 @@ nestUpTo i src =
 -- it to the body of the second module. It first has to make all the inputs into
 -- @reg@.
 --
--- >>> SrcShow $ instantiateMod (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] []) (ModDecl "main" [] [] [])
+-- >>> SrcShow $ instantiateMod mod main
 -- module main;
 -- wire [4:0] y;
 -- reg [4:0] x;
@@ -90,11 +94,19 @@ instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod mod main =
   main & moduleItems %~ ((out ++ regIn)++)
   where
-    out = Decl <$> mod ^. modOutPorts
-    regIn = Decl <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
+    out = Decl Nothing <$> mod ^. modOutPorts
+    regIn = Decl Nothing <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
 
 -- | Initialise all the inputs and outputs to a module.
+--
+-- >>> SrcShow $ initMod mod
+-- module m(y, x);
+-- output wire [4:0] y;
+-- input wire [4:0] x;
+-- endmodule
+-- <BLANKLINE>
 initMod :: ModDecl -> ModDecl
-initMod mod = mod & moduleItems %~ (inOut++)
+initMod mod = mod & moduleItems %~ ((out ++ inp)++)
   where
-    inOut = Decl <$> (mod ^. modOutPorts) ++ (mod ^. modInPorts)
+    out = Decl (Just PortOut) <$> (mod ^. modOutPorts)
+    inp = Decl (Just PortIn) <$> (mod ^. modInPorts)

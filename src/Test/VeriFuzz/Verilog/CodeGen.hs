@@ -47,7 +47,7 @@ genModuleDecl mod =
   where
     ports
       | noIn && noOut = ""
-      | otherwise = "(" <> (sep_ ", " $ genModPort <$> outIn) <> ")"
+      | otherwise = "(" <> (sep ", " $ genModPort <$> outIn) <> ")"
     modItems = fromList $ genModuleItem <$> mod ^. moduleItems
     noOut = null $ mod ^. modOutPorts
     noIn = null $ mod ^. modInPorts
@@ -80,7 +80,8 @@ genModuleItem (ModInst (Identifier id) (Identifier name) conn) =
   id <> " " <> name <> "(" <> sep ", " (genExpr . _modConn <$> conn) <> ")" <> ";\n"
 genModuleItem (Initial stat) = "initial " <> genStatement stat
 genModuleItem (Always stat) = "always " <> genStatement stat
-genModuleItem (Decl port) = genPort port <> ";\n"
+genModuleItem (Decl dir port) =
+  (fromMaybe "" $ ((<>" ") . genPortDir) <$> dir) <> genPort port <> ";\n"
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
