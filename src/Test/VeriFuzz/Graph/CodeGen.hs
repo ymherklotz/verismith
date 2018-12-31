@@ -14,10 +14,12 @@ module Test.VeriFuzz.Graph.CodeGen
   ( generate
   ) where
 
+import           Data.Foldable                 (fold)
 import           Data.Graph.Inductive          (Graph, LNode, Node, indeg,
                                                 labNodes, nodes, outdeg, pre)
 import           Data.Maybe                    (fromMaybe)
-import           Data.Text                     (Text, empty, pack)
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
 import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.Internal.Shared
@@ -37,7 +39,7 @@ lastEl n = fromNode <$> safe head n
 
 toStmnt :: (Graph gr) => gr Gate e -> LNode Gate -> Text
 toStmnt graph (n, g) =
-  fromMaybe empty $ Just "  assign " <> Just (fromNode n)
+  fromMaybe T.empty $ Just "  assign " <> Just (fromNode n)
   <> Just " = " <> statList g nodeL <> lastEl nodeL <> Just ";\n"
   where
     nodeL = pre graph n

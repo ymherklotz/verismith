@@ -14,6 +14,7 @@ This module generates the code from the Verilog AST defined in
 module Test.VeriFuzz.Verilog.CodeGen where
 
 import           Control.Lens
+import           Data.Foldable                 (fold)
 import           Data.Maybe                    (fromMaybe, isNothing)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
