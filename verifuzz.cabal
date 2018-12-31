@@ -69,6 +69,7 @@ executable verifuzz
                      , text
                      , QuickCheck
                      , bytestring
+                     , shelly
   default-extensions:  OverloadedStrings
 
 test-suite verifuzz-test
