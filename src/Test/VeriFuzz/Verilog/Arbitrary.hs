@@ -144,7 +144,7 @@ instance QC.Arbitrary ModConn where
 instance QC.Arbitrary ConstExpr where
   arbitrary = ConstExpr <$> positiveArb
 
-instance QC.Arbitrary RegLVal where
+instance QC.Arbitrary LVal where
   arbitrary = QC.oneof [ RegId <$> QC.arbitrary
                        , RegExpr <$> QC.arbitrary <*> QC.arbitrary
                        , RegSize <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary

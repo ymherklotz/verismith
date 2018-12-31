@@ -159,11 +159,11 @@ genEvent EAll         = "@*"
 genDelay :: Delay -> Text
 genDelay (Delay i) = "#" <> showT i
 
-genRegLVal :: RegLVal -> Text
-genRegLVal (RegId id) = id ^. getIdentifier
-genRegLVal (RegExpr id expr) =
+genLVal :: LVal -> Text
+genLVal (RegId id) = id ^. getIdentifier
+genLVal (RegExpr id expr) =
   id ^. getIdentifier <> " [" <> genExpr expr <> "]"
-genRegLVal (RegSize id msb lsb) =
+genLVal (RegSize id msb lsb) =
   id ^. getIdentifier <> " [" <> genConstExpr msb <> ":" <> genConstExpr lsb <> "]"
 
 genConstExpr :: ConstExpr -> Text
@@ -177,7 +177,7 @@ genPortType (Reg signed)
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
-  genRegLVal r <> op <> fromMaybe "" (genDelay <$> d) <> genExpr e
+  genLVal r <> op <> fromMaybe "" (genDelay <$> d) <> genExpr e
 
 genStmnt :: Stmnt -> Text
 genStmnt (TimeCtrl d stat) = genDelay d <> " " <> defMap stat
@@ -215,8 +215,8 @@ instance Source PortType where
 instance Source ConstExpr where
   genSource = genConstExpr
 
-instance Source RegLVal where
-  genSource = genRegLVal
+instance Source LVal where
+  genSource = genLVal
 
 instance Source Delay where
   genSource = genDelay
@@ -251,7 +251,52 @@ instance Source Description where
 instance Source VerilogSrc where
   genSource = genVerilogSrc
 
-newtype SourceShowable a = SrcShow { unSrcShow :: a }
+-- Show instances
 
-instance (Source a) => Show (SourceShowable a) where
-  show s = T.unpack $ genSource (unSrcShow s)
+instance Show Task where
+  show = T.unpack . genTask
+
+instance Show Stmnt where
+  show = T.unpack . genStmnt
+
+instance Show PortType where
+  show = T.unpack . genPortType
+
+instance Show ConstExpr where
+  show = T.unpack . genConstExpr
+
+instance Show LVal where
+  show = T.unpack . genLVal
+
+instance Show Delay where
+  show = T.unpack . genDelay
+
+instance Show Event where
+  show = T.unpack . genEvent
+
+instance Show UnaryOperator where
+  show = T.unpack . genUnaryOperator
+
+instance Show Expr where
+  show = T.unpack . genExpr
+
+instance Show ContAssign where
+  show = T.unpack . genContAssign
+
+instance Show ModItem where
+  show = T.unpack . genModuleItem
+
+instance Show PortDir where
+  show = T.unpack . genPortDir
+
+instance Show Port where
+  show = T.unpack . genPort
+
+instance Show ModDecl where
+  show = T.unpack . genModuleDecl
+
+instance Show Description where
+  show = T.unpack . genDescription
+
+instance Show VerilogSrc where
+  show = T.unpack . genVerilogSrc

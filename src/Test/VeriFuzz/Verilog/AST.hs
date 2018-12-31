@@ -30,7 +30,7 @@ class Source a where
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { _getIdentifier :: Text }
-                   deriving (Show, Eq, Ord)
+                   deriving (Eq)
 
 instance IsString Identifier where
   fromString = Identifier . T.pack
@@ -42,22 +42,23 @@ instance Monoid Identifier where
   mempty = Identifier mempty
 
 newtype Delay = Delay { _delay :: Int }
-                deriving (Show, Eq, Ord)
+                deriving (Eq)
 
 data Event = EId Identifier
            | EExpr Expr
            | EAll
-           deriving (Show, Eq, Ord)
+           deriving (Eq)
 
-data RegLVal = RegId Identifier
-             | RegExpr { _regExprId :: Identifier
-                       , _regExpr   :: Expr
-                       }
-             | RegSize { _regSizeId  :: Identifier
-                       , _regSizeMSB :: ConstExpr
-                       , _regSizeLSB :: ConstExpr
-                       }
-             deriving (Show, Eq, Ord)
+data LVal = RegId Identifier
+          | RegExpr { _regExprId :: Identifier
+                    , _regExpr   :: Expr
+                    }
+          | RegSize { _regSizeId  :: Identifier
+                    , _regSizeMSB :: ConstExpr
+                    , _regSizeLSB :: ConstExpr
+                    }
+          | RegConcat { _regConc :: [Expr] }
+          deriving (Eq)
 
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
@@ -85,7 +86,7 @@ data BinaryOperator = BinPlus    -- ^ @+@
                     | BinLSR     -- ^ @>>@
                     | BinASL     -- ^ @<<<@
                     | BinASR     -- ^ @>>>@
-                    deriving (Show, Eq, Ord)
+                    deriving (Eq)
 
 -- | Unary operators that are currently supported by the generator.
 data UnaryOperator = UnPlus    -- ^ @+@
@@ -98,7 +99,7 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnXor     -- ^ @^@
                    | UnNxor    -- ^ @~^@
                    | UnNxorInv -- ^ @^~@
-                   deriving (Show, Eq, Ord)
+                   deriving (Eq)
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
@@ -119,7 +120,7 @@ data Expr = Number { _numSize :: Int
                      , _exprFalse :: Expr
                      }
           | Str { _exprStr :: Text }
-          deriving (Show, Eq, Ord)
+          deriving (Eq)
 
 instance Num Expr where
   a + b = BinOp a BinPlus b
@@ -138,7 +139,7 @@ instance Monoid Expr where
   mconcat = Concat
 
 newtype ConstExpr = ConstExpr { _constNum :: Int }
-                  deriving (Show, Eq, Ord)
+                  deriving (Eq)
 
 instance Num ConstExpr where
   ConstExpr a + ConstExpr b = ConstExpr $ a + b
@@ -152,29 +153,29 @@ instance Num ConstExpr where
 data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortOut   -- ^ Output direction for port (@output@).
              | PortInOut -- ^ Inout direction for port (@inout@).
-             deriving (Show, Eq, Ord)
+             deriving (Eq)
 
 data PortType = Wire
               | Reg { _regSigned :: Bool }
-              deriving (Show, Eq, Ord)
+              deriving (Eq)
 
 -- | Port declaration.
 data Port = Port { _portType :: PortType
                  , _portSize :: Int
                  , _portName :: Identifier
-                 } deriving (Show, Eq, Ord)
+                 } deriving (Eq)
 
 newtype ModConn = ModConn { _modConn :: Expr }
-                deriving (Show, Eq, Ord)
+                deriving (Eq)
 
-data Assign = Assign { _assignReg   :: RegLVal
+data Assign = Assign { _assignReg   :: LVal
                      , _assignDelay :: Maybe Delay
                      , _assignExpr  :: Expr
-                     } deriving (Show, Eq, Ord)
+                     } deriving (Eq)
 
 data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expr
-                             } deriving (Show, Eq, Ord)
+                             } deriving (Eq)
 
 -- | Stmnts in Verilog.
 data Stmnt = TimeCtrl { _statDelay     :: Delay
@@ -190,7 +191,7 @@ data Stmnt = TimeCtrl { _statDelay     :: Delay
                | TaskEnable Task
                | SysTaskEnable Task
                | EmptyStat
-               deriving (Show, Eq, Ord)
+               deriving (Eq)
 
 instance Semigroup Stmnt where
   a <> b = mconcat [a, b]
@@ -201,7 +202,7 @@ instance Monoid Stmnt where
 
 data Task = Task { _taskName :: Identifier
                  , _taskExpr :: [Expr]
-                 } deriving (Show, Eq, Ord)
+                 } deriving (Eq)
 
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA ContAssign
@@ -214,22 +215,22 @@ data ModItem = ModCA ContAssign
              | Decl { declDir  :: Maybe PortDir
                     , declPort :: Port
                     }
-             deriving (Show, Eq, Ord)
+             deriving (Eq)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _moduleId    :: Identifier
                        , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
                        , _moduleItems :: [ModItem]
-                       } deriving (Show, Eq, Ord)
+                       } deriving (Eq)
 
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModDecl }
-                    deriving (Show, Eq, Ord)
+                    deriving (Eq)
 
 -- | The complete sourcetext for the Verilog module.
 newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
-                   deriving (Show, Eq, Ord)
+                   deriving (Eq)
 
 instance Semigroup VerilogSrc where
   VerilogSrc a <> VerilogSrc b = VerilogSrc $ a ++ b
