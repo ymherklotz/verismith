@@ -18,6 +18,7 @@ import           Data.Maybe                    (catMaybes, fromMaybe)
 import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
+import           Test.VeriFuzz.Verilog.CodeGen
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
@@ -78,6 +79,13 @@ nestUpTo i src =
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
 -- it to the body of the second module. It first has to make all the inputs into
 -- @reg@.
+--
+-- >>> SrcShow $ instantiateMod (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] []) (ModDecl "main" [] [] [])
+-- module main;
+-- wire y;
+-- reg x;
+-- endmodule
+-- <BLANKLINE>
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod mod main =
   main & moduleItems %~ ((out ++ regIn)++)
