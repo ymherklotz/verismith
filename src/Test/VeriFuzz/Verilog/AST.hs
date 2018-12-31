@@ -385,6 +385,12 @@ instance QC.Arbitrary VerilogSrc where
 instance IsString Identifier where
   fromString = Identifier . T.pack
 
+instance Semigroup Identifier where
+  (Identifier a) <> (Identifier b) = Identifier (a <> b)
+
+instance Monoid Identifier where
+  mempty = Identifier mempty
+
 -- Traversal Instance
 
 traverseExpr :: Traversal' Expression Expression

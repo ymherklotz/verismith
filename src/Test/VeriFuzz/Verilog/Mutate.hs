@@ -20,10 +20,6 @@ import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
 import           Test.VeriFuzz.Verilog.CodeGen
 
--- $setup
--- >>> let mod = (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] [])
--- >>> let main = (ModDecl "main" [] [] [])
-
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
 inPort id mod = inInput
@@ -80,6 +76,10 @@ nestUpTo :: Int -> VerilogSrc -> VerilogSrc
 nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
 
+-- $setup
+-- >>> let mod = (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] [])
+-- >>> let main = (ModDecl "main" [] [] [])
+
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
 -- it to the body of the second module. It first has to make all the inputs into
 -- @reg@.
@@ -88,14 +88,19 @@ nestUpTo i src =
 -- module main;
 -- wire [4:0] y;
 -- reg [4:0] x;
+-- m m1(y, x);
 -- endmodule
 -- <BLANKLINE>
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod mod main =
-  main & moduleItems %~ ((out ++ regIn)++)
+  main & moduleItems %~ ((out ++ regIn ++ [inst])++)
   where
     out = Decl Nothing <$> mod ^. modOutPorts
     regIn = Decl Nothing <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
+    inst = ModInst (mod ^. moduleId) (mod ^. moduleId <> (Identifier . showT $ count+1)) conns
+    count = length . filter (==mod ^. moduleId) $ main ^.. moduleItems . traverse . modInstId
+    conns = ModConn . PrimExpr . PrimId <$>
+      (mod ^.. modOutPorts . traverse . portName) ++ (mod ^.. modInPorts . traverse . portName)
 
 -- | Initialise all the inputs and outputs to a module.
 --
