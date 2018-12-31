@@ -82,8 +82,8 @@ nestUpTo i src =
 --
 -- >>> SrcShow $ instantiateMod (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] []) (ModDecl "main" [] [] [])
 -- module main;
--- wire y;
--- reg x;
+-- wire [4:0] y;
+-- reg [4:0] x;
 -- endmodule
 -- <BLANKLINE>
 instantiateMod :: ModDecl -> ModDecl -> ModDecl

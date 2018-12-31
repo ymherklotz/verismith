@@ -59,9 +59,12 @@ genModPort port = port ^. portName . getIdentifier
 -- | Generate the 'Port' description.
 genPort :: Port -> Text
 genPort port =
-  t <> name
+  t <> size <> name
   where
     t = (<>" ") . genPortType $ port ^. portType
+    size
+      | port ^. portSize > 1 = "[" <> showT (port ^. portSize - 1) <> ":0] "
+      | otherwise = ""
     name = port ^. portName . getIdentifier
 
 -- | Convert the 'PortDir' type to 'Text'.
@@ -182,8 +185,8 @@ genConstExpr (ConstExpr num) = showT num
 genPortType :: PortType -> Text
 genPortType (PortNet net) = genNet net
 genPortType (Reg signed)
-  | signed = " reg signed "
-  | otherwise = " reg "
+  | signed = "reg signed"
+  | otherwise = "reg"
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
@@ -266,3 +269,8 @@ instance Source Description where
 
 instance Source VerilogSrc where
   genSource = genVerilogSrc
+
+newtype SourceShowable a = SrcShow { unSrcShow :: a }
+
+instance (Source a) => Show (SourceShowable a) where
+  show s = T.unpack $ genSource (unSrcShow s)
