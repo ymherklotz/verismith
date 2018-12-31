@@ -15,7 +15,6 @@ Defines the types to build a Verilog AST.
 module Test.VeriFuzz.Verilog.AST where
 
 import           Control.Lens
-import           Control.Monad              (replicateM)
 import qualified Data.Graph.Inductive       as G
 import           Data.String
 import           Data.Text                  (Text)
@@ -33,34 +32,26 @@ class Source a where
 newtype Identifier = Identifier { _getIdentifier :: Text }
                    deriving (Show, Eq, Ord)
 
--- | A number in Verilog which contains a size and a value.
-data Number = Number { _numSize :: Int
-                     , _numVal  :: Int
-                     } deriving (Show, Eq, Ord)
+instance IsString Identifier where
+  fromString = Identifier . T.pack
+
+instance Semigroup Identifier where
+  (Identifier a) <> (Identifier b) = Identifier (a <> b)
+
+instance Monoid Identifier where
+  mempty = Identifier mempty
 
 newtype Delay = Delay { _delay :: Int }
                 deriving (Show, Eq, Ord)
 
 data Event = EId Identifier
-           | EExpr Expression
+           | EExpr Expr
            | EAll
            deriving (Show, Eq, Ord)
 
-data Net = Wire
-         | Tri
-         | Tri1
-         | Supply0
-         | Wand
-         | TriAnd
-         | Tri0
-         | Supply1
-         | Wor
-         | Trior
-         deriving (Show, Eq, Ord)
-
 data RegLVal = RegId Identifier
              | RegExpr { _regExprId :: Identifier
-                       , _regExpr   :: Expression
+                       , _regExpr   :: Expr
                        }
              | RegSize { _regSizeId  :: Identifier
                        , _regSizeMSB :: ConstExpr
@@ -109,30 +100,53 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnNxorInv -- ^ @^~@
                    deriving (Show, Eq, Ord)
 
--- | A primary expression which can either be a number or an identifier.
-data Primary = PrimNum Number    -- ^ Number in primary expression.
-             | PrimId Identifier -- ^ Identifier in primary expression.
-             deriving (Show, Eq, Ord)
-
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
-data Expression = PrimExpr Primary
-                | UnPrimExpr { _exprUnOp :: UnaryOperator
-                             , _exprPrim :: Primary
-                             }
-                | OpExpr { _exprLhs   :: Expression
-                         , _exprBinOp :: BinaryOperator
-                         , _exprRhs   :: Expression
-                         }
-                | CondExpr { _exprCond  :: Expression
-                           , _exprTrue  :: Expression
-                           , _exprFalse :: Expression
-                           }
-                | ExprStr Text
-                deriving (Show, Eq, Ord)
+data Expr = Number { _numSize :: Int
+                   , _numVal  :: Int
+                   }
+          | Id { _exprId :: Identifier }
+          | Concat { _concatExpr :: [Expr] }
+          | UnOp { _exprUnOp       :: UnaryOperator
+                       , _exprPrim :: Expr
+                       }
+          | BinOp { _exprLhs    :: Expr
+                   , _exprBinOp :: BinaryOperator
+                   , _exprRhs   :: Expr
+                   }
+          | Cond { _exprCond      :: Expr
+                     , _exprTrue  :: Expr
+                     , _exprFalse :: Expr
+                     }
+          | Str { _exprStr :: Text }
+          deriving (Show, Eq, Ord)
+
+instance Num Expr where
+  a + b = BinOp a BinPlus b
+  a - b = BinOp a BinMinus b
+  a * b = BinOp a BinTimes b
+  negate = UnOp UnMinus
+  abs = undefined
+  signum = undefined
+  fromInteger = Number 32 . fromInteger
+
+instance Semigroup Expr where
+  a <> b = mconcat [a, b]
+
+instance Monoid Expr where
+  mempty = 0
+  mconcat = Concat
 
 newtype ConstExpr = ConstExpr { _constNum :: Int }
                   deriving (Show, Eq, Ord)
+
+instance Num ConstExpr where
+  ConstExpr a + ConstExpr b = ConstExpr $ a + b
+  ConstExpr a * ConstExpr b = ConstExpr $ a * b
+  ConstExpr a - ConstExpr b = ConstExpr $ a - b
+  abs (ConstExpr a) = ConstExpr $ abs a
+  signum (ConstExpr a) = ConstExpr $ signum a
+  fromInteger = ConstExpr . fromInteger
 
 -- | Different port direction that are supported in Verilog.
 data PortDir = PortIn    -- ^ Input direction for port (@input@).
@@ -140,7 +154,7 @@ data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortInOut -- ^ Inout direction for port (@inout@).
              deriving (Show, Eq, Ord)
 
-data PortType = PortNet Net
+data PortType = Wire
               | Reg { _regSigned :: Bool }
               deriving (Show, Eq, Ord)
 
@@ -150,35 +164,43 @@ data Port = Port { _portType :: PortType
                  , _portName :: Identifier
                  } deriving (Show, Eq, Ord)
 
-newtype ModConn = ModConn { _modConn :: Expression }
+newtype ModConn = ModConn { _modConn :: Expr }
                 deriving (Show, Eq, Ord)
 
 data Assign = Assign { _assignReg   :: RegLVal
                      , _assignDelay :: Maybe Delay
-                     , _assignExpr  :: Expression
+                     , _assignExpr  :: Expr
                      } deriving (Show, Eq, Ord)
 
 data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
-                             , _contAssignExpr    :: Expression
+                             , _contAssignExpr    :: Expr
                              } deriving (Show, Eq, Ord)
 
--- | Statements in Verilog.
-data Statement = TimeCtrl { _statDelay :: Delay
-                          , _statDStat :: Maybe Statement
+-- | Stmnts in Verilog.
+data Stmnt = TimeCtrl { _statDelay     :: Delay
+                          , _statDStat :: Maybe Stmnt
                           }                              -- ^ Time control (@#NUM@)
                | EventCtrl { _statEvent :: Event
-                           , _statEStat :: Maybe Statement
+                           , _statEStat :: Maybe Stmnt
                            }
-               | SeqBlock { _statements :: [Statement] } -- ^ Sequential block (@begin ... end@)
+               | SeqBlock { _statements :: [Stmnt] } -- ^ Sequential block (@begin ... end@)
                | BlockAssign Assign                      -- ^ blocking assignment (@=@)
                | NonBlockAssign Assign                   -- ^ Non blocking assignment (@<=@)
-               | StatCA ContAssign                       -- ^ Statement continuous assignment. May not be correct.
+               | StatCA ContAssign                       -- ^ Stmnt continuous assignment. May not be correct.
                | TaskEnable Task
                | SysTaskEnable Task
+               | EmptyStat
                deriving (Show, Eq, Ord)
 
+instance Semigroup Stmnt where
+  a <> b = mconcat [a, b]
+
+instance Monoid Stmnt where
+  mempty = EmptyStat
+  mconcat = SeqBlock
+
 data Task = Task { _taskName :: Identifier
-                 , _taskExpr :: [Expression]
+                 , _taskExpr :: [Expr]
                  } deriving (Show, Eq, Ord)
 
 -- | Module item which is the body of the module expression.
@@ -187,8 +209,8 @@ data ModItem = ModCA ContAssign
                        , _modInstName  :: Identifier
                        , _modInstConns :: [ModConn]
                        }
-             | Initial Statement
-             | Always Statement
+             | Initial Stmnt
+             | Always Stmnt
              | Decl { declDir  :: Maybe PortDir
                     , declPort :: Port
                     }
@@ -209,200 +231,25 @@ newtype Description = Description { _getDescription :: ModDecl }
 newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
                    deriving (Show, Eq, Ord)
 
--- Generate Arbitrary instances for the AST
+instance Semigroup VerilogSrc where
+  VerilogSrc a <> VerilogSrc b = VerilogSrc $ a ++ b
 
-positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
-positiveArb = QC.suchThat QC.arbitrary (>0)
-
-expr :: Int -> QC.Gen Expression
-expr 0 = QC.oneof
-  [ PrimExpr <$> QC.arbitrary
-  , UnPrimExpr <$> QC.arbitrary <*> QC.arbitrary
-  -- , ExprStr <$> QC.arbitrary
-  ]
-expr n
-  | n > 0 = QC.oneof
-    [ PrimExpr <$> QC.arbitrary
-    , UnPrimExpr <$> QC.arbitrary <*> QC.arbitrary
-    -- , ExprStr <$> QC.arbitrary
-    , OpExpr <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
-    , CondExpr <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
-    ]
-  | otherwise = expr 0
-  where
-    subexpr y = expr (n `div` y)
-
-statement :: Int -> QC.Gen Statement
-statement 0 = QC.oneof
-  [ BlockAssign <$> QC.arbitrary
-  , NonBlockAssign <$> QC.arbitrary
-  -- , StatCA <$> QC.arbitrary
-  , TaskEnable <$> QC.arbitrary
-  , SysTaskEnable <$> QC.arbitrary
-  ]
-statement n
-  | n > 0 = QC.oneof
-    [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
-    , SeqBlock <$> QC.listOf1 (substat 4)
-    , BlockAssign <$> QC.arbitrary
-    , NonBlockAssign <$> QC.arbitrary
-    -- , StatCA <$> QC.arbitrary
-    , TaskEnable <$> QC.arbitrary
-    , SysTaskEnable <$> QC.arbitrary
-    ]
-  | otherwise = statement 0
-  where
-    substat y = statement (n `div` y)
-
-modPortGen :: QC.Gen Port
-modPortGen = QC.oneof
-  [ Port (PortNet Wire) <$> positiveArb <*> QC.arbitrary
-  , Port <$> (Reg <$> QC.arbitrary) <*> positiveArb <*> QC.arbitrary
-  ]
-
-instance QC.Arbitrary Text where
-  arbitrary = T.pack <$> QC.arbitrary
-
-instance QC.Arbitrary Identifier where
-  arbitrary = do
-    l <- QC.choose (2, 10)
-    Identifier . T.pack <$> replicateM l (QC.elements ['a'..'z'])
-
-instance QC.Arbitrary Number where
-  arbitrary = Number <$> positiveArb <*> QC.arbitrary
-
-instance QC.Arbitrary Net where
-  arbitrary = pure Wire
-
-instance QC.Arbitrary BinaryOperator where
-  arbitrary = QC.elements
-    [ BinPlus
-    , BinMinus
-    , BinTimes
-    , BinDiv
-    , BinMod
-    , BinEq
-    , BinNEq
-    , BinCEq
-    , BinCNEq
-    , BinLAnd
-    , BinLOr
-    , BinLT
-    , BinLEq
-    , BinGT
-    , BinGEq
-    , BinAnd
-    , BinOr
-    , BinXor
-    , BinXNor
-    , BinXNorInv
-    , BinPower
-    , BinLSL
-    , BinLSR
-    , BinASL
-    , BinASR
-    ]
-
-instance QC.Arbitrary UnaryOperator where
-  arbitrary = QC.elements
-    [ UnPlus
-    , UnMinus
-    , UnNot
-    , UnAnd
-    , UnNand
-    , UnOr
-    , UnNor
-    , UnXor
-    , UnNxor
-    , UnNxorInv
-    ]
-
-instance QC.Arbitrary Primary where
-  arbitrary = PrimNum <$> QC.arbitrary
-
-instance QC.Arbitrary PortDir where
-  arbitrary = QC.elements [PortIn, PortOut, PortInOut]
-
-instance QC.Arbitrary PortType where
-  arbitrary = QC.oneof [PortNet <$> QC.arbitrary, Reg <$> QC.arbitrary]
-
-instance QC.Arbitrary Port where
-  arbitrary = Port <$> QC.arbitrary <*> positiveArb <*> QC.arbitrary
-
-instance QC.Arbitrary Delay where
-  arbitrary = Delay <$> positiveArb
-
-instance QC.Arbitrary Event where
-  arbitrary = EId <$> QC.arbitrary
-
-instance QC.Arbitrary ModConn where
-  arbitrary = ModConn <$> QC.arbitrary
-
-instance QC.Arbitrary ConstExpr where
-  arbitrary = ConstExpr <$> positiveArb
-
-instance QC.Arbitrary RegLVal where
-  arbitrary = QC.oneof [ RegId <$> QC.arbitrary
-                       , RegExpr <$> QC.arbitrary <*> QC.arbitrary
-                       , RegSize <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-                       ]
-
-instance QC.Arbitrary Assign where
-  arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-
-instance QC.Arbitrary Expression where
-  arbitrary = QC.sized expr
-
-instance QC.Arbitrary Statement where
-  arbitrary = QC.sized statement
-
-instance QC.Arbitrary ContAssign where
-  arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
-
-instance QC.Arbitrary Task where
-  arbitrary = Task <$> QC.arbitrary <*> QC.arbitrary
-
-instance QC.Arbitrary ModItem where
-  arbitrary = QC.oneof [ ModCA <$> QC.arbitrary
-                       , ModInst <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-                       , Initial <$> QC.arbitrary
-                       , Always <$> (EventCtrl <$> QC.arbitrary <*> QC.arbitrary)
-                       , Decl <$> pure Nothing <*> QC.arbitrary
-                       ]
-
-instance QC.Arbitrary ModDecl where
-  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary
-              <*> QC.listOf1 modPortGen <*> QC.arbitrary
-
-instance QC.Arbitrary Description where
-  arbitrary = Description <$> QC.arbitrary
-
-instance QC.Arbitrary VerilogSrc where
-  arbitrary = VerilogSrc <$> QC.arbitrary
-
--- Other Instances
-
-instance IsString Identifier where
-  fromString = Identifier . T.pack
-
-instance Semigroup Identifier where
-  (Identifier a) <> (Identifier b) = Identifier (a <> b)
-
-instance Monoid Identifier where
-  mempty = Identifier mempty
+instance Monoid VerilogSrc where
+  mempty = VerilogSrc []
 
 -- Traversal Instance
 
-traverseExpr :: Traversal' Expression Expression
-traverseExpr _ (PrimExpr e)      = pure (PrimExpr e)
-traverseExpr _ (UnPrimExpr un e) = pure (UnPrimExpr un e)
-traverseExpr f (OpExpr l op r)   = OpExpr <$> f l <*> pure op <*> f r
-traverseExpr f (CondExpr c l r)  = CondExpr <$> f c <*> f l <*> f r
+traverseExpr :: Traversal' Expr Expr
+traverseExpr _ (Number s v)   = pure $ Number s v
+traverseExpr _ (Id id)        = pure $ Id id
+traverseExpr f (Concat e)     = Concat <$> (sequenceA $ f <$> e)
+traverseExpr f (UnOp un e)    = UnOp un <$> f e
+traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
+traverseExpr f (Cond c l r)   = Cond <$> f c <*> f l <*> f r
 
 -- Create all the necessary lenses
 
 makeLenses ''Identifier
-makeLenses ''Number
 makeLenses ''VerilogSrc
 makeLenses ''Description
 makeLenses ''ModDecl
@@ -411,13 +258,12 @@ makeLenses ''Port
 makeLenses ''PortDir
 makeLenses ''BinaryOperator
 makeLenses ''UnaryOperator
-makeLenses ''Primary
-makeLenses ''Expression
+makeLenses ''Expr
 makeLenses ''ContAssign
 makeLenses ''PortType
 
 -- Make all the necessary prisms
 
-makePrisms ''Expression
+makePrisms ''Expr
 makePrisms ''ModItem
 makePrisms ''ModConn

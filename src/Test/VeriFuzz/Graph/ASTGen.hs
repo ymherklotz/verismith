@@ -44,16 +44,16 @@ genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
 genPortsAST f c =
   (port . frNode <$> f c)
   where
-    port = Port (PortNet Wire) 1
+    port = Port Wire 1
 
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
-genAssignExpr :: Gate -> [Node] -> Maybe Expression
+genAssignExpr :: Gate -> [Node] -> Maybe Expr
 genAssignExpr g [] = Nothing
-genAssignExpr g (n:[]) = Just . PrimExpr . PrimId $ frNode n
-genAssignExpr g (n:ns) = OpExpr wire op <$> genAssignExpr g ns
+genAssignExpr g (n:[]) = Just . Id $ frNode n
+genAssignExpr g (n:ns) = BinOp wire op <$> genAssignExpr g ns
   where
-    wire = PrimExpr . PrimId $ frNode n
+    wire = Id $ frNode n
     op = fromGate g
 
 -- | Generate the continuous assignment AST for a particular node. If it does
@@ -77,7 +77,7 @@ genModuleDeclAST c = ModDecl id output ports items
   where
     id = Identifier "gen_module"
     ports = genPortsAST inputsC c
-    output = [Port (PortNet Wire) 1 "y"]
+    output = [Port Wire 1 "y"]
     items = genAssignAST c
 
 generateAST :: Circuit -> VerilogSrc

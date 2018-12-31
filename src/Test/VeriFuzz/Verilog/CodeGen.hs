@@ -21,11 +21,14 @@ import qualified Data.Text.IO                  as T
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
 
+comma :: [Text] -> Text
+comma = T.intercalate ", "
+
 showT :: (Show a) => a -> Text
 showT = T.pack . show
 
-defMap :: Maybe Statement -> Text
-defMap stat = fromMaybe ";\n" $ genStatement <$> stat
+defMap :: Maybe Stmnt -> Text
+defMap stat = fromMaybe ";\n" $ genStmnt <$> stat
 
 -- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
 genVerilogSrc :: VerilogSrc -> Text
@@ -47,7 +50,7 @@ genModuleDecl mod =
   where
     ports
       | noIn && noOut = ""
-      | otherwise = "(" <> (sep ", " $ genModPort <$> outIn) <> ")"
+      | otherwise = "(" <> (comma $ genModPort <$> outIn) <> ")"
     modItems = fromList $ genModuleItem <$> mod ^. moduleItems
     noOut = null $ mod ^. modOutPorts
     noIn = null $ mod ^. modInPorts
@@ -77,41 +80,35 @@ genPortDir PortInOut = "inout"
 genModuleItem :: ModItem -> Text
 genModuleItem (ModCA ca) = genContAssign ca
 genModuleItem (ModInst (Identifier id) (Identifier name) conn) =
-  id <> " " <> name <> "(" <> sep ", " (genExpr . _modConn <$> conn) <> ")" <> ";\n"
-genModuleItem (Initial stat) = "initial " <> genStatement stat
-genModuleItem (Always stat) = "always " <> genStatement stat
+  id <> " " <> name <> "(" <> comma (genExpr . _modConn <$> conn) <> ")" <> ";\n"
+genModuleItem (Initial stat) = "initial " <> genStmnt stat
+genModuleItem (Always stat) = "always " <> genStmnt stat
 genModuleItem (Decl dir port) =
   (fromMaybe "" $ ((<>" ") . genPortDir) <$> dir) <> genPort port <> ";\n"
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
 genContAssign (ContAssign val e) =
-  "  assign " <> name <> " = " <> expr <> ";\n"
+  "assign " <> name <> " = " <> expr <> ";\n"
   where
     name = val ^. getIdentifier
     expr = genExpr $ e
 
--- | Generate 'Expression' to 'Text'.
-genExpr :: Expression -> Text
-genExpr (OpExpr exprRhs bin exprLhs) =
+-- | Generate 'Expr' to 'Text'.
+genExpr :: Expr -> Text
+genExpr (BinOp exprRhs bin exprLhs) =
   "(" <> genExpr exprRhs <> genBinaryOperator bin <> genExpr exprLhs <> ")"
-genExpr (PrimExpr prim) = genPrimary prim
-genExpr (UnPrimExpr u e) =
-  "(" <> genUnaryOperator u <> genPrimary e <> ")"
-genExpr (CondExpr l t f) =
-  "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
-genExpr (ExprStr t) = "\"" <> t <> "\""
-
--- | Generate a 'PrimaryExpression' to 'Text'.
-genPrimary :: Primary -> Text
-genPrimary (PrimNum num) =
-  "(" <> neg <> sh (num ^. numSize) <> "'d" <> (sh . abs) n <> ")"
+genExpr (Number s n) =
+  "(" <> sh (s * signum n) <> "'d" <> (sh . abs) n <> ")"
   where
     sh = T.pack . show
-    abs x = if x <= 0 then -x else x
-    n = num ^. numVal
-    neg = if n <= 0 then "-" else ""
-genPrimary (PrimId ident) = ident ^. getIdentifier
+genExpr (Id i) = i ^. getIdentifier
+genExpr (Concat c) = "{" <> comma (genExpr <$> c) <> "}"
+genExpr (UnOp u e) =
+  "(" <> genUnaryOperator u <> genExpr e <> ")"
+genExpr (Cond l t f) =
+  "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
+genExpr (Str t) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
 genBinaryOperator :: BinaryOperator -> Text
@@ -153,18 +150,6 @@ genUnaryOperator UnXor     = "^"
 genUnaryOperator UnNxor    = "~^"
 genUnaryOperator UnNxorInv = "^~"
 
-genNet :: Net -> Text
-genNet Wire    = "wire"
-genNet Tri     = "tri"
-genNet Tri1    = "tri1"
-genNet Supply0 = "supply0"
-genNet Wand    = "wand"
-genNet TriAnd  = "triand"
-genNet Tri0    = "tri0"
-genNet Supply1 = "supply1"
-genNet Wor     = "wor"
-genNet Trior   = "trior"
-
 genEvent :: Event -> Text
 genEvent (EId id)     = "@(" <> id ^. getIdentifier <> ")"
 genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
@@ -184,7 +169,7 @@ genConstExpr :: ConstExpr -> Text
 genConstExpr (ConstExpr num) = showT num
 
 genPortType :: PortType -> Text
-genPortType (PortNet net) = genNet net
+genPortType Wire = "wire"
 genPortType (Reg signed)
   | signed = "reg signed"
   | otherwise = "reg"
@@ -193,21 +178,21 @@ genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
   genRegLVal r <> op <> fromMaybe "" (genDelay <$> d) <> genExpr e
 
-genStatement :: Statement -> Text
-genStatement (TimeCtrl d stat) = genDelay d <> " " <> defMap stat
-genStatement (EventCtrl e stat) = genEvent e <> " " <> defMap stat
-genStatement (SeqBlock s) =
-  "begin\n" <> fromList (genStatement <$> s) <> "end\n"
-genStatement (BlockAssign a) = genAssign " = " a <> ";\n"
-genStatement (NonBlockAssign a) = genAssign " <= " a <> ";\n"
-genStatement (StatCA a) = genContAssign a
-genStatement (TaskEnable task) = genTask task <> ";\n"
-genStatement (SysTaskEnable task) = "$" <> genTask task <> ";\n"
+genStmnt :: Stmnt -> Text
+genStmnt (TimeCtrl d stat) = genDelay d <> " " <> defMap stat
+genStmnt (EventCtrl e stat) = genEvent e <> " " <> defMap stat
+genStmnt (SeqBlock s) =
+  "begin\n" <> fromList (genStmnt <$> s) <> "end\n"
+genStmnt (BlockAssign a) = genAssign " = " a <> ";\n"
+genStmnt (NonBlockAssign a) = genAssign " <= " a <> ";\n"
+genStmnt (StatCA a) = genContAssign a
+genStmnt (TaskEnable task) = genTask task <> ";\n"
+genStmnt (SysTaskEnable task) = "$" <> genTask task <> ";\n"
 
 genTask :: Task -> Text
 genTask (Task name expr)
   | null expr = id
-  | otherwise = id <> "(" <> sep ", " (genExpr <$> expr) <> ")"
+  | otherwise = id <> "(" <> comma (genExpr <$> expr) <> ")"
   where
     id = name ^. getIdentifier
 
@@ -220,8 +205,8 @@ render = T.putStrLn
 instance Source Task where
   genSource = genTask
 
-instance Source Statement where
-  genSource = genStatement
+instance Source Stmnt where
+  genSource = genStmnt
 
 instance Source PortType where
   genSource = genPortType
@@ -238,16 +223,10 @@ instance Source Delay where
 instance Source Event where
   genSource = genEvent
 
-instance Source Net where
-  genSource = genNet
-
 instance Source UnaryOperator where
   genSource = genUnaryOperator
 
-instance Source Primary where
-  genSource = genPrimary
-
-instance Source Expression where
+instance Source Expr where
   genSource = genExpr
 
 instance Source ContAssign where

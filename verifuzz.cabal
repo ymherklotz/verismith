@@ -31,6 +31,7 @@ library
                      , Test.VeriFuzz.Simulator.Yosys
                      , Test.VeriFuzz.Verilog
                      , Test.VeriFuzz.Verilog.AST
+                     , Test.VeriFuzz.Verilog.Arbitrary
                      , Test.VeriFuzz.Verilog.CodeGen
                      , Test.VeriFuzz.Verilog.Helpers
                      , Test.VeriFuzz.Verilog.Mutate

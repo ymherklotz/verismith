@@ -28,7 +28,7 @@ inPort id mod = inInput
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
-findAssign :: Identifier -> [ModItem] -> Maybe Expression
+findAssign :: Identifier -> [ModItem] -> Maybe Expr
 findAssign id items =
   safe last . catMaybes $ isAssign <$> items
   where
@@ -40,14 +40,14 @@ findAssign id items =
 -- | Transforms an expression by replacing an Identifier with an
 -- expression. This is used inside 'transformOf' and 'traverseExpr' to replace
 -- the 'Identifier' recursively.
-idTrans :: Identifier -> Expression -> Expression -> Expression
-idTrans i expr (PrimExpr (PrimId id))
+idTrans :: Identifier -> Expr -> Expr -> Expr
+idTrans i expr (Id id)
   | id == i = expr
-  | otherwise = (PrimExpr (PrimId id))
+  | otherwise = (Id id)
 idTrans _ _ e = e
 
 -- | Replaces the identifier recursively in an expression.
-replace :: Identifier -> Expression -> Expression -> Expression
+replace :: Identifier -> Expr -> Expr -> Expr
 replace = (transformOf traverseExpr .) . idTrans
 
 -- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not found,
@@ -64,7 +64,7 @@ nestId id mod
   | otherwise = mod
   where
     get = moduleItems . traverse . _ModCA . contAssignExpr
-    def = PrimExpr $ PrimId id
+    def = Id id
 
 -- | Replaces an identifier by a expression in all the module declaration.
 nestSource :: Identifier -> VerilogSrc -> VerilogSrc
@@ -77,7 +77,7 @@ nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
 
 -- $setup
--- >>> let mod = (ModDecl (Identifier "m") [Port (PortNet Wire) 5 (Identifier "y")] [Port (PortNet Wire) 5 "x"] [])
+-- >>> let mod = (ModDecl (Identifier "m") [Port Wire 5 (Identifier "y")] [Port Wire 5 "x"] [])
 -- >>> let main = (ModDecl "main" [] [] [])
 
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
@@ -99,7 +99,7 @@ instantiateMod mod main =
     regIn = Decl Nothing <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
     inst = ModInst (mod ^. moduleId) (mod ^. moduleId <> (Identifier . showT $ count+1)) conns
     count = length . filter (==mod ^. moduleId) $ main ^.. moduleItems . traverse . modInstId
-    conns = ModConn . PrimExpr . PrimId <$>
+    conns = ModConn . Id <$>
       (mod ^.. modOutPorts . traverse . portName) ++ (mod ^.. modInPorts . traverse . portName)
 
 -- | Initialise all the inputs and outputs to a module.

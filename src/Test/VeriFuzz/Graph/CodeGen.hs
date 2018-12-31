@@ -35,8 +35,8 @@ statList g n = toStr <$> safe tail n
 lastEl :: [Node] -> Maybe Text
 lastEl n = fromNode <$> safe head n
 
-toStatement :: (Graph gr) => gr Gate e -> LNode Gate -> Text
-toStatement graph (n, g) =
+toStmnt :: (Graph gr) => gr Gate e -> LNode Gate -> Text
+toStmnt graph (n, g) =
   fromMaybe empty $ Just "  assign " <> Just (fromNode n)
   <> Just " = " <> statList g nodeL <> lastEl nodeL <> Just ";\n"
   where
@@ -48,7 +48,7 @@ generate graph =
   <> fromList (imap "  input wire " ",\n" inp)
   <> sep ",\n" (imap "  output wire " "" out)
   <> ");\n"
-  <> fromList (toStatement graph <$> labNodes graph)
+  <> fromList (toStmnt graph <$> labNodes graph)
   <> "endmodule\n\nmodule main;\n  initial\n    begin\n      "
   <> "$display(\"Hello, world\");\n      $finish;\n    "
   <> "end\nendmodule"

@@ -14,27 +14,29 @@ unitTests = testGroup "Unit tests"
       (transformOf traverseExpr trans transformTestData)
   ]
 
-primExpr :: Text -> Expression
-primExpr = PrimExpr . PrimId . Identifier
+transformTestData :: Expr
+transformTestData = BinOp (BinOp (BinOp (Id "id1") BinAnd (Id "id2")) BinAnd
+                            (BinOp (Id "id1") BinAnd (Id "id2"))) BinAnd
+                    (BinOp (BinOp (BinOp (Id "id1") BinAnd (Id "id2")) BinAnd
+                     (BinOp (Id "id1") BinAnd (BinOp (BinOp (Id "id1") BinAnd (Id "id2")) BinAnd
+                                                      (BinOp (Id "id1") BinAnd (Id "id2"))))) BinOr
+                    (Concat [Concat [ Concat [Id "id1", Id "id2", Id "id2"], Id "id2", Id "id2"
+                                    , Concat [Id "id2", Id "id2", Concat [Id "id1", Id "id2"]]
+                                    , Id "id2"], Id "id1", Id "id2"]))
 
-transformTestData :: Expression
-transformTestData = OpExpr (OpExpr (OpExpr (primExpr "id1") BinAnd (primExpr "id2")) BinAnd
-                            (OpExpr (primExpr "id1") BinAnd (primExpr "id2"))) BinAnd
-                    (OpExpr (OpExpr (primExpr "id1") BinAnd (primExpr "id2")) BinAnd
-                     (OpExpr (primExpr "id1") BinAnd (OpExpr (OpExpr (primExpr "id1") BinAnd (primExpr "id2")) BinAnd
-                                                      (OpExpr (primExpr "id1") BinAnd (primExpr "id2")))))
-
-transformExpectedResult :: Expression
-transformExpectedResult = OpExpr (OpExpr (OpExpr (primExpr "id1") BinAnd (primExpr "Replaced")) BinAnd
-                                  (OpExpr (primExpr "id1") BinAnd (primExpr "Replaced"))) BinAnd
-                          (OpExpr (OpExpr (primExpr "id1") BinAnd (primExpr "Replaced")) BinAnd
-                           (OpExpr (primExpr "id1") BinAnd (OpExpr (OpExpr (primExpr "id1") BinAnd
-                                                                    (primExpr "Replaced")) BinAnd
-                                                            (OpExpr (primExpr "id1") BinAnd (primExpr "Replaced")))))
+transformExpectedResult :: Expr
+transformExpectedResult = BinOp (BinOp (BinOp (Id "id1") BinAnd (Id "Replaced")) BinAnd
+                            (BinOp (Id "id1") BinAnd (Id "Replaced"))) BinAnd
+                    (BinOp (BinOp (BinOp (Id "id1") BinAnd (Id "Replaced")) BinAnd
+                     (BinOp (Id "id1") BinAnd (BinOp (BinOp (Id "id1") BinAnd (Id "Replaced")) BinAnd
+                                                      (BinOp (Id "id1") BinAnd (Id "Replaced"))))) BinOr
+                    (Concat [Concat [ Concat [Id "id1", Id "Replaced", Id "Replaced"], Id "Replaced", Id "Replaced"
+                                    , Concat [Id "Replaced", Id "Replaced", Concat [Id "id1", Id "Replaced"]]
+                                    , Id "Replaced"], Id "id1", Id "Replaced"]))
 
 trans e =
   case e of
-    PrimExpr (PrimId id) -> if id == Identifier "id2" then
-                              PrimExpr . PrimId $ Identifier "Replaced"
-                            else PrimExpr (PrimId id)
+    Id id -> if id == Identifier "id2" then
+                              Id $ Identifier "Replaced"
+                            else Id id
     _                    -> e
