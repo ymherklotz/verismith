@@ -33,7 +33,7 @@ defMap stat = fromMaybe ";\n" $ genStmnt <$> stat
 -- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
 genVerilogSrc :: VerilogSrc -> Text
 genVerilogSrc source =
-  fromList $ genDescription <$> source ^. getVerilogSrc
+  fold $ genDescription <$> source ^. getVerilogSrc
 
 -- | Generate the 'Description' to 'Text'.
 genDescription :: Description -> Text
@@ -51,7 +51,7 @@ genModuleDecl mod =
     ports
       | noIn && noOut = ""
       | otherwise = "(" <> (comma $ genModPort <$> outIn) <> ")"
-    modItems = fromList $ genModuleItem <$> mod ^. moduleItems
+    modItems = fold $ genModuleItem <$> mod ^. moduleItems
     noOut = null $ mod ^. modOutPorts
     noIn = null $ mod ^. modInPorts
     outIn = (mod ^. modOutPorts) ++ (mod ^. modInPorts)
@@ -182,7 +182,7 @@ genStmnt :: Stmnt -> Text
 genStmnt (TimeCtrl d stat) = genDelay d <> " " <> defMap stat
 genStmnt (EventCtrl e stat) = genEvent e <> " " <> defMap stat
 genStmnt (SeqBlock s) =
-  "begin\n" <> fromList (genStmnt <$> s) <> "end\n"
+  "begin\n" <> fold (genStmnt <$> s) <> "end\n"
 genStmnt (BlockAssign a) = genAssign " = " a <> ";\n"
 genStmnt (NonBlockAssign a) = genAssign " <= " a <> ";\n"
 genStmnt (StatCA a) = genContAssign a

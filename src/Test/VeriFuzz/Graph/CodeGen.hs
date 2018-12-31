@@ -30,7 +30,7 @@ toOperator Xor = " ^ "
 statList :: Gate -> [Node] -> Maybe Text
 statList g n = toStr <$> safe tail n
   where
-    toStr = fromList . fmap ((<> toOperator g) . fromNode)
+    toStr = fold . fmap ((<> toOperator g) . fromNode)
 
 lastEl :: [Node] -> Maybe Text
 lastEl n = fromNode <$> safe head n
@@ -45,10 +45,10 @@ toStmnt graph (n, g) =
 generate :: (Graph gr) => gr Gate e -> Text
 generate graph =
   "module generated_module(\n"
-  <> fromList (imap "  input wire " ",\n" inp)
-  <> sep ",\n" (imap "  output wire " "" out)
+  <> fold (imap "  input wire " ",\n" inp)
+  <> T.intercalate ",\n" (imap "  output wire " "" out)
   <> ");\n"
-  <> fromList (toStmnt graph <$> labNodes graph)
+  <> fold (toStmnt graph <$> labNodes graph)
   <> "endmodule\n\nmodule main;\n  initial\n    begin\n      "
   <> "$display(\"Hello, world\");\n      $finish;\n    "
   <> "end\nendmodule"
