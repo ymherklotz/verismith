@@ -165,6 +165,8 @@ genLVal (RegExpr id expr) =
   id ^. getIdentifier <> " [" <> genExpr expr <> "]"
 genLVal (RegSize id msb lsb) =
   id ^. getIdentifier <> " [" <> genConstExpr msb <> ":" <> genConstExpr lsb <> "]"
+genLVal (RegConcat e) =
+  "{" <> comma (genExpr <$> e) <> "}"
 
 genConstExpr :: ConstExpr -> Text
 genConstExpr (ConstExpr num) = showT num
