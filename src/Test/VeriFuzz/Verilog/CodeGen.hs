@@ -22,12 +22,16 @@ import qualified Data.Text.IO                  as T
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
 
+-- | Inserts commas between '[Text]' and except the last one.
 comma :: [Text] -> Text
 comma = T.intercalate ", "
 
+-- | Show function for 'Text'
 showT :: (Show a) => a -> Text
 showT = T.pack . show
 
+-- | Map a 'Maybe Stmnt' to 'Text'. If it is 'Just stmnt', the generated
+-- statements are returned. If it is 'Nothing', then @;\n@ is returned.
 defMap :: Maybe Stmnt -> Text
 defMap stat = fromMaybe ";\n" $ genStmnt <$> stat
 
@@ -57,6 +61,8 @@ genModuleDecl mod =
     noIn = null $ mod ^. modInPorts
     outIn = (mod ^. modOutPorts) ++ (mod ^. modInPorts)
 
+-- | Conversts 'Port' to 'Text' for the module list, which means it only
+-- generates a list of identifiers.
 genModPort :: Port -> Text
 genModPort port = port ^. portName . getIdentifier
 
@@ -139,6 +145,7 @@ genBinaryOperator BinLSR     = " >> "
 genBinaryOperator BinASL     = " <<< "
 genBinaryOperator BinASR     = " >>> "
 
+-- | Convert 'UnaryOperator' to 'Text'.
 genUnaryOperator :: UnaryOperator -> Text
 genUnaryOperator UnPlus    = "+"
 genUnaryOperator UnMinus   = "-"
@@ -151,14 +158,17 @@ genUnaryOperator UnXor     = "^"
 genUnaryOperator UnNxor    = "~^"
 genUnaryOperator UnNxorInv = "^~"
 
+-- | Generate verilog code for an 'Event'.
 genEvent :: Event -> Text
 genEvent (EId id)     = "@(" <> id ^. getIdentifier <> ")"
 genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
 genEvent EAll         = "@*"
 
+-- | Generates verilog code for a 'Delay'.
 genDelay :: Delay -> Text
 genDelay (Delay i) = "#" <> showT i
 
+-- | Generate the verilog code for an 'LVal'.
 genLVal :: LVal -> Text
 genLVal (RegId id) = id ^. getIdentifier
 genLVal (RegExpr id expr) =
