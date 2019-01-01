@@ -70,3 +70,6 @@ addTestBench = addDescription $ Description testBench
 
 defaultPort :: Identifier -> Port
 defaultPort = Port Wire 1
+
+portToExpr :: Port -> Expr
+portToExpr (Port _ _ id) = Id id
