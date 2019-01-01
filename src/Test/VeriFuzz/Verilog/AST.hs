@@ -230,6 +230,9 @@ instance Semigroup Stmnt where
   a <> (SeqBlock b) = SeqBlock $ a : b
   a <> b = SeqBlock [a, b]
 
+instance Monoid Stmnt where
+  mempty = SeqBlock []
+
 data Task = Task { _taskName :: Identifier
                  , _taskExpr :: [Expr]
                  } deriving (Eq)
