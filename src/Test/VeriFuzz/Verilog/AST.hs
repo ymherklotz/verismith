@@ -23,6 +23,9 @@ import qualified Test.QuickCheck            as QC
 import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Graph.Random
 
+-- | 'Source' class which determines that source code is able to be generated
+-- from the data structure using 'genSource'. This will be stored in 'Text' and
+-- can then be processed further.
 class Source a where
   genSource :: a -> Text
 
@@ -41,14 +44,22 @@ instance Semigroup Identifier where
 instance Monoid Identifier where
   mempty = Identifier mempty
 
+-- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _delay :: Int }
                 deriving (Eq)
 
+-- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
 data Event = EId Identifier
            | EExpr Expr
            | EAll
            deriving (Eq)
 
+-- | Type that represents the left hand side of an assignment, which can be a
+-- concatenation such as in:
+--
+-- @
+-- {a, b, c} = 32'h94238;
+-- @
 data LVal = RegId Identifier
           | RegExpr { _regExprId :: Identifier
                     , _regExpr   :: Expr
@@ -108,17 +119,17 @@ data Expr = Number { _numSize :: Int
                    }
           | Id { _exprId :: Identifier }
           | Concat { _concatExpr :: [Expr] }
-          | UnOp { _exprUnOp       :: UnaryOperator
-                       , _exprPrim :: Expr
-                       }
-          | BinOp { _exprLhs    :: Expr
-                   , _exprBinOp :: BinaryOperator
-                   , _exprRhs   :: Expr
-                   }
-          | Cond { _exprCond      :: Expr
-                     , _exprTrue  :: Expr
-                     , _exprFalse :: Expr
-                     }
+          | UnOp { _exprUnOp :: UnaryOperator
+                 , _exprPrim :: Expr
+                 }
+          | BinOp { _exprLhs   :: Expr
+                  , _exprBinOp :: BinaryOperator
+                  , _exprRhs   :: Expr
+                  }
+          | Cond { _exprCond  :: Expr
+                 , _exprTrue  :: Expr
+                 , _exprFalse :: Expr
+                 }
           | Str { _exprStr :: Text }
           deriving (Eq)
 
@@ -138,6 +149,10 @@ instance Monoid Expr where
   mempty = 0
   mconcat = Concat
 
+instance IsString Expr where
+  fromString = Str . fromString
+
+-- | Constant expression, which are known before simulation at compilation time.
 newtype ConstExpr = ConstExpr { _constNum :: Int }
                   deriving (Eq)
 
@@ -155,16 +170,31 @@ data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortInOut -- ^ Inout direction for port (@inout@).
              deriving (Eq)
 
+-- | Currently, only @wire@ and @reg@ are supported, as the other net types are
+-- not that common and not a priority.
 data PortType = Wire
               | Reg { _regSigned :: Bool }
               deriving (Eq)
 
--- | Port declaration.
+-- | Port declaration. It contains information about the type of the port, the
+-- size, and the port name. It used to also contain information about if it was
+-- an input or output port. However, this is not always necessary and was more
+-- cumbersome than useful, as a lot of ports can be declared without input and
+-- output port.
+--
+-- This is now implemented inside 'ModDecl' itself, which uses a list of output
+-- and input ports.
 data Port = Port { _portType :: PortType
                  , _portSize :: Int
                  , _portName :: Identifier
                  } deriving (Eq)
 
+-- | This is currently a type because direct module declaration should also be
+-- added:
+--
+-- @
+-- mod a(.y(y1), .x1(x11), .x2(x22));
+-- @
 newtype ModConn = ModConn { _modConn :: Expr }
                 deriving (Eq)
 
