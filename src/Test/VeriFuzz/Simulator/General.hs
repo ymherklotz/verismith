@@ -12,10 +12,11 @@ Class of the simulator and the synthesize tool.
 
 module Test.VeriFuzz.Simulator.General where
 
+import           Data.Bits                     (shiftL)
+import           Data.ByteString               (ByteString)
+import qualified Data.ByteString               as B
 import           Data.ByteString.Builder       (byteStringHex, toLazyByteString)
-import           Data.ByteString.Char8         (ByteString)
-import qualified Data.ByteString.Char8         as B
-import qualified Data.ByteString.Lazy.Char8    as BL
+import qualified Data.ByteString.Lazy          as BL
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Lazy                as TL
@@ -56,5 +57,7 @@ synthesizers = ["yosys", "xst"]
 simulators :: [Text]
 simulators = ["yosim", "iverilog"]
 
-toHex :: ByteString -> Text
-toHex bs = T.pack . BL.unpack . toLazyByteString $ byteStringHex bs
+-- | Helper function to convert bytestrings to integers
+bsToI :: ByteString -> Integer
+bsToI = B.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
+{-# INLINE bsToI #-}
