@@ -71,15 +71,6 @@ data LVal = RegId Identifier
           | RegConcat { _regConc :: [Expr] }
           deriving (Eq)
 
-instance Semigroup LVal where
-  (RegConcat a) <> (RegConcat b) = RegConcat $ a <> b
-  (RegConcat a) <> b = RegConcat $ a <> [b]
-  a <> (RegConcat b) = RegConcat $ a : b
-  a <> b = RegConcat [a, b]
-
-instance Monoid LVal where
-  mempty = RegConcat []
-
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
                     | BinMinus   -- ^ @-@
