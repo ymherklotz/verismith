@@ -71,6 +71,15 @@ data LVal = RegId Identifier
           | RegConcat { _regConc :: [Expr] }
           deriving (Eq)
 
+instance Semigroup LVal where
+  (RegConcat a) <> (RegConcat b) = RegConcat $ a <> b
+  (RegConcat a) <> b = RegConcat $ a <> [b]
+  a <> (RegConcat b) = RegConcat $ a : b
+  a <> b = RegConcat [a, b]
+
+instance Monoid LVal where
+  mempty = RegConcat []
+
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
                     | BinMinus   -- ^ @-@
@@ -115,7 +124,7 @@ data UnaryOperator = UnPlus    -- ^ @+@
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
 data Expr = Number { _numSize :: Int
-                   , _numVal  :: Int
+                   , _numVal  :: Integer
                    }
           | Id { _exprId :: Identifier }
           | Concat { _concatExpr :: [Expr] }
