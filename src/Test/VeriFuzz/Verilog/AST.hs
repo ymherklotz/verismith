@@ -149,7 +149,7 @@ instance Semigroup Expr where
   a <> b = Concat [a, b]
 
 instance Monoid Expr where
-  mempty = 0
+  mempty = Concat []
 
 instance IsString Expr where
   fromString = Str . fromString
