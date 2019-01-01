@@ -36,11 +36,9 @@ instance Simulate Icarus where
 runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh Int
 runSimIcarus sim mod tst = do
   let tb = ModDecl "main" [] []
-        [ Initial $ SeqBlock
-          [ SysTaskEnable $ Task "display"
-            [ Str "21832" ]
-          , SysTaskEnable $ Task "finish" []
-          ]
+        [ Initial $
+          (SysTaskEnable $ Task "display" [ Str "21832" ])
+          <> (SysTaskEnable $ Task "finish" [])
         ]
   let newtb = instantiateMod mod tb
   let modWithTb = VerilogSrc $ Description <$> [newtb, mod]
