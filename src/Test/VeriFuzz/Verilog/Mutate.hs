@@ -33,7 +33,7 @@ findAssign id items =
   safe last . catMaybes $ isAssign <$> items
   where
     isAssign (ModCA (ContAssign val expr))
-      | val == id = Just $ expr
+      | val == id = Just expr
       | otherwise = Nothing
     isAssign _ = Nothing
 
@@ -43,7 +43,7 @@ findAssign id items =
 idTrans :: Identifier -> Expr -> Expr -> Expr
 idTrans i expr (Id id)
   | id == i = expr
-  | otherwise = (Id id)
+  | otherwise = Id id
 idTrans _ _ e = e
 
 -- | Replaces the identifier recursively in an expression.

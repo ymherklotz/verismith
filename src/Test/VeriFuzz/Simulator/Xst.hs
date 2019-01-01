@@ -24,7 +24,7 @@ import           Test.VeriFuzz.Verilog.AST
 import           Test.VeriFuzz.Verilog.CodeGen
 import           Text.Shakespeare.Text           (st)
 
-data Xst = Xst { xstPath :: FilePath }
+newtype Xst = Xst { xstPath :: FilePath }
 
 instance Simulator Xst where
   toText _ = "xst"

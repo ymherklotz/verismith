@@ -273,7 +273,7 @@ instance Monoid VerilogSrc where
 traverseExpr :: Traversal' Expr Expr
 traverseExpr _ (Number s v)   = pure $ Number s v
 traverseExpr _ (Id id)        = pure $ Id id
-traverseExpr f (Concat e)     = Concat <$> (sequenceA $ f <$> e)
+traverseExpr f (Concat e)     = Concat <$> sequenceA (f <$> e)
 traverseExpr f (UnOp un e)    = UnOp un <$> f e
 traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
 traverseExpr f (Cond c l r)   = Cond <$> f c <*> f l <*> f r

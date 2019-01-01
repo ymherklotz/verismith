@@ -46,7 +46,7 @@ randomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e)
                           -- generate random instances of each node
 randomDAG = do
   list <- QC.infiniteListOf QC.arbitrary
-  l <- QC.infiniteListOf $ aE
+  l <- QC.infiniteListOf aE
   QC.sized (\n -> return . G.mkGraph (nodes list n) $ take (10*n) l)
     where
       nodes l n = zip [0..n] $ take n l

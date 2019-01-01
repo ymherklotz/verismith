@@ -25,7 +25,7 @@ import           Test.VeriFuzz.Verilog.AST
 import           Test.VeriFuzz.Verilog.CodeGen
 import           Text.Shakespeare.Text           (st)
 
-data Yosys = Yosys { yosysPath :: FilePath }
+newtype Yosys = Yosys { yosysPath :: FilePath }
 
 instance Simulator Yosys where
   toText _ = "yosys"

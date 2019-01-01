@@ -33,7 +33,7 @@ showT = T.pack . show
 -- | Map a 'Maybe Stmnt' to 'Text'. If it is 'Just stmnt', the generated
 -- statements are returned. If it is 'Nothing', then @;\n@ is returned.
 defMap :: Maybe Stmnt -> Text
-defMap stat = fromMaybe ";\n" $ genStmnt <$> stat
+defMap = maybe ";\n" genStmnt
 
 -- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
 genVerilogSrc :: VerilogSrc -> Text
@@ -55,7 +55,7 @@ genModuleDecl mod =
   where
     ports
       | noIn && noOut = ""
-      | otherwise = "(" <> (comma $ genModPort <$> outIn) <> ")"
+      | otherwise = "(" <> comma (genModPort <$> outIn) <> ")"
     modItems = fold $ genModuleItem <$> mod ^. moduleItems
     noOut = null $ mod ^. modOutPorts
     noIn = null $ mod ^. modInPorts
@@ -91,7 +91,7 @@ genModuleItem (ModInst (Identifier id) (Identifier name) conn) =
 genModuleItem (Initial stat) = "initial " <> genStmnt stat
 genModuleItem (Always stat) = "always " <> genStmnt stat
 genModuleItem (Decl dir port) =
-  (fromMaybe "" $ ((<>" ") . genPortDir) <$> dir) <> genPort port <> ";\n"
+  (maybe "" (<>" ") . genPortDir <$> dir) <> genPort port <> ";\n"
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
@@ -99,7 +99,7 @@ genContAssign (ContAssign val e) =
   "assign " <> name <> " = " <> expr <> ";\n"
   where
     name = val ^. getIdentifier
-    expr = genExpr $ e
+    expr = genExpr e
 
 -- | Generate 'Expr' to 'Text'.
 genExpr :: Expr -> Text
@@ -189,7 +189,7 @@ genPortType (Reg signed)
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
-  genLVal r <> op <> fromMaybe "" (genDelay <$> d) <> genExpr e
+  genLVal r <> op <> maybe "" genDelay d <> genExpr e
 
 genStmnt :: Stmnt -> Text
 genStmnt (TimeCtrl d stat) = genDelay d <> " " <> defMap stat

@@ -15,7 +15,7 @@ main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
   gr <- QC.generate $ rDups <$> QC.resize 30 (randomDAG :: QC.Gen (G.Gr Gate ()))
-  let dot = G.showDot . G.fglToDotString $ G.nemap (\x -> show x) (\_ -> "") gr
+  let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
   writeFile "file.dot" dot
   shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- T.putStrLn $ generate gr

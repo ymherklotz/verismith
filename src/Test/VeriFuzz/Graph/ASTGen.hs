@@ -42,7 +42,7 @@ outputsC c =
 
 genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
 genPortsAST f c =
-  (port . frNode <$> f c)
+  port . frNode <$> f c
   where
     port = Port Wire 1
 
@@ -50,7 +50,7 @@ genPortsAST f c =
 -- assignment expressions.
 genAssignExpr :: Gate -> [Node] -> Maybe Expr
 genAssignExpr g [] = Nothing
-genAssignExpr g (n:[]) = Just . Id $ frNode n
+genAssignExpr g [n] = Just . Id $ frNode n
 genAssignExpr g (n:ns) = BinOp wire op <$> genAssignExpr g ns
   where
     wire = Id $ frNode n
