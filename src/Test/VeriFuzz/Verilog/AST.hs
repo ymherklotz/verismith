@@ -222,7 +222,6 @@ data Stmnt = TimeCtrl { _statDelay     :: Delay
                | StatCA ContAssign                       -- ^ Stmnt continuous assignment. May not be correct.
                | TaskEnable Task
                | SysTaskEnable Task
-               | EmptyStat
                deriving (Eq)
 
 instance Semigroup Stmnt where
@@ -230,9 +229,6 @@ instance Semigroup Stmnt where
   (SeqBlock a) <> b = SeqBlock $ a <> [b]
   a <> (SeqBlock b) = SeqBlock $ a : b
   a <> b = SeqBlock [a, b]
-
-instance Monoid Stmnt where
-  mempty = EmptyStat
 
 data Task = Task { _taskName :: Identifier
                  , _taskExpr :: [Expr]
