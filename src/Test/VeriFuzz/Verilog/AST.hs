@@ -210,9 +210,9 @@ data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              } deriving (Eq)
 
 -- | Stmnts in Verilog.
-data Stmnt = TimeCtrl { _statDelay     :: Delay
-                          , _statDStat :: Maybe Stmnt
-                          }                              -- ^ Time control (@#NUM@)
+data Stmnt = TimeCtrl { _statDelay :: Delay
+                      , _statDStat :: Maybe Stmnt
+                      }                              -- ^ Time control (@#NUM@)
                | EventCtrl { _statEvent :: Event
                            , _statEStat :: Maybe Stmnt
                            }
