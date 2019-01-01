@@ -15,7 +15,7 @@ module Test.VeriFuzz.Verilog.CodeGen where
 
 import           Control.Lens
 import           Data.Foldable                 (fold)
-import           Data.Maybe                    (fromMaybe, isNothing)
+import           Data.Maybe                    (isNothing)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
@@ -91,7 +91,9 @@ genModuleItem (ModInst (Identifier id) (Identifier name) conn) =
 genModuleItem (Initial stat) = "initial " <> genStmnt stat
 genModuleItem (Always stat) = "always " <> genStmnt stat
 genModuleItem (Decl dir port) =
-  (maybe "" (<>" ") . genPortDir <$> dir) <> genPort port <> ";\n"
+  (maybe "" makePort dir) <> genPort port <> ";\n"
+  where
+    makePort = (<>" ") . genPortDir
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
