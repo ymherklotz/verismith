@@ -143,11 +143,13 @@ instance Num Expr where
   fromInteger = Number 32 . fromInteger
 
 instance Semigroup Expr where
-  a <> b = mconcat [a, b]
+  (Concat a) <> (Concat b) = Concat $ a <> b
+  (Concat a) <> b = Concat $ a <> [b]
+  a <> (Concat b) = Concat $ a : b
+  a <> b = Concat [a, b]
 
 instance Monoid Expr where
   mempty = 0
-  mconcat = Concat
 
 instance IsString Expr where
   fromString = Str . fromString
@@ -224,11 +226,13 @@ data Stmnt = TimeCtrl { _statDelay     :: Delay
                deriving (Eq)
 
 instance Semigroup Stmnt where
-  a <> b = mconcat [a, b]
+  (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
+  (SeqBlock a) <> b = SeqBlock $ a <> [b]
+  a <> (SeqBlock b) = SeqBlock $ a : b
+  a <> b = SeqBlock [a, b]
 
 instance Monoid Stmnt where
   mempty = EmptyStat
-  mconcat = SeqBlock
 
 data Task = Task { _taskName :: Identifier
                  , _taskExpr :: [Expr]
