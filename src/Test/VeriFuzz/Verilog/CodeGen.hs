@@ -19,6 +19,7 @@ import           Data.Maybe                    (isNothing)
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
+import           Numeric                       (showHex)
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
 
@@ -108,9 +109,7 @@ genExpr :: Expr -> Text
 genExpr (BinOp exprRhs bin exprLhs) =
   "(" <> genExpr exprRhs <> genBinaryOperator bin <> genExpr exprLhs <> ")"
 genExpr (Number s n) =
-  "(" <> sh (s * signum n) <> "'d" <> (sh . abs) n <> ")"
-  where
-    sh = T.pack . show
+  showT s <> "'h" <> T.pack (showHex n "")
 genExpr (Id i) = i ^. getIdentifier
 genExpr (Concat c) = "{" <> comma (genExpr <$> c) <> "}"
 genExpr (UnOp u e) =
