@@ -213,16 +213,16 @@ data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
 data Stmnt = TimeCtrl { _statDelay :: Delay
                       , _statDStat :: Maybe Stmnt
                       }                              -- ^ Time control (@#NUM@)
-               | EventCtrl { _statEvent :: Event
-                           , _statEStat :: Maybe Stmnt
-                           }
-               | SeqBlock { _statements :: [Stmnt] } -- ^ Sequential block (@begin ... end@)
-               | BlockAssign Assign                      -- ^ blocking assignment (@=@)
-               | NonBlockAssign Assign                   -- ^ Non blocking assignment (@<=@)
-               | StatCA ContAssign                       -- ^ Stmnt continuous assignment. May not be correct.
-               | TaskEnable Task
-               | SysTaskEnable Task
-               deriving (Eq)
+           | EventCtrl { _statEvent :: Event
+                       , _statEStat :: Maybe Stmnt
+                       }
+           | SeqBlock { _statements :: [Stmnt] } -- ^ Sequential block (@begin ... end@)
+           | BlockAssign Assign                      -- ^ blocking assignment (@=@)
+           | NonBlockAssign Assign                   -- ^ Non blocking assignment (@<=@)
+           | StatCA ContAssign                       -- ^ Stmnt continuous assignment. May not be correct.
+           | TaskEnable Task
+           | SysTaskEnable Task
+           deriving (Eq)
 
 instance Semigroup Stmnt where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
