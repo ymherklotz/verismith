@@ -48,6 +48,15 @@ instance Monoid Identifier where
 newtype Delay = Delay { _delay :: Int }
                 deriving (Eq)
 
+instance Num Delay where
+  Delay a + Delay b = Delay $ a + b
+  Delay a - Delay b = Delay $ a - b
+  Delay a * Delay b = Delay $ a * b
+  negate (Delay a) = Delay $ negate a
+  abs (Delay a) = Delay $ abs a
+  signum (Delay a) = Delay $ signum a
+  fromInteger = Delay . fromInteger
+
 -- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
 data Event = EId Identifier
            | EExpr Expr
