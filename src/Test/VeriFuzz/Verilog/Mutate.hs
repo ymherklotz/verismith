@@ -76,6 +76,9 @@ nestUpTo :: Int -> VerilogSrc -> VerilogSrc
 nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
 
+allVars :: ModDecl -> [Identifier]
+allVars mod =
+  (mod ^.. modOutPorts . traverse . portName) ++ (mod ^.. modInPorts . traverse . portName)
 -- $setup
 -- >>> let mod = (ModDecl (Identifier "m") [Port Wire 5 (Identifier "y")] [Port Wire 5 "x"] [])
 -- >>> let main = (ModDecl "main" [] [] [])
@@ -99,6 +102,18 @@ instantiateMod mod main =
     regIn = Decl Nothing <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
     inst = ModInst (mod ^. moduleId) (mod ^. moduleId <> (Identifier . showT $ count+1)) conns
     count = length . filter (==mod ^. moduleId) $ main ^.. moduleItems . traverse . modInstId
+    conns = ModConn . Id <$> allVars mod
+
+-- | Instantiate without adding wire declarations. It also does not count the
+-- current instantiations of the same module.
+--
+-- >>> instantiateMod_ mod main
+-- m m(y, x);
+-- <BLANKLINE>
+instantiateMod_ :: ModDecl -> ModItem
+instantiateMod_ mod =
+  ModInst (mod ^. moduleId) (mod ^. moduleId) conns
+  where
     conns = ModConn . Id <$>
       (mod ^.. modOutPorts . traverse . portName) ++ (mod ^.. modInPorts . traverse . portName)
 
@@ -115,3 +130,19 @@ initMod mod = mod & moduleItems %~ ((out ++ inp)++)
   where
     out = Decl (Just PortOut) <$> (mod ^. modOutPorts)
     inp = Decl (Just PortIn) <$> (mod ^. modInPorts)
+
+makeIdFrom :: (Show a) => a -> Identifier -> Identifier
+makeIdFrom a i =
+  (i<>) . Identifier . ("_"<>) $ showT a
+
+-- | Make top level module for equivalence verification. Also takes in how many
+-- modules to instantiate.
+makeTop :: Int -> ModDecl -> ModDecl
+makeTop i m =
+  ModDecl (m ^. moduleId) ys (m ^. modInPorts) modItems
+  where
+    ys = Port Wire 90 . (flip makeIdFrom) "y" <$> [1..i]
+    modItems = instantiateMod_ . modN <$> [1..i]
+    modN n = m
+             & moduleId %~ makeIdFrom n
+             & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
