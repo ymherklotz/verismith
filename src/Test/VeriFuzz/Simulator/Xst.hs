@@ -24,13 +24,18 @@ import           Test.VeriFuzz.Verilog.AST
 import           Test.VeriFuzz.Verilog.CodeGen
 import           Text.Shakespeare.Text           (st)
 
-newtype Xst = Xst { xstPath :: FilePath }
+data Xst = Xst { xstPath    :: FilePath
+               , netgenPath :: FilePath
+               }
 
 instance Simulator Xst where
   toText _ = "xst"
 
 instance Synthesize Xst where
   runSynth = runSynthXst
+
+defaultXst :: Xst
+defaultXst = Xst "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst" "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/netgen"
 
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim mod outf = do
@@ -40,10 +45,11 @@ runSynthXst sim mod outf = do
 -fsm_extract YES -fsm_encoding Auto
 -change_error_to_warning "HDLCompiler:226 HDLCompiler:1832"
 |]
-  writefile prjFile [st|verilog work "#{modName}.v"|]
-  writefile vFile $ genSource mod
-  timeout_ "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst" ["-ifn", toTextIgnore xstFile]
-  run_ "netgen" ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", "output.v"]
+  writefile prjFile [st|verilog work "rtl.v"|]
+  writefile "rtl.v" $ genSource mod
+  timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
+  run_ (netgenPath sim) ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
+  run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
   where
     modName = mod ^. moduleId . getIdentifier
     modFile = fromText modName
