@@ -1,7 +1,8 @@
 name:                  verifuzz
 version:               0.1.0.0
--- synopsis:
--- description:
+synopsis:              Random verilog generation and simulator testing.
+description:           VeriFuzz provides random verilog generation modules
+                       implementing functions to test supported simulators.
 homepage:              https://github.com/githubuser/verifuzz#readme
 license:               BSD3
 license-file:          LICENSE
@@ -89,4 +90,5 @@ test-suite verifuzz-doctest
   build-depends:       base >= 4 && < 5
                      , verifuzz
                      , doctest
+                     , doctest-discover
   default-extensions:  OverloadedStrings

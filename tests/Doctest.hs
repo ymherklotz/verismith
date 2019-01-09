@@ -1,4 +1,1 @@
-import           Test.DocTest
-
-main =
-  doctest ["-XOverloadedStrings", "-isrc", "src/Test/VeriFuzz/Verilog/Mutate.hs"]
+{-# options_ghc -F -pgmF doctest-discover -optF test/doctest.json #-}
