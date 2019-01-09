@@ -35,6 +35,8 @@ class Source a where
 newtype Identifier = Identifier { _getIdentifier :: Text }
                    deriving (Eq)
 
+makeLenses ''Identifier
+
 instance IsString Identifier where
   fromString = Identifier . T.pack
 
@@ -43,6 +45,9 @@ instance Semigroup Identifier where
 
 instance Monoid Identifier where
   mempty = Identifier mempty
+
+instance Show Identifier where
+  show i = T.unpack $ i ^. getIdentifier
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _delay :: Int }
@@ -218,6 +223,8 @@ data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expr
                              } deriving (Eq)
 
+makeLenses ''ContAssign
+
 -- | Stmnts in Verilog.
 data Stmnt = TimeCtrl { _statDelay :: Delay
                       , _statDStat :: Maybe Stmnt
@@ -283,16 +290,14 @@ instance Monoid VerilogSrc where
 -- Traversal Instance
 
 traverseExpr :: Traversal' Expr Expr
-traverseExpr _ (Number s v)   = pure $ Number s v
-traverseExpr _ (Id id)        = pure $ Id id
 traverseExpr f (Concat e)     = Concat <$> sequenceA (f <$> e)
 traverseExpr f (UnOp un e)    = UnOp un <$> f e
 traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
 traverseExpr f (Cond c l r)   = Cond <$> f c <*> f l <*> f r
+traverseExpr _ e              = pure e
 
 -- Create all the necessary lenses
 
-makeLenses ''Identifier
 makeLenses ''VerilogSrc
 makeLenses ''Description
 makeLenses ''ModDecl
@@ -302,7 +307,6 @@ makeLenses ''PortDir
 makeLenses ''BinaryOperator
 makeLenses ''UnaryOperator
 makeLenses ''Expr
-makeLenses ''ContAssign
 makeLenses ''PortType
 
 -- Make all the necessary prisms
