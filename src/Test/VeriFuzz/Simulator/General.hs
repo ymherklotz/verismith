@@ -45,11 +45,11 @@ class (Simulator a) => Synthesize a where
            -> FilePath -- ^ Output verilog file for the module
            -> Sh ()    -- ^ does not return any values
 
-timeout :: Text -> [Text] -> Sh Text
-timeout = command1 "timeout" ["180"]
+timeout :: FilePath -> [Text] -> Sh Text
+timeout = command1 "timeout" ["180"] . toTextIgnore
 
-timeout_ :: Text -> [Text] -> Sh ()
-timeout_ = command1_ "timeout" ["180"]
+timeout_ :: FilePath -> [Text] -> Sh ()
+timeout_ = command1_ "timeout" ["180"] . toTextIgnore
 
 synthesizers :: [Text]
 synthesizers = ["yosys", "xst"]
