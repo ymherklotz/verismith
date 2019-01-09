@@ -37,10 +37,17 @@ runSimulation = do
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   let circ = head $ (nestUpTo 5 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
-  val <- shelly $ runSim (Icarus "iverilog") (initMod circ) rand
+  val <- shelly $ runSim defaultIcarus (initMod circ) rand
   putStrLn $ showHex val ""
 
+runEquivalence:: IO ()
+runEquivalence = do
+  gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
+  let circ = initMod . head $ (nestUpTo 5 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
+  shelly . verbosely $ runEquiv defaultYosys defaultYosys (Just defaultXst) circ
 
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
-main = runSimulation
+main =
+  -- runEquivalence
+  runSimulation
