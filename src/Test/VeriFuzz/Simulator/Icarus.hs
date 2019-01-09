@@ -26,13 +26,18 @@ import           Test.VeriFuzz.Simulator.General
 import           Test.VeriFuzz.Verilog
 import           Text.Shakespeare.Text           (st)
 
-newtype Icarus = Icarus { icarusPath :: FilePath }
+data Icarus = Icarus { icarusPath :: FilePath
+                     , vvpPath    :: FilePath
+                     }
 
 instance Simulator Icarus where
   toText _ = "iverilog"
 
 instance Simulate Icarus where
   runSim = runSimIcarus
+
+defaultIcarus :: Icarus
+defaultIcarus = Icarus "iverilog" "vvp"
 
 addDisplay :: [Stmnt] -> [Stmnt]
 addDisplay s =
@@ -48,14 +53,14 @@ assignFunc inp bs =
     conc = RegConcat (portToExpr <$> inp)
 
 runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh Int
-runSimIcarus sim mod bss = do
+runSimIcarus sim m bss = do
   let tb = ModDecl "main" [] []
         [ Initial $
-          fold (addDisplay $ assignFunc (mod ^. modInPorts) <$> bss)
+          fold (addDisplay $ assignFunc (m ^. modInPorts) <$> bss)
           <> (SysTaskEnable $ Task "finish" [])
         ]
-  let newtb = instantiateMod mod tb
-  let modWithTb = VerilogSrc $ Description <$> [newtb, mod]
+  let newtb = instantiateMod m tb
+  let modWithTb = VerilogSrc $ Description <$> [newtb, m]
   writefile "main.v" $ genSource modWithTb
-  run_ "iverilog" ["-o", "main", "main.v"]
-  hash <$> run "vvp" ["main"]
+  run_ (icarusPath sim) ["-o", "main", "main.v"]
+  hash <$> run (vvpPath sim) ["main"]
