@@ -12,6 +12,7 @@ Generates the AST from the graph directly.
 
 module Test.VeriFuzz.Graph.ASTGen where
 
+import           Data.Foldable                 (fold)
 import           Data.Graph.Inductive          (LNode, Node)
 import qualified Data.Graph.Inductive          as G
 import           Data.Maybe                    (catMaybes)
@@ -20,6 +21,7 @@ import           Test.VeriFuzz.Circuit
 import           Test.VeriFuzz.Internal.Gen
 import           Test.VeriFuzz.Internal.Shared
 import           Test.VeriFuzz.Verilog.AST
+import           Test.VeriFuzz.Verilog.Helpers
 
 -- | Converts a 'CNode' to an 'Identifier'.
 frNode :: Node -> Identifier
@@ -44,7 +46,7 @@ genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
 genPortsAST f c =
   port . frNode <$> f c
   where
-    port = Port Wire 1
+    port = Port Wire 4
 
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
@@ -77,8 +79,8 @@ genModuleDeclAST c = ModDecl id output ports items
   where
     id = Identifier "gen_module"
     ports = genPortsAST inputsC c
-    output = [Port Wire 1 "y"]
-    items = genAssignAST c
+    output = [Port Wire 90 "y"]
+    items = genAssignAST c ++ [ModCA . ContAssign "y" . fold $ portToExpr <$> ports]
 
 generateAST :: Circuit -> VerilogSrc
 generateAST c = VerilogSrc [Description $ genModuleDeclAST c]
