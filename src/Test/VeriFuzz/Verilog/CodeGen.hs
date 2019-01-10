@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Verilog.CodeGen
+Module      : VeriFuzz.Verilog.CodeGen
 Description : Code generation for Verilog AST.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -8,20 +8,20 @@ Stability   : experimental
 Portability : POSIX
 
 This module generates the code from the Verilog AST defined in
-"Test.VeriFuzz.Verilog.AST".
+"VeriFuzz.Verilog.AST".
 -}
 
-module Test.VeriFuzz.Verilog.CodeGen where
+module VeriFuzz.Verilog.CodeGen where
 
 import           Control.Lens
-import           Data.Foldable                 (fold)
-import           Data.Maybe                    (isNothing)
-import           Data.Text                     (Text)
-import qualified Data.Text                     as T
-import qualified Data.Text.IO                  as T
-import           Numeric                       (showHex)
-import           Test.VeriFuzz.Internal.Shared
-import           Test.VeriFuzz.Verilog.AST
+import           Data.Foldable            (fold)
+import           Data.Maybe               (isNothing)
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import qualified Data.Text.IO             as T
+import           Numeric                  (showHex)
+import           VeriFuzz.Internal.Shared
+import           VeriFuzz.Verilog.AST
 
 -- | Inserts commas between '[Text]' and except the last one.
 comma :: [Text] -> Text

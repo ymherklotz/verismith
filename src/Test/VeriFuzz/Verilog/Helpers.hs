@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Verilog.Helpers
+Module      : VeriFuzz.Verilog.Helpers
 Description : Defaults and common functions.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,12 +10,12 @@ Portability : POSIX
 Defaults and common functions.
 -}
 
-module Test.VeriFuzz.Verilog.Helpers where
+module VeriFuzz.Verilog.Helpers where
 
 import           Control.Lens
-import           Data.Text                 (Text)
+import           Data.Text            (Text)
 import qualified Data.Text
-import           Test.VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem
 regDecl = Decl Nothing . Port (Reg False) 1

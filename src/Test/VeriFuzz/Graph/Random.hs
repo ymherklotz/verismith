@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Graph.Random
+Module      : VeriFuzz.Graph.Random
 Description : Random generation for DAG
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Define the random generation for the directed acyclic graph.
 -}
 
-module Test.VeriFuzz.Graph.Random where
+module VeriFuzz.Graph.Random where
 
 import           Data.Graph.Inductive              (Context, Graph, LEdge)
 import qualified Data.Graph.Inductive              as G

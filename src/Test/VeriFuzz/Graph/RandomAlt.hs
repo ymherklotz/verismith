@@ -1,5 +1,5 @@
 {-|p
-Module      : Test.VeriFuzz.Graph.RandomAlt
+Module      : VeriFuzz.Graph.RandomAlt
 Description : RandomAlt generation for DAG
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Define the random generation for the directed acyclic graph.
 -}
 
-module Test.VeriFuzz.Graph.RandomAlt where
+module VeriFuzz.Graph.RandomAlt where
 
 import           Data.Graph.Inductive              (Graph, LEdge, mkGraph)
 import qualified Data.Graph.Inductive.Arbitrary    as G

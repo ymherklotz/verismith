@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Simulator.Xst
+Module      : VeriFuzz.Simulator.Xst
 Description : Xst (ise) simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -12,17 +12,17 @@ Xst (ise) simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module Test.VeriFuzz.Simulator.Xst where
+module VeriFuzz.Simulator.Xst where
 
-import           Control.Lens                    hiding ((<.>))
-import           Data.Text                       (Text)
-import qualified Data.Text                       as T
-import           Prelude                         hiding (FilePath)
+import           Control.Lens               hiding ((<.>))
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Prelude                    hiding (FilePath)
 import           Shelly
-import           Test.VeriFuzz.Simulator.General
-import           Test.VeriFuzz.Verilog.AST
-import           Test.VeriFuzz.Verilog.CodeGen
-import           Text.Shakespeare.Text           (st)
+import           Text.Shakespeare.Text      (st)
+import           VeriFuzz.Simulator.General
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.CodeGen
 
 data Xst = Xst { xstPath    :: FilePath
                , netgenPath :: FilePath

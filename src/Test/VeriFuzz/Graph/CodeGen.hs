@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Graph.Random
+Module      : VeriFuzz.Graph.Random
 Description : Code generation directly from DAG.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,19 +10,19 @@ Portability : POSIX
 Define the code generation directly from the random DAG.
 -}
 
-module Test.VeriFuzz.Graph.CodeGen
+module VeriFuzz.Graph.CodeGen
   ( generate
   ) where
 
-import           Data.Foldable                 (fold)
-import           Data.Graph.Inductive          (Graph, LNode, Node, indeg,
-                                                labNodes, nodes, outdeg, pre)
-import           Data.Maybe                    (fromMaybe)
-import           Data.Text                     (Text)
-import qualified Data.Text                     as T
-import           Test.VeriFuzz.Circuit
-import           Test.VeriFuzz.Internal.Gen
-import           Test.VeriFuzz.Internal.Shared
+import           Data.Foldable            (fold)
+import           Data.Graph.Inductive     (Graph, LNode, Node, indeg, labNodes,
+                                           nodes, outdeg, pre)
+import           Data.Maybe               (fromMaybe)
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           VeriFuzz.Circuit
+import           VeriFuzz.Internal.Gen
+import           VeriFuzz.Internal.Shared
 
 toOperator :: Gate -> Text
 toOperator And = " & "

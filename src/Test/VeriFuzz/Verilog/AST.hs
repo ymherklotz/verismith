@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Verilog.AST
+Module      : VeriFuzz.Verilog.AST
 Description : Definition of the Verilog AST types.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,18 +10,17 @@ Poratbility : POSIX
 Defines the types to build a Verilog AST.
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell            #-}
 
-module Test.VeriFuzz.Verilog.AST where
+module VeriFuzz.Verilog.AST where
 
-import           Control.Lens
-import qualified Data.Graph.Inductive       as G
-import           Data.String
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import qualified Test.QuickCheck            as QC
-import           Test.VeriFuzz.Circuit
-import           Test.VeriFuzz.Graph.Random
+import           Control.Lens     (makeLenses, (^.))
+import           Data.String      (IsString, fromString)
+import           Data.Text        (Text)
+import qualified Data.Text        as T
+import           Data.Traversable (sequenceA)
+import qualified QuickCheck       as QC
 
 -- | 'Source' class which determines that source code is able to be generated
 -- from the data structure using 'genSource'. This will be stored in 'Text' and
@@ -29,25 +28,27 @@ import           Test.VeriFuzz.Graph.Random
 class Source a where
   genSource :: a -> Text
 
+positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
+positiveArb = QC.suchThat QC.arbitrary (>0)
+
+instance QC.Arbitrary Text where
+  arbitrary = T.pack <$> QC.arbitrary
+
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { _getIdentifier :: Text }
-                   deriving (Eq)
+                   deriving (Eq, IsString, Semigroup, Monoid)
 
 makeLenses ''Identifier
 
-instance IsString Identifier where
-  fromString = Identifier . T.pack
-
-instance Semigroup Identifier where
-  (Identifier a) <> (Identifier b) = Identifier (a <> b)
-
-instance Monoid Identifier where
-  mempty = Identifier mempty
-
 instance Show Identifier where
   show i = T.unpack $ i ^. getIdentifier
+
+instance QC.Arbitrary Identifier where
+  arbitrary = do
+    l <- QC.choose (2, 10)
+    Identifier . T.pack <$> replicateM l (QC.elements ['a'..'z'])
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _delay :: Int }
@@ -62,28 +63,17 @@ instance Num Delay where
   signum (Delay a) = Delay $ signum a
   fromInteger = Delay . fromInteger
 
+instance QC.Arbitrary Delay where
+  arbitrary = Delay <$> positiveArb
+
 -- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
 data Event = EId Identifier
            | EExpr Expr
            | EAll
            deriving (Eq)
 
--- | Type that represents the left hand side of an assignment, which can be a
--- concatenation such as in:
---
--- @
--- {a, b, c} = 32'h94238;
--- @
-data LVal = RegId Identifier
-          | RegExpr { _regExprId :: Identifier
-                    , _regExpr   :: Expr
-                    }
-          | RegSize { _regSizeId  :: Identifier
-                    , _regSizeMSB :: ConstExpr
-                    , _regSizeLSB :: ConstExpr
-                    }
-          | RegConcat { _regConc :: [Expr] }
-          deriving (Eq)
+instance QC.Arbitrary Event where
+  arbitrary = EId <$> QC.arbitrary
 
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
@@ -113,6 +103,35 @@ data BinaryOperator = BinPlus    -- ^ @+@
                     | BinASR     -- ^ @>>>@
                     deriving (Eq)
 
+instance QC.Arbitrary BinaryOperator where
+  arbitrary = QC.elements
+    [ BinPlus
+    , BinMinus
+    , BinTimes
+    , BinDiv
+    , BinMod
+    , BinEq
+    , BinNEq
+    , BinCEq
+    , BinCNEq
+    , BinLAnd
+    , BinLOr
+    , BinLT
+    , BinLEq
+    , BinGT
+    , BinGEq
+    , BinAnd
+    , BinOr
+    , BinXor
+    , BinXNor
+    , BinXNorInv
+    , BinPower
+    , BinLSL
+    , BinLSR
+    , BinASL
+    , BinASR
+    ]
+
 -- | Unary operators that are currently supported by the generator.
 data UnaryOperator = UnPlus    -- ^ @+@
                    | UnMinus   -- ^ @-@
@@ -125,6 +144,20 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnNxor    -- ^ @~^@
                    | UnNxorInv -- ^ @^~@
                    deriving (Eq)
+
+instance QC.Arbitrary UnaryOperator where
+  arbitrary = QC.elements
+    [ UnPlus
+    , UnMinus
+    , UnNot
+    , UnAnd
+    , UnNand
+    , UnOr
+    , UnNor
+    , UnXor
+    , UnNxor
+    , UnNxorInv
+    ]
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
@@ -168,17 +201,70 @@ instance Monoid Expr where
 instance IsString Expr where
   fromString = Str . fromString
 
+expr :: Int -> QC.Gen Expr
+expr 0 = QC.oneof
+  [ Id <$> QC.arbitrary
+  , Number <$> positiveArb <*> QC.arbitrary
+  , UnOp <$> QC.arbitrary <*> QC.arbitrary
+  -- , Str <$> QC.arbitrary
+  ]
+expr n
+  | n > 0 = QC.oneof
+    [ Id <$> QC.arbitrary
+    , Number <$> positiveArb <*> QC.arbitrary
+    , Concat <$> QC.listOf1 (subexpr 4)
+    , UnOp <$> QC.arbitrary <*> QC.arbitrary
+    -- , Str <$> QC.arbitrary
+    , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
+    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+    ]
+  | otherwise = expr 0
+  where
+    subexpr y = expr (n `div` y)
+
+instance QC.Arbitrary Expr where
+  arbitrary = QC.sized expr
+
+traverseExpr :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
+traverseExpr f (Concat e)     = Concat <$> sequenceA (f <$> e)
+traverseExpr f (UnOp un e)    = UnOp un <$> f e
+traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
+traverseExpr f (Cond c l r)   = Cond <$> f c <*> f l <*> f r
+traverseExpr _ e              = pure e
+
+makeLenses ''Expr
+
 -- | Constant expression, which are known before simulation at compilation time.
 newtype ConstExpr = ConstExpr { _constNum :: Int }
-                  deriving (Eq)
+                  deriving (Eq, Num)
 
-instance Num ConstExpr where
-  ConstExpr a + ConstExpr b = ConstExpr $ a + b
-  ConstExpr a * ConstExpr b = ConstExpr $ a * b
-  ConstExpr a - ConstExpr b = ConstExpr $ a - b
-  abs (ConstExpr a) = ConstExpr $ abs a
-  signum (ConstExpr a) = ConstExpr $ signum a
-  fromInteger = ConstExpr . fromInteger
+instance QC.Arbitrary ConstExpr where
+  arbitrary = ConstExpr <$> positiveArb
+
+-- | Type that represents the left hand side of an assignment, which can be a
+-- concatenation such as in:
+--
+-- @
+-- {a, b, c} = 32'h94238;
+-- @
+data LVal = RegId Identifier
+          | RegExpr { _regExprId :: Identifier
+                    , _regExpr   :: Expr
+                    }
+          | RegSize { _regSizeId  :: Identifier
+                    , _regSizeMSB :: ConstExpr
+                    , _regSizeLSB :: ConstExpr
+                    }
+          | RegConcat { _regConc :: [Expr] }
+          deriving (Eq)
+
+makeLenses ''LVal
+
+instance QC.Arbitrary LVal where
+  arbitrary = QC.oneof [ RegId <$> QC.arbitrary
+                       , RegExpr <$> QC.arbitrary <*> QC.arbitrary
+                       , RegSize <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+                       ]
 
 -- | Different port direction that are supported in Verilog.
 data PortDir = PortIn    -- ^ Input direction for port (@input@).
@@ -186,11 +272,19 @@ data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortInOut -- ^ Inout direction for port (@inout@).
              deriving (Eq)
 
+instance QC.Arbitrary PortDir where
+  arbitrary = QC.elements [PortIn, PortOut, PortInOut]
+
 -- | Currently, only @wire@ and @reg@ are supported, as the other net types are
 -- not that common and not a priority.
 data PortType = Wire
               | Reg { _regSigned :: Bool }
               deriving (Eq)
+
+instance QC.Arbitrary PortType where
+  arbitrary = QC.oneof [pure Wire, Reg <$> QC.arbitrary]
+
+makeLenses ''PortType
 
 -- | Port declaration. It contains information about the type of the port, the
 -- size, and the port name. It used to also contain information about if it was
@@ -205,6 +299,11 @@ data Port = Port { _portType :: PortType
                  , _portName :: Identifier
                  } deriving (Eq)
 
+makeLenses ''Port
+
+instance QC.Arbitrary Port where
+  arbitrary = Port <$> QC.arbitrary <*> positiveArb <*> QC.arbitrary
+
 -- | This is currently a type because direct module declaration should also be
 -- added:
 --
@@ -214,16 +313,27 @@ data Port = Port { _portType :: PortType
 newtype ModConn = ModConn { _modConn :: Expr }
                 deriving (Eq)
 
+makeLenses ''ModConn
+
+instance QC.Arbitrary ModConn where
+  arbitrary = ModConn <$> QC.arbitrary
+
 data Assign = Assign { _assignReg   :: LVal
                      , _assignDelay :: Maybe Delay
                      , _assignExpr  :: Expr
                      } deriving (Eq)
+
+instance QC.Arbitrary Assign where
+  arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expr
                              } deriving (Eq)
 
 makeLenses ''ContAssign
+
+instance QC.Arbitrary ContAssign where
+  arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
 
 -- | Stmnts in Verilog.
 data Stmnt = TimeCtrl { _statDelay :: Delay
@@ -249,9 +359,39 @@ instance Semigroup Stmnt where
 instance Monoid Stmnt where
   mempty = SeqBlock []
 
+statement :: Int -> QC.Gen Stmnt
+statement 0 = QC.oneof
+  [ BlockAssign <$> QC.arbitrary
+  , NonBlockAssign <$> QC.arbitrary
+  -- , StatCA <$> QC.arbitrary
+  , TaskEnable <$> QC.arbitrary
+  , SysTaskEnable <$> QC.arbitrary
+  ]
+statement n
+  | n > 0 = QC.oneof
+    [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
+    , SeqBlock <$> QC.listOf1 (substat 4)
+    , BlockAssign <$> QC.arbitrary
+    , NonBlockAssign <$> QC.arbitrary
+    -- , StatCA <$> QC.arbitrary
+    , TaskEnable <$> QC.arbitrary
+    , SysTaskEnable <$> QC.arbitrary
+    ]
+  | otherwise = statement 0
+  where
+    substat y = statement (n `div` y)
+
+instance QC.Arbitrary Stmnt where
+  arbitrary = QC.sized statement
+
 data Task = Task { _taskName :: Identifier
                  , _taskExpr :: [Expr]
                  } deriving (Eq)
+
+makeLenses ''Task
+
+instance QC.Arbitrary Task where
+  arbitrary = Task <$> QC.arbitrary <*> QC.arbitrary
 
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA ContAssign
@@ -266,6 +406,16 @@ data ModItem = ModCA ContAssign
                     }
              deriving (Eq)
 
+makeLenses ''ModItem
+
+instance QC.Arbitrary ModItem where
+  arbitrary = QC.oneof [ ModCA <$> QC.arbitrary
+                       , ModInst <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+                       , Initial <$> QC.arbitrary
+                       , Always <$> (EventCtrl <$> QC.arbitrary <*> QC.arbitrary)
+                       , Decl <$> pure Nothing <*> QC.arbitrary
+                       ]
+
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _moduleId    :: Identifier
                        , _modOutPorts :: [Port]
@@ -273,13 +423,33 @@ data ModDecl = ModDecl { _moduleId    :: Identifier
                        , _moduleItems :: [ModItem]
                        } deriving (Eq)
 
+makeLenses ''ModDecl
+
+modPortGen :: QC.Gen Port
+modPortGen = QC.oneof
+  [ Port Wire <$> positiveArb <*> QC.arbitrary
+  , Port <$> (Reg <$> QC.arbitrary) <*> positiveArb <*> QC.arbitrary
+  ]
+
+
+instance QC.Arbitrary ModDecl where
+  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary
+              <*> QC.listOf1 modPortGen <*> QC.arbitrary
+
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModDecl }
                     deriving (Eq)
 
+makeLenses ''Description
+
+instance QC.Arbitrary Description where
+  arbitrary = Description <$> QC.arbitrary
+
 -- | The complete sourcetext for the Verilog module.
 newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
                    deriving (Eq)
+
+makeLenses ''VerilogSrc
 
 instance Semigroup VerilogSrc where
   VerilogSrc a <> VerilogSrc b = VerilogSrc $ a ++ b
@@ -287,30 +457,5 @@ instance Semigroup VerilogSrc where
 instance Monoid VerilogSrc where
   mempty = VerilogSrc []
 
--- Traversal Instance
-
-traverseExpr :: Traversal' Expr Expr
-traverseExpr f (Concat e)     = Concat <$> sequenceA (f <$> e)
-traverseExpr f (UnOp un e)    = UnOp un <$> f e
-traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
-traverseExpr f (Cond c l r)   = Cond <$> f c <*> f l <*> f r
-traverseExpr _ e              = pure e
-
--- Create all the necessary lenses
-
-makeLenses ''VerilogSrc
-makeLenses ''Description
-makeLenses ''ModDecl
-makeLenses ''ModItem
-makeLenses ''Port
-makeLenses ''PortDir
-makeLenses ''BinaryOperator
-makeLenses ''UnaryOperator
-makeLenses ''Expr
-makeLenses ''PortType
-
--- Make all the necessary prisms
-
-makePrisms ''Expr
-makePrisms ''ModItem
-makePrisms ''ModConn
+instance QC.Arbitrary VerilogSrc where
+  arbitrary = VerilogSrc <$> QC.arbitrary

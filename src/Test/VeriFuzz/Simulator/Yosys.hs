@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Simulator.Yosys
+Module      : VeriFuzz.Simulator.Yosys
 Description : Yosys simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -12,19 +12,19 @@ Yosys simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module Test.VeriFuzz.Simulator.Yosys where
+module VeriFuzz.Simulator.Yosys where
 
 import           Control.Lens
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as B
-import           Data.Maybe                      (fromMaybe)
-import           Data.Text                       (Text)
-import qualified Data.Text                       as T
-import           Prelude                         hiding (FilePath)
+import           Data.ByteString            (ByteString)
+import qualified Data.ByteString            as B
+import           Data.Maybe                 (fromMaybe)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Prelude                    hiding (FilePath)
 import           Shelly
-import           Test.VeriFuzz.Simulator.General
-import           Test.VeriFuzz.Verilog
-import           Text.Shakespeare.Text           (st)
+import           Text.Shakespeare.Text      (st)
+import           VeriFuzz.Simulator.General
+import           VeriFuzz.Verilog
 
 newtype Yosys = Yosys { yosysPath :: FilePath }
 

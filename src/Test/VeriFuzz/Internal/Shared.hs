@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Internal.Shared
+Module      : VeriFuzz.Internal.Shared
 Description : Shared high level code used in the other modules internally.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Shared high level code used in the other modules internally.
 -}
 
-module Test.VeriFuzz.Internal.Shared where
+module VeriFuzz.Internal.Shared where
 
 -- | Converts unsafe list functions in the Prelude to a safe version.
 safe :: ([a] -> b) -> [a] -> Maybe b

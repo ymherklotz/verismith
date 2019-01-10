@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz.Circuit
+Module      : VeriFuzz.Circuit
 Description : Definition of the circuit graph.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Definition of the circuit graph.
 -}
 
-module Test.VeriFuzz.Circuit where
+module VeriFuzz.Circuit where
 
 import           Data.Graph.Inductive (Gr, LNode)
 import           System.Random
