@@ -33,7 +33,6 @@ library
                      , VeriFuzz.Simulator.Yosys
                      , VeriFuzz.Verilog
                      , VeriFuzz.Verilog.AST
-                     , VeriFuzz.Verilog.Arbitrary
                      , VeriFuzz.Verilog.CodeGen
                      , VeriFuzz.Verilog.Helpers
                      , VeriFuzz.Verilog.Mutate
