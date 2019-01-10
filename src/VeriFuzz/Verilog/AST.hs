@@ -14,30 +14,43 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE TemplateHaskell            #-}
 
 module VeriFuzz.Verilog.AST
-  ( Identifier(..), getIdentifier
+  ( -- * Top level types
+    Description(..), getDescription
+  , VerilogSrc(..), getVerilogSrc
+    -- * Primitives
+    -- ** Identifier
+  , Identifier(..), getIdentifier
+    -- ** Control
   , Delay(..), getDelay
   , Event(..)
+    -- ** Operators
   , BinaryOperator(..)
   , UnaryOperator(..)
+    -- ** Task
+  , Task(..), taskName, taskExpr
+    -- ** Left hand side value
+  , LVal(..), regId, regExprId, regExpr, regSizeId, regSizeMSB
+  , regSizeLSB, regConc
+    -- ** Ports
+  , PortDir(..)
+  , PortType(..), regSigned
+  , Port(..), portType, portSize, portName
+    -- * Expression
   , Expr(..), exprSize, exprVal, exprId, exprConcat
   , exprUnOp, exprPrim, exprLhs, exprBinOp, exprRhs
   , exprCond, exprTrue, exprFalse, exprStr, traverseExpr
   , ConstExpr(..), constNum
-  , Task(..), taskName, taskExpr
-  , LVal(..), regId, regExprId, regExpr, regSizeId, regSizeMSB
-  , regSizeLSB, regConc
-  , PortDir(..)
-  , PortType(..), regSigned
-  , Port(..), portType, portSize, portName
-  , ModConn(..), modConn
+    -- * Assignment
   , Assign(..), assignReg, assignDelay, assignExpr
   , ContAssign(..), contAssignNetLVal, contAssignExpr
+    -- * Statment
   , Stmnt(..), statDelay, statDStat, statEvent, statEStat, statements
   , stmntBA, stmntNBA, stmntCA, stmntTask, stmntSysTask
-  , ModItem(..), _ModCA, modInstId, modInstName, modInstConns, declDir, declPort
+    -- * Module
   , ModDecl(..), moduleId, modOutPorts, modInPorts, modItems
-  , Description(..), getDescription
-  , VerilogSrc(..), getVerilogSrc) where
+  , ModItem(..), _ModCA, modInstId, modInstName, modInstConns, declDir, declPort
+  , ModConn(..), modConn
+  ) where
 
 import           Control.Lens     (makeLenses, makePrisms)
 import           Control.Monad    (replicateM)
@@ -348,17 +361,17 @@ makeLenses ''ContAssign
 instance QC.Arbitrary ContAssign where
   arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
 
--- | Stmnts in Verilog.
+-- | Statements in Verilog.
 data Stmnt = TimeCtrl { _statDelay :: Delay
                       , _statDStat :: Maybe Stmnt
-                      }                              -- ^ Time control (@#NUM@)
+                      }                             -- ^ Time control (@#NUM@)
            | EventCtrl { _statEvent :: Event
                        , _statEStat :: Maybe Stmnt
                        }
-           | SeqBlock { _statements :: [Stmnt] } -- ^ Sequential block (@begin ... end@)
-           | BlockAssign { _stmntBA :: Assign }                      -- ^ blocking assignment (@=@)
-           | NonBlockAssign { _stmntNBA :: Assign }                   -- ^ Non blocking assignment (@<=@)
-           | StatCA { _stmntCA :: ContAssign }                       -- ^ Stmnt continuous assignment. May not be correct.
+           | SeqBlock { _statements :: [Stmnt] }    -- ^ Sequential block (@begin ... end@)
+           | BlockAssign { _stmntBA :: Assign }     -- ^ blocking assignment (@=@)
+           | NonBlockAssign { _stmntNBA :: Assign } -- ^ Non blocking assignment (@<=@)
+           | StatCA { _stmntCA :: ContAssign }      -- ^ Stmnt continuous assignment. May not be correct.
            | TaskEnable { _stmntTask :: Task}
            | SysTaskEnable { _stmntSysTask :: Task}
            deriving (Eq, Show)
