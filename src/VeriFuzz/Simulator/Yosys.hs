@@ -15,11 +15,7 @@ Yosys simulator implementation.
 module VeriFuzz.Simulator.Yosys where
 
 import           Control.Lens
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString            as B
-import           Data.Maybe                 (fromMaybe)
 import           Data.Text                  (Text)
-import qualified Data.Text                  as T
 import           Prelude                    hiding (FilePath)
 import           Shelly
 import           Text.Shakespeare.Text      (st)
@@ -31,9 +27,6 @@ newtype Yosys = Yosys { yosysPath :: FilePath }
 instance Simulator Yosys where
   toText _ = "yosys"
 
-instance Simulate Yosys where
-  runSim = runSimYosys
-
 instance Synthesize Yosys where
   runSynth = runSynthYosys
 
@@ -44,14 +37,11 @@ writeSimFile :: Yosys    -- ^ Simulator instance
              -> ModDecl  -- ^ Current module
              -> FilePath -- ^ Output sim file
              -> Sh ()
-writeSimFile sim m file = do
+writeSimFile _ m file = do
   writefile "rtl.v" $ genSource m
   writefile file [st|read_verilog rtl.v; proc;;
 rename mod mod_rtl
 |]
-
-runSimYosys :: Yosys -> ModDecl -> [ByteString] -> Sh Int
-runSimYosys sim ver tb = return 0
 
 runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
 runSynthYosys sim m outf = do
@@ -77,7 +67,7 @@ sat -timeout 20 -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{modName}
   where
     idSim2 = maybe "rtl" toText sim2
     modName = m ^. moduleId . getIdentifier
-    ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
+    -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
 runOtherSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
 runOtherSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]

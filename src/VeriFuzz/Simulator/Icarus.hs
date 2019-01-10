@@ -18,11 +18,8 @@ import qualified Data.ByteString            as B
 import           Data.Foldable              (fold)
 import           Data.Hashable
 import           Data.List                  (transpose)
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
 import           Prelude                    hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text      (st)
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog
 

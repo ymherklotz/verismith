@@ -59,13 +59,13 @@ genModuleDecl :: ModDecl -> Text
 genModuleDecl mod =
   "module " <> mod ^. moduleId . getIdentifier
   <> ports <> ";\n"
-  <> modItems
+  <> modI
   <> "endmodule\n"
   where
     ports
       | noIn && noOut = ""
       | otherwise = "(" <> comma (genModPort <$> outIn) <> ")"
-    modItems = fold $ genModuleItem <$> mod ^. moduleItems
+    modI = fold $ genModuleItem <$> mod ^. modItems
     noOut = null $ mod ^. modOutPorts
     noIn = null $ mod ^. modInPorts
     outIn = (mod ^. modOutPorts) ++ (mod ^. modInPorts)

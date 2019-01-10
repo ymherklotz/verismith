@@ -22,18 +22,18 @@ import           VeriFuzz.Verilog.CodeGen
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
-inPort id mod = inInput
+inPort i m = inInput
   where
-    inInput = any (\a -> a ^. portName == id) $ mod ^. modInPorts ++ mod ^. modOutPorts
+    inInput = any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
 findAssign :: Identifier -> [ModItem] -> Maybe Expr
-findAssign id items =
+findAssign i items =
   safe last . catMaybes $ isAssign <$> items
   where
     isAssign (ModCA (ContAssign val expr))
-      | val == id = Just expr
+      | val == i = Just expr
       | otherwise = Nothing
     isAssign _ = Nothing
 
@@ -41,9 +41,9 @@ findAssign id items =
 -- expression. This is used inside 'transformOf' and 'traverseExpr' to replace
 -- the 'Identifier' recursively.
 idTrans :: Identifier -> Expr -> Expr -> Expr
-idTrans i expr (Id id)
-  | id == i = expr
-  | otherwise = Id id
+idTrans i expr (Id id')
+  | id' == i = expr
+  | otherwise = Id id'
 idTrans _ _ e = e
 
 -- | Replaces the identifier recursively in an expression.
@@ -57,19 +57,19 @@ replace = (transformOf traverseExpr .) . idTrans
 -- wire that one finds, to use the assignment to the wire before the current
 -- expression. This would require a different approach though.
 nestId :: Identifier -> ModDecl -> ModDecl
-nestId id mod
-  | not $ inPort id mod =
-      let expr = fromMaybe def . findAssign id $ mod ^. moduleItems
-      in mod & get %~ replace id expr
-  | otherwise = mod
+nestId i m
+  | not $ inPort i m =
+      let expr = fromMaybe def . findAssign i $ m ^. modItems
+      in m & get %~ replace i expr
+  | otherwise = m
   where
-    get = moduleItems . traverse . _ModCA . contAssignExpr
-    def = Id id
+    get = modItems . traverse . _ModCA . contAssignExpr
+    def = Id i
 
 -- | Replaces an identifier by a expression in all the module declaration.
 nestSource :: Identifier -> VerilogSrc -> VerilogSrc
-nestSource id src =
-  src & getVerilogSrc . traverse . getDescription %~ nestId id
+nestSource i src =
+  src & getVerilogSrc . traverse . getDescription %~ nestId i
 
 -- | Nest variables in the format @w[0-9]*@ up to a certain number.
 nestUpTo :: Int -> VerilogSrc -> VerilogSrc
@@ -77,17 +77,17 @@ nestUpTo i src =
   foldl (flip nestSource) src $ Identifier . fromNode <$> [1..i]
 
 allVars :: ModDecl -> [Identifier]
-allVars mod =
-  (mod ^.. modOutPorts . traverse . portName) ++ (mod ^.. modInPorts . traverse . portName)
+allVars m =
+  (m ^.. modOutPorts . traverse . portName) ++ (m ^.. modInPorts . traverse . portName)
 -- $setup
--- >>> let mod = (ModDecl (Identifier "m") [Port Wire 5 (Identifier "y")] [Port Wire 5 "x"] [])
+-- >>> let m = (ModDecl (Identifier "m") [Port Wire 5 (Identifier "y")] [Port Wire 5 "x"] [])
 -- >>> let main = (ModDecl "main" [] [] [])
 
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
 -- it to the body of the second module. It first has to make all the inputs into
 -- @reg@.
 --
--- >>> render $ instantiateMod mod main
+-- >>> render $ instantiateMod m main
 -- module main;
 -- wire [4:0] y;
 -- reg [4:0] x;
@@ -95,27 +95,27 @@ allVars mod =
 -- endmodule
 -- <BLANKLINE>
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
-instantiateMod mod main =
-  main & moduleItems %~ ((out ++ regIn ++ [inst])++)
+instantiateMod m main =
+  main & modItems %~ ((out ++ regIn ++ [inst])++)
   where
-    out = Decl Nothing <$> mod ^. modOutPorts
-    regIn = Decl Nothing <$> (mod ^. modInPorts & traverse . portType .~ Reg False)
-    inst = ModInst (mod ^. moduleId) (mod ^. moduleId <> (Identifier . showT $ count+1)) conns
-    count = length . filter (==mod ^. moduleId) $ main ^.. moduleItems . traverse . modInstId
-    conns = ModConn . Id <$> allVars mod
+    out = Decl Nothing <$> m ^. modOutPorts
+    regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg False)
+    inst = ModInst (m ^. moduleId) (m ^. moduleId <> (Identifier . showT $ count+1)) conns
+    count = length . filter (==m ^. moduleId) $ main ^.. modItems . traverse . modInstId
+    conns = ModConn . Id <$> allVars m
 
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
 --
--- >>> render $ instantiateMod_ mod
+-- >>> render $ instantiateMod_ m
 -- m m(y, x);
 -- <BLANKLINE>
 instantiateMod_ :: ModDecl -> ModItem
-instantiateMod_ mod =
-  ModInst (mod ^. moduleId) (mod ^. moduleId) conns
+instantiateMod_ m =
+  ModInst (m ^. moduleId) (m ^. moduleId) conns
   where
     conns = ModConn . Id <$>
-      (mod ^.. modOutPorts . traverse . portName) ++ (mod ^.. modInPorts . traverse . portName)
+      (m ^.. modOutPorts . traverse . portName) ++ (m ^.. modInPorts . traverse . portName)
 
 -- | Initialise all the inputs and outputs to a module.
 --
@@ -126,10 +126,10 @@ instantiateMod_ mod =
 -- endmodule
 -- <BLANKLINE>
 initMod :: ModDecl -> ModDecl
-initMod mod = mod & moduleItems %~ ((out ++ inp)++)
+initMod m = m & modItems %~ ((out ++ inp)++)
   where
-    out = Decl (Just PortOut) <$> (mod ^. modOutPorts)
-    inp = Decl (Just PortIn) <$> (mod ^. modInPorts)
+    out = Decl (Just PortOut) <$> (m ^. modOutPorts)
+    inp = Decl (Just PortIn) <$> (m ^. modInPorts)
 
 makeIdFrom :: (Show a) => a -> Identifier -> Identifier
 makeIdFrom a i =
