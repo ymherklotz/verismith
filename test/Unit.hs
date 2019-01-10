@@ -6,7 +6,7 @@ import           Data.Text            (Text)
 import qualified Data.Text            as T
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Test.VeriFuzz
+import           VeriFuzz
 
 unitTests = testGroup "Unit tests"
   [ testCase "Transformation of AST" $

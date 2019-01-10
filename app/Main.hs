@@ -14,8 +14,8 @@ import           Numeric                           (showHex)
 import           Numeric.Natural                   (Natural)
 import           Shelly
 import qualified Test.QuickCheck                   as QC
-import           Test.VeriFuzz
-import qualified Test.VeriFuzz.Graph.RandomAlt     as V
+import           VeriFuzz
+import qualified VeriFuzz.Graph.RandomAlt          as V
 
 genRand :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
 genRand gen n bytes

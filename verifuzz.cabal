@@ -17,25 +17,25 @@ extra-source-files:    README.md
 library
   hs-source-dirs:      src
   default-language:    Haskell2010
-  other-modules:       Test.VeriFuzz.Internal.Shared
-                     , Test.VeriFuzz.Internal.Gen
-  exposed-modules:     Test.VeriFuzz
-                     , Test.VeriFuzz.Circuit
-                     , Test.VeriFuzz.Graph.ASTGen
-                     , Test.VeriFuzz.Graph.CodeGen
-                     , Test.VeriFuzz.Graph.Random
-                     , Test.VeriFuzz.Graph.RandomAlt
-                     , Test.VeriFuzz.Simulator
-                     , Test.VeriFuzz.Simulator.General
-                     , Test.VeriFuzz.Simulator.Icarus
-                     , Test.VeriFuzz.Simulator.Xst
-                     , Test.VeriFuzz.Simulator.Yosys
-                     , Test.VeriFuzz.Verilog
-                     , Test.VeriFuzz.Verilog.AST
-                     , Test.VeriFuzz.Verilog.Arbitrary
-                     , Test.VeriFuzz.Verilog.CodeGen
-                     , Test.VeriFuzz.Verilog.Helpers
-                     , Test.VeriFuzz.Verilog.Mutate
+  other-modules:       VeriFuzz.Internal.Shared
+                     , VeriFuzz.Internal.Gen
+  exposed-modules:     VeriFuzz
+                     , VeriFuzz.Circuit
+                     , VeriFuzz.Graph.ASTGen
+                     , VeriFuzz.Graph.CodeGen
+                     , VeriFuzz.Graph.Random
+                     , VeriFuzz.Graph.RandomAlt
+                     , VeriFuzz.Simulator
+                     , VeriFuzz.Simulator.General
+                     , VeriFuzz.Simulator.Icarus
+                     , VeriFuzz.Simulator.Xst
+                     , VeriFuzz.Simulator.Yosys
+                     , VeriFuzz.Verilog
+                     , VeriFuzz.Verilog.AST
+                     , VeriFuzz.Verilog.Arbitrary
+                     , VeriFuzz.Verilog.CodeGen
+                     , VeriFuzz.Verilog.Helpers
+                     , VeriFuzz.Verilog.Mutate
   build-depends:       base >= 4.7 && < 5
                      , QuickCheck >=2.3 && <2.10
                      , fgl

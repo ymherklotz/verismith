@@ -1,5 +1,5 @@
 {-|
-Module      : Test.VeriFuzz
+Module      : VeriFuzz
 Description : VeriFuzz
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -8,23 +8,23 @@ Stability   : experimental
 Portability : POSIX
 -}
 
-module Test.VeriFuzz
+module VeriFuzz
   (
     -- * Definitions
-    module Test.VeriFuzz.Circuit
+    module VeriFuzz.Circuit
     -- * Verilog AST Data Types
-  , module Test.VeriFuzz.Verilog
+  , module VeriFuzz.Verilog
     -- * Graphs
-  , module Test.VeriFuzz.Graph.ASTGen
-  , module Test.VeriFuzz.Graph.CodeGen
-  , module Test.VeriFuzz.Graph.Random
+  , module VeriFuzz.Graph.ASTGen
+  , module VeriFuzz.Graph.CodeGen
+  , module VeriFuzz.Graph.Random
     -- * Simulator
-  , module Test.VeriFuzz.Simulator
+  , module VeriFuzz.Simulator
   ) where
 
-import           Test.VeriFuzz.Circuit
-import           Test.VeriFuzz.Graph.ASTGen
-import           Test.VeriFuzz.Graph.CodeGen
-import           Test.VeriFuzz.Graph.Random
-import           Test.VeriFuzz.Simulator
-import           Test.VeriFuzz.Verilog
+import           VeriFuzz.Circuit
+import           VeriFuzz.Graph.ASTGen
+import           VeriFuzz.Graph.CodeGen
+import           VeriFuzz.Graph.Random
+import           VeriFuzz.Simulator
+import           VeriFuzz.Verilog
