@@ -119,7 +119,7 @@ instantiateMod_ m =
 
 -- | Initialise all the inputs and outputs to a module.
 --
--- >>> render $ initMod mod
+-- >>> render $ initMod m
 -- module m(y, x);
 -- output wire [4:0] y;
 -- input wire [4:0] x;
