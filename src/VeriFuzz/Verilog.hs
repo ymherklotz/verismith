@@ -18,10 +18,8 @@ module VeriFuzz.Verilog
     -- * Verilog mutations
   , module VeriFuzz.Verilog.Mutate
   , module VeriFuzz.Verilog.Helpers
-  , module VeriFuzz.Verilog.Arbitrary
   ) where
 
-import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Helpers
