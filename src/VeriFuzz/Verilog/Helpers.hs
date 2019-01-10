@@ -14,7 +14,6 @@ module VeriFuzz.Verilog.Helpers where
 
 import           Control.Lens
 import           Data.Text            (Text)
-import qualified Data.Text
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem
@@ -69,4 +68,4 @@ defaultPort :: Identifier -> Port
 defaultPort = Port Wire 1
 
 portToExpr :: Port -> Expr
-portToExpr (Port _ _ id) = Id id
+portToExpr (Port _ _ i) = Id i

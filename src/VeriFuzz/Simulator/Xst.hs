@@ -15,8 +15,6 @@ Xst (ise) simulator implementation.
 module VeriFuzz.Simulator.Xst where
 
 import           Control.Lens               hiding ((<.>))
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
 import           Prelude                    hiding (FilePath)
 import           Shelly
 import           Text.Shakespeare.Text      (st)
@@ -38,7 +36,7 @@ defaultXst :: Xst
 defaultXst = Xst "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst" "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/netgen"
 
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
-runSynthXst sim mod outf = do
+runSynthXst sim m outf = do
   writefile xstFile [st|run
 -ifn #{modName}.prj -ofn #{modName} -p artix7 -top #{modName}
 -iobuf NO -ram_extract NO -rom_extract NO -use_dsp48 NO
@@ -46,13 +44,12 @@ runSynthXst sim mod outf = do
 -change_error_to_warning "HDLCompiler:226 HDLCompiler:1832"
 |]
   writefile prjFile [st|verilog work "rtl.v"|]
-  writefile "rtl.v" $ genSource mod
+  writefile "rtl.v" $ genSource m
   timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
   run_ (netgenPath sim) ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
   run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
   where
-    modName = mod ^. moduleId . getIdentifier
+    modName = m ^. moduleId . getIdentifier
     modFile = fromText modName
     xstFile = modFile <.> "xst"
     prjFile = modFile <.> "prj"
-    vFile = modFile <.> "v"

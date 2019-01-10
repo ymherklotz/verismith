@@ -139,10 +139,10 @@ makeIdFrom a i =
 -- modules to instantiate.
 makeTop :: Int -> ModDecl -> ModDecl
 makeTop i m =
-  ModDecl (m ^. moduleId) ys (m ^. modInPorts) modItems
+  ModDecl (m ^. moduleId) ys (m ^. modInPorts) modIt
   where
     ys = Port Wire 90 . (flip makeIdFrom) "y" <$> [1..i]
-    modItems = instantiateMod_ . modN <$> [1..i]
+    modIt = instantiateMod_ . modN <$> [1..i]
     modN n = m
              & moduleId %~ makeIdFrom n
              & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]

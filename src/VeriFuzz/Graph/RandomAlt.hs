@@ -12,7 +12,6 @@ Define the random generation for the directed acyclic graph.
 
 module VeriFuzz.Graph.RandomAlt where
 
-import           Data.Graph.Inductive              (Graph, LEdge, mkGraph)
 import qualified Data.Graph.Inductive.Arbitrary    as G
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Test.QuickCheck                   (Arbitrary, Gen)

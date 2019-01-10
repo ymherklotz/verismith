@@ -15,14 +15,12 @@ This module generates the code from the Verilog AST defined in
 
 module VeriFuzz.Verilog.CodeGen where
 
-import           Control.Lens             (view, (^.))
-import           Data.Foldable            (fold)
-import           Data.Maybe               (isNothing)
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import qualified Data.Text.IO             as T
-import           Numeric                  (showHex)
-import           VeriFuzz.Internal.Shared
+import           Control.Lens         (view, (^.))
+import           Data.Foldable        (fold)
+import           Data.Text            (Text)
+import qualified Data.Text            as T
+import qualified Data.Text.IO         as T
+import           Numeric              (showHex)
 import           VeriFuzz.Verilog.AST
 
 -- | 'Source' class which determines that source code is able to be generated
@@ -56,8 +54,8 @@ genDescription desc =
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 genModuleDecl :: ModDecl -> Text
-genModuleDecl mod =
-  "module " <> mod ^. moduleId . getIdentifier
+genModuleDecl m =
+  "module " <> m ^. moduleId . getIdentifier
   <> ports <> ";\n"
   <> modI
   <> "endmodule\n"
@@ -65,10 +63,10 @@ genModuleDecl mod =
     ports
       | noIn && noOut = ""
       | otherwise = "(" <> comma (genModPort <$> outIn) <> ")"
-    modI = fold $ genModuleItem <$> mod ^. modItems
-    noOut = null $ mod ^. modOutPorts
-    noIn = null $ mod ^. modInPorts
-    outIn = (mod ^. modOutPorts) ++ (mod ^. modInPorts)
+    modI = fold $ genModuleItem <$> m ^. modItems
+    noOut = null $ m ^. modOutPorts
+    noIn = null $ m ^. modInPorts
+    outIn = (m ^. modOutPorts) ++ (m ^. modInPorts)
 
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
@@ -95,8 +93,8 @@ genPortDir PortInOut = "inout"
 -- | Generate a 'ModItem'.
 genModuleItem :: ModItem -> Text
 genModuleItem (ModCA ca) = genContAssign ca
-genModuleItem (ModInst (Identifier id) (Identifier name) conn) =
-  id <> " " <> name <> "(" <> comma (genExpr . _modConn <$> conn) <> ")" <> ";\n"
+genModuleItem (ModInst (Identifier i) (Identifier name) conn) =
+  i <> " " <> name <> "(" <> comma (genExpr . _modConn <$> conn) <> ")" <> ";\n"
 genModuleItem (Initial stat) = "initial " <> genStmnt stat
 genModuleItem (Always stat) = "always " <> genStmnt stat
 genModuleItem (Decl dir port) =
@@ -114,8 +112,8 @@ genContAssign (ContAssign val e) =
 
 -- | Generate 'Expr' to 'Text'.
 genExpr :: Expr -> Text
-genExpr (BinOp exprRhs bin exprLhs) =
-  "(" <> genExpr exprRhs <> genBinaryOperator bin <> genExpr exprLhs <> ")"
+genExpr (BinOp eRhs bin eLhs) =
+  "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
 genExpr (Number s n) =
   showT s <> "'h" <> T.pack (showHex n "")
 genExpr (Id i) = i ^. getIdentifier
@@ -169,7 +167,7 @@ genUnaryOperator UnNxorInv = "^~"
 
 -- | Generate verilog code for an 'Event'.
 genEvent :: Event -> Text
-genEvent (EId id)     = "@(" <> id ^. getIdentifier <> ")"
+genEvent (EId i)      = "@(" <> i ^. getIdentifier <> ")"
 genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
 genEvent EAll         = "@*"
 
@@ -179,11 +177,11 @@ genDelay (Delay i) = "#" <> showT i
 
 -- | Generate the verilog code for an 'LVal'.
 genLVal :: LVal -> Text
-genLVal (RegId id) = id ^. getIdentifier
-genLVal (RegExpr id expr) =
-  id ^. getIdentifier <> " [" <> genExpr expr <> "]"
-genLVal (RegSize id msb lsb) =
-  id ^. getIdentifier <> " [" <> genConstExpr msb <> ":" <> genConstExpr lsb <> "]"
+genLVal (RegId i) = i ^. getIdentifier
+genLVal (RegExpr i expr) =
+  i ^. getIdentifier <> " [" <> genExpr expr <> "]"
+genLVal (RegSize i msb lsb) =
+  i ^. getIdentifier <> " [" <> genConstExpr msb <> ":" <> genConstExpr lsb <> "]"
 genLVal (RegConcat e) =
   "{" <> comma (genExpr <$> e) <> "}"
 
@@ -213,10 +211,10 @@ genStmnt (SysTaskEnable task) = "$" <> genTask task <> ";\n"
 
 genTask :: Task -> Text
 genTask (Task name expr)
-  | null expr = id
-  | otherwise = id <> "(" <> comma (genExpr <$> expr) <> ")"
+  | null expr = i
+  | otherwise = i <> "(" <> comma (genExpr <$> expr) <> ")"
   where
-    id = name ^. getIdentifier
+    i = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: (Source a) => a -> IO ()

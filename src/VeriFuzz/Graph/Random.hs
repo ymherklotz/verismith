@@ -12,7 +12,7 @@ Define the random generation for the directed acyclic graph.
 
 module VeriFuzz.Graph.Random where
 
-import           Data.Graph.Inductive              (Context, Graph, LEdge)
+import           Data.Graph.Inductive              (Context, LEdge)
 import qualified Data.Graph.Inductive              as G
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Data.List                         (nub)

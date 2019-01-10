@@ -16,10 +16,8 @@ import           Data.Foldable            (fold)
 import           Data.Graph.Inductive     (LNode, Node)
 import qualified Data.Graph.Inductive     as G
 import           Data.Maybe               (catMaybes)
-import qualified Data.Text                as T
 import           VeriFuzz.Circuit
 import           VeriFuzz.Internal.Gen
-import           VeriFuzz.Internal.Shared
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.Helpers
 
@@ -51,8 +49,8 @@ genPortsAST f c =
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
 genAssignExpr :: Gate -> [Node] -> Maybe Expr
-genAssignExpr g [] = Nothing
-genAssignExpr g [n] = Just . Id $ frNode n
+genAssignExpr _ [] = Nothing
+genAssignExpr _ [n] = Just . Id $ frNode n
 genAssignExpr g (n:ns) = BinOp wire op <$> genAssignExpr g ns
   where
     wire = Id $ frNode n
@@ -75,9 +73,9 @@ genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
     nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModDecl
-genModuleDeclAST c = ModDecl id output ports items
+genModuleDeclAST c = ModDecl i output ports items
   where
-    id = Identifier "gen_module"
+    i = Identifier "gen_module"
     ports = genPortsAST inputsC c
     output = [Port Wire 90 "y"]
     items = genAssignAST c ++ [ModCA . ContAssign "y" . fold $ portToExpr <$> ports]

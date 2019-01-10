@@ -15,8 +15,7 @@ module VeriFuzz.Graph.CodeGen
   ) where
 
 import           Data.Foldable            (fold)
-import           Data.Graph.Inductive     (Graph, LNode, Node, indeg, labNodes,
-                                           nodes, outdeg, pre)
+import           Data.Graph.Inductive     (Graph, LNode, Node, labNodes, pre)
 import           Data.Maybe               (fromMaybe)
 import           Data.Text                (Text)
 import qualified Data.Text                as T
