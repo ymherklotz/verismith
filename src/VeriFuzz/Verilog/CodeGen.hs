@@ -11,9 +11,11 @@ This module generates the code from the Verilog AST defined in
 "VeriFuzz.Verilog.AST".
 -}
 
+{-# LANGUAGE FlexibleInstances #-}
+
 module VeriFuzz.Verilog.CodeGen where
 
-import           Control.Lens
+import           Control.Lens             (view, (^.))
 import           Data.Foldable            (fold)
 import           Data.Maybe               (isNothing)
 import           Data.Text                (Text)
@@ -22,6 +24,12 @@ import qualified Data.Text.IO             as T
 import           Numeric                  (showHex)
 import           VeriFuzz.Internal.Shared
 import           VeriFuzz.Verilog.AST
+
+-- | 'Source' class which determines that source code is able to be generated
+-- from the data structure using 'genSource'. This will be stored in 'Text' and
+-- can then be processed further.
+class Source a where
+  genSource :: a -> Text
 
 -- | Inserts commas between '[Text]' and except the last one.
 comma :: [Text] -> Text
@@ -211,10 +219,13 @@ genTask (Task name expr)
     id = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
-render :: Text -> IO ()
-render = T.putStrLn
+render :: (Source a) => a -> IO ()
+render = T.putStrLn . genSource
 
 -- Instances
+
+instance Source Identifier where
+  genSource = view getIdentifier
 
 instance Source Task where
   genSource = genTask
@@ -263,53 +274,3 @@ instance Source Description where
 
 instance Source VerilogSrc where
   genSource = genVerilogSrc
-
--- Show instances
-
-instance Show Task where
-  show = T.unpack . genTask
-
-instance Show Stmnt where
-  show = T.unpack . genStmnt
-
-instance Show PortType where
-  show = T.unpack . genPortType
-
-instance Show ConstExpr where
-  show = T.unpack . genConstExpr
-
-instance Show LVal where
-  show = T.unpack . genLVal
-
-instance Show Delay where
-  show = T.unpack . genDelay
-
-instance Show Event where
-  show = T.unpack . genEvent
-
-instance Show UnaryOperator where
-  show = T.unpack . genUnaryOperator
-
-instance Show Expr where
-  show = T.unpack . genExpr
-
-instance Show ContAssign where
-  show = T.unpack . genContAssign
-
-instance Show ModItem where
-  show = T.unpack . genModuleItem
-
-instance Show PortDir where
-  show = T.unpack . genPortDir
-
-instance Show Port where
-  show = T.unpack . genPort
-
-instance Show ModDecl where
-  show = T.unpack . genModuleDecl
-
-instance Show Description where
-  show = T.unpack . genDescription
-
-instance Show VerilogSrc where
-  show = T.unpack . genVerilogSrc
