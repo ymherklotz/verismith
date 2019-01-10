@@ -13,7 +13,31 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
-module VeriFuzz.Verilog.AST where
+module VeriFuzz.Verilog.AST
+  ( Identifier(..), getIdentifier
+  , Delay(..), getDelay
+  , Event(..)
+  , BinaryOperator(..)
+  , UnaryOperator(..)
+  , Expr(..), exprSize, exprVal, exprId, exprConcat
+  , exprUnOp, exprPrim, exprLhs, exprBinOp, exprRhs
+  , exprCond, exprTrue, exprFalse, exprStr, traverseExpr
+  , ConstExpr(..), constNum
+  , Task(..), taskName, taskExpr
+  , LVal(..), regId, regExprId, regExpr, regSizeId, regSizeMSB
+  , regSizeLSB, regConc
+  , PortDir(..)
+  , PortType(..), regSigned
+  , Port(..), portType, portSize, portName
+  , ModConn(..), modConn
+  , Assign(..), assignReg, assignDelay, assignExpr
+  , ContAssign(..), contAssignNetLVal, contAssignExpr
+  , Stmnt(..), statDelay, statDStat, statEvent, statEStat, statements
+  , stmntBA, stmntNBA, stmntCA, stmntTask, stmntSysTask
+  , ModItem(..), _ModCA, modInstId, modInstName, modInstConns, declDir, declPort
+  , ModDecl(..), moduleId, modOutPorts, modInPorts, modItems
+  , Description(..), getDescription
+  , VerilogSrc(..), getVerilogSrc) where
 
 import           Control.Lens     (makeLenses, makePrisms)
 import           Control.Monad    (replicateM)
@@ -40,8 +64,10 @@ instance QC.Arbitrary Identifier where
     Identifier . T.pack <$> replicateM l (QC.elements ['a'..'z'])
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
-newtype Delay = Delay { _delay :: Int }
+newtype Delay = Delay { _getDelay :: Int }
                 deriving (Eq, Show, Num)
+
+makeLenses ''Delay
 
 instance QC.Arbitrary Delay where
   arbitrary = Delay <$> positiveArb
@@ -141,11 +167,11 @@ instance QC.Arbitrary UnaryOperator where
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
-data Expr = Number { _numSize :: Int
-                   , _numVal  :: Integer
+data Expr = Number { _exprSize :: Int
+                   , _exprVal  :: Integer
                    }
           | Id { _exprId :: Identifier }
-          | Concat { _concatExpr :: [Expr] }
+          | Concat { _exprConcat :: [Expr] }
           | UnOp { _exprUnOp :: UnaryOperator
                  , _exprPrim :: Expr
                  }
@@ -218,13 +244,24 @@ makeLenses ''Expr
 newtype ConstExpr = ConstExpr { _constNum :: Int }
                   deriving (Eq, Show, Num, QC.Arbitrary)
 
+makeLenses ''ConstExpr
+
+data Task = Task { _taskName :: Identifier
+                 , _taskExpr :: [Expr]
+                 } deriving (Eq, Show)
+
+makeLenses ''Task
+
+instance QC.Arbitrary Task where
+  arbitrary = Task <$> QC.arbitrary <*> QC.arbitrary
+
 -- | Type that represents the left hand side of an assignment, which can be a
 -- concatenation such as in:
 --
 -- @
 -- {a, b, c} = 32'h94238;
 -- @
-data LVal = RegId Identifier
+data LVal = RegId { _regId :: Identifier}
           | RegExpr { _regExprId :: Identifier
                     , _regExpr   :: Expr
                     }
@@ -297,6 +334,8 @@ data Assign = Assign { _assignReg   :: LVal
                      , _assignExpr  :: Expr
                      } deriving (Eq, Show)
 
+makeLenses ''Assign
+
 instance QC.Arbitrary Assign where
   arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
@@ -317,12 +356,14 @@ data Stmnt = TimeCtrl { _statDelay :: Delay
                        , _statEStat :: Maybe Stmnt
                        }
            | SeqBlock { _statements :: [Stmnt] } -- ^ Sequential block (@begin ... end@)
-           | BlockAssign Assign                      -- ^ blocking assignment (@=@)
-           | NonBlockAssign Assign                   -- ^ Non blocking assignment (@<=@)
-           | StatCA ContAssign                       -- ^ Stmnt continuous assignment. May not be correct.
-           | TaskEnable Task
-           | SysTaskEnable Task
+           | BlockAssign { _stmntBA :: Assign }                      -- ^ blocking assignment (@=@)
+           | NonBlockAssign { _stmntNBA :: Assign }                   -- ^ Non blocking assignment (@<=@)
+           | StatCA { _stmntCA :: ContAssign }                       -- ^ Stmnt continuous assignment. May not be correct.
+           | TaskEnable { _stmntTask :: Task}
+           | SysTaskEnable { _stmntSysTask :: Task}
            deriving (Eq, Show)
+
+makeLenses ''Stmnt
 
 instance Semigroup Stmnt where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
@@ -358,15 +399,6 @@ statement n
 instance QC.Arbitrary Stmnt where
   arbitrary = QC.sized statement
 
-data Task = Task { _taskName :: Identifier
-                 , _taskExpr :: [Expr]
-                 } deriving (Eq, Show)
-
-makeLenses ''Task
-
-instance QC.Arbitrary Task where
-  arbitrary = Task <$> QC.arbitrary <*> QC.arbitrary
-
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA ContAssign
              | ModInst { _modInstId    :: Identifier
@@ -375,8 +407,8 @@ data ModItem = ModCA ContAssign
                        }
              | Initial Stmnt
              | Always Stmnt
-             | Decl { declDir  :: Maybe PortDir
-                    , declPort :: Port
+             | Decl { _declDir  :: Maybe PortDir
+                    , _declPort :: Port
                     }
              deriving (Eq, Show)
 
@@ -395,7 +427,7 @@ instance QC.Arbitrary ModItem where
 data ModDecl = ModDecl { _moduleId    :: Identifier
                        , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
-                       , _moduleItems :: [ModItem]
+                       , _modItems    :: [ModItem]
                        } deriving (Eq, Show)
 
 makeLenses ''ModDecl
@@ -405,7 +437,6 @@ modPortGen = QC.oneof
   [ Port Wire <$> positiveArb <*> QC.arbitrary
   , Port <$> (Reg <$> QC.arbitrary) <*> positiveArb <*> QC.arbitrary
   ]
-
 
 instance QC.Arbitrary ModDecl where
   arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary
