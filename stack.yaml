@@ -2,13 +2,9 @@ flags: {}
 packages:
   - .
 extra-deps:
-  # Not in lts release
-  - DRBG-0.5.5@sha256:3b8040bed356e2b63927a27fb6d5adbd19d70c9e1d1bb66111bbeb33e56900eb
-  # For fgl to work properly
-  - QuickCheck-2.9.2@sha256:93cebf9f9c55e8a941bd3166272680d67b80d9b5d95bd836765e3d4a4ef278d0
-  - fgl-5.7.0.1@sha256:92f2e8769ae12232727d7d8b773f9aac924f3c9324935690a5096efc6289fe35
-  - fgl-arbitrary-0.2.0.3@sha256:d80598d16963ba151bf5dfaed5cfb8bb1cf441ce9b60bccce82367cc575c1622
-  - fgl-visualize-0.1.0.1@sha256:e682066053a6e75478a08fd6822dd0143a3b8ea23244bdb01dd389a266447c5e
-  # For hoogle
-  - haskell-src-exts-1.21.0@sha256:02421cacaa48c055551b8e5796efc543301b7ea9527a38e1385403d2b85512fb
-resolver: lts-13.0
+- haskell-src-exts-1.21.0@sha256:02421cacaa48c055551b8e5796efc543301b7ea9527a38e1385403d2b85512fb
+- DRBG-0.5.5@sha256:3b8040bed356e2b63927a27fb6d5adbd19d70c9e1d1bb66111bbeb33e56900eb
+- QuickCheck-2.9.2@sha256:93cebf9f9c55e8a941bd3166272680d67b80d9b5d95bd836765e3d4a4ef278d0
+- fgl-arbitrary-0.2.0.3@sha256:d80598d16963ba151bf5dfaed5cfb8bb1cf441ce9b60bccce82367cc575c1622
+- fgl-visualize-0.1.0.1@sha256:e682066053a6e75478a08fd6822dd0143a3b8ea23244bdb01dd389a266447c5e
+resolver: lts-13.2
