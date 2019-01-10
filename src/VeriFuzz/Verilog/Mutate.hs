@@ -87,7 +87,7 @@ allVars mod =
 -- it to the body of the second module. It first has to make all the inputs into
 -- @reg@.
 --
--- >>> instantiateMod mod main
+-- >>> render $ instantiateMod mod main
 -- module main;
 -- wire [4:0] y;
 -- reg [4:0] x;
@@ -107,7 +107,7 @@ instantiateMod mod main =
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
 --
--- >>> instantiateMod_ mod
+-- >>> render $ instantiateMod_ mod
 -- m m(y, x);
 -- <BLANKLINE>
 instantiateMod_ :: ModDecl -> ModItem
@@ -119,7 +119,7 @@ instantiateMod_ mod =
 
 -- | Initialise all the inputs and outputs to a module.
 --
--- >>> initMod mod
+-- >>> render $ initMod mod
 -- module m(y, x);
 -- output wire [4:0] y;
 -- input wire [4:0] x;
