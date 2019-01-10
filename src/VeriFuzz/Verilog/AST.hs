@@ -15,12 +15,13 @@ Defines the types to build a Verilog AST.
 
 module VeriFuzz.Verilog.AST where
 
-import           Control.Lens     (makeLenses, (^.))
+import           Control.Lens     (makeLenses, makePrisms, (^.))
+import           Control.Monad    (replicateM)
 import           Data.String      (IsString, fromString)
 import           Data.Text        (Text)
 import qualified Data.Text        as T
 import           Data.Traversable (sequenceA)
-import qualified QuickCheck       as QC
+import qualified Test.QuickCheck  as QC
 
 -- | 'Source' class which determines that source code is able to be generated
 -- from the data structure using 'genSource'. This will be stored in 'Text' and
@@ -30,9 +31,6 @@ class Source a where
 
 positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
 positiveArb = QC.suchThat QC.arbitrary (>0)
-
-instance QC.Arbitrary Text where
-  arbitrary = T.pack <$> QC.arbitrary
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -52,16 +50,7 @@ instance QC.Arbitrary Identifier where
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _delay :: Int }
-                deriving (Eq)
-
-instance Num Delay where
-  Delay a + Delay b = Delay $ a + b
-  Delay a - Delay b = Delay $ a - b
-  Delay a * Delay b = Delay $ a * b
-  negate (Delay a) = Delay $ negate a
-  abs (Delay a) = Delay $ abs a
-  signum (Delay a) = Delay $ signum a
-  fromInteger = Delay . fromInteger
+                deriving (Eq, Num)
 
 instance QC.Arbitrary Delay where
   arbitrary = Delay <$> positiveArb
@@ -236,10 +225,7 @@ makeLenses ''Expr
 
 -- | Constant expression, which are known before simulation at compilation time.
 newtype ConstExpr = ConstExpr { _constNum :: Int }
-                  deriving (Eq, Num)
-
-instance QC.Arbitrary ConstExpr where
-  arbitrary = ConstExpr <$> positiveArb
+                  deriving (Eq, Num, QC.Arbitrary)
 
 -- | Type that represents the left hand side of an assignment, which can be a
 -- concatenation such as in:
@@ -311,12 +297,9 @@ instance QC.Arbitrary Port where
 -- mod a(.y(y1), .x1(x11), .x2(x22));
 -- @
 newtype ModConn = ModConn { _modConn :: Expr }
-                deriving (Eq)
+                deriving (Eq, QC.Arbitrary)
 
 makeLenses ''ModConn
-
-instance QC.Arbitrary ModConn where
-  arbitrary = ModConn <$> QC.arbitrary
 
 data Assign = Assign { _assignReg   :: LVal
                      , _assignDelay :: Maybe Delay
@@ -407,6 +390,7 @@ data ModItem = ModCA ContAssign
              deriving (Eq)
 
 makeLenses ''ModItem
+makePrisms ''ModItem
 
 instance QC.Arbitrary ModItem where
   arbitrary = QC.oneof [ ModCA <$> QC.arbitrary
@@ -438,24 +422,12 @@ instance QC.Arbitrary ModDecl where
 
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModDecl }
-                    deriving (Eq)
+                    deriving (Eq, QC.Arbitrary)
 
 makeLenses ''Description
 
-instance QC.Arbitrary Description where
-  arbitrary = Description <$> QC.arbitrary
-
 -- | The complete sourcetext for the Verilog module.
 newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
-                   deriving (Eq)
+                   deriving (Eq, QC.Arbitrary, Semigroup, Monoid)
 
 makeLenses ''VerilogSrc
-
-instance Semigroup VerilogSrc where
-  VerilogSrc a <> VerilogSrc b = VerilogSrc $ a ++ b
-
-instance Monoid VerilogSrc where
-  mempty = VerilogSrc []
-
-instance QC.Arbitrary VerilogSrc where
-  arbitrary = VerilogSrc <$> QC.arbitrary

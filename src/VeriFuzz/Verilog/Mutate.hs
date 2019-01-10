@@ -107,7 +107,7 @@ instantiateMod mod main =
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
 --
--- >>> instantiateMod_ mod main
+-- >>> instantiateMod_ mod
 -- m m(y, x);
 -- <BLANKLINE>
 instantiateMod_ :: ModDecl -> ModItem
