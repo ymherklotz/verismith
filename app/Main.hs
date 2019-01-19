@@ -38,7 +38,7 @@ runSimulation = do
   let circ = head $ (nestUpTo 5 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
   val <- shelly $ runSim defaultIcarus (initMod circ) rand
-  putStrLn $ showHex val ""
+  putStrLn $ showHex (abs val) ""
 
 runEquivalence:: IO ()
 runEquivalence = do
