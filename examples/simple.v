@@ -17,7 +17,8 @@ module main;
      begin
         a = 1'b1;
         b = 1'b1;
-        #1 $display("%d & %d = %d", a, b, c);
+        #1;
+        $display("%d & %d = %d", a, b, c);
         $finish;
      end
 endmodule
