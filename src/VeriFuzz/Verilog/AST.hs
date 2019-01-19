@@ -15,8 +15,8 @@ Defines the types to build a Verilog AST.
 
 module VeriFuzz.Verilog.AST
   ( -- * Top level types
-    Description(..), getDescription
-  , VerilogSrc(..), getVerilogSrc
+    VerilogSrc(..), getVerilogSrc
+  , Description(..), getDescription
     -- * Primitives
     -- ** Identifier
   , Identifier(..), getIdentifier
