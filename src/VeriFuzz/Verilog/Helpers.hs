@@ -45,9 +45,7 @@ testBench = ModDecl
   [ regDecl "a"
   , regDecl "b"
   , wireDecl "c"
-  , ModInst "and"
-            "and_gate"
-            [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
+  , ModInst "and" "and_gate" [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
   , Initial $ SeqBlock
     [ BlockAssign . Assign (RegId "a") Nothing $ Number 1 1
     , BlockAssign . Assign (RegId "b") Nothing $ Number 1 1

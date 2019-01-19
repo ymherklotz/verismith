@@ -38,15 +38,11 @@ defaultIcarus = Icarus "iverilog" "vvp"
 
 addDisplay :: [Stmnt] -> [Stmnt]
 addDisplay s = concat $ transpose
-  [ s
-  , replicate l $ TimeCtrl 1 Nothing
-  , replicate l . SysTaskEnable $ Task "display" ["%h", Id "y"]
-  ]
+  [s, replicate l $ TimeCtrl 1 Nothing, replicate l . SysTaskEnable $ Task "display" ["%h", Id "y"]]
   where l = length s
 
 assignFunc :: [Port] -> ByteString -> Stmnt
-assignFunc inp bs =
-  NonBlockAssign . Assign conc Nothing . Number (B.length bs * 4) $ bsToI bs
+assignFunc inp bs = NonBlockAssign . Assign conc Nothing . Number (B.length bs * 4) $ bsToI bs
   where conc = RegConcat (portToExpr <$> inp)
 
 runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh Int

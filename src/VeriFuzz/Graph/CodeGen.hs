@@ -35,8 +35,7 @@ toOperator Or  = " | "
 toOperator Xor = " ^ "
 
 statList :: Gate -> [Node] -> Maybe Text
-statList g n = toStr <$> safe tail n
-  where toStr = fold . fmap ((<> toOperator g) . fromNode)
+statList g n = toStr <$> safe tail n where toStr = fold . fmap ((<> toOperator g) . fromNode)
 
 lastEl :: [Node] -> Maybe Text
 lastEl n = fromNode <$> safe head n

@@ -25,8 +25,7 @@ import           Test.QuickCheck                ( Arbitrary
 import qualified Test.QuickCheck               as QC
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]
-dupFolder cont ns = unique cont : ns
-  where unique (a, b, c, d) = (nub a, b, c, nub d)
+dupFolder cont ns = unique cont : ns where unique (a, b, c, d) = (nub a, b, c, nub d)
 
 -- | Remove duplicates.
 rDups :: (Eq a, Eq b) => Gr a b -> Gr a b

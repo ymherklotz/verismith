@@ -25,9 +25,7 @@ import           VeriFuzz.Verilog.CodeGen
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
 inPort i m = inInput
- where
-  inInput =
-    any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
+  where inInput = any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
@@ -59,8 +57,7 @@ replace = (transformOf traverseExpr .) . idTrans
 nestId :: Identifier -> ModDecl -> ModDecl
 nestId i m
   | not $ inPort i m
-  = let expr = fromMaybe def . findAssign i $ m ^. modItems
-    in  m & get %~ replace i expr
+  = let expr = fromMaybe def . findAssign i $ m ^. modItems in m & get %~ replace i expr
   | otherwise
   = m
  where
@@ -73,13 +70,10 @@ nestSource i src = src & getVerilogSrc . traverse . getDescription %~ nestId i
 
 -- | Nest variables in the format @w[0-9]*@ up to a certain number.
 nestUpTo :: Int -> VerilogSrc -> VerilogSrc
-nestUpTo i src =
-  foldl (flip nestSource) src $ Identifier . fromNode <$> [1 .. i]
+nestUpTo i src = foldl (flip nestSource) src $ Identifier . fromNode <$> [1 .. i]
 
 allVars :: ModDecl -> [Identifier]
-allVars m =
-  (m ^.. modOutPorts . traverse . portName)
-    ++ (m ^.. modInPorts . traverse . portName)
+allVars m = (m ^.. modOutPorts . traverse . portName) ++ (m ^.. modInPorts . traverse . portName)
 -- $setup
 -- >>> let m = (ModDecl (Identifier "m") [Port Wire 5 (Identifier "y")] [Port Wire 5 "x"] [])
 -- >>> let main = (ModDecl "main" [] [] [])
@@ -100,16 +94,8 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
  where
   out   = Decl Nothing <$> m ^. modOutPorts
   regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg False)
-  inst  = ModInst (m ^. moduleId)
-                  (m ^. moduleId <> (Identifier . showT $ count + 1))
-                  conns
-  count =
-    length
-      .   filter (== m ^. moduleId)
-      $   main
-      ^.. modItems
-      .   traverse
-      .   modInstId
+  inst  = ModInst (m ^. moduleId) (m ^. moduleId <> (Identifier . showT $ count + 1)) conns
+  count = length . filter (== m ^. moduleId) $ main ^.. modItems . traverse . modInstId
   conns = ModConn . Id <$> allVars m
 
 -- | Instantiate without adding wire declarations. It also does not count the
@@ -151,9 +137,4 @@ makeTop i m = ModDecl (m ^. moduleId) ys (m ^. modInPorts) modIt
  where
   ys    = Port Wire 90 . (flip makeIdFrom) "y" <$> [1 .. i]
   modIt = instantiateMod_ . modN <$> [1 .. i]
-  modN n =
-    m
-      &  moduleId
-      %~ makeIdFrom n
-      &  modOutPorts
-      .~ [Port Wire 90 (makeIdFrom n "y")]
+  modN n = m & moduleId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
