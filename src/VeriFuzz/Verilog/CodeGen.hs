@@ -91,7 +91,7 @@ genModuleItem (ModInst (Identifier i) (Identifier name) conn) =
   i <> " " <> name <> "(" <> comma (genExpr . _modConn <$> conn) <> ")" <> ";\n"
 genModuleItem (Initial stat ) = "initial " <> genStmnt stat
 genModuleItem (Always  stat ) = "always " <> genStmnt stat
-genModuleItem (Decl dir port) = (maybe "" makePort dir) <> genPort port <> ";\n"
+genModuleItem (Decl dir port) = maybe "" makePort dir <> genPort port <> ";\n"
   where makePort = (<> " ") . genPortDir
 
 -- | Generate continuous assignment

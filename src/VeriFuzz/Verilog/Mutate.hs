@@ -135,6 +135,6 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 makeTop :: Int -> ModDecl -> ModDecl
 makeTop i m = ModDecl (m ^. moduleId) ys (m ^. modInPorts) modIt
  where
-  ys    = Port Wire 90 . (flip makeIdFrom) "y" <$> [1 .. i]
+  ys    = Port Wire 90 . flip makeIdFrom "y" <$> [1 .. i]
   modIt = instantiateMod_ . modN <$> [1 .. i]
   modN n = m & moduleId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]

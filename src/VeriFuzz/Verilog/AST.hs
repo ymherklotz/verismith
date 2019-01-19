@@ -514,8 +514,7 @@ modPortGen = QC.oneof
   ]
 
 instance QC.Arbitrary ModDecl where
-  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary
-              <*> QC.listOf1 modPortGen <*> QC.arbitrary
+  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary
 
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModDecl }
