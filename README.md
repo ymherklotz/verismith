@@ -11,8 +11,8 @@ It currently supports the following simulators:
 
 ## Build the Fuzzer
 
-The fuzzer is split into an executable (in the [`app`](/app) folder) and a
-library (in the [`src`](/src) folder). To build the executable, you will need
+The fuzzer is split into an executable (in the [app](/app) folder) and a
+library (in the [src](/src) folder). To build the executable, you will need
 [stack](https://docs.haskellstack.org/en/stable/README/) installed. Building
 directly using [cabal-install](https://www.haskell.org/cabal/download.html) is
 possible but not recommended and not directly supported.
