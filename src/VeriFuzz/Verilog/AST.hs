@@ -221,13 +221,13 @@ instance IsString Expr where
   fromString = Str . fromString
 
 expr :: Int -> QC.Gen Expr
-expr 0 = QC.oneof
-  [ Id <$> QC.arbitrary
-  , Number <$> positiveArb <*> QC.arbitrary
-  , UnOp <$> QC.arbitrary <*> QC.arbitrary
-  -- , Str <$> QC.arbitrary
-  ]
 expr n
+  | n == 0 = QC.oneof
+    [ Id <$> QC.arbitrary
+    , Number <$> positiveArb <*> QC.arbitrary
+    , UnOp <$> QC.arbitrary <*> QC.arbitrary
+    -- , Str <$> QC.arbitrary
+    ]
   | n > 0 = QC.oneof
     [ Id <$> QC.arbitrary
     , Number <$> positiveArb <*> QC.arbitrary
@@ -292,6 +292,9 @@ instance QC.Arbitrary LVal where
                        , RegExpr <$> QC.arbitrary <*> QC.arbitrary
                        , RegSize <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
                        ]
+
+instance IsString LVal where
+  fromString = RegId . fromString
 
 -- | Different port direction that are supported in Verilog.
 data PortDir = PortIn    -- ^ Input direction for port (@input@).
@@ -388,14 +391,14 @@ instance Monoid Stmnt where
   mempty = SeqBlock []
 
 statement :: Int -> QC.Gen Stmnt
-statement 0 = QC.oneof
-  [ BlockAssign <$> QC.arbitrary
-  , NonBlockAssign <$> QC.arbitrary
-  -- , StatCA <$> QC.arbitrary
-  , TaskEnable <$> QC.arbitrary
-  , SysTaskEnable <$> QC.arbitrary
-  ]
 statement n
+  | n == 0 = QC.oneof
+    [ BlockAssign <$> QC.arbitrary
+    , NonBlockAssign <$> QC.arbitrary
+    -- , StatCA <$> QC.arbitrary
+    , TaskEnable <$> QC.arbitrary
+    , SysTaskEnable <$> QC.arbitrary
+    ]
   | n > 0 = QC.oneof
     [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
     , SeqBlock <$> QC.listOf1 (substat 4)
