@@ -20,7 +20,8 @@ module VeriFuzz
   , module VeriFuzz.Graph.Random
     -- * Simulator
   , module VeriFuzz.Simulator
-  ) where
+  )
+where
 
 import           VeriFuzz.Circuit
 import           VeriFuzz.Graph.ASTGen

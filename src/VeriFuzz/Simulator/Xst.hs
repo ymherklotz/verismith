@@ -14,10 +14,10 @@ Xst (ise) simulator implementation.
 
 module VeriFuzz.Simulator.Xst where
 
-import           Control.Lens               hiding ((<.>))
-import           Prelude                    hiding (FilePath)
+import           Control.Lens            hiding ( (<.>) )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Text.Shakespeare.Text      (st)
+import           Text.Shakespeare.Text          ( st )
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
@@ -33,8 +33,10 @@ instance Synthesize Xst where
   runSynth = runSynthXst
 
 defaultXst :: Xst
-defaultXst = Xst "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst" "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/netgen"
+defaultXst = Xst "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst"
+                 "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/netgen"
 
+-- brittany-disable-next-binding
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
   writefile xstFile [st|run

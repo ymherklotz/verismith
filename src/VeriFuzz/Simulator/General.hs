@@ -12,11 +12,11 @@ Class of the simulator and the synthesize tool.
 
 module VeriFuzz.Simulator.General where
 
-import           Data.Bits            (shiftL)
-import           Data.ByteString      (ByteString)
-import qualified Data.ByteString      as B
-import           Data.Text            (Text)
-import           Prelude              hiding (FilePath)
+import           Data.Bits                      ( shiftL )
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as B
+import           Data.Text                      ( Text )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
 import           VeriFuzz.Verilog.AST
 

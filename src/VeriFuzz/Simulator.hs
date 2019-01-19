@@ -15,7 +15,8 @@ module VeriFuzz.Simulator
   , module VeriFuzz.Simulator.Yosys
   , module VeriFuzz.Simulator.Xst
   , module VeriFuzz.Simulator.Icarus
-  ) where
+  )
+where
 
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Simulator.Icarus

@@ -13,7 +13,7 @@ Defaults and common functions.
 module VeriFuzz.Verilog.Helpers where
 
 import           Control.Lens
-import           Data.Text            (Text)
+import           Data.Text                      ( Text )
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem
@@ -38,16 +38,16 @@ addDescription :: Description -> VerilogSrc -> VerilogSrc
 addDescription desc = getVerilogSrc %~ (:) desc
 
 testBench :: ModDecl
-testBench =
-  ModDecl "main" [] []
+testBench = ModDecl
+  "main"
+  []
+  []
   [ regDecl "a"
   , regDecl "b"
   , wireDecl "c"
-  , ModInst "and" "and_gate"
-    [ ModConn $ Id "c"
-    , ModConn $ Id "a"
-    , ModConn $ Id "b"
-    ]
+  , ModInst "and"
+            "and_gate"
+            [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
   , Initial $ SeqBlock
     [ BlockAssign . Assign (RegId "a") Nothing $ Number 1 1
     , BlockAssign . Assign (RegId "b") Nothing $ Number 1 1

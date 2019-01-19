@@ -15,53 +15,112 @@ Defines the types to build a Verilog AST.
 
 module VeriFuzz.Verilog.AST
   ( -- * Top level types
-    VerilogSrc(..), getVerilogSrc
-  , Description(..), getDescription
+    VerilogSrc(..)
+  , getVerilogSrc
+  , Description(..)
+  , getDescription
     -- * Primitives
     -- ** Identifier
-  , Identifier(..), getIdentifier
+  , Identifier(..)
+  , getIdentifier
     -- ** Control
-  , Delay(..), getDelay
+  , Delay(..)
+  , getDelay
   , Event(..)
     -- ** Operators
   , BinaryOperator(..)
   , UnaryOperator(..)
     -- ** Task
-  , Task(..), taskName, taskExpr
+  , Task(..)
+  , taskName
+  , taskExpr
     -- ** Left hand side value
-  , LVal(..), regId, regExprId, regExpr, regSizeId, regSizeMSB
-  , regSizeLSB, regConc
+  , LVal(..)
+  , regId
+  , regExprId
+  , regExpr
+  , regSizeId
+  , regSizeMSB
+  , regSizeLSB
+  , regConc
     -- ** Ports
   , PortDir(..)
-  , PortType(..), regSigned
-  , Port(..), portType, portSize, portName
+  , PortType(..)
+  , regSigned
+  , Port(..)
+  , portType
+  , portSize
+  , portName
     -- * Expression
-  , Expr(..), exprSize, exprVal, exprId, exprConcat
-  , exprUnOp, exprPrim, exprLhs, exprBinOp, exprRhs
-  , exprCond, exprTrue, exprFalse, exprStr, traverseExpr
-  , ConstExpr(..), constNum
+  , Expr(..)
+  , exprSize
+  , exprVal
+  , exprId
+  , exprConcat
+  , exprUnOp
+  , exprPrim
+  , exprLhs
+  , exprBinOp
+  , exprRhs
+  , exprCond
+  , exprTrue
+  , exprFalse
+  , exprStr
+  , traverseExpr
+  , ConstExpr(..)
+  , constNum
     -- * Assignment
-  , Assign(..), assignReg, assignDelay, assignExpr
-  , ContAssign(..), contAssignNetLVal, contAssignExpr
+  , Assign(..)
+  , assignReg
+  , assignDelay
+  , assignExpr
+  , ContAssign(..)
+  , contAssignNetLVal
+  , contAssignExpr
     -- * Statment
-  , Stmnt(..), statDelay, statDStat, statEvent, statEStat, statements
-  , stmntBA, stmntNBA, stmntCA, stmntTask, stmntSysTask
+  , Stmnt(..)
+  , statDelay
+  , statDStat
+  , statEvent
+  , statEStat
+  , statements
+  , stmntBA
+  , stmntNBA
+  , stmntCA
+  , stmntTask
+  , stmntSysTask
     -- * Module
-  , ModDecl(..), moduleId, modOutPorts, modInPorts, modItems
-  , ModItem(..), _ModCA, modInstId, modInstName, modInstConns, declDir, declPort
-  , ModConn(..), modConn
-  ) where
+  , ModDecl(..)
+  , moduleId
+  , modOutPorts
+  , modInPorts
+  , modItems
+  , ModItem(..)
+  , _ModCA
+  , modInstId
+  , modInstName
+  , modInstConns
+  , declDir
+  , declPort
+  , ModConn(..)
+  , modConn
+  )
+where
 
-import           Control.Lens     (makeLenses, makePrisms)
-import           Control.Monad    (replicateM)
-import           Data.String      (IsString, fromString)
-import           Data.Text        (Text)
-import qualified Data.Text        as T
-import           Data.Traversable (sequenceA)
-import qualified Test.QuickCheck  as QC
+import           Control.Lens                   ( makeLenses
+                                                , makePrisms
+                                                )
+import           Control.Monad                  ( replicateM )
+import           Data.String                    ( IsString
+                                                , fromString
+                                                )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Traversable               ( sequenceA )
+import qualified Test.QuickCheck               as QC
 
 positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
-positiveArb = QC.suchThat QC.arbitrary (>0)
+positiveArb = QC.suchThat QC.arbitrary (> 0)
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -232,23 +291,24 @@ expr n
     [ Id <$> QC.arbitrary
     , Number <$> positiveArb <*> QC.arbitrary
     , Concat <$> QC.listOf1 (subexpr 4)
-    , UnOp <$> QC.arbitrary <*> QC.arbitrary
+    , UnOp
+    <$> QC.arbitrary
+    <*> QC.arbitrary
     -- , Str <$> QC.arbitrary
     , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
     , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
     ]
   | otherwise = expr 0
-  where
-    subexpr y = expr (n `div` y)
+  where subexpr y = expr (n `div` y)
 
 instance QC.Arbitrary Expr where
   arbitrary = QC.sized expr
 
 traverseExpr :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
-traverseExpr f (Concat e)     = Concat <$> sequenceA (f <$> e)
-traverseExpr f (UnOp un e)    = UnOp un <$> f e
+traverseExpr f (Concat e    ) = Concat <$> sequenceA (f <$> e)
+traverseExpr f (UnOp un e   ) = UnOp un <$> f e
 traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
-traverseExpr f (Cond c l r)   = Cond <$> f c <*> f l <*> f r
+traverseExpr f (Cond  c l  r) = Cond <$> f c <*> f l <*> f r
 traverseExpr _ e              = pure e
 
 makeLenses ''Expr
@@ -409,8 +469,7 @@ statement n
     , SysTaskEnable <$> QC.arbitrary
     ]
   | otherwise = statement 0
-  where
-    substat y = statement (n `div` y)
+  where substat y = statement (n `div` y)
 
 instance QC.Arbitrary Stmnt where
   arbitrary = QC.sized statement

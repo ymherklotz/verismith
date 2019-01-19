@@ -15,10 +15,10 @@ Yosys simulator implementation.
 module VeriFuzz.Simulator.Yosys where
 
 import           Control.Lens
-import           Data.Text                  (Text)
-import           Prelude                    hiding (FilePath)
+import           Data.Text                      ( Text )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Text.Shakespeare.Text      (st)
+import           Text.Shakespeare.Text          ( st )
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog
 
@@ -33,6 +33,7 @@ instance Synthesize Yosys where
 defaultYosys :: Yosys
 defaultYosys = Yosys "/usr/bin/yosys"
 
+-- brittany-disable-next-binding
 writeSimFile :: Yosys    -- ^ Simulator instance
              -> ModDecl  -- ^ Current module
              -> FilePath -- ^ Output sim file
@@ -47,11 +48,12 @@ runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
 runSynthYosys sim m outf = do
   writefile inpf $ genSource m
   run_ (yosysPath sim) ["-q", "-b", "verilog -noattr", "-o", out, "-S", inp]
-  where
-    inpf = "rtl.v"
-    inp = toTextIgnore inpf
-    out = toTextIgnore outf
+ where
+  inpf = "rtl.v"
+  inp  = toTextIgnore inpf
+  out  = toTextIgnore outf
 
+-- brittany-disable-next-binding
 writeSatFile :: (Synthesize a, Synthesize b) => Text -> a -> Maybe b -> ModDecl -> Sh ()
 writeSatFile checkFile sim1 sim2 m =
   writefile (fromText checkFile) [st|read_verilog syn_#{toText sim1}.v
@@ -69,10 +71,12 @@ sat -timeout 20 -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{modName}
     modName = m ^. moduleId . getIdentifier
     -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
+-- brittany-disable-next-binding
 runOtherSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
 runOtherSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
 runOtherSynth Nothing m = writefile "syn_rtl.v" $ genSource m
 
+-- brittany-disable-next-binding
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv yosys sim1 sim2 m = do
   writefile "top.v" . genSource . initMod $ makeTop 2 m

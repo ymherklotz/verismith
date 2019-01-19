@@ -15,12 +15,14 @@ This module generates the code from the Verilog AST defined in
 
 module VeriFuzz.Verilog.CodeGen where
 
-import           Control.Lens         (view, (^.))
-import           Data.Foldable        (fold)
-import           Data.Text            (Text)
-import qualified Data.Text            as T
-import qualified Data.Text.IO         as T
-import           Numeric              (showHex)
+import           Control.Lens                   ( view
+                                                , (^.)
+                                                )
+import           Data.Foldable                  ( fold )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import qualified Data.Text.IO                  as T
+import           Numeric                        ( showHex )
 import           VeriFuzz.Verilog.AST
 
 -- | 'Source' class which determines that source code is able to be generated
@@ -44,29 +46,30 @@ defMap = maybe ";\n" genStmnt
 
 -- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
 genVerilogSrc :: VerilogSrc -> Text
-genVerilogSrc source =
-  fold $ genDescription <$> source ^. getVerilogSrc
+genVerilogSrc source = fold $ genDescription <$> source ^. getVerilogSrc
 
 -- | Generate the 'Description' to 'Text'.
 genDescription :: Description -> Text
-genDescription desc =
-  genModuleDecl $ desc ^. getDescription
+genDescription desc = genModuleDecl $ desc ^. getDescription
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 genModuleDecl :: ModDecl -> Text
 genModuleDecl m =
-  "module " <> m ^. moduleId . getIdentifier
-  <> ports <> ";\n"
-  <> modI
-  <> "endmodule\n"
-  where
-    ports
-      | noIn && noOut = ""
-      | otherwise = "(" <> comma (genModPort <$> outIn) <> ")"
-    modI = fold $ genModuleItem <$> m ^. modItems
-    noOut = null $ m ^. modOutPorts
-    noIn = null $ m ^. modInPorts
-    outIn = (m ^. modOutPorts) ++ (m ^. modInPorts)
+  "module "
+    <> m
+    ^. moduleId
+    .  getIdentifier
+    <> ports
+    <> ";\n"
+    <> modI
+    <> "endmodule\n"
+ where
+  ports | noIn && noOut = ""
+        | otherwise     = "(" <> comma (genModPort <$> outIn) <> ")"
+  modI  = fold $ genModuleItem <$> m ^. modItems
+  noOut = null $ m ^. modOutPorts
+  noIn  = null $ m ^. modInPorts
+  outIn = (m ^. modOutPorts) ++ (m ^. modInPorts)
 
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
@@ -75,14 +78,12 @@ genModPort port = port ^. portName . getIdentifier
 
 -- | Generate the 'Port' description.
 genPort :: Port -> Text
-genPort port =
-  t <> size <> name
-  where
-    t = (<>" ") . genPortType $ port ^. portType
-    size
-      | port ^. portSize > 1 = "[" <> showT (port ^. portSize - 1) <> ":0] "
-      | otherwise = ""
-    name = port ^. portName . getIdentifier
+genPort port = t <> size <> name
+ where
+  t = (<> " ") . genPortType $ port ^. portType
+  size | port ^. portSize > 1 = "[" <> showT (port ^. portSize - 1) <> ":0] "
+       | otherwise            = ""
+  name = port ^. portName . getIdentifier
 
 -- | Convert the 'PortDir' type to 'Text'.
 genPortDir :: PortDir -> Text
@@ -96,30 +97,26 @@ genModuleItem (ModCA ca) = genContAssign ca
 genModuleItem (ModInst (Identifier i) (Identifier name) conn) =
   i <> " " <> name <> "(" <> comma (genExpr . _modConn <$> conn) <> ")" <> ";\n"
 genModuleItem (Initial stat) = "initial " <> genStmnt stat
-genModuleItem (Always stat) = "always " <> genStmnt stat
+genModuleItem (Always  stat) = "always " <> genStmnt stat
 genModuleItem (Decl dir port) =
   (maybe "" makePort dir) <> genPort port <> ";\n"
-  where
-    makePort = (<>" ") . genPortDir
+  where makePort = (<> " ") . genPortDir
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
-genContAssign (ContAssign val e) =
-  "assign " <> name <> " = " <> expr <> ";\n"
-  where
-    name = val ^. getIdentifier
-    expr = genExpr e
+genContAssign (ContAssign val e) = "assign " <> name <> " = " <> expr <> ";\n"
+ where
+  name = val ^. getIdentifier
+  expr = genExpr e
 
 -- | Generate 'Expr' to 'Text'.
 genExpr :: Expr -> Text
 genExpr (BinOp eRhs bin eLhs) =
   "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
-genExpr (Number s n) =
-  showT s <> "'h" <> T.pack (showHex n "")
-genExpr (Id i) = i ^. getIdentifier
-genExpr (Concat c) = "{" <> comma (genExpr <$> c) <> "}"
-genExpr (UnOp u e) =
-  "(" <> genUnaryOperator u <> genExpr e <> ")"
+genExpr (Number s n) = showT s <> "'h" <> T.pack (showHex n "")
+genExpr (Id     i  ) = i ^. getIdentifier
+genExpr (Concat c  ) = "{" <> comma (genExpr <$> c) <> "}"
+genExpr (UnOp u e  ) = "(" <> genUnaryOperator u <> genExpr e <> ")"
 genExpr (Cond l t f) =
   "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
 genExpr (Str t) = "\"" <> t <> "\""
@@ -167,7 +164,7 @@ genUnaryOperator UnNxorInv = "^~"
 
 -- | Generate verilog code for an 'Event'.
 genEvent :: Event -> Text
-genEvent (EId i)      = "@(" <> i ^. getIdentifier <> ")"
+genEvent (EId   i   ) = "@(" <> i ^. getIdentifier <> ")"
 genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
 genEvent EAll         = "@*"
 
@@ -177,44 +174,45 @@ genDelay (Delay i) = "#" <> showT i
 
 -- | Generate the verilog code for an 'LVal'.
 genLVal :: LVal -> Text
-genLVal (RegId i) = i ^. getIdentifier
-genLVal (RegExpr i expr) =
-  i ^. getIdentifier <> " [" <> genExpr expr <> "]"
+genLVal (RegId i       ) = i ^. getIdentifier
+genLVal (RegExpr i expr) = i ^. getIdentifier <> " [" <> genExpr expr <> "]"
 genLVal (RegSize i msb lsb) =
-  i ^. getIdentifier <> " [" <> genConstExpr msb <> ":" <> genConstExpr lsb <> "]"
-genLVal (RegConcat e) =
-  "{" <> comma (genExpr <$> e) <> "}"
+  i
+    ^. getIdentifier
+    <> " ["
+    <> genConstExpr msb
+    <> ":"
+    <> genConstExpr lsb
+    <> "]"
+genLVal (RegConcat e) = "{" <> comma (genExpr <$> e) <> "}"
 
 genConstExpr :: ConstExpr -> Text
 genConstExpr (ConstExpr num) = showT num
 
 genPortType :: PortType -> Text
 genPortType Wire = "wire"
-genPortType (Reg signed)
-  | signed = "reg signed"
-  | otherwise = "reg"
+genPortType (Reg signed) | signed    = "reg signed"
+                         | otherwise = "reg"
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
   genLVal r <> op <> maybe "" genDelay d <> genExpr e
 
 genStmnt :: Stmnt -> Text
-genStmnt (TimeCtrl d stat) = genDelay d <> " " <> defMap stat
-genStmnt (EventCtrl e stat) = genEvent e <> " " <> defMap stat
-genStmnt (SeqBlock s) =
-  "begin\n" <> fold (genStmnt <$> s) <> "end\n"
-genStmnt (BlockAssign a) = genAssign " = " a <> ";\n"
-genStmnt (NonBlockAssign a) = genAssign " <= " a <> ";\n"
-genStmnt (StatCA a) = genContAssign a
-genStmnt (TaskEnable task) = genTask task <> ";\n"
-genStmnt (SysTaskEnable task) = "$" <> genTask task <> ";\n"
+genStmnt (TimeCtrl  d stat   ) = genDelay d <> " " <> defMap stat
+genStmnt (EventCtrl e stat   ) = genEvent e <> " " <> defMap stat
+genStmnt (SeqBlock       s   ) = "begin\n" <> fold (genStmnt <$> s) <> "end\n"
+genStmnt (BlockAssign    a   ) = genAssign " = " a <> ";\n"
+genStmnt (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
+genStmnt (StatCA         a   ) = genContAssign a
+genStmnt (TaskEnable     task) = genTask task <> ";\n"
+genStmnt (SysTaskEnable  task) = "$" <> genTask task <> ";\n"
 
 genTask :: Task -> Text
 genTask (Task name expr)
   | null expr = i
   | otherwise = i <> "(" <> comma (genExpr <$> expr) <> ")"
-  where
-    i = name ^. getIdentifier
+  where i = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: (Source a) => a -> IO ()
