@@ -49,6 +49,7 @@ library
                      , text
                      , bytestring
                      , hashable
+                     , transformers
   default-extensions:  OverloadedStrings
 
 executable verifuzz

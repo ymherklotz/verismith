@@ -15,10 +15,10 @@ Yosys simulator implementation.
 module VeriFuzz.Simulator.Yosys where
 
 import           Control.Lens
-import           Data.Text                      ( Text )
-import           Prelude                 hiding ( FilePath )
+import           Data.Text                  (Text)
+import           Prelude                    hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text          ( st )
+import           Text.Shakespeare.Text      (st)
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog
 
@@ -71,12 +71,10 @@ sat -timeout 20 -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{modName}
     modName = m ^. moduleId . getIdentifier
     -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
--- brittany-disable-next-binding
 runOtherSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
 runOtherSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
-runOtherSynth Nothing m = writefile "syn_rtl.v" $ genSource m
+runOtherSynth Nothing    m = writefile "syn_rtl.v" $ genSource m
 
--- brittany-disable-next-binding
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv yosys sim1 sim2 m = do
   writefile "top.v" . genSource . initMod $ makeTop 2 m
@@ -84,5 +82,9 @@ runEquiv yosys sim1 sim2 m = do
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runOtherSynth sim2 m
   run_ (yosysPath yosys) [checkFile]
-  where
-    checkFile = [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+  where checkFile = [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+
+-- | Generate @.il@ files for Yosys equivalence checking using the SAT solver.
+genIl :: (Synthesize a) => Yosys -> a -> ModDecl -> Sh ()
+genIl yosys sim m = do
+  return

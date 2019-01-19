@@ -18,7 +18,16 @@ module VeriFuzz.Simulator
   )
 where
 
+import           Control.Monad.Trans.Reader (ReaderT)
+import           Shelly
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Simulator.Icarus
 import           VeriFuzz.Simulator.Xst
 import           VeriFuzz.Simulator.Yosys
+
+data SimMatrix = SimMatrix { yosys  :: Yosys
+                           , xst    :: Maybe Xst
+                           , icarus :: Maybe Icarus
+                           }
+
+type SimEnv = ReaderT SimMatrix Sh

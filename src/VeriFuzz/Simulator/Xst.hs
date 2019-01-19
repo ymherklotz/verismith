@@ -14,10 +14,10 @@ Xst (ise) simulator implementation.
 
 module VeriFuzz.Simulator.Xst where
 
-import           Control.Lens            hiding ( (<.>) )
-import           Prelude                 hiding ( FilePath )
+import           Control.Lens               hiding ((<.>))
+import           Prelude                    hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text          ( st )
+import           Text.Shakespeare.Text      (st)
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen

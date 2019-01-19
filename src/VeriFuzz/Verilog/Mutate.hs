@@ -14,9 +14,7 @@ more random patterns, such as nesting wires instead of creating new ones.
 module VeriFuzz.Verilog.Mutate where
 
 import           Control.Lens
-import           Data.Maybe                     ( catMaybes
-                                                , fromMaybe
-                                                )
+import           Data.Maybe               (catMaybes, fromMaybe)
 import           VeriFuzz.Internal.Gen
 import           VeriFuzz.Internal.Shared
 import           VeriFuzz.Verilog.AST

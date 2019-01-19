@@ -12,17 +12,12 @@ Define the random generation for the directed acyclic graph.
 
 module VeriFuzz.Graph.Random where
 
-import           Data.Graph.Inductive           ( Context
-                                                , LEdge
-                                                )
-import qualified Data.Graph.Inductive          as G
-import           Data.Graph.Inductive.PatriciaTree
-                                                ( Gr )
-import           Data.List                      ( nub )
-import           Test.QuickCheck                ( Arbitrary
-                                                , Gen
-                                                )
-import qualified Test.QuickCheck               as QC
+import           Data.Graph.Inductive              (Context, LEdge)
+import qualified Data.Graph.Inductive              as G
+import           Data.Graph.Inductive.PatriciaTree (Gr)
+import           Data.List                         (nub)
+import           Test.QuickCheck                   (Arbitrary, Gen)
+import qualified Test.QuickCheck                   as QC
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]
 dupFolder cont ns = unique cont : ns where unique (a, b, c, d) = (nub a, b, c, nub d)

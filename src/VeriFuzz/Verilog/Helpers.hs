@@ -13,7 +13,7 @@ Defaults and common functions.
 module VeriFuzz.Verilog.Helpers where
 
 import           Control.Lens
-import           Data.Text                      ( Text )
+import           Data.Text            (Text)
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem

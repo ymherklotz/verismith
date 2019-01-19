@@ -12,11 +12,9 @@ Internal helpers for generation.
 
 module VeriFuzz.Internal.Gen where
 
-import           Data.Graph.Inductive           ( Graph
-                                                , Node
-                                                )
-import qualified Data.Graph.Inductive          as G
-import qualified Data.Text                     as T
+import           Data.Graph.Inductive (Graph, Node)
+import qualified Data.Graph.Inductive as G
+import qualified Data.Text            as T
 
 fromNode :: Int -> T.Text
 fromNode node = T.pack $ "w" <> show node

@@ -12,12 +12,10 @@ Generates the AST from the graph directly.
 
 module VeriFuzz.Graph.ASTGen where
 
-import           Data.Foldable                  ( fold )
-import           Data.Graph.Inductive           ( LNode
-                                                , Node
-                                                )
-import qualified Data.Graph.Inductive          as G
-import           Data.Maybe                     ( catMaybes )
+import           Data.Foldable            (fold)
+import           Data.Graph.Inductive     (LNode, Node)
+import qualified Data.Graph.Inductive     as G
+import           Data.Maybe               (catMaybes)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Internal.Gen
 import           VeriFuzz.Verilog.AST

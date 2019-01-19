@@ -12,9 +12,7 @@ Definition of the circuit graph.
 
 module VeriFuzz.Circuit where
 
-import           Data.Graph.Inductive           ( Gr
-                                                , LNode
-                                                )
+import           Data.Graph.Inductive (Gr, LNode)
 import           System.Random
 import           Test.QuickCheck
 

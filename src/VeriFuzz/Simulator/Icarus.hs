@@ -13,12 +13,12 @@ Icarus verilog module.
 module VeriFuzz.Simulator.Icarus where
 
 import           Control.Lens
-import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString               as B
-import           Data.Foldable                  ( fold )
+import           Data.ByteString            (ByteString)
+import qualified Data.ByteString            as B
+import           Data.Foldable              (fold)
 import           Data.Hashable
-import           Data.List                      ( transpose )
-import           Prelude                 hiding ( FilePath )
+import           Data.List                  (transpose)
+import           Prelude                    hiding (FilePath)
 import           Shelly
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog

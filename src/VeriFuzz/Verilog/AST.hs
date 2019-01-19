@@ -107,17 +107,13 @@ module VeriFuzz.Verilog.AST
   )
 where
 
-import           Control.Lens                   ( makeLenses
-                                                , makePrisms
-                                                )
-import           Control.Monad                  ( replicateM )
-import           Data.String                    ( IsString
-                                                , fromString
-                                                )
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Data.Traversable               ( sequenceA )
-import qualified Test.QuickCheck               as QC
+import           Control.Lens     (makeLenses, makePrisms)
+import           Control.Monad    (replicateM)
+import           Data.String      (IsString, fromString)
+import           Data.Text        (Text)
+import qualified Data.Text        as T
+import           Data.Traversable (sequenceA)
+import qualified Test.QuickCheck  as QC
 
 positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
 positiveArb = QC.suchThat QC.arbitrary (> 0)
