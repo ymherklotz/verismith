@@ -19,19 +19,19 @@ possible but not recommended and not directly supported.
 
 To build the executable
 
-``` shell
+```
 stack build
 ```
 
 To run the executable
 
-``` shell
+```
 stack exec verifuzz
 ```
 
 To install the executable (which defaults to installing it in `~/.local`)
 
-``` shell
+```
 stack install
 ```
 
@@ -44,6 +44,6 @@ uses `doctest` to test the examples that are in the documentation.
 
 To run the test-suites
 
-``` shell
+```
 stack test
 ```
