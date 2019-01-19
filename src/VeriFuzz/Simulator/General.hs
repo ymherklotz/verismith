@@ -40,9 +40,11 @@ class (Simulator a) => Synthesize a where
 
 timeout :: FilePath -> [Text] -> Sh Text
 timeout = command1 "timeout" ["180"] . toTextIgnore
+{-# INLINE timeout #-}
 
 timeout_ :: FilePath -> [Text] -> Sh ()
 timeout_ = command1_ "timeout" ["180"] . toTextIgnore
+{-# INLINE timeout_ #-}
 
 -- | Helper function to convert bytestrings to integers
 bsToI :: ByteString -> Integer
