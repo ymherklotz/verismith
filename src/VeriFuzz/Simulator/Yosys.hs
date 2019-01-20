@@ -65,8 +65,14 @@ runEquivYosys yosys sim1 sim2 m = do
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runMaybeSynth sim2 m
   run_ (yosysPath yosys) [toTextIgnore checkFile]
-  where checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+  where
+    checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv yosys sim1 sim2 m = do
+  root <- rootPath
   writefile "top.v" . genSource . initMod $ makeTopAssert m
+  writefile "test.sby" $ sbyConfig root sim1 sim2 m
+  runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
+  runMaybeSynth sim2 m
+  run_ "sby" ["test.sby"]

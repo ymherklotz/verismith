@@ -65,9 +65,9 @@ smtbmc
 
 [script]
 #{readL}
-read syn_#{toText sim1}.v
+read -formal syn_#{toText sim1}.v
 rename #{mi} #{mi}_1
-read syn_#{maybe "rtl" toText sim2}.v
+read -formal syn_#{maybe "rtl" toText sim2}.v
 rename #{mi} #{mi}_2
 read -formal top.v
 prep -top #{mi}
@@ -87,4 +87,4 @@ top.v
         .   ((bd </> fromText "data") </>)
         .   fromText
         <$> deps
-    readL = T.intercalate "\n" $ mappend "read " <$> deps
+    readL = T.intercalate "\n" $ mappend "read -formal " <$> deps
