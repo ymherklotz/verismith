@@ -15,6 +15,9 @@ module VeriFuzz.Verilog.Mutate where
 
 import           Control.Lens
 import           Data.Maybe               (catMaybes, fromMaybe)
+import           Data.Maybe               (fromMaybe)
+import           Data.Text                (Text)
+import qualified Data.Text                as T
 import           VeriFuzz.Internal.Gen
 import           VeriFuzz.Internal.Shared
 import           VeriFuzz.Verilog.AST
@@ -111,6 +114,25 @@ instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
       <$> (m ^.. modOutPorts . traverse . portName)
       ++  (m ^.. modInPorts . traverse . portName)
 
+-- | Instantiate without adding wire declarations. It also does not count the
+-- current instantiations of the same module.
+--
+-- >>> render $ instantiateModSpec_ "_" m
+-- m m(.y(y), .x(x));
+-- <BLANKLINE>
+instantiateModSpec_ :: Text -> ModDecl -> ModItem
+instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
+ where
+  conns =
+    zipWith ModConnNamed ids (Id <$> instIds)
+  ids = (filterChar outChar $ name modOutPorts) ++ (name modInPorts)
+  instIds = (name modOutPorts) ++ (name modInPorts)
+  name v = m ^.. v . traverse . portName
+
+filterChar :: Text -> [Identifier] -> [Identifier]
+filterChar t ids =
+  ids & traverse . getIdentifier %~ (\x -> fromMaybe x . safe head $ T.splitOn t x)
+
 -- | Initialise all the inputs and outputs to a module.
 --
 -- >>> render $ initMod m
@@ -134,7 +156,7 @@ makeTop :: Int -> ModDecl -> ModDecl
 makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
  where
   ys    = Port Wire 90 . flip makeIdFrom "y" <$> [1 .. i]
-  modIt = instantiateMod_ . modN <$> [1 .. i]
+  modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
   modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
 
 makeTopAssert :: ModDecl -> ModDecl

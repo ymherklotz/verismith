@@ -86,11 +86,17 @@ genPortDir PortInOut = "inout"
 genModuleItem :: ModItem -> Text
 genModuleItem (ModCA ca) = genContAssign ca
 genModuleItem (ModInst (Identifier i) (Identifier name) conn) =
-  i <> " " <> name <> "(" <> comma (genExpr . _modConn <$> conn) <> ")" <> ";\n"
+  i <> " " <> name <> "(" <> comma (genModConn <$> conn) <> ")" <> ";\n"
 genModuleItem (Initial stat ) = "initial " <> genStmnt stat
 genModuleItem (Always  stat ) = "always " <> genStmnt stat
 genModuleItem (Decl dir port) = maybe "" makePort dir <> genPort port <> ";\n"
   where makePort = (<> " ") . genPortDir
+
+genModConn :: ModConn -> Text
+genModConn (ModConn c) =
+  genExpr c
+genModConn (ModConnNamed n c) =
+  "." <> n ^. getIdentifier <> "(" <> genExpr c <> ")"
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text

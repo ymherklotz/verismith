@@ -104,6 +104,8 @@ module VeriFuzz.Verilog.AST
   , declPort
   , ModConn(..)
   , modConn
+  , modConnName
+  , modExpr
   )
 where
 
@@ -398,10 +400,16 @@ instance QC.Arbitrary Port where
 -- @
 -- mod a(.y(y1), .x1(x11), .x2(x22));
 -- @
-newtype ModConn = ModConn { _modConn :: Expr }
-                deriving (Eq, Show, QC.Arbitrary)
+data ModConn = ModConn { _modConn :: Expr }
+             | ModConnNamed { _modConnName :: Identifier
+                            , _modExpr     :: Expr
+                            }
+             deriving (Eq, Show)
 
 makeLenses ''ModConn
+
+instance QC.Arbitrary ModConn where
+  arbitrary = ModConn <$> QC.arbitrary
 
 data Assign = Assign { _assignReg   :: LVal
                      , _assignDelay :: Maybe Delay
