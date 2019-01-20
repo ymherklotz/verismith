@@ -14,13 +14,14 @@ Yosys simulator implementation.
 
 module VeriFuzz.Simulator.Yosys where
 
-import           Data.Maybe                 (fromMaybe)
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import           Prelude                    hiding (FilePath)
+import           Data.Maybe                           (fromMaybe)
+import           Data.Text                            (Text)
+import qualified Data.Text                            as T
+import           Prelude                              hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text      (st)
+import           Text.Shakespeare.Text                (st)
 import           VeriFuzz.Simulator.General
+import           VeriFuzz.Simulator.Internal.Template
 import           VeriFuzz.Verilog
 
 newtype Yosys = Yosys { yosysPath :: FilePath }
@@ -34,16 +35,13 @@ instance Synthesize Yosys where
 defaultYosys :: Yosys
 defaultYosys = Yosys "/usr/bin/yosys"
 
--- brittany-disable-next-binding
 writeSimFile :: Yosys    -- ^ Simulator instance
              -> ModDecl  -- ^ Current module
              -> FilePath -- ^ Output sim file
              -> Sh ()
 writeSimFile _ m file = do
   writefile "rtl.v" $ genSource m
-  writefile file [st|read_verilog rtl.v; proc;;
-rename mod mod_rtl
-|]
+  writefile file yosysSimConfig
 
 runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
 runSynthYosys sim m outf = do
@@ -53,23 +51,7 @@ runSynthYosys sim m outf = do
   inpf = "rtl.v"
   inp  = toTextIgnore inpf
   out  = toTextIgnore outf
-
--- brittany-disable-next-binding
-writeSatFile :: (Synthesize a, Synthesize b) => FilePath -> a -> Maybe b -> ModDecl -> Sh ()
-writeSatFile checkFile sim1 sim2 m =
-  writefile checkFile [st|read_ilang syn_#{toText sim1}.il
-rename #{modName m} #{modName m}_1
-read_ilang syn_#{idSim2}.il
-rename #{modName m} #{modName m}_2
-read_verilog top.v
-proc; opt_clean
-flatten #{modName m}
-! touch test.#{toText sim1}.#{idSim2}.input_ok
-sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{modName m}
-|]
-  where
-    idSim2 = maybe "rtl" toText sim2
-    -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
+  -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
 runOtherSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
 runOtherSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
@@ -78,13 +60,9 @@ runOtherSynth Nothing    m = writefile "syn_rtl.v" $ genSource m
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv yosys sim1 sim2 m = do
   writefile "top.v" . genSource . initMod $ makeTop 2 m
-  writeSatFile checkFile sim1 sim2 m
+  writefile checkFile $ yosysSatConfig sim1 sim2 m
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runOtherSynth sim2 m
-  run_ (yosysPath yosys) [checkFile]
-  where checkFile = [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
-
--- | Generate @.il@ files for Yosys equivalence checking using the SAT solver.
-genIl :: (Synthesize a) => Yosys -> a -> ModDecl -> Sh ()
-genIl yosys sim m = do
-  return
+  run_ (yosysPath yosys) [toTextIgnore checkFile]
+  where
+    checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]

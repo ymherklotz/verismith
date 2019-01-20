@@ -14,13 +14,14 @@ Xst (ise) simulator implementation.
 
 module VeriFuzz.Simulator.Xst where
 
-import           Control.Lens               hiding ((<.>))
-import           Prelude                    hiding (FilePath)
+import           Control.Lens                         hiding ((<.>))
+import           Prelude                              hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text      (st)
+import           Text.Shakespeare.Text                (st)
 import           VeriFuzz.Simulator.General
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           VeriFuzz.Simulator.Internal.Template
+import           VeriFuzz.Verilog
+import           VeriFuzz.Verilog
 
 data Xst = Xst { xstPath    :: FilePath
                , netgenPath :: FilePath
@@ -39,19 +40,13 @@ defaultXst =
 -- brittany-disable-next-binding
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
-  writefile xstFile [st|run
--ifn #{modName}.prj -ofn #{modName} -p artix7 -top #{modName}
--iobuf NO -ram_extract NO -rom_extract NO -use_dsp48 NO
--fsm_extract YES -fsm_encoding Auto
--change_error_to_warning "HDLCompiler:226 HDLCompiler:1832"
-|]
+  writefile xstFile $ xstSynthConfig m
   writefile prjFile [st|verilog work "rtl.v"|]
   writefile "rtl.v" $ genSource m
   timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
   run_ (netgenPath sim) ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
   run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
   where
-    modName = m ^. modId . getIdentifier
-    modFile = fromText modName
+    modFile = fromText $ modName m
     xstFile = modFile <.> "xst"
     prjFile = modFile <.> "prj"

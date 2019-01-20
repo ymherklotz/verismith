@@ -38,6 +38,11 @@ class (Simulator a) => Synthesize a where
            -> FilePath -- ^ Output verilog file for the module
            -> Sh ()    -- ^ does not return any values
 
+rootPath :: Sh FilePath
+rootPath = do
+  current <- pwd
+  maybe current fromText <$> get_env "VERIFUZZ_ROOT"
+
 timeout :: FilePath -> [Text] -> Sh Text
 timeout = command1 "timeout" ["180"] . toTextIgnore
 {-# INLINE timeout #-}
