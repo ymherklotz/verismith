@@ -1,4 +1,7 @@
-module Property (propertyTests) where
+module Property
+  ( propertyTests
+  )
+where
 
 import qualified Data.Graph.Inductive              as G
 import           Data.Graph.Inductive.PatriciaTree (Gr)
@@ -19,16 +22,11 @@ instance QC.Arbitrary TestGraph where
 instance QC.Arbitrary AltTestGraph where
   arbitrary = AltTestGraph <$> QC.resize 100 V.randomDAG
 
-simpleGraph = QC.testProperty "simple graph generation check" $
-  \graph -> simp graph
+simpleGraph = QC.testProperty "simple graph generation check" $ \graph -> simp graph
   where simp = G.isSimple . getGraph
 
-simpleAltGraph = QC.testProperty "simple alternative graph generation check" $
-  \graph -> simp graph
+simpleAltGraph = QC.testProperty "simple alternative graph generation check" $ \graph -> simp graph
   where simp = G.isSimple . getAltGraph
 
 propertyTests :: TestTree
-propertyTests = testGroup "Property Tests"
-  [ simpleGraph
-  , simpleAltGraph
-  ]
+propertyTests = testGroup "Property Tests" [simpleGraph, simpleAltGraph]

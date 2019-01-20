@@ -144,6 +144,8 @@ instance QC.Arbitrary Delay where
 data Event = EId Identifier
            | EExpr Expr
            | EAll
+           | EPosEdge Identifier
+           | ENegEdge Identifier
            deriving (Eq, Show)
 
 instance QC.Arbitrary Event where

@@ -37,16 +37,16 @@ defaultXst :: Xst
 defaultXst =
   Xst "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst" "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/netgen"
 
--- brittany-disable-next-binding
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
   writefile xstFile $ xstSynthConfig m
   writefile prjFile [st|verilog work "rtl.v"|]
   writefile "rtl.v" $ genSource m
   timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
-  run_ (netgenPath sim) ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
+  run_ (netgenPath sim)
+       ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
   run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
-  where
-    modFile = fromText $ modName m
-    xstFile = modFile <.> "xst"
-    prjFile = modFile <.> "prj"
+ where
+  modFile = fromText $ modName m
+  xstFile = modFile <.> "xst"
+  prjFile = modFile <.> "prj"

@@ -136,3 +136,10 @@ makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
   ys    = Port Wire 90 . flip makeIdFrom "y" <$> [1 .. i]
   modIt = instantiateMod_ . modN <$> [1 .. i]
   modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
+
+makeTopAssert :: ModDecl -> ModDecl
+makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ ((Port Wire 1 "clk") :)) . makeTop 2
+ where
+  assert = Always . EventCtrl e . Just $ SeqBlock
+    [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
+  e = EPosEdge "clk"

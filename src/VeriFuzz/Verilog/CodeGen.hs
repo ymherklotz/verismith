@@ -155,6 +155,8 @@ genEvent :: Event -> Text
 genEvent (EId   i   ) = "@(" <> i ^. getIdentifier <> ")"
 genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
 genEvent EAll         = "@*"
+genEvent (EPosEdge i) = "@(posedge " <> i ^. getIdentifier <> ")"
+genEvent (ENegEdge i) = "@(negedge " <> i ^. getIdentifier <> ")"
 
 -- | Generates verilog code for a 'Delay'.
 genDelay :: Delay -> Text

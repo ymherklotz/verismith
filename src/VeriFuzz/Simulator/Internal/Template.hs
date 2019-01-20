@@ -22,6 +22,7 @@ import           Text.Shakespeare.Text      (st)
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Verilog
 
+-- brittany-disable-next-binding
 yosysSatConfig :: (Simulator a, Simulator b) => a -> Maybe b -> ModDecl -> Text
 yosysSatConfig sim1 sim2 m = [st|read_verilog syn_#{toText sim1}.v
 rename #{mi} #{mi}_1
@@ -37,11 +38,13 @@ sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 
     idSim2 = maybe "rtl" toText sim2
     mi = modName m
 
+-- brittany-disable-next-binding
 yosysSimConfig :: Text
 yosysSimConfig = [st|read_verilog rtl.v; proc;;
 rename mod mod_rtl
 |]
 
+-- brittany-disable-next-binding
 xstSynthConfig :: ModDecl -> Text
 xstSynthConfig m = [st|run
 -ifn #{mi}.prj -ofn #{mi} -p artix7 -top #{mi}
@@ -52,6 +55,7 @@ xstSynthConfig m = [st|run
   where
     mi = modName m
 
+-- brittany-disable-next-binding
 sbyConfig :: (Simulator a, Simulator b) => FilePath -> a -> Maybe b -> ModDecl -> Text
 sbyConfig bd sim1 sim2 m = [st|[options]
 mode prove
@@ -79,7 +83,6 @@ top.v
     deps = ["cells_cmos.v", "cells_cyclone_v.v", "cells_verific.v", "cells_xilinx_7.v"]
     depList =
       T.intercalate "\n"
-        .   zipWith mappend ((<>" ") <$> deps)
         $   toTextIgnore
         .   ((bd </> fromText "data") </>)
         .   fromText

@@ -35,10 +35,11 @@ instance Synthesize Yosys where
 defaultYosys :: Yosys
 defaultYosys = Yosys "/usr/bin/yosys"
 
-writeSimFile :: Yosys    -- ^ Simulator instance
-             -> ModDecl  -- ^ Current module
-             -> FilePath -- ^ Output sim file
-             -> Sh ()
+writeSimFile
+  :: Yosys    -- ^ Simulator instance
+  -> ModDecl  -- ^ Current module
+  -> FilePath -- ^ Output sim file
+  -> Sh ()
 writeSimFile _ m file = do
   writefile "rtl.v" $ genSource m
   writefile file yosysSimConfig
@@ -53,16 +54,19 @@ runSynthYosys sim m outf = do
   out  = toTextIgnore outf
   -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
-runOtherSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
-runOtherSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
-runOtherSynth Nothing    m = writefile "syn_rtl.v" $ genSource m
+runMaybeSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
+runMaybeSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
+runMaybeSynth Nothing    m = writefile "syn_rtl.v" $ genSource m
 
-runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
-runEquiv yosys sim1 sim2 m = do
+runEquivYosys :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
+runEquivYosys yosys sim1 sim2 m = do
   writefile "top.v" . genSource . initMod $ makeTop 2 m
   writefile checkFile $ yosysSatConfig sim1 sim2 m
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
-  runOtherSynth sim2 m
+  runMaybeSynth sim2 m
   run_ (yosysPath yosys) [toTextIgnore checkFile]
-  where
-    checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+  where checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+
+runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
+runEquiv yosys sim1 sim2 m = do
+  writefile "top.v" . genSource . initMod $ makeTopAssert m
