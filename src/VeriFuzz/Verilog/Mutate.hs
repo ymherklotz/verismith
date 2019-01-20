@@ -92,8 +92,8 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
  where
   out   = Decl Nothing <$> m ^. modOutPorts
   regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg False)
-  inst  = ModInst (m ^. moduleId) (m ^. moduleId <> (Identifier . showT $ count + 1)) conns
-  count = length . filter (== m ^. moduleId) $ main ^.. modItems . traverse . modInstId
+  inst  = ModInst (m ^. modId) (m ^. modId <> (Identifier . showT $ count + 1)) conns
+  count = length . filter (== m ^. modId) $ main ^.. modItems . traverse . modInstId
   conns = ModConn . Id <$> allVars m
 
 -- | Instantiate without adding wire declarations. It also does not count the
@@ -103,7 +103,7 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
 -- m m(y, x);
 -- <BLANKLINE>
 instantiateMod_ :: ModDecl -> ModItem
-instantiateMod_ m = ModInst (m ^. moduleId) (m ^. moduleId) conns
+instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
  where
   conns =
     ModConn
@@ -131,8 +131,8 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 -- | Make top level module for equivalence verification. Also takes in how many
 -- modules to instantiate.
 makeTop :: Int -> ModDecl -> ModDecl
-makeTop i m = ModDecl (m ^. moduleId) ys (m ^. modInPorts) modIt
+makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
  where
   ys    = Port Wire 90 . flip makeIdFrom "y" <$> [1 .. i]
   modIt = instantiateMod_ . modN <$> [1 .. i]
-  modN n = m & moduleId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
+  modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]

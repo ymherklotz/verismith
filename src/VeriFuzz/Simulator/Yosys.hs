@@ -14,8 +14,9 @@ Yosys simulator implementation.
 
 module VeriFuzz.Simulator.Yosys where
 
-import           Control.Lens
+import           Data.Maybe                 (fromMaybe)
 import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 import           Prelude                    hiding (FilePath)
 import           Shelly
 import           Text.Shakespeare.Text      (st)
@@ -54,21 +55,20 @@ runSynthYosys sim m outf = do
   out  = toTextIgnore outf
 
 -- brittany-disable-next-binding
-writeSatFile :: (Synthesize a, Synthesize b) => Text -> a -> Maybe b -> ModDecl -> Sh ()
+writeSatFile :: (Synthesize a, Synthesize b) => FilePath -> a -> Maybe b -> ModDecl -> Sh ()
 writeSatFile checkFile sim1 sim2 m =
-  writefile (fromText checkFile) [st|read_verilog syn_#{toText sim1}.v
-rename #{modName} #{modName}_1
-read_verilog syn_#{idSim2}.v
-rename #{modName} #{modName}_2
+  writefile checkFile [st|read_ilang syn_#{toText sim1}.il
+rename #{modName m} #{modName m}_1
+read_ilang syn_#{idSim2}.il
+rename #{modName m} #{modName m}_2
 read_verilog top.v
 proc; opt_clean
-flatten #{modName}
+flatten #{modName m}
 ! touch test.#{toText sim1}.#{idSim2}.input_ok
-sat -timeout 20 -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{modName}
+sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{modName m}
 |]
   where
     idSim2 = maybe "rtl" toText sim2
-    modName = m ^. moduleId . getIdentifier
     -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
 runOtherSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()

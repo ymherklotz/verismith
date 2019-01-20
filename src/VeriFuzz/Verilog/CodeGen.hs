@@ -53,7 +53,7 @@ genDescription desc = genModuleDecl $ desc ^. getDescription
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 genModuleDecl :: ModDecl -> Text
 genModuleDecl m =
-  "module " <> m ^. moduleId . getIdentifier <> ports <> ";\n" <> modI <> "endmodule\n"
+  "module " <> m ^. modId . getIdentifier <> ports <> ";\n" <> modI <> "endmodule\n"
  where
   ports | noIn && noOut = ""
         | otherwise     = "(" <> comma (genModPort <$> outIn) <> ")"

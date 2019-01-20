@@ -51,7 +51,7 @@ runSynthXst sim m outf = do
   run_ (netgenPath sim) ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
   run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
   where
-    modName = m ^. moduleId . getIdentifier
+    modName = m ^. modId . getIdentifier
     modFile = fromText modName
     xstFile = modFile <.> "xst"
     prjFile = modFile <.> "prj"

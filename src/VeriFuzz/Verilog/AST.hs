@@ -91,7 +91,7 @@ module VeriFuzz.Verilog.AST
   , stmntSysTask
     -- * Module
   , ModDecl(..)
-  , moduleId
+  , modId
   , modOutPorts
   , modInPorts
   , modItems
@@ -495,7 +495,7 @@ instance QC.Arbitrary ModItem where
                        ]
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
-data ModDecl = ModDecl { _moduleId    :: Identifier
+data ModDecl = ModDecl { _modId       :: Identifier
                        , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
                        , _modItems    :: [ModItem]

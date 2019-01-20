@@ -4,7 +4,9 @@ import           Control.Lens
 import qualified Crypto.Random.DRBG   as C
 import           Data.ByteString      (ByteString)
 import qualified Data.Graph.Inductive as G
+import           Data.Text            (Text)
 import           Numeric              (showHex)
+import           Prelude              hiding (FilePath)
 import           Shelly
 import qualified Test.QuickCheck      as QC
 import           VeriFuzz
@@ -31,8 +33,8 @@ runSimulation = do
   val  <- shelly $ runSim defaultIcarus (initMod circ) rand
   putStrLn $ showHex (abs val) ""
 
-runEquivalence :: IO ()
-runEquivalence = do
+runEquivalence :: Text -> IO ()
+runEquivalence t = do
   gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
   let circ =
         initMod
@@ -41,7 +43,7 @@ runEquivalence = do
           ^.. getVerilogSrc
           .   traverse
           .   getDescription
-  shelly . verbosely $ runEquiv defaultYosys defaultYosys (Just defaultXst) circ
+  shelly . chdir_p (fromText "equiv" </> fromText t) . verbosely $ runEquiv defaultYosys defaultYosys (Just defaultXst) circ
 
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))

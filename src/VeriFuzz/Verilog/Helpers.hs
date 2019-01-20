@@ -28,7 +28,7 @@ emptyMod = ModDecl "" [] [] []
 
 -- | Set a module name for a module declaration.
 setModName :: Text -> ModDecl -> ModDecl
-setModName str = moduleId .~ Identifier str
+setModName str = modId .~ Identifier str
 
 -- | Add a input port to the module declaration.
 addModPort :: Port -> ModDecl -> ModDecl
@@ -67,3 +67,6 @@ defaultPort = Port Wire 1
 
 portToExpr :: Port -> Expr
 portToExpr (Port _ _ i) = Id i
+
+modName :: ModDecl -> Text
+modName = view $ modId . getIdentifier
