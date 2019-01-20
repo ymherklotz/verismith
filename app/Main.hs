@@ -43,10 +43,12 @@ runEquivalence t = do
           ^.. getVerilogSrc
           .   traverse
           .   getDescription
-  shelly . chdir_p (fromText "equiv" </> fromText t) . verbosely $ runEquiv defaultYosys
-                                                                            defaultYosys
-                                                                            (Just defaultXst)
-                                                                            circ
+  shelly . verbosely $ do
+    mkdir_p (fromText "equiv" </> fromText t)
+    curr <- toTextIgnore <$> pwd
+    setenv "VERIFUZZ_ROOT" curr
+    cd (fromText "equiv" </> fromText t)
+    runEquiv defaultYosys defaultYosys (Just defaultXst) circ
 
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
