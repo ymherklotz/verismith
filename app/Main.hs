@@ -1,10 +1,12 @@
 module Main where
 
+import           Control.Concurrent
 import           Control.Lens
 import qualified Crypto.Random.DRBG   as C
 import           Data.ByteString      (ByteString)
 import qualified Data.Graph.Inductive as G
 import           Data.Text            (Text)
+import qualified Data.Text            as T
 import           Numeric              (showHex)
 import           Prelude              hiding (FilePath)
 import           Shelly
@@ -33,9 +35,14 @@ runSimulation = do
   val  <- shelly $ runSim defaultIcarus (initMod circ) rand
   putStrLn $ showHex (abs val) ""
 
-runEquivalence :: Text -> IO ()
-runEquivalence t = do
-  gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
+onFailure :: Text -> RunFailed -> Sh ()
+onFailure t _ = do
+  cd ".."
+  cp_r (fromText t) $ fromText (t <> "_failed")
+
+runEquivalence :: Text -> Int -> IO ()
+runEquivalence t i = do
+  gr <- QC.generate $ rDups <$> QC.resize 1000 (randomDAG :: QC.Gen (G.Gr Gate ()))
   let circ =
         initMod
           .   head
@@ -43,15 +50,21 @@ runEquivalence t = do
           ^.. getVerilogSrc
           .   traverse
           .   getDescription
-  shelly . verbosely $ do
-    mkdir_p (fromText "equiv" </> fromText t)
+  shellyFailDir . verbosely $ do
+    mkdir_p (fromText "equiv" </> fromText n)
     curr <- toTextIgnore <$> pwd
     setenv "VERIFUZZ_ROOT" curr
-    cd (fromText "equiv" </> fromText t)
-    runEquiv defaultYosys defaultYosys (Just defaultXst) circ
+    cd (fromText "equiv" </> fromText n)
+    catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) circ) $ onFailure n
+    cd ".."
+  runEquivalence t $ i+1
+  where
+    n = t <> "_" <> T.pack (show i)
 
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
-main =
-  -- runEquivalence
-  runSimulation
+main = do
+  _ <- forkIO $ runEquivalence "test_1" 0
+  _ <- forkIO $ runEquivalence "test_2" 0
+  _ <- forkIO $ runEquivalence "test_3" 0
+  runEquivalence "test_4" 0
