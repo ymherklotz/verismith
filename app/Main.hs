@@ -13,6 +13,12 @@ import           Shelly
 import qualified Test.QuickCheck      as QC
 import           VeriFuzz
 
+myForkIO :: IO () -> IO (MVar ())
+myForkIO io = do
+  mvar <- newEmptyMVar
+  _ <- forkFinally io (\_ -> putMVar mvar ())
+  return mvar
+
 genRand :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
 genRand gen n bytes | n == 0    = ranBytes : bytes
                     | otherwise = genRand newGen (n - 1) $ ranBytes : bytes
@@ -57,14 +63,14 @@ runEquivalence t i = do
     cd (fromText "equiv" </> fromText n)
     catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) circ) $ onFailure n
     cd ".."
-  runEquivalence t $ i+1
+  --runEquivalence t $ i+1
   where
     n = t <> "_" <> T.pack (show i)
 
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
-  _ <- forkIO $ runEquivalence "test_1" 0
-  _ <- forkIO $ runEquivalence "test_2" 0
-  _ <- forkIO $ runEquivalence "test_3" 0
-  runEquivalence "test_4" 0
+  num <- getNumCapabilities
+  vars <- sequence $ (\x -> myForkIO $
+                       runEquivalence ("test_" <> T.pack (show x)) 0) <$> [1..num]
+  sequence_ $ takeMVar <$> vars

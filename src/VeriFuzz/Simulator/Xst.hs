@@ -42,10 +42,10 @@ runSynthXst sim m outf = do
   writefile xstFile $ xstSynthConfig m
   writefile prjFile [st|verilog work "rtl.v"|]
   writefile "rtl.v" $ genSource m
-  timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
-  run_ (netgenPath sim)
-       ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
-  run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
+  noPrint $ timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
+  noPrint $ run_ (netgenPath sim)
+    ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
+  noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
  where
   modFile = fromText $ modName m
   xstFile = modFile <.> "xst"

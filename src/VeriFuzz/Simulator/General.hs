@@ -55,3 +55,7 @@ timeout_ = command1_ "timeout" ["180"] . toTextIgnore
 bsToI :: ByteString -> Integer
 bsToI = B.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
 {-# INLINE bsToI #-}
+
+noPrint :: Sh a -> Sh a
+noPrint =
+  print_stdout False . print_stderr False
