@@ -58,5 +58,6 @@ runSimIcarus sim m bss = do
   let newtb     = instantiateMod m tb
   let modWithTb = VerilogSrc $ Description <$> [newtb, m]
   writefile "main.v" $ genSource modWithTb
+  echoP "Run icarus"
   noPrint $ run_ (icarusPath sim) ["-o", "main", "main.v"]
   hash <$> run (vvpPath sim) ["main"]

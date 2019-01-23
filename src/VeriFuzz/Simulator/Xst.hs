@@ -15,8 +15,10 @@ Xst (ise) simulator implementation.
 module VeriFuzz.Simulator.Xst where
 
 import           Control.Lens                         hiding ((<.>))
+import qualified Data.Text                            as T
 import           Prelude                              hiding (FilePath)
 import           Shelly
+import           System.FilePath.Posix                (takeBaseName)
 import           Text.Shakespeare.Text                (st)
 import           VeriFuzz.Simulator.General
 import           VeriFuzz.Simulator.Internal.Template
@@ -42,9 +44,12 @@ runSynthXst sim m outf = do
   writefile xstFile $ xstSynthConfig m
   writefile prjFile [st|verilog work "rtl.v"|]
   writefile "rtl.v" $ genSource m
+  echoP "Run xst"
   noPrint $ timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
+  echoP "Run netgen"
   noPrint $ run_ (netgenPath sim)
     ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
+  echoP "Clean synthesized file"
   noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
  where
   modFile = fromText $ modName m

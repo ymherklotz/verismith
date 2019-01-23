@@ -47,6 +47,7 @@ writeSimFile _ m file = do
 runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
 runSynthYosys sim m outf = do
   writefile inpf $ genSource m
+  echoP "Run yosim"
   noPrint $ run_ (yosysPath sim) ["-q", "-b", "verilog -noattr", "-o", out, "-S", inp]
  where
   inpf = "rtl.v"
@@ -64,6 +65,7 @@ runEquivYosys yosys sim1 sim2 m = do
   writefile checkFile $ yosysSatConfig sim1 sim2 m
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runMaybeSynth sim2 m
+  echoP "Run yosys"
   noPrint $ run_ (yosysPath yosys) [toTextIgnore checkFile]
   where
     checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
@@ -75,4 +77,5 @@ runEquiv yosys sim1 sim2 m = do
   writefile "test.sby" $ sbyConfig root sim1 sim2 m
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runMaybeSynth sim2 m
+  echoP "Run SymbiYosys"
   noPrint $ run_ "sby" ["test.sby"]
