@@ -51,6 +51,7 @@ library
                      , bytestring
                      , hashable
                      , transformers
+                     , filepath
   default-extensions:  OverloadedStrings
 
 executable verifuzz
