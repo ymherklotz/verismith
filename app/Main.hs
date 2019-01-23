@@ -36,19 +36,20 @@ runSimulation = do
   -- writeFile "file.dot" dot
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   let circ =
-        head $ (nestUpTo 5 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
+        head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
   val  <- shelly $ runSim defaultIcarus (initMod circ) rand
   putStrLn $ showHex (abs val) ""
 
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
+  echoP "FAIL"
   cd ".."
   cp_r (fromText t) $ fromText (t <> "_failed")
 
 runEquivalence :: Text -> Int -> IO ()
 runEquivalence t i = do
-  gr <- QC.generate $ rDups <$> QC.resize 1000 (randomDAG :: QC.Gen (G.Gr Gate ()))
+  gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
   let circ =
         initMod
           .   head
@@ -56,14 +57,14 @@ runEquivalence t i = do
           ^.. getVerilogSrc
           .   traverse
           .   getDescription
-  shellyFailDir . verbosely $ do
+  shellyFailDir $ do
     mkdir_p (fromText "equiv" </> fromText n)
     curr <- toTextIgnore <$> pwd
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText "equiv" </> fromText n)
-    catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) circ) $ onFailure n
+    catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) circ >> echoP "OK") $ onFailure n
     cd ".."
-  --runEquivalence t $ i+1
+  when (i < 5) (runEquivalence t $ i+1)
   where
     n = t <> "_" <> T.pack (show i)
 
