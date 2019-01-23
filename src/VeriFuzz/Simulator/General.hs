@@ -12,12 +12,14 @@ Class of the simulator and the synthesize tool.
 
 module VeriFuzz.Simulator.General where
 
-import           Data.Bits            (shiftL)
-import           Data.ByteString      (ByteString)
-import qualified Data.ByteString      as B
-import           Data.Text            (Text)
-import           Prelude              hiding (FilePath)
+import           Data.Bits             (shiftL)
+import           Data.ByteString       (ByteString)
+import qualified Data.ByteString       as B
+import           Data.Text             (Text)
+import qualified Data.Text             as T
+import           Prelude               hiding (FilePath)
 import           Shelly
+import           System.FilePath.Posix (takeBaseName)
 import           VeriFuzz.Verilog.AST
 
 -- | Simulator class.
@@ -59,3 +61,10 @@ bsToI = B.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
 noPrint :: Sh a -> Sh a
 noPrint =
   print_stdout False . print_stderr False
+
+echoP :: Text -> Sh ()
+echoP t = do
+  fn <- pwd
+  echo $ bname fn <> " :: " <> t
+  where
+    bname = T.pack . takeBaseName . T.unpack . toTextIgnore
