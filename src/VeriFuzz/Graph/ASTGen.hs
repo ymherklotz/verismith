@@ -12,6 +12,7 @@ Generates the AST from the graph directly.
 
 module VeriFuzz.Graph.ASTGen where
 
+import           Control.Lens             ((^..))
 import           Data.Foldable            (fold)
 import           Data.Graph.Inductive     (LNode, Node)
 import qualified Data.Graph.Inductive     as G
@@ -73,7 +74,9 @@ genModuleDeclAST c = ModDecl i output ports items
   i      = Identifier "gen_module"
   ports  = genPortsAST inputsC c
   output = [Port Wire 90 "y"]
-  items  = genAssignAST c ++ [ModCA . ContAssign "y" . fold $ portToExpr <$> ports]
+  a = genAssignAST c
+  items  = a ++ [ModCA . ContAssign "y" . fold $ Id <$> assigns]
+  assigns = a ^.. traverse . _ModCA . contAssignNetLVal
 
 generateAST :: Circuit -> VerilogSrc
 generateAST c = VerilogSrc [Description $ genModuleDeclAST c]
