@@ -17,19 +17,19 @@ library (in the [src](/src) folder). To build the executable, you will need
 directly using [cabal-install](https://www.haskell.org/cabal/download.html) is
 possible but not recommended and not directly supported.
 
-To build the executable
+To build the executable:
 
 ```
 stack build
 ```
 
-To run the executable
+To run the executable:
 
 ```
 stack exec verifuzz
 ```
 
-To install the executable (which defaults to installing it in `~/.local`)
+To install the executable (which defaults to installing it in `~/.local`):
 
 ```
 stack install
@@ -42,7 +42,7 @@ test-suites tests the random code generation and generation of the acyclic
 graph. It also contains some property based tests for this. The other test-suite
 uses `doctest` to test the examples that are in the documentation.
 
-To run the test-suites
+To run the test-suites:
 
 ```
 stack test
