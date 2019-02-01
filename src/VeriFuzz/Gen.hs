@@ -32,7 +32,7 @@ randomAssigns ids = random ids . ContAssign <$> ids
 randomMod :: Gen ModDecl
 randomMod = do
   let ids = Identifier . ("w"<>) . T.pack . show <$> [1..100]
-  _ <- sequence $ randomAssigns ids
+  sequence_ $ randomAssigns ids
   return $ ModDecl "" [] [] []
 
 fromGraph :: Gen ModDecl
