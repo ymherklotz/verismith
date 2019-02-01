@@ -65,10 +65,13 @@ module VeriFuzz.Verilog.AST
   , exprCond
   , exprTrue
   , exprFalse
+  , exprFunc
+  , exprBody
   , exprStr
   , traverseExpr
   , ConstExpr(..)
   , constNum
+  , Function (..)
     -- * Assignment
   , Assign(..)
   , assignReg
@@ -124,7 +127,7 @@ positiveArb = QC.suchThat QC.arbitrary (> 0)
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { _getIdentifier :: Text }
-                   deriving (Eq, Show, IsString, Semigroup, Monoid)
+                   deriving (Eq, IsString, Semigroup, Monoid)
 
 makeLenses ''Identifier
 
@@ -135,7 +138,7 @@ instance QC.Arbitrary Identifier where
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _getDelay :: Int }
-                deriving (Eq, Show, Num)
+                deriving (Eq, Num)
 
 makeLenses ''Delay
 
@@ -148,7 +151,7 @@ data Event = EId Identifier
            | EAll
            | EPosEdge Identifier
            | ENegEdge Identifier
-           deriving (Eq, Show)
+           deriving (Eq)
 
 instance QC.Arbitrary Event where
   arbitrary = EId <$> QC.arbitrary
@@ -179,7 +182,7 @@ data BinaryOperator = BinPlus    -- ^ @+@
                     | BinLSR     -- ^ @>>@
                     | BinASL     -- ^ @<<<@
                     | BinASR     -- ^ @>>>@
-                    deriving (Eq, Show)
+                    deriving (Eq)
 
 instance QC.Arbitrary BinaryOperator where
   arbitrary = QC.elements
@@ -221,7 +224,7 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnXor     -- ^ @^@
                    | UnNxor    -- ^ @~^@
                    | UnNxorInv -- ^ @^~@
-                   deriving (Eq, Show)
+                   deriving (Eq)
 
 instance QC.Arbitrary UnaryOperator where
   arbitrary = QC.elements
@@ -235,6 +238,16 @@ instance QC.Arbitrary UnaryOperator where
     , UnXor
     , UnNxor
     , UnNxorInv
+    ]
+
+data Function = SignedFunc
+              | UnSignedFunc
+              deriving (Eq)
+
+instance QC.Arbitrary Function where
+  arbitrary = QC.elements
+    [ SignedFunc
+    , UnSignedFunc
     ]
 
 -- | Verilog expression, which can either be a primary expression, unary
@@ -255,8 +268,11 @@ data Expr = Number { _exprSize :: Int
                  , _exprTrue  :: Expr
                  , _exprFalse :: Expr
                  }
+          | Func { _exprFunc :: Function
+                 , _exprBody :: Expr
+                 }
           | Str { _exprStr :: Text }
-          deriving (Eq, Show)
+          deriving (Eq)
 
 instance Num Expr where
   a + b = BinOp a BinPlus b
@@ -284,7 +300,6 @@ expr n
   | n == 0 = QC.oneof
     [ Id <$> QC.arbitrary
     , Number <$> positiveArb <*> QC.arbitrary
-    , UnOp <$> QC.arbitrary <*> QC.arbitrary
     -- , Str <$> QC.arbitrary
     ]
   | n > 0 = QC.oneof
@@ -297,6 +312,7 @@ expr n
     -- , Str <$> QC.arbitrary
     , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
     , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+    , Func <$> QC.arbitrary <*> subexpr 2
     ]
   | otherwise = expr 0
   where subexpr y = expr (n `div` y)
@@ -315,13 +331,13 @@ makeLenses ''Expr
 
 -- | Constant expression, which are known before simulation at compilation time.
 newtype ConstExpr = ConstExpr { _constNum :: Int }
-                  deriving (Eq, Show, Num, QC.Arbitrary)
+                  deriving (Eq, Num, QC.Arbitrary)
 
 makeLenses ''ConstExpr
 
 data Task = Task { _taskName :: Identifier
                  , _taskExpr :: [Expr]
-                 } deriving (Eq, Show)
+                 } deriving (Eq)
 
 makeLenses ''Task
 
@@ -343,7 +359,7 @@ data LVal = RegId { _regId :: Identifier}
                     , _regSizeLSB :: ConstExpr
                     }
           | RegConcat { _regConc :: [Expr] }
-          deriving (Eq, Show)
+          deriving (Eq)
 
 makeLenses ''LVal
 
@@ -360,7 +376,7 @@ instance IsString LVal where
 data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortOut   -- ^ Output direction for port (@output@).
              | PortInOut -- ^ Inout direction for port (@inout@).
-             deriving (Eq, Show)
+             deriving (Eq)
 
 instance QC.Arbitrary PortDir where
   arbitrary = QC.elements [PortIn, PortOut, PortInOut]
@@ -369,7 +385,7 @@ instance QC.Arbitrary PortDir where
 -- not that common and not a priority.
 data PortType = Wire
               | Reg { _regSigned :: Bool }
-              deriving (Eq, Show)
+              deriving (Eq)
 
 instance QC.Arbitrary PortType where
   arbitrary = QC.oneof [pure Wire, Reg <$> QC.arbitrary]
@@ -387,7 +403,7 @@ makeLenses ''PortType
 data Port = Port { _portType :: PortType
                  , _portSize :: Int
                  , _portName :: Identifier
-                 } deriving (Eq, Show)
+                 } deriving (Eq)
 
 makeLenses ''Port
 
@@ -404,7 +420,7 @@ data ModConn = ModConn { _modConn :: Expr }
              | ModConnNamed { _modConnName :: Identifier
                             , _modExpr     :: Expr
                             }
-             deriving (Eq, Show)
+             deriving (Eq)
 
 makeLenses ''ModConn
 
@@ -414,7 +430,7 @@ instance QC.Arbitrary ModConn where
 data Assign = Assign { _assignReg   :: LVal
                      , _assignDelay :: Maybe Delay
                      , _assignExpr  :: Expr
-                     } deriving (Eq, Show)
+                     } deriving (Eq)
 
 makeLenses ''Assign
 
@@ -423,7 +439,7 @@ instance QC.Arbitrary Assign where
 
 data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
                              , _contAssignExpr    :: Expr
-                             } deriving (Eq, Show)
+                             } deriving (Eq)
 
 makeLenses ''ContAssign
 
@@ -443,7 +459,7 @@ data Stmnt = TimeCtrl { _statDelay :: Delay
            | StatCA { _stmntCA :: ContAssign }      -- ^ Stmnt continuous assignment. May not be correct.
            | TaskEnable { _stmntTask :: Task}
            | SysTaskEnable { _stmntSysTask :: Task}
-           deriving (Eq, Show)
+           deriving (Eq)
 
 makeLenses ''Stmnt
 
@@ -491,7 +507,7 @@ data ModItem = ModCA ContAssign
              | Decl { _declDir  :: Maybe PortDir
                     , _declPort :: Port
                     }
-             deriving (Eq, Show)
+             deriving (Eq)
 
 makeLenses ''ModItem
 makePrisms ''ModItem
@@ -509,7 +525,7 @@ data ModDecl = ModDecl { _modId       :: Identifier
                        , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
                        , _modItems    :: [ModItem]
-                       } deriving (Eq, Show)
+                       } deriving (Eq)
 
 makeLenses ''ModDecl
 
@@ -524,12 +540,12 @@ instance QC.Arbitrary ModDecl where
 
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModDecl }
-                    deriving (Eq, Show, QC.Arbitrary)
+                    deriving (Eq, QC.Arbitrary)
 
 makeLenses ''Description
 
 -- | The complete sourcetext for the Verilog module.
 newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
-                   deriving (Eq, Show, QC.Arbitrary, Semigroup, Monoid)
+                   deriving (Eq, QC.Arbitrary, Semigroup, Monoid)
 
 makeLenses ''VerilogSrc

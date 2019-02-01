@@ -21,6 +21,7 @@ import           Data.Text            (Text)
 import qualified Data.Text            as T
 import qualified Data.Text.IO         as T
 import           Numeric              (showHex)
+import           Test.QuickCheck      (Arbitrary, arbitrary)
 import           VeriFuzz.Verilog.AST
 
 -- | 'Source' class which determines that source code is able to be generated
@@ -105,14 +106,21 @@ genContAssign (ContAssign val e) = "assign " <> name <> " = " <> expr <> ";\n"
   name = val ^. getIdentifier
   expr = genExpr e
 
+-- | Generate 'Function' to 'Text'
+genFunc :: Function -> Text
+genFunc SignedFunc   = "$signed"
+genFunc UnSignedFunc = "$unsigned"
+
 -- | Generate 'Expr' to 'Text'.
 genExpr :: Expr -> Text
 genExpr (BinOp eRhs bin eLhs) = "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
-genExpr (Number s n         ) = showT s <> "'h" <> T.pack (showHex n "")
+genExpr (Number s n         ) = minus <> showT s <> "'h" <> T.pack (showHex (abs n) "")
+  where minus | signum n > 0 = "" | otherwise = "-"
 genExpr (Id     i           ) = i ^. getIdentifier
 genExpr (Concat c           ) = "{" <> comma (genExpr <$> c) <> "}"
 genExpr (UnOp u e           ) = "(" <> genUnaryOperator u <> genExpr e <> ")"
 genExpr (Cond l t f         ) = "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
+genExpr (Func f e           ) = genFunc f <> "(" <> genExpr e <> ")"
 genExpr (Str t              ) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
@@ -258,3 +266,11 @@ instance Source Description where
 
 instance Source VerilogSrc where
   genSource = genVerilogSrc
+
+newtype GenVerilog a = GenVerilog { unGenVerilog :: a }
+
+instance (Source a) => Show (GenVerilog a) where
+  show = T.unpack . genSource . unGenVerilog
+
+instance (Arbitrary a) => Arbitrary (GenVerilog a) where
+  arbitrary = GenVerilog <$> arbitrary
