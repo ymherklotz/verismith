@@ -21,25 +21,23 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   ghc-options: -Wall
-  other-modules: VeriFuzz.Internal.Gen
-               , VeriFuzz.Internal.Shared
-               , VeriFuzz.Simulator.Internal.Template
-  exposed-modules: VeriFuzz
+  other-modules: VeriFuzz.Internal
+               , VeriFuzz.Internal.Circuit
+               , VeriFuzz.Internal.Simulator
+  exposed-modules: VeriFuzz.ASTGen
+                 , VeriFuzz.AST
                  , VeriFuzz.Circuit
-                 , VeriFuzz.Graph.ASTGen
-                 , VeriFuzz.Graph.CodeGen
-                 , VeriFuzz.Graph.Random
-                 , VeriFuzz.Graph.RandomAlt
-                 , VeriFuzz.Simulator
-                 , VeriFuzz.Simulator.General
-                 , VeriFuzz.Simulator.Icarus
-                 , VeriFuzz.Simulator.Xst
-                 , VeriFuzz.Simulator.Yosys
-                 , VeriFuzz.Verilog
-                 , VeriFuzz.Verilog.AST
-                 , VeriFuzz.Verilog.CodeGen
-                 , VeriFuzz.Verilog.Helpers
-                 , VeriFuzz.Verilog.Mutate
+                 , VeriFuzz.CodeGen
+                 , VeriFuzz.Env
+                 , VeriFuzz.General
+                 , VeriFuzz.Gen
+                 , VeriFuzz.Helpers
+                 , VeriFuzz.Icarus
+                 , VeriFuzz.Mutate
+                 , VeriFuzz.RandomAlt
+                 , VeriFuzz.Random
+                 , VeriFuzz.XST
+                 , VeriFuzz.Yosys
   build-depends: base >= 4.7 && < 5
                , QuickCheck >=2.3 && <2.10
                , fgl
