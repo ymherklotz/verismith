@@ -68,6 +68,7 @@ module VeriFuzz.Verilog.AST
   , exprFunc
   , exprBody
   , exprStr
+  , exprWithContext
   , traverseExpr
   , ConstExpr(..)
   , constNum
@@ -295,27 +296,38 @@ instance Monoid Expr where
 instance IsString Expr where
   fromString = Str . fromString
 
+exprSafeList :: [QC.Gen Expr]
+exprSafeList =
+  [ Number <$> positiveArb <*> QC.arbitrary
+    -- , Str <$> QC.arbitrary
+  ]
+
+exprRecList :: (Int -> QC.Gen Expr) -> [QC.Gen Expr]
+exprRecList subexpr =
+  [ Number <$> positiveArb <*> QC.arbitrary
+  , Concat <$> QC.listOf1 (subexpr 8)
+  , UnOp
+    <$> QC.arbitrary
+    <*> subexpr 2
+    -- , Str <$> QC.arbitrary
+  , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
+  , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+  , Func <$> QC.arbitrary <*> subexpr 2
+  ]
+
 expr :: Int -> QC.Gen Expr
 expr n
-  | n == 0 = QC.oneof
-    [ Id <$> QC.arbitrary
-    , Number <$> positiveArb <*> QC.arbitrary
-    -- , Str <$> QC.arbitrary
-    ]
-  | n > 0 = QC.oneof
-    [ Id <$> QC.arbitrary
-    , Number <$> positiveArb <*> QC.arbitrary
-    , Concat <$> QC.listOf1 (subexpr 4)
-    , UnOp
-    <$> QC.arbitrary
-    <*> QC.arbitrary
-    -- , Str <$> QC.arbitrary
-    , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
-    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
-    , Func <$> QC.arbitrary <*> subexpr 2
-    ]
+  | n == 0 = QC.oneof $ (Id <$> QC.arbitrary) : exprSafeList
+  | n > 0 = QC.oneof $ (Id <$> QC.arbitrary) : exprRecList subexpr
   | otherwise = expr 0
   where subexpr y = expr (n `div` y)
+
+exprWithContext :: [Identifier] -> Int -> QC.Gen Expr
+exprWithContext l n
+  | n == 0 = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
+  | n > 0 = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
+  | otherwise = exprWithContext l 0
+  where subexpr y = exprWithContext l (n `div` y)
 
 instance QC.Arbitrary Expr where
   arbitrary = QC.sized expr
@@ -325,6 +337,7 @@ traverseExpr f (Concat e    ) = Concat <$> sequenceA (f <$> e)
 traverseExpr f (UnOp un e   ) = UnOp un <$> f e
 traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
 traverseExpr f (Cond  c l  r) = Cond <$> f c <*> f l <*> f r
+traverseExpr f (Func fn e   ) = Func fn <$> f e
 traverseExpr _ e              = pure e
 
 makeLenses ''Expr
