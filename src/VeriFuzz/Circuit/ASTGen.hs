@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Graph.ASTGen
+Module      : VeriFuzz.Circuit.ASTGen
 Description : Generates the AST from the graph directly.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Generates the AST from the graph directly.
 -}
 
-module VeriFuzz.Graph.ASTGen where
+module VeriFuzz.Circuit.ASTGen where
 
 import           Control.Lens             ((^..))
 import           Data.Foldable            (fold)

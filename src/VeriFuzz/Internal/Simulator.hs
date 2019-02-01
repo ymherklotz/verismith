@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Simulator.Internal.Template
+Module      : VeriFuzz.Internal.Simulator
 Description : Template file for different configuration files
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -12,7 +12,7 @@ Template file for different configuration files.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Simulator.Internal.Template where
+module VeriFuzz.Internal.Simulator where
 
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T

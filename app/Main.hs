@@ -11,6 +11,7 @@ import qualified Data.Text                as T
 import           Numeric                  (showHex)
 import           Prelude                  hiding (FilePath)
 import           Shelly
+import           Test.QuickCheck          (Gen)
 import qualified Test.QuickCheck          as QC
 import           VeriFuzz
 import qualified VeriFuzz.Graph.RandomAlt as V
@@ -56,24 +57,27 @@ onFailure t _ = do
   cd ".."
   cp_r (fromText t) $ fromText (t <> "_failed")
 
-runEquivalence :: Text -> Int -> IO ()
-runEquivalence t i = do
-  gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
-  let circ =
-        initMod
-          .   head
-          $   (nestUpTo 5 . generateAST $ Circuit gr)
-          ^.. getVerilogSrc
-          .   traverse
-          .   getDescription
+random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
+random ctx fun = do
+  expr <- QC.sized (exprWithContext ctx)
+  return . ModCA $ fun expr
+
+randomAssigns :: [Identifier] -> [Gen ModItem]
+randomAssigns ids = random ids . ContAssign <$> ids
+
+runEquivalence :: IO ModDecl -> Text -> Int -> IO ()
+runEquivalence gm t i = do
+  m <- gm
   shellyFailDir $ do
     mkdir_p (fromText "equiv" </> fromText n)
     curr <- toTextIgnore <$> pwd
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText "equiv" </> fromText n)
-    catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) circ >> echoP "OK") $ onFailure n
+    catch_sh (runEquiv defaultYosys defaultYosys
+              (Just defaultXst) m >> echoP "OK") $
+      onFailure n
     cd ".."
-  when (i < 5) (runEquivalence t $ i+1)
+  when (i < 5) (runEquivalence gm t $ i+1)
   where
     n = t <> "_" <> T.pack (show i)
 

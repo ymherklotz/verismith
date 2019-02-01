@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Graph.Random
+Module      : VeriFuzz.Circuit.Random
 Description : Code generation directly from DAG.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Define the code generation directly from the random DAG.
 -}
 
-module VeriFuzz.Graph.CodeGen
+module VeriFuzz.Circuit.CodeGen
   ( generate
   )
 where
