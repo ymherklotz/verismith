@@ -15,7 +15,6 @@ module VeriFuzz.Verilog.Mutate where
 
 import           Control.Lens
 import           Data.Maybe               (catMaybes, fromMaybe)
-import           Data.Maybe               (fromMaybe)
 import           Data.Text                (Text)
 import qualified Data.Text                as T
 import           VeriFuzz.Internal.Gen
