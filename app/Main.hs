@@ -2,16 +2,18 @@ module Main where
 
 import           Control.Concurrent
 import           Control.Lens
-import qualified Crypto.Random.DRBG   as C
-import           Data.ByteString      (ByteString)
-import qualified Data.Graph.Inductive as G
-import           Data.Text            (Text)
-import qualified Data.Text            as T
-import           Numeric              (showHex)
-import           Prelude              hiding (FilePath)
+import qualified Crypto.Random.DRBG       as C
+import           Data.ByteString          (ByteString)
+import qualified Data.Graph.Inductive     as G
+import qualified Data.Graph.Inductive.Dot as G
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           Numeric                  (showHex)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import qualified Test.QuickCheck      as QC
+import qualified Test.QuickCheck          as QC
 import           VeriFuzz
+import qualified VeriFuzz.Graph.RandomAlt as V
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -28,6 +30,13 @@ genRandom :: Int -> IO [ByteString]
 genRandom n = do
   gen <- C.newGenIO :: IO C.CtrDRBG
   return $ genRand gen n []
+
+draw :: IO ()
+draw = do
+  gr <- QC.generate $ rDups <$> QC.resize 10 (randomDAG :: QC.Gen (G.Gr Gate ()))
+  let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
+  writeFile "file.dot" dot
+  shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
 
 runSimulation :: IO ()
 runSimulation = do
