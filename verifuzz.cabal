@@ -1,100 +1,101 @@
-name:                  verifuzz
-version:               0.1.0.0
-synopsis:              Random verilog generation and simulator testing.
-description:           VeriFuzz provides random verilog generation modules
-                       implementing functions to test supported simulators.
-homepage:              https://github.com/githubuser/verifuzz#readme
-license:               BSD3
-license-file:          LICENSE
-author:                Yann Herklotz
-maintainer:            ymherklotz@gmail.com
-copyright:             2018 Yann Herklotz
-category:              Web
-build-type:            Simple
-cabal-version:         >=1.10
-extra-source-files:    README.md
-                     , data/*.v
-                     , examples/*.v
+name: verifuzz
+version: 0.1.0.0
+synopsis: Random verilog generation and simulator testing.
+description:
+  VeriFuzz provides random verilog generation modules
+  implementing functions to test supported simulators.
+homepage: https://github.com/githubuser/verifuzz#readme
+license: BSD3
+license-file: LICENSE
+author: Yann Herklotz Grave
+maintainer: yann [at] yannherklotzgrave [dot] com
+copyright: 2018 Yann Herklotz Grave
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+extra-source-files: README.md
+                  , data/*.v
+                  , examples/*.v
 
 library
-  hs-source-dirs:      src
-  default-language:    Haskell2010
-  ghc-options:         -Wall
-  other-modules:       VeriFuzz.Internal.Gen
-                     , VeriFuzz.Internal.Shared
-                     , VeriFuzz.Simulator.Internal.Template
-  exposed-modules:     VeriFuzz
-                     , VeriFuzz.Circuit
-                     , VeriFuzz.Graph.ASTGen
-                     , VeriFuzz.Graph.CodeGen
-                     , VeriFuzz.Graph.Random
-                     , VeriFuzz.Graph.RandomAlt
-                     , VeriFuzz.Simulator
-                     , VeriFuzz.Simulator.General
-                     , VeriFuzz.Simulator.Icarus
-                     , VeriFuzz.Simulator.Xst
-                     , VeriFuzz.Simulator.Yosys
-                     , VeriFuzz.Verilog
-                     , VeriFuzz.Verilog.AST
-                     , VeriFuzz.Verilog.CodeGen
-                     , VeriFuzz.Verilog.Helpers
-                     , VeriFuzz.Verilog.Mutate
-  build-depends:       base >= 4.7 && < 5
-                     , QuickCheck >=2.3 && <2.10
-                     , fgl
-                     , fgl-arbitrary
-                     , lens
-                     , random
-                     , shakespeare
-                     , shelly
-                     , text
-                     , bytestring
-                     , hashable
-                     , transformers
-                     , filepath
-  default-extensions:  OverloadedStrings
+  hs-source-dirs: src
+  default-language: Haskell2010
+  ghc-options: -Wall
+  other-modules: VeriFuzz.Internal.Gen
+               , VeriFuzz.Internal.Shared
+               , VeriFuzz.Simulator.Internal.Template
+  exposed-modules: VeriFuzz
+                 , VeriFuzz.Circuit
+                 , VeriFuzz.Graph.ASTGen
+                 , VeriFuzz.Graph.CodeGen
+                 , VeriFuzz.Graph.Random
+                 , VeriFuzz.Graph.RandomAlt
+                 , VeriFuzz.Simulator
+                 , VeriFuzz.Simulator.General
+                 , VeriFuzz.Simulator.Icarus
+                 , VeriFuzz.Simulator.Xst
+                 , VeriFuzz.Simulator.Yosys
+                 , VeriFuzz.Verilog
+                 , VeriFuzz.Verilog.AST
+                 , VeriFuzz.Verilog.CodeGen
+                 , VeriFuzz.Verilog.Helpers
+                 , VeriFuzz.Verilog.Mutate
+  build-depends: base >= 4.7 && < 5
+               , QuickCheck >=2.3 && <2.10
+               , fgl
+               , fgl-arbitrary
+               , lens
+               , random
+               , shakespeare
+               , shelly
+               , text
+               , bytestring
+               , hashable
+               , transformers
+               , filepath
+  default-extensions: OverloadedStrings
 
 executable verifuzz
-  main-is:             app/Main.hs
-  default-language:    Haskell2010
-  ghc-options:         -threaded
-  build-depends:       base >= 4.7 && < 5
-                     , verifuzz
-                     , fgl
-                     , fgl-arbitrary
-                     , fgl-visualize
-                     , text
-                     , QuickCheck
-                     , bytestring
-                     , shelly
-                     , DRBG
-                     , lens
-  default-extensions:  OverloadedStrings
+  main-is: app/Main.hs
+  default-language: Haskell2010
+  ghc-options: -threaded
+  build-depends: base >= 4.7 && < 5
+               , verifuzz
+               , fgl
+               , fgl-arbitrary
+               , fgl-visualize
+               , text
+               , QuickCheck
+               , bytestring
+               , shelly
+               , DRBG
+               , lens
+  default-extensions: OverloadedStrings
 
 test-suite verifuzz-test
-  default-language:    Haskell2010
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Test.hs
-  other-modules:       Unit
-                     , Property
-  build-depends:       base >= 4 && < 5
-                     , verifuzz
-                     , fgl
-                     , tasty >= 0.7
-                     , tasty-hunit >= 0.10
-                     , tasty-quickcheck >= 0.10
-                     , lens
-                     , text
-  default-extensions:  OverloadedStrings
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Test.hs
+  other-modules: Unit
+               , Property
+  build-depends: base >= 4 && < 5
+               , verifuzz
+               , fgl
+               , tasty >= 0.7
+               , tasty-hunit >= 0.10
+               , tasty-quickcheck >= 0.10
+               , lens
+               , text
+  default-extensions: OverloadedStrings
 
 test-suite verifuzz-doctest
-  default-language:    Haskell2010
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Doctest.hs
-  build-depends:       base >= 4 && < 5
-                     , verifuzz
-                     , doctest
-                     , doctest-discover
-  default-extensions:  OverloadedStrings
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Doctest.hs
+  build-depends: base >= 4 && < 5
+               , verifuzz
+               , doctest
+               , doctest-discover
+  default-extensions: OverloadedStrings
