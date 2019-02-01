@@ -7,8 +7,8 @@ Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 
-Functions to mutate the Verilog AST from "VeriFuzz.Verilog.AST" to generate
-more random patterns, such as nesting wires instead of creating new ones.
+Functions to mutate the Verilog AST from "VeriFuzz.Verilog.AST" to generate more
+random patterns, such as nesting wires instead of creating new ones.
 -}
 
 module VeriFuzz.Verilog.Mutate where
@@ -25,15 +25,17 @@ import           VeriFuzz.Verilog.CodeGen
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
 inPort i m = inInput
-  where inInput = any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
+  where inInput = any (\a -> a ^. portName == i) $
+          m ^. modInPorts ++ m ^. modOutPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
 findAssign :: Identifier -> [ModItem] -> Maybe Expr
 findAssign i items = safe last . catMaybes $ isAssign <$> items
  where
-  isAssign (ModCA (ContAssign val expr)) | val == i  = Just expr
-                                         | otherwise = Nothing
+  isAssign (ModCA (ContAssign val expr))
+    | val == i  = Just expr
+    | otherwise = Nothing
   isAssign _ = Nothing
 
 -- | Transforms an expression by replacing an Identifier with an
@@ -48,8 +50,8 @@ idTrans _ _ e = e
 replace :: Identifier -> Expr -> Expr -> Expr
 replace = (transformOf traverseExpr .) . idTrans
 
--- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not found,
--- the AST is not changed.
+-- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not
+-- found, the AST is not changed.
 --
 -- This could be improved by instead of only using the last assignment to the
 -- wire that one finds, to use the assignment to the wire before the current
