@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Mutation
+Module      : VeriFuzz.Mutation
 Description : Functions to mutate the Verilog AST.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -11,16 +11,15 @@ Functions to mutate the Verilog AST from "VeriFuzz.Verilog.AST" to generate more
 random patterns, such as nesting wires instead of creating new ones.
 -}
 
-module VeriFuzz.Verilog.Mutate where
+module VeriFuzz.Mutate where
 
 import           Control.Lens
-import           Data.Maybe               (catMaybes, fromMaybe)
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           VeriFuzz.Internal.Gen
-import           VeriFuzz.Internal.Shared
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           Data.Maybe        (catMaybes, fromMaybe)
+import           Data.Text         (Text)
+import qualified Data.Text         as T
+import           VeriFuzz.AST
+import           VeriFuzz.CodeGen
+import           VeriFuzz.Internal
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool

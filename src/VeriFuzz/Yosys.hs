@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Simulator.Yosys
+Module      : VeriFuzz.Yosys
 Description : Yosys simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -12,7 +12,7 @@ Yosys simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Simulator.Yosys where
+module VeriFuzz.Yosys where
 
 import           Data.Maybe                           (fromMaybe)
 import           Data.Text                            (Text)

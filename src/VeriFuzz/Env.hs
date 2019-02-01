@@ -12,6 +12,11 @@ Environment to run the simulator and synthesisers in a matrix.
 
 module VeriFuzz.Env where
 
+import           Control.Monad.Trans.Reader
+import           VeriFuzz.Icarus
+import           VeriFuzz.XST
+import           VeriFuzz.Yosys
+
 -- | Environment used to run the main
 data SimMatrix = SimMatrix { yosys  :: Yosys
                            , xst    :: Maybe Xst

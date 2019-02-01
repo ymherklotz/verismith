@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Simulator.Icarus
+Module      : VeriFuzz.Icarus
 Description : Icarus verilog module.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,18 +10,18 @@ Portability : POSIX
 Icarus verilog module.
 -}
 
-module VeriFuzz.Simulator.Icarus where
+module VeriFuzz.Icarus where
 
 import           Control.Lens
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString            as B
-import           Data.Foldable              (fold)
+import           Data.ByteString  (ByteString)
+import qualified Data.ByteString  as B
+import           Data.Foldable    (fold)
 import           Data.Hashable
-import           Data.List                  (transpose)
-import           Prelude                    hiding (FilePath)
+import           Data.List        (transpose)
+import           Prelude          hiding (FilePath)
 import           Shelly
-import           VeriFuzz.Simulator.General
-import           VeriFuzz.Verilog
+import           VeriFuzz.AST
+import           VeriFuzz.General
 
 data Icarus = Icarus { icarusPath :: FilePath
                      , vvpPath    :: FilePath

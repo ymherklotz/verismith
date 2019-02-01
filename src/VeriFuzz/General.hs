@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Simulator.General
+Module      : VeriFuzz.General
 Description : Class of the simulator.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Class of the simulator and the synthesize tool.
 -}
 
-module VeriFuzz.Simulator.General where
+module VeriFuzz.General where
 
 import           Data.Bits             (shiftL)
 import           Data.ByteString       (ByteString)
@@ -20,7 +20,7 @@ import qualified Data.Text             as T
 import           Prelude               hiding (FilePath)
 import           Shelly
 import           System.FilePath.Posix (takeBaseName)
-import           VeriFuzz.Verilog.AST
+import           VeriFuzz.AST
 
 -- | Simulator class.
 class Simulator a where

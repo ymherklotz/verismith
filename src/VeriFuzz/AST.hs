@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.AST
+Module      : VeriFuzz.AST
 Description : Definition of the Verilog AST types.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -13,7 +13,7 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
-module VeriFuzz.Verilog.AST
+module VeriFuzz.AST
   ( -- * Top level types
     VerilogSrc(..)
   , getVerilogSrc

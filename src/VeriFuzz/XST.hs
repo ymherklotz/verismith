@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Simulator.XST
+Module      : VeriFuzz.XST
 Description : Xst (ise) simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -12,7 +12,7 @@ Xst (ise) simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Simulator.XST where
+module VeriFuzz.XST where
 
 import           Control.Lens                         hiding ((<.>))
 import qualified Data.Text                            as T

@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Gen
+Module      : VeriFuzz.Gen
 Description : Various useful generators.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Various useful generators.
 -}
 
-module VeriFuzz.Verilog.Gen where
+module VeriFuzz.Gen where
 
 import qualified Data.Text        as T
 import           Test.QuickCheck  (Arbitrary, Gen, arbitrary)

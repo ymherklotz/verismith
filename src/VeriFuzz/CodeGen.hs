@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.CodeGen
+Module      : VeriFuzz.CodeGen
 Description : Code generation for Verilog AST.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -13,16 +13,16 @@ This module generates the code from the Verilog AST defined in
 
 {-# LANGUAGE FlexibleInstances #-}
 
-module VeriFuzz.Verilog.CodeGen where
+module VeriFuzz.CodeGen where
 
-import           Control.Lens         (view, (^.))
-import           Data.Foldable        (fold)
-import           Data.Text            (Text)
-import qualified Data.Text            as T
-import qualified Data.Text.IO         as T
-import           Numeric              (showHex)
-import           Test.QuickCheck      (Arbitrary, arbitrary)
-import           VeriFuzz.Verilog.AST
+import           Control.Lens    (view, (^.))
+import           Data.Foldable   (fold)
+import           Data.Text       (Text)
+import qualified Data.Text       as T
+import qualified Data.Text.IO    as T
+import           Numeric         (showHex)
+import           Test.QuickCheck (Arbitrary, arbitrary)
+import           VeriFuzz.AST
 
 -- | 'Source' class which determines that source code is able to be generated
 -- from the data structure using 'genSource'. This will be stored in 'Text' and

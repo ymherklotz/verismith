@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Circuit.ASTGen
+Module      : VeriFuzz.ASTGen
 Description : Generates the AST from the graph directly.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,17 +10,17 @@ Portability : POSIX
 Generates the AST from the graph directly.
 -}
 
-module VeriFuzz.Circuit.ASTGen where
+module VeriFuzz.ASTGen where
 
-import           Control.Lens             ((^..))
-import           Data.Foldable            (fold)
-import           Data.Graph.Inductive     (LNode, Node)
-import qualified Data.Graph.Inductive     as G
-import           Data.Maybe               (catMaybes)
+import           Control.Lens              ((^..))
+import           Data.Foldable             (fold)
+import           Data.Graph.Inductive      (LNode, Node)
+import qualified Data.Graph.Inductive      as G
+import           Data.Maybe                (catMaybes)
+import           VeriFuzz.AST
 import           VeriFuzz.Circuit
-import           VeriFuzz.Internal.Gen
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.Helpers
+import           VeriFuzz.Helpers
+import           VeriFuzz.Internal.Circuit
 
 -- | Converts a 'CNode' to an 'Identifier'.
 frNode :: Node -> Identifier
