@@ -9,23 +9,35 @@ Portability : POSIX
 -}
 
 module VeriFuzz
-  (
-    -- * Definitions
-    module VeriFuzz.Circuit
-    -- * Verilog AST Data Types
-  , module VeriFuzz.Verilog
-    -- * Graphs
-  , module VeriFuzz.Graph.ASTGen
-  , module VeriFuzz.Graph.CodeGen
-  , module VeriFuzz.Graph.Random
-    -- * Simulator
-  , module VeriFuzz.Simulator
-  )
-where
+  ( module VeriFuzz.AST
+  , module VeriFuzz.ASTGen
+  , module VeriFuzz.Circuit
+  , module VeriFuzz.CodeGen
+  , module VeriFuzz.Env
+  , module VeriFuzz.Gen
+  , module VeriFuzz.General
+  , module VeriFuzz.Helpers
+  , module VeriFuzz.Icarus
+  , module VeriFuzz.Internal
+  , module VeriFuzz.Mutate
+  , module VeriFuzz.Random
+  , module VeriFuzz.RandomAlt
+  , module VeriFuzz.XST
+  , module VeriFuzz.Yosys
+  ) where
 
+import           VeriFuzz.AST
+import           VeriFuzz.ASTGen
 import           VeriFuzz.Circuit
-import           VeriFuzz.Graph.ASTGen
-import           VeriFuzz.Graph.CodeGen
-import           VeriFuzz.Graph.Random
-import           VeriFuzz.Simulator
-import           VeriFuzz.Verilog
+import           VeriFuzz.CodeGen
+import           VeriFuzz.Env
+import           VeriFuzz.Gen
+import           VeriFuzz.General
+import           VeriFuzz.Helpers
+import           VeriFuzz.Icarus
+import           VeriFuzz.Internal
+import           VeriFuzz.Mutate
+import           VeriFuzz.Random
+import           VeriFuzz.RandomAlt
+import           VeriFuzz.XST
+import           VeriFuzz.Yosys
