@@ -11,6 +11,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz
 
+unitTests :: TestTree
 unitTests = testGroup
   "Unit tests"
   [ testCase "Transformation of AST" $ assertEqual
@@ -80,6 +81,7 @@ transformExpectedResult = BinOp
     )
   )
 
+trans :: Expr -> Expr
 trans e = case e of
   Id id -> if id == Identifier "id2" then Id $ Identifier "Replaced" else Id id
   _     -> e
