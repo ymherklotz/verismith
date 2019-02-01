@@ -13,6 +13,8 @@ Environment to run the simulator and synthesisers in a matrix.
 module VeriFuzz.Env where
 
 import           Control.Monad.Trans.Reader
+import           Prelude                    hiding (FilePath)
+import           Shelly
 import           VeriFuzz.Icarus
 import           VeriFuzz.XST
 import           VeriFuzz.Yosys
@@ -27,5 +29,5 @@ type SimEnv = ReaderT SimMatrix IO
 
 runAll :: SimEnv ()
 runAll = do
-  val <- asks xst
+  _ <- asks xst
   shelly $ run_ "echo" ["Hello World"]

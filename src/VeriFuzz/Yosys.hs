@@ -14,15 +14,14 @@ Yosys simulator implementation.
 
 module VeriFuzz.Yosys where
 
-import           Data.Maybe                           (fromMaybe)
-import           Data.Text                            (Text)
-import qualified Data.Text                            as T
-import           Prelude                              hiding (FilePath)
+import           Prelude                     hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text                (st)
-import           VeriFuzz.Simulator.General
-import           VeriFuzz.Simulator.Internal.Template
-import           VeriFuzz.Verilog
+import           Text.Shakespeare.Text       (st)
+import           VeriFuzz.AST
+import           VeriFuzz.CodeGen
+import           VeriFuzz.General
+import           VeriFuzz.Internal.Simulator
+import           VeriFuzz.Mutate
 
 newtype Yosys = Yosys { yosysPath :: FilePath }
 
@@ -71,7 +70,7 @@ runEquivYosys yosys sim1 sim2 m = do
     checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
-runEquiv yosys sim1 sim2 m = do
+runEquiv _ sim1 sim2 m = do
   root <- rootPath
   writefile "top.v" . genSource . initMod $ makeTopAssert m
   writefile "test.sby" $ sbyConfig root sim1 sim2 m

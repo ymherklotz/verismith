@@ -8,7 +8,7 @@ import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Test.Tasty
 import qualified Test.Tasty.QuickCheck             as QC
 import           VeriFuzz
-import qualified VeriFuzz.Graph.RandomAlt          as V
+import qualified VeriFuzz.RandomAlt                as V
 
 newtype TestGraph = TestGraph { getGraph :: Gr Gate () }
                   deriving (Show)

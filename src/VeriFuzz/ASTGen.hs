@@ -19,7 +19,6 @@ import qualified Data.Graph.Inductive      as G
 import           Data.Maybe                (catMaybes)
 import           VeriFuzz.AST
 import           VeriFuzz.Circuit
-import           VeriFuzz.Helpers
 import           VeriFuzz.Internal.Circuit
 
 -- | Converts a 'CNode' to an 'Identifier'.

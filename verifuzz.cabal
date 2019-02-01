@@ -24,14 +24,15 @@ library
   other-modules: VeriFuzz.Internal
                , VeriFuzz.Internal.Circuit
                , VeriFuzz.Internal.Simulator
-  exposed-modules: VeriFuzz.ASTGen
+               , VeriFuzz.Internal.AST
+  exposed-modules: VeriFuzz
+                 , VeriFuzz.ASTGen
                  , VeriFuzz.AST
                  , VeriFuzz.Circuit
                  , VeriFuzz.CodeGen
                  , VeriFuzz.Env
                  , VeriFuzz.General
                  , VeriFuzz.Gen
-                 , VeriFuzz.Helpers
                  , VeriFuzz.Icarus
                  , VeriFuzz.Mutate
                  , VeriFuzz.RandomAlt

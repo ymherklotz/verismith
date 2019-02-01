@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Helpers
+Module      : VeriFuzz.Internal.AST
 Description : Defaults and common functions.
 Copyright   : (c) 2018-2019, Yann Herklotz Grave
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Defaults and common functions.
 -}
 
-module VeriFuzz.Helpers where
+module VeriFuzz.Internal.AST where
 
 import           Control.Lens
 import           Data.Text    (Text)

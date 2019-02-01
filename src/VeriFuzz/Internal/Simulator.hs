@@ -14,13 +14,14 @@ Template file for different configuration files.
 
 module VeriFuzz.Internal.Simulator where
 
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import           Prelude                    hiding (FilePath)
+import           Data.Text             (Text)
+import qualified Data.Text             as T
+import           Prelude               hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text      (st)
-import           VeriFuzz.Simulator.General
-import           VeriFuzz.Verilog
+import           Text.Shakespeare.Text (st)
+import           VeriFuzz.AST
+import           VeriFuzz.General
+import           VeriFuzz.Internal.AST
 
 -- brittany-disable-next-binding
 yosysSatConfig :: (Simulator a, Simulator b) => a -> Maybe b -> ModDecl -> Text

@@ -14,16 +14,14 @@ Xst (ise) simulator implementation.
 
 module VeriFuzz.XST where
 
-import           Control.Lens                         hiding ((<.>))
-import qualified Data.Text                            as T
-import           Prelude                              hiding (FilePath)
+import           Prelude                     hiding (FilePath)
 import           Shelly
-import           System.FilePath.Posix                (takeBaseName)
-import           Text.Shakespeare.Text                (st)
-import           VeriFuzz.Simulator.General
-import           VeriFuzz.Simulator.Internal.Template
-import           VeriFuzz.Verilog
-import           VeriFuzz.Verilog
+import           Text.Shakespeare.Text       (st)
+import           VeriFuzz.AST
+import           VeriFuzz.CodeGen
+import           VeriFuzz.General
+import           VeriFuzz.Internal.AST
+import           VeriFuzz.Internal.Simulator
 
 data Xst = Xst { xstPath    :: FilePath
                , netgenPath :: FilePath

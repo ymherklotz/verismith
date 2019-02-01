@@ -14,7 +14,7 @@ import           Shelly
 import           Test.QuickCheck          (Gen)
 import qualified Test.QuickCheck          as QC
 import           VeriFuzz
-import qualified VeriFuzz.Graph.RandomAlt as V
+import qualified VeriFuzz.RandomAlt       as V
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -57,17 +57,9 @@ onFailure t _ = do
   cd ".."
   cp_r (fromText t) $ fromText (t <> "_failed")
 
-random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
-random ctx fun = do
-  expr <- QC.sized (exprWithContext ctx)
-  return . ModCA $ fun expr
-
-randomAssigns :: [Identifier] -> [Gen ModItem]
-randomAssigns ids = random ids . ContAssign <$> ids
-
-runEquivalence :: IO ModDecl -> Text -> Int -> IO ()
+runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
-  m <- gm
+  m <- QC.generate gm
   shellyFailDir $ do
     mkdir_p (fromText "equiv" </> fromText n)
     curr <- toTextIgnore <$> pwd
@@ -86,5 +78,5 @@ main :: IO ()
 main = do
   num <- getNumCapabilities
   vars <- sequence $ (\x -> myForkIO $
-                       runEquivalence ("test_" <> T.pack (show x)) 0) <$> [1..num]
+                       runEquivalence fromGraph ("test_" <> T.pack (show x)) 0) <$> [1..num]
   sequence_ $ takeMVar <$> vars

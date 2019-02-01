@@ -12,24 +12,35 @@ Various useful generators.
 
 module VeriFuzz.Gen where
 
-import qualified Data.Text        as T
-import           Test.QuickCheck  (Arbitrary, Gen, arbitrary)
-import qualified Test.QuickCheck  as QC
-import           VeriFuzz.Circuit
-import           VeriFuzz.Verilog
+import           Control.Lens
+import qualified Data.Text       as T
+import           Test.QuickCheck (Gen)
+import qualified Test.QuickCheck as QC
+import           VeriFuzz.AST
+import           VeriFuzz.ASTGen
+import           VeriFuzz.Mutate
+import           VeriFuzz.Random
+
+random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
+random ctx fun = do
+  expr <- QC.sized (exprWithContext ctx)
+  return . ModCA $ fun expr
+
+randomAssigns :: [Identifier] -> [Gen ModItem]
+randomAssigns ids = random ids . ContAssign <$> ids
 
 randomMod :: Gen ModDecl
 randomMod = do
   let ids = Identifier . ("w"<>) . T.pack . show <$> [1..100]
-  moditems <- sequence $ randomAssigns ids
+  _ <- sequence $ randomAssigns ids
   return $ ModDecl "" [] [] []
 
 fromGraph :: Gen ModDecl
 fromGraph = do
-  gr <- QC.generate $ rDups <$> QC.resize 100 (randomCircuit)
+  gr <- rDupsCirc <$> QC.resize 100 randomCircuit
   return $ initMod
     .   head
-    $   (nestUpTo 5 . generateAST $ Circuit gr)
+    $   nestUpTo 5 (generateAST gr)
     ^.. getVerilogSrc
     .   traverse
     .   getDescription

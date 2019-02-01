@@ -18,6 +18,7 @@ import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Data.List                         (nub)
 import           Test.QuickCheck                   (Arbitrary, Gen)
 import qualified Test.QuickCheck                   as QC
+import           VeriFuzz.Circuit
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]
 dupFolder cont ns = unique cont : ns
@@ -26,6 +27,10 @@ dupFolder cont ns = unique cont : ns
 -- | Remove duplicates.
 rDups :: (Eq a, Eq b) => Gr a b -> Gr a b
 rDups g = G.buildGr $ G.ufold dupFolder [] g
+
+-- | Remove duplicates.
+rDupsCirc :: Circuit -> Circuit
+rDupsCirc = Circuit . rDups . getCircuit
 
 -- | Gen instance to create an arbitrary edge, where the edges are limited by
 -- `n` that is passed to it.
@@ -52,3 +57,7 @@ randomDAG = do
 -- | Generate a random acyclic DAG with an IO instance.
 genRandomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e) => IO (Gr l e)
 genRandomDAG = QC.generate randomDAG
+
+-- | Generate a random circuit instead of a random graph
+randomCircuit :: Gen Circuit
+randomCircuit = Circuit <$> randomDAG
