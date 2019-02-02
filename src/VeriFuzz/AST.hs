@@ -323,6 +323,11 @@ expr n
   where subexpr y = expr (n `div` y)
 
 exprWithContext :: [Identifier] -> Int -> QC.Gen Expr
+exprWithContext [] n
+  | n == 0 = QC.oneof exprSafeList
+  | n > 0 = QC.oneof $ exprRecList subexpr
+  | otherwise = exprWithContext [] 0
+  where subexpr y = exprWithContext [] (n `div` y)
 exprWithContext l n
   | n == 0 = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
   | n > 0 = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
