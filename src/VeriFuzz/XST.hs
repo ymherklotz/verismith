@@ -35,7 +35,7 @@ instance Synthesize Xst where
 
 defaultXst :: Xst
 defaultXst =
-  Xst "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst" "/opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/netgen"
+  Xst "xst" "netgen"
 
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
