@@ -53,9 +53,16 @@ runSimulation = do
 
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
-  echoP "Test FAIL"
-  cd ".."
-  cp_r (fromText t) $ fromText (t <> "_failed")
+  ex <- lastExitCode
+  case ex of
+    124 -> do
+      echoP "Test TIMEOUT"
+      cd ".."
+      cp_r (fromText t) $ fromText (t <> "_timeout")
+    _ -> do
+      echoP "Test FAIL"
+      cd ".."
+      cp_r (fromText t) $ fromText (t <> "_failed")
 
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
