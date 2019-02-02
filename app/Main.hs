@@ -53,7 +53,7 @@ runSimulation = do
 
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
-  echoP "FAIL"
+  echoP "Test FAIL"
   cd ".."
   cp_r (fromText t) $ fromText (t <> "_failed")
 
@@ -61,14 +61,13 @@ runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
   m <- QC.generate gm
   shellyFailDir $ do
-    mkdir_p (fromText "equiv" </> fromText n)
+    mkdir_p (fromText "output" </> fromText n)
     curr <- toTextIgnore <$> pwd
     setenv "VERIFUZZ_ROOT" curr
-    cd (fromText "equiv" </> fromText n)
+    cd (fromText "output" </> fromText n)
     catch_sh (runEquiv defaultYosys defaultYosys
-              (Just defaultXst) m >> echoP "OK") $
+              (Just defaultXst) m >> echoP "Test OK") $
       onFailure n
-    cd ".."
   when (i < 5) (runEquivalence gm t $ i+1)
   where
     n = t <> "_" <> T.pack (show i)
@@ -78,5 +77,5 @@ main :: IO ()
 main = do
   num <- getNumCapabilities
   vars <- sequence $ (\x -> myForkIO $
-                       runEquivalence (randomMod 5 50) ("test_" <> T.pack (show x)) 0) <$> [1..num]
+                       runEquivalence (randomMod 5 15) ("test_" <> T.pack (show x)) 0) <$> [1..num]
   sequence_ $ takeMVar <$> vars

@@ -207,7 +207,7 @@ instance QC.Arbitrary BinaryOperator where
     , BinXor
     , BinXNor
     , BinXNorInv
-    , BinPower
+--    , BinPower
     , BinLSL
     , BinLSR
     , BinASL

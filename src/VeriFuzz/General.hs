@@ -46,11 +46,11 @@ rootPath = do
   maybe current fromText <$> get_env "VERIFUZZ_ROOT"
 
 timeout :: FilePath -> [Text] -> Sh Text
-timeout = command1 "timeout" ["180"] . toTextIgnore
+timeout = command1 "timeout" ["500"] . toTextIgnore
 {-# INLINE timeout #-}
 
 timeout_ :: FilePath -> [Text] -> Sh ()
-timeout_ = command1_ "timeout" ["180"] . toTextIgnore
+timeout_ = command1_ "timeout" ["500"] . toTextIgnore
 {-# INLINE timeout_ #-}
 
 -- | Helper function to convert bytestrings to integers
@@ -68,3 +68,9 @@ echoP t = do
   echo $ bname fn <> " :: " <> t
   where
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
+
+logger :: FilePath -> Text -> Sh a -> Sh a
+logger fp name =
+  log_stderr_with (l "_log.stderr.txt") . log_stdout_with (l "_log.txt")
+  where
+    l s = writeFile (T.unpack (toTextIgnore $ fp </> fromText name) <> s) . T.unpack

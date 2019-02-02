@@ -39,16 +39,18 @@ defaultXst =
 
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
+  dir <- pwd
   writefile xstFile $ xstSynthConfig m
   writefile prjFile [st|verilog work "rtl.v"|]
   writefile "rtl.v" $ genSource m
-  echoP "Run xst"
-  noPrint $ timeout_ (xstPath sim) ["-ifn", toTextIgnore xstFile]
-  echoP "Run netgen"
-  noPrint $ run_ (netgenPath sim)
+  echoP "XST: run"
+  _ <- logger dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
+  echoP "XST: netgen"
+  _ <- logger dir "netgen" $ run (netgenPath sim)
     ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
-  echoP "Clean synthesized file"
+  echoP "XST: clean"
   noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
+  echoP "XST: done"
  where
   modFile = fromText $ modName m
   xstFile = modFile <.> "xst"

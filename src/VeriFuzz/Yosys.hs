@@ -32,7 +32,7 @@ instance Synthesize Yosys where
   runSynth = runSynthYosys
 
 defaultYosys :: Yosys
-defaultYosys = Yosys "/usr/bin/yosys"
+defaultYosys = Yosys "yosys"
 
 writeSimFile
   :: Yosys    -- ^ Simulator instance
@@ -45,9 +45,11 @@ writeSimFile _ m file = do
 
 runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
 runSynthYosys sim m outf = do
+  dir <- pwd
   writefile inpf $ genSource m
-  echoP "Run yosim"
-  noPrint $ run_ (yosysPath sim) ["-q", "-b", "verilog -noattr", "-o", out, "-S", inp]
+  echoP "Yosys: synthesis"
+  _ <- logger dir "yosys" $ run (yosysPath sim) ["-q", "-b", "verilog -noattr", "-o", out, "-S", inp]
+  echoP "Yosys: synthesis done"
  where
   inpf = "rtl.v"
   inp  = toTextIgnore inpf
@@ -64,17 +66,21 @@ runEquivYosys yosys sim1 sim2 m = do
   writefile checkFile $ yosysSatConfig sim1 sim2 m
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runMaybeSynth sim2 m
-  echoP "Run yosys"
-  noPrint $ run_ (yosysPath yosys) [toTextIgnore checkFile]
+  echoP "Yosys: equivalence check"
+  run_ (yosysPath yosys) [toTextIgnore checkFile]
+  echoP "Yosys: equivalence done"
   where
     checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv _ sim1 sim2 m = do
   root <- rootPath
+  dir <- pwd
+  echoP "SymbiYosys: setup"
   writefile "top.v" . genSource . initMod $ makeTopAssert m
   writefile "test.sby" $ sbyConfig root sim1 sim2 m
   runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
   runMaybeSynth sim2 m
-  echoP "Run SymbiYosys"
-  noPrint $ run_ "sby" ["test.sby"]
+  echoP "SymbiYosys: run"
+  _ <- logger dir "symbiyosys" $ run "sby" ["test.sby"]
+  echoP "SymbiYosys: done"
