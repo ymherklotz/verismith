@@ -166,3 +166,8 @@ makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
     [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
   e = EPosEdge "clk"
   addClk = ((Port Wire 1 "clk") :)
+
+declareMod :: [Port] -> ModDecl -> ModDecl
+declareMod ports = modItems %~ (decl++)
+  where
+    decl = Decl Nothing <$> ports
