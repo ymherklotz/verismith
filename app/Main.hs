@@ -78,5 +78,5 @@ main :: IO ()
 main = do
   num <- getNumCapabilities
   vars <- sequence $ (\x -> myForkIO $
-                       runEquivalence fromGraph ("test_" <> T.pack (show x)) 0) <$> [1..num]
+                       runEquivalence (randomMod 10 100) ("test_" <> T.pack (show x)) 0) <$> [1..num]
   sequence_ $ takeMVar <$> vars
