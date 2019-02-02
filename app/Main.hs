@@ -66,8 +66,9 @@ runEquivalence gm t i = do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText "output" </> fromText n)
     catch_sh (runEquiv defaultYosys defaultYosys
-              (Just defaultXst) m >> echoP "Test OK") $
+              (Just defaultXst) m >> echoP "Test OK" >> cd "..") $
       onFailure n
+    rm_rf $ fromText n
   when (i < 5) (runEquivalence gm t $ i+1)
   where
     n = t <> "_" <> T.pack (show i)
