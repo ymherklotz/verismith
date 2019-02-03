@@ -69,6 +69,7 @@ executable verifuzz
                , shelly
                , DRBG
                , lens
+               , optparse-applicative
   default-extensions: OverloadedStrings
 
 test-suite verifuzz-test
