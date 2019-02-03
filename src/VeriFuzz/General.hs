@@ -73,4 +73,5 @@ logger :: FilePath -> Text -> Sh a -> Sh a
 logger fp name =
   log_stderr_with (l "_log.stderr.txt") . log_stdout_with (l "_log.txt")
   where
-    l s = writeFile (T.unpack (toTextIgnore $ fp </> fromText name) <> s) . T.unpack
+    l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
+    file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s

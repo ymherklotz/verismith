@@ -48,7 +48,7 @@ runSynthYosys sim m outf = do
   dir <- pwd
   writefile inpf $ genSource m
   echoP "Yosys: synthesis"
-  _ <- logger dir "yosys" $ timeout (yosysPath sim) ["-q", "-b", "verilog -noattr", "-o", out, "-S", inp]
+  _ <- logger dir "yosys" $ timeout (yosysPath sim) ["-b", "verilog -noattr", "-o", out, "-S", inp]
   echoP "Yosys: synthesis done"
  where
   inpf = "rtl.v"
