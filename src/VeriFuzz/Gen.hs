@@ -46,18 +46,21 @@ randomOrdAssigns :: [Identifier] -> [Identifier] -> [Gen ModItem]
 randomOrdAssigns inp ids =
   snd $ foldr gen (inp, []) ids
   where
-    gen cid (i, o) = (cid : i, o ++ [random i $ ContAssign cid])
+    gen cid (i, o) = (cid : i, random i (ContAssign cid) : o)
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
-  let ids = toId <$> [1..total]
-  x <- sequence . randomOrdAssigns (take inps ids) $ drop inps ids
+  x <- sequence $ randomOrdAssigns start end
   ident <-  sequence $ toPort <$> ids
   let inputs = take inps ident
   let other = drop inps ident
   let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
   let yport = [Port Wire (sumSize other) "y"]
-  return . initMod . declareMod other .ModDecl "test_module" yport inputs $ x ++ [y]
+  return . initMod . declareMod other . ModDecl "test_module" yport inputs $ x ++ [y]
+  where
+    ids = toId <$> [1..total]
+    end = drop inps ids
+    start = take inps ids
 
 fromGraph :: Gen ModDecl
 fromGraph = do
