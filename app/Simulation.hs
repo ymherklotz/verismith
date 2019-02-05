@@ -55,7 +55,8 @@ runSimulation = do
   let circ =
         head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
-  val  <- shelly $ runSim defaultIcarus (initMod circ) rand
+  rand2 <- QC.generate (randomMod 10 100)
+  val  <- shelly $ runSim defaultIcarus (rand2) rand
   T.putStrLn . decodeUtf8 $ (L.toStrict . toLazyByteString . byteStringHex $ val)
 
 onFailure :: Text -> RunFailed -> Sh ()
