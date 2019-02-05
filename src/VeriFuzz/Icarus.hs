@@ -13,11 +13,20 @@ Icarus verilog module.
 module VeriFuzz.Icarus where
 
 import           Control.Lens
+import           Crypto.Hash.SHA1      (hash)
+import           Data.Binary           (encode)
 import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as B
+import           Data.ByteString.Lazy  (toStrict)
+import qualified Data.ByteString.Lazy  as L (ByteString)
+import           Data.Char             (digitToInt)
 import           Data.Foldable         (fold)
-import           Data.Hashable
 import           Data.List             (transpose)
+import           Data.Maybe            (fromMaybe, listToMaybe)
+import           Data.Text             (Text)
+import qualified Data.Text             as T
+import           Data.Text.Encoding    (encodeUtf8)
+import           Numeric               (readInt)
 import           Prelude               hiding (FilePath)
 import           Shelly
 import           VeriFuzz.AST
@@ -41,14 +50,34 @@ defaultIcarus = Icarus "iverilog" "vvp"
 
 addDisplay :: [Stmnt] -> [Stmnt]
 addDisplay s = concat $ transpose
-  [s, replicate l $ TimeCtrl 1 Nothing, replicate l . SysTaskEnable $ Task "display" ["%h", Id "y"]]
+  [s, replicate l $ TimeCtrl 1 Nothing, replicate l
+    . SysTaskEnable $ Task "display" ["%b", Id "y"]]
   where l = length s
 
 assignFunc :: [Port] -> ByteString -> Stmnt
-assignFunc inp bs = NonBlockAssign . Assign conc Nothing . Number (B.length bs * 4) $ bsToI bs
-  where conc = RegConcat (portToExpr <$> inp)
+assignFunc inp bs =
+  NonBlockAssign . Assign conc Nothing . Number (B.length bs * 8) $ bsToI bs
+  where
+    conc = RegConcat (portToExpr <$> inp)
 
-runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh Int
+convert :: Text -> ByteString
+convert =
+  toStrict
+  . (encode :: Integer -> L.ByteString)
+  . fromMaybe 0
+  . fmap fst
+  . listToMaybe
+  . readInt 2 (`elem` ("01" :: String)) digitToInt
+  . T.unpack
+
+mask :: Text -> Text
+mask = T.replace "x" "0"
+
+callback :: ByteString -> Text -> ByteString
+callback b t =
+  b <> convert (mask t)
+
+runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh ByteString
 runSimIcarus sim m bss = do
   let tb = ModDecl
         "main"
@@ -63,4 +92,4 @@ runSimIcarus sim m bss = do
   writefile "main.v" $ genSource modWithTb
   echoP "Run icarus"
   run_ (icarusPath sim) ["-o", "main", "main.v"]
-  hash <$> run (vvpPath sim) ["main"]
+  hash <$> runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"]
