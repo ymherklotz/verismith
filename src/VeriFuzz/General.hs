@@ -28,10 +28,10 @@ class Simulator a where
 
 -- | Simulation type class.
 class (Simulator a) => Simulate a where
-  runSim :: a            -- ^ Simulator instance
-         -> ModDecl      -- ^ Module to simulate
-         -> [ByteString] -- ^ Inputs to simulate
-         -> Sh Int       -- ^ Returns the value of the hash at the output of the testbench.
+  runSim :: a             -- ^ Simulator instance
+         -> ModDecl       -- ^ Module to simulate
+         -> [ByteString]  -- ^ Inputs to simulate
+         -> Sh ByteString -- ^ Returns the value of the hash at the output of the testbench.
 
 -- | Synthesize type class.
 class (Simulator a) => Synthesize a where
