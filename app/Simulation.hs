@@ -15,17 +15,19 @@ module Simulation where
 import           Control.Lens
 import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
+import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
+import qualified Data.ByteString.Lazy     as L
 import qualified Data.Graph.Inductive     as G
 import qualified Data.Graph.Inductive.Dot as G
 import           Data.Text                (Text)
 import qualified Data.Text                as T
-import           Numeric                  (showHex)
+import           Data.Text.Encoding       (decodeUtf8)
+import qualified Data.Text.IO             as T
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Test.QuickCheck          (Gen)
 import qualified Test.QuickCheck          as QC
 import           VeriFuzz
-import qualified VeriFuzz.RandomAlt       as V
 
 genRand :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
 genRand gen n bytes | n == 0    = ranBytes : bytes
@@ -54,7 +56,7 @@ runSimulation = do
         head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
   val  <- shelly $ runSim defaultIcarus (initMod circ) rand
-  putStrLn $ showHex (abs val) ""
+  T.putStrLn . decodeUtf8 $ (L.toStrict . toLazyByteString . byteStringHex $ val)
 
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
