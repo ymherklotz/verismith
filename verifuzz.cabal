@@ -52,6 +52,9 @@ library
                , hashable
                , transformers
                , filepath
+               , binary >= 0.8.6.0
+               , cryptonite
+               , memory
   default-extensions: OverloadedStrings
 
 executable verifuzz
@@ -72,6 +75,7 @@ executable verifuzz
                , DRBG
                , lens
                , optparse-applicative
+               , binary
   default-extensions: OverloadedStrings
 
 test-suite verifuzz-test
