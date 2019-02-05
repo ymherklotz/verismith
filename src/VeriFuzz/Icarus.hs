@@ -13,21 +13,22 @@ Icarus verilog module.
 module VeriFuzz.Icarus where
 
 import           Control.Lens
-import           Crypto.Hash.SHA1      (hash)
-import           Data.Binary           (encode)
-import           Data.ByteString       (ByteString)
-import qualified Data.ByteString       as B
-import           Data.ByteString.Lazy  (toStrict)
-import qualified Data.ByteString.Lazy  as L (ByteString)
-import           Data.Char             (digitToInt)
-import           Data.Foldable         (fold)
-import           Data.List             (transpose)
-import           Data.Maybe            (fromMaybe, listToMaybe)
-import           Data.Text             (Text)
-import qualified Data.Text             as T
-import           Data.Text.Encoding    (encodeUtf8)
-import           Numeric               (readInt)
-import           Prelude               hiding (FilePath)
+import           Crypto.Hash            (Digest, hash)
+import           Crypto.Hash.Algorithms (SHA256)
+import           Data.Binary            (encode)
+import qualified Data.ByteArray         as BA (convert)
+import           Data.ByteString        (ByteString)
+import qualified Data.ByteString        as B
+import           Data.ByteString.Lazy   (toStrict)
+import qualified Data.ByteString.Lazy   as L (ByteString)
+import           Data.Char              (digitToInt)
+import           Data.Foldable          (fold)
+import           Data.List              (transpose)
+import           Data.Maybe             (fromMaybe, listToMaybe)
+import           Data.Text              (Text)
+import qualified Data.Text              as T
+import           Numeric                (readInt)
+import           Prelude                hiding (FilePath)
 import           Shelly
 import           VeriFuzz.AST
 import           VeriFuzz.CodeGen
@@ -92,4 +93,5 @@ runSimIcarus sim m bss = do
   writefile "main.v" $ genSource modWithTb
   echoP "Run icarus"
   run_ (icarusPath sim) ["-o", "main", "main.v"]
-  hash <$> runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"]
+  B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$>
+    runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"]
