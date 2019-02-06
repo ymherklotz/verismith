@@ -46,6 +46,9 @@ draw = do
   writeFile "file.dot" dot
   shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
 
+showBS :: ByteString -> Text
+showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
+
 runSimulation :: IO ()
 runSimulation = do
   gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
@@ -57,7 +60,7 @@ runSimulation = do
   rand <- genRandom 20
   rand2 <- QC.generate (randomMod 10 100)
   val  <- shelly $ runSim defaultIcarus (rand2) rand
-  T.putStrLn . decodeUtf8 $ (L.toStrict . toLazyByteString . byteStringHex $ val)
+  T.putStrLn $ showBS val
 
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
@@ -65,24 +68,33 @@ onFailure t _ = do
   case ex of
     124 -> do
       echoP "Test TIMEOUT"
-      cd ".."
-      cp_r (fromText t) $ fromText (t <> "_timeout")
+      chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
     _ -> do
       echoP "Test FAIL"
-      cd ".."
-      cp_r (fromText t) $ fromText (t <> "_failed")
+      chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
 
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
   m <- QC.generate gm
+  rand <- genRandom 20
   shellyFailDir $ do
     mkdir_p (fromText "output" </> fromText n)
     curr <- toTextIgnore <$> pwd
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText "output" </> fromText n)
     catch_sh (runEquiv defaultYosys defaultYosys
-              (Just defaultXst) m >> echoP "Test OK" >> cd "..") $
+              (Just defaultXst) m >> echoP "Test OK") $
       onFailure n
+    catch_sh (runSim (Icarus "iverilog" "vvp") m rand
+              >>= (\b -> echoP ("RTL Sim: " <> showBS b))) $
+      onFailure n
+    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
+             --AZZZZZZZZZQaa--              >>= (\b -> echoP ("Yosys Sim1q``````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````q-a----------aaaaaaaaaa: " <> showBS b))) $
+      onFailure n
+    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_xst.v" rand
+              >>= (\b -> echoP ("XST Sim: " <> showBS b))) $
+      onFailure n
+    cd ".."
     rm_rf $ fromText n
   when (i < 5) (runEquivalence gm t $ i+1)
   where
