@@ -190,8 +190,8 @@ instance QC.Arbitrary BinaryOperator where
     [ BinPlus
     , BinMinus
     , BinTimes
-    , BinDiv
-    , BinMod
+--    , BinDiv
+--    , BinMod
     , BinEq
     , BinNEq
     , BinCEq
