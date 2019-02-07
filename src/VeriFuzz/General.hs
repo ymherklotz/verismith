@@ -32,6 +32,10 @@ class (Simulator a) => Simulate a where
          -> ModDecl       -- ^ Module to simulate
          -> [ByteString]  -- ^ Inputs to simulate
          -> Sh ByteString -- ^ Returns the value of the hash at the output of the testbench.
+  runSimWithFile :: a
+                 -> FilePath
+                 -> [ByteString]
+                 -> Sh ByteString
 
 -- | Synthesize type class.
 class (Simulator a) => Synthesize a where
@@ -46,11 +50,11 @@ rootPath = do
   maybe current fromText <$> get_env "VERIFUZZ_ROOT"
 
 timeout :: FilePath -> [Text] -> Sh Text
-timeout = command1 "timeout" ["500"] . toTextIgnore
+timeout = command1 "timeout" ["60"] . toTextIgnore
 {-# INLINE timeout #-}
 
 timeout_ :: FilePath -> [Text] -> Sh ()
-timeout_ = command1_ "timeout" ["500"] . toTextIgnore
+timeout_ = command1_ "timeout" ["60"] . toTextIgnore
 {-# INLINE timeout_ #-}
 
 -- | Helper function to convert bytestrings to integers
@@ -65,7 +69,7 @@ noPrint =
 echoP :: Text -> Sh ()
 echoP t = do
   fn <- pwd
-  echo $ bname fn <> " :: " <> t
+  echo $ bname fn <> " - " <> t
   where
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
