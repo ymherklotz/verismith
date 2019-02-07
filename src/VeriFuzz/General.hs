@@ -50,11 +50,11 @@ rootPath = do
   maybe current fromText <$> get_env "VERIFUZZ_ROOT"
 
 timeout :: FilePath -> [Text] -> Sh Text
-timeout = command1 "timeout" ["60"] . toTextIgnore
+timeout = command1 "timeout" ["300"] . toTextIgnore
 {-# INLINE timeout #-}
 
 timeout_ :: FilePath -> [Text] -> Sh ()
-timeout_ = command1_ "timeout" ["60"] . toTextIgnore
+timeout_ = command1_ "timeout" ["300"] . toTextIgnore
 {-# INLINE timeout_ #-}
 
 -- | Helper function to convert bytestrings to integers
