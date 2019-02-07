@@ -45,6 +45,7 @@ instance Simulator Icarus where
 
 instance Simulate Icarus where
   runSim = runSimIcarus
+  runSimWithFile = runSimIcarusWithFile
 
 defaultIcarus :: Icarus
 defaultIcarus = Icarus "iverilog" "vvp"
@@ -91,7 +92,13 @@ runSimIcarus sim m bss = do
   let newtb     = instantiateMod m tb
   let modWithTb = VerilogSrc $ Description <$> [newtb, m]
   writefile "main.v" $ genSource modWithTb
-  echoP "Run icarus"
-  run_ (icarusPath sim) ["-o", "main", "main.v"]
+  runSimWithFile sim "main.v" bss
+
+runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> Sh ByteString
+runSimIcarusWithFile sim f _ = do
+  dir <- pwd
+  echoP "Icarus: Compile"
+  _ <- logger dir "icarus" $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
+  echoP "Icarus: Run"
   B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$>
-    runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"]
+    logger dir "vvp" (runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"])
