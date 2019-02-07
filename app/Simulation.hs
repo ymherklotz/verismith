@@ -88,12 +88,12 @@ runEquivalence gm t i = do
     catch_sh (runSim (Icarus "iverilog" "vvp") m rand
               >>= (\b -> echoP ("RTL Sim: " <> showBS b))) $
       onFailure n
-    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
-             --AZZZZZZZZZQaa--              >>= (\b -> echoP ("Yosys Sim1q``````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````q-a----------aaaaaaaaaa: " <> showBS b))) $
-      onFailure n
-    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_xst.v" rand
-              >>= (\b -> echoP ("XST Sim: " <> showBS b))) $
-      onFailure n
+--    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
+--              >>= (\b -> echoP ("Yosys Sim: " <> showBS b))) $
+--      onFailure n
+--    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_xst.v" rand
+--              >>= (\b -> echoP ("XST Sim: " <> showBS b))) $
+--      onFailure n
     cd ".."
     rm_rf $ fromText n
   when (i < 5) (runEquivalence gm t $ i+1)
