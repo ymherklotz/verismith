@@ -75,7 +75,7 @@ genModuleDeclAST c = ModDecl i output ports items
   output = [Port Wire 90 "y"]
   a = genAssignAST c
   items  = a ++ [ModCA . ContAssign "y" . fold $ Id <$> assigns]
-  assigns = a ^.. traverse . _ModCA . contAssignNetLVal
+  assigns = a ^.. traverse . modContAssign . contAssignNetLVal
 
 generateAST :: Circuit -> VerilogSrc
 generateAST c = VerilogSrc [Description $ genModuleDeclAST c]
