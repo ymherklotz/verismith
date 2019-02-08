@@ -43,6 +43,7 @@ library
                , QuickCheck >=2.3 && <2.10
                , fgl
                , fgl-arbitrary
+               , fgl-visualize
                , lens
                , random
                , shakespeare
@@ -55,6 +56,7 @@ library
                , binary >= 0.8.6.0
                , cryptonite
                , memory
+               , DRBG
   default-extensions: OverloadedStrings
 
 executable verifuzz
@@ -62,7 +64,6 @@ executable verifuzz
   main-is: Main.hs
   default-language: Haskell2010
   ghc-options: -threaded
-  other-modules: Simulation
   build-depends: base >= 4.7 && < 5
                , verifuzz
                , fgl
