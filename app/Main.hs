@@ -6,7 +6,6 @@ import qualified Data.Text           as T
 import qualified Data.Text.IO        as T
 import           Options.Applicative
 import qualified Shelly              as S
-import           Simulation
 import qualified Test.QuickCheck     as QC
 import qualified VeriFuzz            as V
 
@@ -116,7 +115,7 @@ handleOpts :: Opts -> IO ()
 handleOpts (Fuzz a) = do
   num <- getNumCapabilities
   vars <- sequence $ (\x -> myForkIO $
-                       runEquivalence (V.randomMod 10 100)
+                       V.runEquivalence (V.randomMod 10 100)
                        ("test_" <> T.pack (show x)) 0) <$> [1..num]
   sequence_ $ takeMVar <$> vars
 handleOpts (Generate f) = do
