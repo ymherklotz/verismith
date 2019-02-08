@@ -17,7 +17,7 @@ unitTests = testGroup
   [ testCase "Transformation of AST" $ assertEqual
       "Successful transformation"
       transformExpectedResult
-      (transformOf traverseExpr trans transformTestData)
+      (transform trans transformTestData)
   ]
 
 transformTestData :: Expr
