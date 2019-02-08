@@ -62,7 +62,7 @@ nestId i m
   | otherwise
   = m
  where
-  get = modItems . traverse . _ModCA . contAssignExpr
+  get = modItems . traverse . modContAssign . contAssignExpr
   def = Id i
 
 -- | Replaces an identifier by a expression in all the module declaration.
@@ -147,6 +147,8 @@ initMod m = m & modItems %~ ((out ++ inp) ++)
   out = Decl (Just PortOut) <$> (m ^. modOutPorts)
   inp = Decl (Just PortIn) <$> (m ^. modInPorts)
 
+-- | Make an 'Identifier' from and existing Identifier and an object with a
+-- 'Show' instance to make it unique.
 makeIdFrom :: (Show a) => a -> Identifier -> Identifier
 makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 
@@ -159,6 +161,8 @@ makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
   modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
   modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
 
+-- | Make a top module with an assert that requires @y_1@ to always be equal to
+-- @y_2@, which can then be proven using a formal verification tool.
 makeTopAssert :: ModDecl -> ModDecl
 makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
  where
@@ -167,7 +171,49 @@ makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
   e = EPosEdge "clk"
   addClk = ((Port Wire 1 "clk") :)
 
+-- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl
 declareMod ports = modItems %~ (decl++)
   where
     decl = Decl Nothing <$> ports
+
+-- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
+-- simplify expressions. To make this work effectively, it should be run until
+-- no more changes were made to the expression.
+simplify :: Expr -> Expr
+simplify (BinOp (Number _ 1) BinAnd e)   = e
+simplify (BinOp e BinAnd (Number _ 1))   = e
+simplify (BinOp (Number _ 0) BinAnd _)   = Number 1 0
+simplify (BinOp _ BinAnd (Number _ 0))   = Number 1 0
+simplify (BinOp e BinPlus (Number _ 0))  = e
+simplify (BinOp (Number _ 0) BinPlus e)  = e
+simplify (BinOp e BinMinus (Number _ 0)) = e
+simplify (BinOp (Number _ 0) BinMinus e) = e
+simplify (BinOp e BinTimes (Number _ 1)) = e
+simplify (BinOp (Number _ 1) BinTimes e) = e
+simplify (BinOp _ BinTimes (Number _ 0)) = Number 1 0
+simplify (BinOp (Number _ 0) BinTimes _) = Number 1 0
+simplify (BinOp e BinOr (Number _ 0))    = e
+simplify (BinOp (Number _ 0) BinOr e)    = e
+simplify (BinOp e BinLSL (Number _ 0))   = e
+simplify (BinOp (Number _ 0) BinLSL e)   = e
+simplify (BinOp e BinLSR (Number _ 0))   = e
+simplify (BinOp (Number _ 0) BinLSR e)   = e
+simplify (BinOp e BinASL (Number _ 0))   = e
+simplify (BinOp (Number _ 0) BinASL e)   = e
+simplify (BinOp e BinASR (Number _ 0))   = e
+simplify (BinOp (Number _ 0) BinASR e)   = e
+simplify (UnOp UnPlus e)                 = e
+simplify e                               = e
+
+-- | Remove all 'Identifier' that do not appeare in the input list from an
+-- 'Expr'. The identifier will be replaced by @1'b0@, which can then later be
+-- simplified further.
+removeId :: [Identifier] -> Expr -> Expr
+removeId i expr =
+  transform trans expr
+  where
+    trans (Id ident)
+      | all (ident /=) i = Number 1 0
+      | otherwise = Id ident
+    trans e = e
