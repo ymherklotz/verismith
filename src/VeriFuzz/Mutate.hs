@@ -102,7 +102,7 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
 --
--- >>> render $ instantiateMod_ m
+-- >>> GenVerilog $ instantiateMod_ m
 -- m m(y, x);
 -- <BLANKLINE>
 instantiateMod_ :: ModDecl -> ModItem
@@ -117,7 +117,7 @@ instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
 --
--- >>> render $ instantiateModSpec_ "_" m
+-- >>> GenVerilog $ instantiateModSpec_ "_" m
 -- m m(.y(y), .x(x));
 -- <BLANKLINE>
 instantiateModSpec_ :: Text -> ModDecl -> ModItem
@@ -135,7 +135,7 @@ filterChar t ids =
 
 -- | Initialise all the inputs and outputs to a module.
 --
--- >>> render $ initMod m
+-- >>> GenVerilog $ initMod m
 -- module m(y, x);
 -- output wire [4:0] y;
 -- input wire [4:0] x;
@@ -180,6 +180,12 @@ declareMod ports = modItems %~ (decl++)
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until
 -- no more changes were made to the expression.
+--
+-- >>> GenVerilog . simplify $ (Id "x") + 0
+-- x
+--
+-- >>> GenVerilog . simplify $ (Id "y") + (Id "x")
+-- (y + x)
 simplify :: Expr -> Expr
 simplify (BinOp (Number _ 1) BinAnd e)   = e
 simplify (BinOp e BinAnd (Number _ 1))   = e
@@ -209,6 +215,13 @@ simplify e                               = e
 -- | Remove all 'Identifier' that do not appeare in the input list from an
 -- 'Expr'. The identifier will be replaced by @1'b0@, which can then later be
 -- simplified further.
+--
+-- >>> GenVerilog . removeId ["x"] $ Id "x" + Id "y"
+-- (x + (-1'h0))
+--
+-- This can be combined with 'simplify' to completely remove an identifier.
+--
+-- >>> GenVerilog . simplify . removeId ["z"] $ Id "x" + Id "y" - Id "z"
 removeId :: [Identifier] -> Expr -> Expr
 removeId i expr =
   transform trans expr
