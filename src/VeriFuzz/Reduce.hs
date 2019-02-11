@@ -14,10 +14,9 @@ module VeriFuzz.Reduce where
 
 import           Control.Lens
 import           VeriFuzz.AST
-import           VeriFuzz.Mutate
 
 halve :: [a] -> ([a], [a])
-halve l  = splitAt (length l `div` 2) l
+halve l = splitAt (length l `div` 2) l
 
 removeUninitWires :: [ModItem] -> [ModItem]
 removeUninitWires ms = ms
