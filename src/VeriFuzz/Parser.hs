@@ -22,4 +22,4 @@ parseDescription :: Text -> Parser Description
 parseDescription = undefined
 
 parseVerilogSrc :: Text -> Parser VerilogSrc
-parseVerilogSrc = VerilogSrc <$> many1 parseDescription
+parseVerilogSrc t = VerilogSrc <$> many1 (parseDescription t)
