@@ -57,6 +57,7 @@ library
                , cryptonite
                , memory
                , DRBG
+               , attoparsec
   default-extensions: OverloadedStrings
 
 executable verifuzz

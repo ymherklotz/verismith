@@ -20,7 +20,7 @@ halve :: [a] -> ([a], [a])
 halve l  = splitAt (length l `div` 2) l
 
 removeUninitWires :: [ModItem] -> [ModItem]
-removeUninitWires ms =  transformOf traverseModItem trans <$> ms
+removeUninitWires ms = ms
   where
     ids = ms ^.. traverse . modContAssign . contAssignNetLVal
 
