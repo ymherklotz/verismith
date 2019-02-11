@@ -1,10 +1,10 @@
 name: verifuzz
-version: 0.1.0.0
+version: 0.1.1.0
 synopsis: Random verilog generation and simulator testing.
 description:
   VeriFuzz provides random verilog generation modules
   implementing functions to test supported simulators.
-homepage: https://github.com/githubuser/verifuzz#readme
+homepage: https://github.com/ymherklotz/VeriFuzz#readme
 license: BSD3
 license-file: LICENSE
 author: Yann Herklotz Grave
@@ -39,25 +39,25 @@ library
                  , VeriFuzz.Random
                  , VeriFuzz.XST
                  , VeriFuzz.Yosys
-  build-depends: base >= 4.7 && < 5
+  build-depends: base >=4.7 && <5
                , QuickCheck >=2.3 && <2.10
-               , fgl
-               , fgl-arbitrary
-               , fgl-visualize
-               , lens
-               , random
-               , shakespeare
-               , shelly
-               , text
-               , bytestring
-               , hashable
-               , transformers
-               , filepath
-               , binary >= 0.8.6.0
-               , cryptonite
-               , memory
-               , DRBG
-               , attoparsec
+               , fgl >=5.7 && <5.8
+               , fgl-arbitrary >=0.2 && <0.3
+               , fgl-visualize >=0.1 && <0.2
+               , lens >=4.17 && <4.18
+               , random >=1.1 && <1.2
+               , shakespeare >=2 && <2.1
+               , shelly >=1.8.1 && <1.9
+               , text >=1.2 && <1.3
+               , bytestring >=0.10 && <0.11
+               , hashable >=1.2 && <1.3
+               , transformers >=0.5 && <0.6
+               , filepath >=1.4.2 && <1.5
+               , binary >= 0.8.6 && <0.9
+               , cryptonite >=0.25 && <0.26
+               , memory >=0.14 && <0.15
+               , DRBG >=0.5 && <0.6
+               , attoparsec >=0.13 && <0.14
   default-extensions: OverloadedStrings
 
 executable verifuzz
@@ -66,18 +66,18 @@ executable verifuzz
   default-language: Haskell2010
   ghc-options: -threaded
   build-depends: base >= 4.7 && < 5
-               , verifuzz
-               , fgl
-               , fgl-arbitrary
-               , fgl-visualize
-               , text
-               , QuickCheck
-               , bytestring
-               , shelly
-               , DRBG
-               , lens
-               , optparse-applicative
-               , binary
+               , verifuzz >= 0.1 && <0.2
+               , fgl >=5.7 && <5.8
+               , fgl-arbitrary >=0.2 && <0.3
+               , fgl-visualize >=0.1 && <0.2
+               , QuickCheck >=2.3 && <2.10
+               , text >=1.2 && <1.3
+               , bytestring >=0.10 && <0.11
+               , shelly >=1.8.1 && <1.9
+               , DRBG >=0.5 && <0.6
+               , lens >=4.17 && <4.18
+               , binary >= 0.8.6 && <0.9
+               , optparse-applicative >=0.14 && <0.15
   default-extensions: OverloadedStrings
 
 test-suite verifuzz-test
@@ -88,13 +88,13 @@ test-suite verifuzz-test
   other-modules: Unit
                , Property
   build-depends: base >= 4 && < 5
-               , verifuzz
-               , fgl
-               , tasty >= 0.7
-               , tasty-hunit >= 0.10
-               , tasty-quickcheck >= 0.10
-               , lens
-               , text
+               , verifuzz >=0.1 && <0.2
+               , fgl >=5.7 && <5.8
+               , tasty >= 0.7 && <0.8
+               , tasty-hunit >= 0.10 && <0.11
+               , tasty-quickcheck >= 0.10 && <0.11
+               , lens >=4.17 && <4.18
+               , text >=1.2 && <1.3
   default-extensions: OverloadedStrings
 
 test-suite verifuzz-doctest
@@ -102,8 +102,8 @@ test-suite verifuzz-doctest
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Doctest.hs
-  build-depends: base >= 4 && < 5
-               , verifuzz
-               , doctest
-               , doctest-discover
+  build-depends: base >=4.7 && <5
+               , verifuzz >=0.1 && <0.2
+               , doctest >=0.16 && <0.17
+               , doctest-discover >=0.2 && <0.3
   default-extensions: OverloadedStrings
