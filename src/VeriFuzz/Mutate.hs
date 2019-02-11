@@ -218,10 +218,6 @@ simplify e                               = e
 --
 -- >>> GenVerilog . removeId ["x"] $ Id "x" + Id "y"
 -- (x + (-1'h0))
---
--- This can be combined with 'simplify' to completely remove an identifier.
---
--- >>> GenVerilog . simplify . removeId ["z"] $ Id "x" + Id "y" - Id "z"
 removeId :: [Identifier] -> Expr -> Expr
 removeId i expr =
   transform trans expr
