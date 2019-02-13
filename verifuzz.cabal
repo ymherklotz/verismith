@@ -58,6 +58,7 @@ library
                , memory >=0.14 && <0.15
                , DRBG >=0.5 && <0.6
                , attoparsec >=0.13 && <0.14
+               , attoparsec-expr >=0.1 && <0.2
   default-extensions: OverloadedStrings
 
 executable verifuzz
