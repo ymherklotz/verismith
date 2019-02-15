@@ -198,8 +198,8 @@ instance QC.Arbitrary BinaryOperator where
 --    , BinMod
     , BinEq
     , BinNEq
-    , BinCEq
-    , BinCNEq
+--    , BinCEq
+--    , BinCNEq
     , BinLAnd
     , BinLOr
     , BinLT
