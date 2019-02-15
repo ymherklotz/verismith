@@ -3,7 +3,6 @@ module Main where
 import           Control.Concurrent
 import           Data.Text           (Text)
 import qualified Data.Text           as T
-import qualified Data.Text.IO        as T
 import           Options.Applicative
 import qualified Shelly              as S
 import qualified Test.QuickCheck     as QC

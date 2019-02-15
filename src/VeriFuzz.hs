@@ -11,6 +11,7 @@ Portability : POSIX
 module VeriFuzz
   ( runEquivalence
   , runSimulation
+  , draw
   , module VeriFuzz.AST
   , module VeriFuzz.ASTGen
   , module VeriFuzz.Circuit
@@ -26,7 +27,6 @@ module VeriFuzz
   , module VeriFuzz.Yosys
   ) where
 
-import           Control.Lens
 import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
 import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
@@ -77,12 +77,12 @@ showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
 
 runSimulation :: IO ()
 runSimulation = do
-  gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
+  -- gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
   -- let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
   -- writeFile "file.dot" dot
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
-  let circ =
-        head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
+  -- let circ =
+  --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
   rand2 <- QC.generate (randomMod 10 100)
   val  <- shelly $ runSim defaultIcarus (rand2) rand

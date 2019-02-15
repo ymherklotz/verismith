@@ -237,6 +237,7 @@ instance QC.Arbitrary UnaryOperator where
     [ UnPlus
     , UnMinus
     , UnNot
+    , UnLNot
     , UnAnd
     , UnNand
     , UnOr
@@ -347,8 +348,8 @@ instance QC.Arbitrary Expr where
 
 traverseExpr :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 traverseExpr f (Concat e    ) = Concat <$> sequenceA (f <$> e)
-traverseExpr f (UnOp un e   ) = UnOp un <$> f e
-traverseExpr f (BinOp l op r) = BinOp <$> f l <*> pure op <*> f r
+traverseExpr f (UnOp u e   )  = UnOp u <$> f e
+traverseExpr f (BinOp l o r)  = BinOp <$> f l <*> pure o <*> f r
 traverseExpr f (Cond  c l  r) = Cond <$> f c <*> f l <*> f r
 traverseExpr f (Func fn e   ) = Func fn <$> f e
 traverseExpr _ e              = pure e
