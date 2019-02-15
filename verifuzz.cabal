@@ -86,6 +86,7 @@ test-suite verifuzz-test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Test.hs
+  ghc-options: -Wall -Werror
   other-modules: Unit
                , Property
   build-depends: base >= 4 && < 5
@@ -103,6 +104,7 @@ test-suite verifuzz-doctest
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Doctest.hs
+  ghc-options: -Wall -Werror
   build-depends: base >=4.7 && <5
                , verifuzz >=0.1 && <0.2
                , doctest >=0.16 && <0.17
