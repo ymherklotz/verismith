@@ -112,7 +112,7 @@ opts = info (argparse <**> helper)
          <> header "VeriFuzz - A hardware simulator and synthesiser Verilog fuzzer." )
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz a) = do
+handleOpts (Fuzz _) = do
   num <- getNumCapabilities
   vars <- sequence $ (\x -> myForkIO $
                        V.runEquivalence (V.randomMod 10 100)
@@ -121,11 +121,10 @@ handleOpts (Fuzz a) = do
 handleOpts (Generate f) = do
   g <- QC.generate $ V.randomMod 5 15
   S.shelly . S.writefile f $ V.genSource g
-handleOpts (Rerun f) = undefined
+handleOpts (Rerun _) = undefined
 
 main :: IO ()
  --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
   optsparsed <- execParser opts
   handleOpts optsparsed
-
