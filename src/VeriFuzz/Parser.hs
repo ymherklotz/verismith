@@ -205,7 +205,7 @@ parseModDecl = do
   _ <- symbol ";"
   modItem <- lexeme $ option [] . try $ many1 parseModItem
   _ <- reserved "endmodule"
-  return $ ModDecl name [defaultPort "y"] modL modItem
+  return $ ModDecl name [] modL modItem
 
 parseDescription :: Parser Description
 parseDescription = Description <$> lexeme parseModDecl

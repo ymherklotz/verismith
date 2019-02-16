@@ -3,10 +3,11 @@ module Property
   )
 where
 
-import           Data.Either                       (isRight)
+import           Data.Either                       (fromRight, isRight)
 import qualified Data.Graph.Inductive              as G
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Test.Tasty
+import           Test.Tasty.QuickCheck             ((===))
 import qualified Test.Tasty.QuickCheck             as QC
 import           Text.Parsec
 import           VeriFuzz
@@ -24,7 +25,7 @@ instance Show ModDeclSub where
   show = show . GenVerilog . getModDecl
 
 instance QC.Arbitrary ModDeclSub where
-  arbitrary = ModDeclSub <$> randomMod 3 10
+  arbitrary = ModDeclSub <$> QC.resize 20 (randomMod 3 10)
 
 instance QC.Arbitrary TestGraph where
   arbitrary = TestGraph <$> QC.resize 30 randomDAG
@@ -46,20 +47,23 @@ parserInput' (ModDeclSub v) =
   where
     str = show . GenVerilog $ v
 
---parserIdempotent' :: (GenVerilog VerilogSrc) -> Bool
---parserIdempotent' v =
---  p sv == (p . p) sv
---  where
---    sv = show v
---    p = show . fromRight (VerilogSrc []) . parse parseVerilogSrc "idempotent_test.v"
+parserIdempotent' :: ModDeclSub -> QC.Property
+parserIdempotent' (ModDeclSub v) =
+  p sv === (p . p) sv
+  where
+    vshow = show . GenVerilog
+    sv = vshow v
+    p = vshow . fromRight (error "Failed idempotent test")
+        . parse parseModDecl "idempotent_test.v"
 
 parserInput :: TestTree
 parserInput = QC.testProperty "parser input" $
   parserInput'
 
---parserIdempotent :: TestTree
---parserIdempotent = QC.testProperty "parser idempotence" $
---  parserIdempotent'
+parserIdempotent :: TestTree
+parserIdempotent = QC.testProperty "parser idempotence" $
+  parserIdempotent'
 
 propertyTests :: TestTree
-propertyTests = testGroup "Property Tests" [simpleGraph, simpleAltGraph, parserInput]
+propertyTests = testGroup "Property Tests" [simpleGraph, simpleAltGraph
+                                           , parserInput, parserIdempotent]

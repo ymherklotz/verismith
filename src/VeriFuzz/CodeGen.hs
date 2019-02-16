@@ -118,7 +118,7 @@ genFunc UnSignedFunc = "$unsigned"
 genExpr :: Expr -> Text
 genExpr (BinOp eRhs bin eLhs) = "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
 genExpr (Number s n         ) = "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
-  where minus | signum n > 0 = "" | otherwise = "-"
+  where minus | signum n >= 0 = "" | otherwise = "-"
 genExpr (Id     i           ) = i ^. getIdentifier
 genExpr (Concat c           ) = "{" <> comma (genExpr <$> c) <> "}"
 genExpr (UnOp u e           ) = "(" <> genUnaryOperator u <> genExpr e <> ")"
