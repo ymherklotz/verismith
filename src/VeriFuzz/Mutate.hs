@@ -220,7 +220,7 @@ simplify e                               = e
 -- simplified further.
 --
 -- >>> GenVerilog . removeId ["x"] $ Id "x" + Id "y"
--- (x + (-1'h0))
+-- (x + (1'h0))
 removeId :: [Identifier] -> Expr -> Expr
 removeId i =
   transform trans
