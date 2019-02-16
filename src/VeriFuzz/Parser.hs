@@ -113,8 +113,7 @@ parseCond e = do
 parseExpr :: Parser Expr
 parseExpr = do
   e <- parseExpr'
-  y <- option e $ parseCond e
-  return y
+  option e $ parseCond e
 
 -- | Table of binary and unary operators that encode the right precedence for
 -- each.
@@ -161,7 +160,7 @@ aroundList a b c = do
 
 parseContAssign :: Parser ContAssign
 parseContAssign = do
-  var <- (spaces *> reserved "assign" *> spaces *> ident)
+  var <- spaces *> reserved "assign" *> spaces *> ident
   expr <- spaces *> reservedOp "=" *> spaces *> parseExpr
   _ <- spaces *> string ";"
   return $ ContAssign var expr
@@ -213,7 +212,7 @@ parseModList = list <|> spaces $> []
 
 parseModDecl :: Parser ModDecl
 parseModDecl = do
-  name <- (reserved "module" *> ident)
+  name <- reserved "module" *> ident
   modL <- fmap defaultPort <$> parseModList
   _ <- string ";"
   modItem <- option [] . try $ many1 parseModItem
