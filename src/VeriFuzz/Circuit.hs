@@ -10,7 +10,12 @@ Portability : POSIX
 Definition of the circuit graph.
 -}
 
-module VeriFuzz.Circuit where
+module VeriFuzz.Circuit
+  ( -- * Circuit
+    Gate(..)
+  , Circuit(..)
+  , CNode(..)
+  ) where
 
 import           Data.Graph.Inductive (Gr, LNode)
 import           System.Random

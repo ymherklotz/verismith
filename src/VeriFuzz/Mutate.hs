@@ -18,7 +18,6 @@ import           Data.Maybe        (catMaybes, fromMaybe)
 import           Data.Text         (Text)
 import qualified Data.Text         as T
 import           VeriFuzz.AST
-import           VeriFuzz.CodeGen
 import           VeriFuzz.Internal
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
@@ -74,8 +73,12 @@ nestUpTo :: Int -> VerilogSrc -> VerilogSrc
 nestUpTo i src = foldl (flip nestSource) src $ Identifier . fromNode <$> [1 .. i]
 
 allVars :: ModDecl -> [Identifier]
-allVars m = (m ^.. modOutPorts . traverse . portName) ++ (m ^.. modInPorts . traverse . portName)
+allVars m =
+  (m ^.. modOutPorts . traverse . portName)
+  <> (m ^.. modInPorts . traverse . portName)
+
 -- $setup
+-- >>> import VeriFuzz.CodeGen
 -- >>> let m = (ModDecl (Identifier "m") [Port Wire 5 (Identifier "y")] [Port Wire 5 "x"] [])
 -- >>> let main = (ModDecl "main" [] [] [])
 

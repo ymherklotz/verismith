@@ -13,30 +13,28 @@ This module generates the code from the Verilog AST defined in
 
 {-# LANGUAGE FlexibleInstances #-}
 
-module VeriFuzz.CodeGen where
+module VeriFuzz.CodeGen
+  ( -- * Code Generation
+    GenVerilog(..)
+  , genSource
+  , render
+  ) where
 
-import           Control.Lens    (view, (^.))
-import           Data.Foldable   (fold)
-import           Data.Text       (Text)
-import qualified Data.Text       as T
-import qualified Data.Text.IO    as T
-import           Numeric         (showHex)
-import           Test.QuickCheck (Arbitrary, arbitrary)
+import           Control.Lens      (view, (^.))
+import           Data.Foldable     (fold)
+import           Data.Text         (Text)
+import qualified Data.Text         as T
+import qualified Data.Text.IO      as T
+import           Numeric           (showHex)
+import           Test.QuickCheck   (Arbitrary, arbitrary)
 import           VeriFuzz.AST
+import           VeriFuzz.Internal
 
 -- | 'Source' class which determines that source code is able to be generated
 -- from the data structure using 'genSource'. This will be stored in 'Text' and
 -- can then be processed further.
 class Source a where
   genSource :: a -> Text
-
--- | Inserts commas between '[Text]' and except the last one.
-comma :: [Text] -> Text
-comma = T.intercalate ", "
-
--- | Show function for 'Text'
-showT :: (Show a) => a -> Text
-showT = T.pack . show
 
 -- | Map a 'Maybe Stmnt' to 'Text'. If it is 'Just stmnt', the generated
 -- statements are returned. If it is 'Nothing', then @;\n@ is returned.

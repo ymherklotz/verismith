@@ -10,7 +10,9 @@ Portability : POSIX
 Generates the AST from the graph directly.
 -}
 
-module VeriFuzz.ASTGen where
+module VeriFuzz.ASTGen
+  ( generateAST
+  ) where
 
 import           Control.Lens              ((^..))
 import           Data.Foldable             (fold)
@@ -34,9 +36,6 @@ fromGate Xor = BinXor
 
 inputsC :: Circuit -> [Node]
 inputsC c = inputs (getCircuit c)
-
-outputsC :: Circuit -> [Node]
-outputsC c = outputs (getCircuit c)
 
 genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
 genPortsAST f c = port . frNode <$> f c where port = Port Wire 4
