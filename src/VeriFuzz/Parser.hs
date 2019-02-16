@@ -11,7 +11,14 @@ Minimal Verilog parser to reconstruct the AST. This parser does not support the
 whole Verilog syntax, as the AST does not support it either.
 -}
 
-module VeriFuzz.Parser where
+module VeriFuzz.Parser
+  ( -- * Parsers
+    parseVerilogSrc
+  , parseDescription
+  , parseModDecl
+  , parseContAssign
+  , parseExpr
+  ) where
 
 import           Control.Applicative  ((<|>))
 import           Data.Attoparsec.Expr
@@ -44,9 +51,7 @@ constP p t = case parseOnly p t of
   Right a -> return a
 
 parseOf :: Parser Text -> Parser a -> Parser a
-parseOf ptxt pa = bothParse
-  where
-    bothParse = ptxt >>= constP pa
+parseOf ptxt pa = ptxt >>= constP pa
 
 ignoreWS :: Parser a -> Parser a
 ignoreWS a = do
@@ -55,11 +60,34 @@ ignoreWS a = do
   skipSpace
   return t
 
+matchHex :: Char -> Bool
+matchHex c = c == 'h' || c == 'H'
+
+--matchBin :: Char -> Bool
+--matchBin c = c == 'b' || c == 'B'
+
+matchDec :: Char -> Bool
+matchDec c = c == 'd' || c == 'D'
+
+--matchOct :: Char -> Bool
+--matchOct c = c == 'o' || c == 'O'
+
+-- | Parse a Number depending on if it is in a hex or decimal form. Octal and
+-- binary are not supported yet.
+parseNum :: Parser Expr
+parseNum = ignoreWS $ do
+  size <- decimal
+  _ <- "'"
+  matchNum size
+  where
+    matchNum size = (satisfy matchHex >> Number size <$> hexadecimal)
+                    <|> (satisfy matchDec >> Number size <$> decimal)
+
 parseTerm :: Parser Expr
 parseTerm = (Concat <$> aroundList "{" "}" parseExpr)
             <|> parseCond
             <|> parseParens parseExpr
-            <|> ignoreWS (Number 32 <$> decimal)
+            <|> parseNum
             <?> "simple expr"
 
 takeUntil :: Char -> Parser Text
@@ -68,12 +96,16 @@ takeUntil c = do
   _ <- char c
   return t
 
+-- | Parses the ternary conditional operator. It will behave in a right
+-- associative way.
 parseCond :: Parser Expr
 parseCond = do
   x <- parseOf (takeUntil '?') parseExpr
   y <- parseOf (takeUntil ':') parseExpr
   Cond x y <$> parseExpr
 
+-- | Table of binary and unary operators that encode the right precedence for
+-- each.
 parseTable :: [[Operator Text Expr]]
 parseTable =
   [ [ prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot) ]
@@ -108,9 +140,6 @@ binary name fun = Infix ((string name <?> "binary") >> return fun)
 
 prefix :: Text -> (a -> a) -> Operator Text a
 prefix name fun = Prefix ((string name <?> "prefix") >> return fun)
-
-postfix :: Text -> (a -> a) -> Operator Text a
-postfix name fun = Postfix ((string name <?> "postfix") >> return fun)
 
 commaSep :: Parser a -> Parser [a]
 commaSep f = sepBy f (skipSpace *> char ',' *> skipSpace)
