@@ -48,7 +48,7 @@ library
                , lens >=4.17 && <4.18
                , random >=1.1 && <1.2
                , shakespeare >=2 && <2.1
-               , shelly >=1.8.1 && <1.9
+               , shelly >=1.8.0 && <1.9
                , text >=1.2 && <1.3
                , bytestring >=0.10 && <0.11
                , hashable >=1.2 && <1.3
@@ -75,7 +75,7 @@ executable verifuzz
                , QuickCheck >=2.3 && <2.10
                , text >=1.2 && <1.3
                , bytestring >=0.10 && <0.11
-               , shelly >=1.8.1 && <1.9
+               , shelly >=1.8.0 && <1.9
                , DRBG >=0.5 && <0.6
                , lens >=4.17 && <4.18
                , binary >= 0.8.6 && <0.9
