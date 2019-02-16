@@ -17,10 +17,10 @@ import           Data.Text    (Text)
 import           VeriFuzz.AST
 
 regDecl :: Identifier -> ModItem
-regDecl = Decl Nothing . Port (Reg False) 1
+regDecl = Decl Nothing . Port Reg False 1
 
 wireDecl :: Identifier -> ModItem
-wireDecl = Decl Nothing . Port Wire 1
+wireDecl = Decl Nothing . Port Wire False 1
 
 -- | Create an empty module.
 emptyMod :: ModDecl
@@ -63,10 +63,19 @@ addTestBench :: VerilogSrc -> VerilogSrc
 addTestBench = addDescription $ Description testBench
 
 defaultPort :: Identifier -> Port
-defaultPort = Port Wire 1
+defaultPort = Port Wire False 1
 
 portToExpr :: Port -> Expr
-portToExpr (Port _ _ i) = Id i
+portToExpr (Port _ _ _ i) = Id i
 
 modName :: ModDecl -> Text
 modName = view $ modId . getIdentifier
+
+yPort :: Identifier -> Port
+yPort = Port Wire False 90
+
+wire :: Int -> Identifier -> Port
+wire = Port Wire False
+
+reg :: Int -> Identifier -> Port
+reg = Port Reg False

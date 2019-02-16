@@ -68,12 +68,17 @@ genModPort port = port ^. portName . getIdentifier
 
 -- | Generate the 'Port' description.
 genPort :: Port -> Text
-genPort port = t <> size <> name
+genPort port = t <> sign <> size <> name
  where
-  t = (<> " ") . genPortType $ port ^. portType
+  t = flip mappend " " . genPortType $ port ^. portType
   size | port ^. portSize > 1 = "[" <> showT (port ^. portSize - 1) <> ":0] "
        | otherwise            = ""
   name = port ^. portName . getIdentifier
+  sign = genSigned $ port ^. portSigned
+
+genSigned :: Bool -> Text
+genSigned True = "signed "
+genSigned _    = ""
 
 -- | Convert the 'PortDir' type to 'Text'.
 genPortDir :: PortDir -> Text
@@ -188,8 +193,7 @@ genConstExpr (ConstExpr num) = showT num
 
 genPortType :: PortType -> Text
 genPortType Wire = "wire"
-genPortType (Reg signed) | signed    = "reg signed"
-                         | otherwise = "reg"
+genPortType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) = genLVal r <> op <> maybe "" genDelay d <> genExpr e

@@ -97,7 +97,7 @@ instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
  where
   out   = Decl Nothing <$> m ^. modOutPorts
-  regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg False)
+  regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg)
   inst  = ModInst (m ^. modId) (m ^. modId <> (Identifier . showT $ count + 1)) conns
   count = length . filter (== m ^. modId) $ main ^.. modItems . traverse . modInstId
   conns = ModConn . Id <$> allVars m
@@ -160,9 +160,9 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 makeTop :: Int -> ModDecl -> ModDecl
 makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
  where
-  ys    = Port Wire 90 . flip makeIdFrom "y" <$> [1 .. i]
+  ys    = yPort . flip makeIdFrom "y" <$> [1 .. i]
   modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
-  modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [Port Wire 90 (makeIdFrom n "y")]
+  modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [yPort (makeIdFrom n "y")]
 
 -- | Make a top module with an assert that requires @y_1@ to always be equal to
 -- @y_2@, which can then be proven using a formal verification tool.
@@ -172,7 +172,7 @@ makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
   assert = Always . EventCtrl e . Just $ SeqBlock
     [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
   e = EPosEdge "clk"
-  addClk = (Port Wire 1 "clk" :)
+  addClk = (defaultPort "clk" :)
 
 -- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl

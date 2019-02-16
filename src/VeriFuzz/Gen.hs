@@ -13,12 +13,13 @@ Various useful generators.
 module VeriFuzz.Gen where
 
 import           Control.Lens
-import           Data.Foldable   (fold)
-import qualified Data.Text       as T
-import           Test.QuickCheck (Gen)
-import qualified Test.QuickCheck as QC
+import           Data.Foldable     (fold)
+import qualified Data.Text         as T
+import           Test.QuickCheck   (Gen)
+import qualified Test.QuickCheck   as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
+import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 import           VeriFuzz.Random
 
@@ -28,7 +29,7 @@ toId = Identifier . ("w"<>) . T.pack . show
 toPort :: Identifier -> Gen Port
 toPort ident = do
   i <- abs <$> QC.arbitrary
-  return $ Port Wire i ident
+  return $ wire i ident
 
 sumSize :: [Port] -> Int
 sumSize ports =
@@ -52,11 +53,11 @@ randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
   x <- sequence $ randomOrdAssigns start end
   ident <-  sequence $ toPort <$> ids
-  let inputs = take inps ident
+  let inputs_ = take inps ident
   let other = drop inps ident
   let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
-  let yport = [Port Wire (sumSize other) "y"]
-  return . initMod . declareMod other . ModDecl "test_module" yport inputs $ x ++ [y]
+  let yport = [wire (sumSize other) "y"]
+  return . initMod . declareMod other . ModDecl "test_module" yport inputs_ $ x ++ [y]
   where
     ids = toId <$> [1..total]
     end = drop inps ids

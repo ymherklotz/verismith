@@ -47,9 +47,9 @@ module VeriFuzz.AST
     -- ** Ports
   , PortDir(..)
   , PortType(..)
-  , regSigned
   , Port(..)
   , portType
+  , portSigned
   , portSize
   , portName
     -- * Expression
@@ -411,11 +411,11 @@ instance QC.Arbitrary PortDir where
 -- | Currently, only @wire@ and @reg@ are supported, as the other net types are
 -- not that common and not a priority.
 data PortType = Wire
-              | Reg { _regSigned :: Bool }
+              | Reg
               deriving (Eq, Show, Data)
 
 instance QC.Arbitrary PortType where
-  arbitrary = QC.oneof [pure Wire, Reg <$> QC.arbitrary]
+  arbitrary = QC.elements [Wire, Reg]
 
 makeLenses ''PortType
 
@@ -427,15 +427,17 @@ makeLenses ''PortType
 --
 -- This is now implemented inside 'ModDecl' itself, which uses a list of output
 -- and input ports.
-data Port = Port { _portType :: PortType
-                 , _portSize :: Int
-                 , _portName :: Identifier
+data Port = Port { _portType   :: PortType
+                 , _portSigned :: Bool
+                 , _portSize   :: Int
+                 , _portName   :: Identifier
                  } deriving (Eq, Show, Data)
 
 makeLenses ''Port
 
 instance QC.Arbitrary Port where
-  arbitrary = Port <$> QC.arbitrary <*> positiveArb <*> QC.arbitrary
+  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary
+              <*> positiveArb <*> QC.arbitrary
 
 -- | This is currently a type because direct module declaration should also be
 -- added:
@@ -565,10 +567,8 @@ traverseModItem _ e = pure e
 makeLenses ''ModDecl
 
 modPortGen :: QC.Gen Port
-modPortGen = QC.oneof
-  [ Port Wire <$> positiveArb <*> QC.arbitrary
-  , Port <$> (Reg <$> QC.arbitrary) <*> positiveArb <*> QC.arbitrary
-  ]
+modPortGen = Port <$> QC.arbitrary <*> QC.arbitrary
+             <*> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary ModDecl where
   arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary

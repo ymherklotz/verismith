@@ -38,7 +38,7 @@ inputsC :: Circuit -> [Node]
 inputsC c = inputs (getCircuit c)
 
 genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
-genPortsAST f c = port . frNode <$> f c where port = Port Wire 4
+genPortsAST f c = port . frNode <$> f c where port = Port Wire False 4
 
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
@@ -71,7 +71,7 @@ genModuleDeclAST c = ModDecl i output ports items
  where
   i      = Identifier "gen_module"
   ports  = genPortsAST inputsC c
-  output = [Port Wire 90 "y"]
+  output = [Port Wire False 90 "y"]
   a = genAssignAST c
   items  = a ++ [ModCA . ContAssign "y" . fold $ Id <$> assigns]
   assigns = a ^.. traverse . modContAssign . contAssignNetLVal
