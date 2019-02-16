@@ -26,9 +26,7 @@ import           Data.Attoparsec.Text as A
 import           Data.Char            (isLetter)
 import           Data.Functor         (($>))
 import           Data.Text            (Text)
-import qualified Data.Text            as T
 import           VeriFuzz.AST
-import           VeriFuzz.CodeGen
 
 sBinOp :: BinaryOperator -> Expr -> Expr -> Expr
 sBinOp = sOp BinOp

@@ -22,9 +22,11 @@ instance QC.Arbitrary TestGraph where
 instance QC.Arbitrary AltTestGraph where
   arbitrary = AltTestGraph <$> QC.resize 100 V.randomDAG
 
+simpleGraph :: TestTree
 simpleGraph = QC.testProperty "simple graph generation check" $ \graph -> simp graph
   where simp = G.isSimple . getGraph
 
+simpleAltGraph :: TestTree
 simpleAltGraph = QC.testProperty "simple alternative graph generation check" $ \graph -> simp graph
   where simp = G.isSimple . getAltGraph
 

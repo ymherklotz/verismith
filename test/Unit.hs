@@ -4,9 +4,6 @@ module Unit
 where
 
 import           Control.Lens
-import qualified Data.Graph.Inductive as G
-import           Data.Text            (Text)
-import qualified Data.Text            as T
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz
@@ -83,5 +80,5 @@ transformExpectedResult = BinOp
 
 trans :: Expr -> Expr
 trans e = case e of
-  Id id -> if id == Identifier "id2" then Id $ Identifier "Replaced" else Id id
-  _     -> e
+  Id i -> if i == Identifier "id2" then Id $ Identifier "Replaced" else Id i
+  _    -> e
