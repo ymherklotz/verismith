@@ -128,8 +128,8 @@ instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
  where
   conns =
     zipWith ModConnNamed ids (Id <$> instIds)
-  ids = (filterChar outChar $ name modOutPorts) ++ (name modInPorts)
-  instIds = (name modOutPorts) ++ (name modInPorts)
+  ids = filterChar outChar (name modOutPorts) <> name modInPorts
+  instIds = name modOutPorts <> name modInPorts
   name v = m ^.. v . traverse . portName
 
 filterChar :: Text -> [Identifier] -> [Identifier]
@@ -172,7 +172,7 @@ makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
   assert = Always . EventCtrl e . Just $ SeqBlock
     [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
   e = EPosEdge "clk"
-  addClk = ((Port Wire 1 "clk") :)
+  addClk = (Port Wire 1 "clk" :)
 
 -- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl
@@ -222,10 +222,10 @@ simplify e                               = e
 -- >>> GenVerilog . removeId ["x"] $ Id "x" + Id "y"
 -- (x + (-1'h0))
 removeId :: [Identifier] -> Expr -> Expr
-removeId i expr =
-  transform trans expr
+removeId i =
+  transform trans
   where
     trans (Id ident)
-      | all (ident /=) i = Number 1 0
+      | ident `notElem` i = Number 1 0
       | otherwise = Id ident
     trans e = e

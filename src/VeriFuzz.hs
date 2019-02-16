@@ -87,7 +87,7 @@ runSimulation = do
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
   rand <- genRandom 20
   rand2 <- QC.generate (randomMod 10 100)
-  val  <- shelly $ runSim defaultIcarus (rand2) rand
+  val  <- shelly $ runSim defaultIcarus rand2 rand
   T.putStrLn $ showBS val
 
 onFailure :: Text -> RunFailed -> Sh ()

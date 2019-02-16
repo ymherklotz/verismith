@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy   as L (ByteString)
 import           Data.Char              (digitToInt)
 import           Data.Foldable          (fold)
 import           Data.List              (transpose)
-import           Data.Maybe             (fromMaybe, listToMaybe)
+import           Data.Maybe             (listToMaybe)
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Numeric                (readInt)
@@ -66,8 +66,7 @@ convert :: Text -> ByteString
 convert =
   toStrict
   . (encode :: Integer -> L.ByteString)
-  . fromMaybe 0
-  . fmap fst
+  . maybe 0 fst
   . listToMaybe
   . readInt 2 (`elem` ("01" :: String)) digitToInt
   . T.unpack
