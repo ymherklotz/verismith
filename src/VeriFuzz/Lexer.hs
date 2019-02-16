@@ -42,6 +42,7 @@ module VeriFuzz.Lexer
   , commaSep1
   ) where
 
+import           Data.Char         (digitToInt)
 import           Text.Parsec
 import qualified Text.Parsec.Token as P
 
@@ -53,7 +54,7 @@ type Parser = Parsec String ()
 
 verilogDef :: VerilogDef
 verilogDef = P.LanguageDef "/*" "*/" "//" False letter (alphaNum <|> char '_')
-             (oneOf ":!#$%&*+./<=>?@\\^|-~") (oneOf ":!#$%&*+./<=>?@\\^|-~")
+             (oneOf ":!#%&*+./<=>?@\\^|-~") (oneOf ":!#%&*+./<=>?@\\^|-~")
              reserved' reservedOp' True
 
 lexer :: Lexer
@@ -92,11 +93,17 @@ naturalOrFloat = P.naturalOrFloat lexer
 decimal :: Parser Integer
 decimal = P.decimal lexer
 
+number :: Integer -> Parser Char -> Parser Integer
+number base baseDigit = do
+  digits <- many1 baseDigit
+  let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
+  seq n (return n)
+
 hexadecimal :: Parser Integer
-hexadecimal = P.hexadecimal lexer
+hexadecimal = number 16 hexDigit
 
 octal :: Parser Integer
-octal = P.octal lexer
+octal = number 8 octDigit
 
 symbol :: String -> Parser String
 symbol = P.symbol lexer

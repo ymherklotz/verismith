@@ -26,6 +26,7 @@ import qualified Data.Text             as T
 import           Text.Parsec
 import           Text.Parsec.Expr
 import           VeriFuzz.AST
+--import           VeriFuzz.CodeGen
 import           VeriFuzz.Internal
 import           VeriFuzz.Lexer
 
@@ -42,19 +43,6 @@ parseExpr' :: Parser Expr
 parseExpr' = buildExpressionParser parseTable parseTerm
             <?> "expr"
 
-parseParens :: Parser a -> Parser a
-parseParens a = do
-  val <- string "(" *> spaces *> a
-  _ <- spaces *> string ")"
-  return val
-
-ignoreWS :: Parser a -> Parser a
-ignoreWS a = do
-  spaces
-  t <- a
-  spaces
-  return t
-
 matchHex :: Char -> Bool
 matchHex c = c == 'h' || c == 'H'
 
@@ -70,7 +58,7 @@ matchOct c = c == 'o' || c == 'O'
 -- | Parse a Number depending on if it is in a hex or decimal form. Octal and
 -- binary are not supported yet.
 parseNum :: Parser Expr
-parseNum = ignoreWS $ do
+parseNum = do
   size <- fromIntegral <$> decimal
   _ <- string "'"
   matchNum size
@@ -83,8 +71,8 @@ parseVar :: Parser Expr
 parseVar = Id <$> ident
 
 parseFunction :: Parser Function
-parseFunction = string "unsigned" $> UnSignedFunc
-                <|> string "signed" $> SignedFunc
+parseFunction = reserved "unsigned" $> UnSignedFunc
+                <|> reserved "signed" $> SignedFunc
 
 parseFun :: Parser Expr
 parseFun = do
@@ -94,10 +82,10 @@ parseFun = do
   return $ Func f expr
 
 parseTerm :: Parser Expr
-parseTerm = parseParens parseExpr
+parseTerm = parens parseExpr
             <|> (Concat <$> aroundList (string "{") (string "}") parseExpr)
             <|> parseFun
-            <|> parseNum
+            <|> lexeme parseNum
             <|> parseVar
             <?> "simple expr"
 
@@ -105,15 +93,15 @@ parseTerm = parseParens parseExpr
 -- associative way.
 parseCond :: Expr -> Parser Expr
 parseCond e = do
-  _ <- reservedOp "?"
-  expr <- parseExpr
-  _ <- reservedOp ":"
+  _ <- spaces *> reservedOp "?"
+  expr <- spaces *> parseExpr
+  _ <- spaces *> reservedOp ":"
   Cond e expr <$> parseExpr
 
 parseExpr :: Parser Expr
 parseExpr = do
   e <- parseExpr'
-  option e $ parseCond e
+  option e . try $ parseCond e
 
 -- | Table of binary and unary operators that encode the right precedence for
 -- each.
@@ -143,7 +131,7 @@ parseTable =
     ]
   , [ binary "|" (sBinOp BinOr) AssocLeft ]
   , [ binary "&&" (sBinOp BinLAnd) AssocLeft ]
-  , [ binary "|" (sBinOp BinLOr) AssocLeft ]
+  , [ binary "||" (sBinOp BinLOr) AssocLeft ]
   ]
 
 binary :: String -> (a -> a -> a) -> Assoc -> ParseOperator a
@@ -153,25 +141,25 @@ prefix :: String -> (a -> a) -> ParseOperator a
 prefix name fun = Prefix ((reservedOp name <?> "prefix") >> return fun)
 
 aroundList :: Parser a -> Parser b -> Parser c -> Parser [c]
-aroundList a b c = do
+aroundList a b c = lexeme $ do
   l <- a *> spaces *> commaSep c
   _ <- b
   return l
 
 parseContAssign :: Parser ContAssign
 parseContAssign = do
-  var <- spaces *> reserved "assign" *> spaces *> ident
-  expr <- spaces *> reservedOp "=" *> spaces *> parseExpr
-  _ <- spaces *> string ";"
+  var <- reserved "assign" *> ident
+  expr <- reservedOp "=" *> parseExpr
+  _ <- symbol ";"
   return $ ContAssign var expr
 
 -- | Parse a range and return the total size. As it is inclusive, 1 has to be
 -- added to the difference.
 parseRange :: Parser Int
 parseRange = do
-  rangeH <- string "[" *> spaces *> decimal
-  rangeL <- spaces *> string ":" *> spaces *> decimal
-  spaces *> string "]" *> spaces
+  rangeH <- symbol "[" *> decimal
+  rangeL <- symbol ":" *> decimal
+  _ <- symbol "]"
   return . fromIntegral $ rangeH - rangeL + 1
 
 ident :: Parser Identifier
@@ -180,20 +168,20 @@ ident = Identifier . T.pack <$> identifier
 parseNetDecl :: Maybe PortDir -> Parser ModItem
 parseNetDecl pd = do
   t <- option Wire type_
-  sign <- option False (reserved "signed" *> spaces $> True)
+  sign <- option False (reserved "signed" $> True)
   range <- option 1 parseRange
   name <- ident
-  _ <- spaces *> string ";"
+  _ <- symbol ";"
   return . Decl pd . Port t sign range $ name
   where
-    type_ = reserved "wire" *> spaces $> Wire
-            <|> reserved "reg" *> spaces $> Reg
+    type_ = reserved "wire" $> Wire
+            <|> reserved "reg" $> Reg
 
 parsePortDir :: Parser PortDir
 parsePortDir =
-  reserved "output" *> spaces $> PortOut
-  <|> reserved "input" *> spaces $> PortIn
-  <|> reserved "inout" *> spaces $> PortInOut
+  reserved "output" $> PortOut
+  <|> reserved "input" $> PortIn
+  <|> reserved "inout" $> PortInOut
 
 parseDecl :: Parser ModItem
 parseDecl =
@@ -214,13 +202,13 @@ parseModDecl :: Parser ModDecl
 parseModDecl = do
   name <- reserved "module" *> ident
   modL <- fmap defaultPort <$> parseModList
-  _ <- string ";"
-  modItem <- option [] . try $ many1 parseModItem
+  _ <- symbol ";"
+  modItem <- lexeme $ option [] . try $ many1 parseModItem
   _ <- reserved "endmodule"
   return $ ModDecl name [defaultPort "y"] modL modItem
 
 parseDescription :: Parser Description
-parseDescription = Description <$> parseModDecl
+parseDescription = Description <$> lexeme parseModDecl
 
 parseVerilogSrc :: Parser VerilogSrc
-parseVerilogSrc = VerilogSrc <$> many parseDescription
+parseVerilogSrc = VerilogSrc <$> (whiteSpace *> (many parseDescription))
