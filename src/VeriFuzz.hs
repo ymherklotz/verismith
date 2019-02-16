@@ -22,6 +22,7 @@ module VeriFuzz
   , module VeriFuzz.Icarus
   , module VeriFuzz.Internal
   , module VeriFuzz.Mutate
+  , module VeriFuzz.Parser
   , module VeriFuzz.Random
   , module VeriFuzz.XST
   , module VeriFuzz.Yosys
@@ -51,6 +52,7 @@ import           VeriFuzz.General
 import           VeriFuzz.Icarus
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
+import           VeriFuzz.Parser
 import           VeriFuzz.Random
 import           VeriFuzz.XST
 import           VeriFuzz.Yosys

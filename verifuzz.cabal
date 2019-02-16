@@ -35,6 +35,7 @@ library
                  , VeriFuzz.Gen
                  , VeriFuzz.Icarus
                  , VeriFuzz.Mutate
+                 , VeriFuzz.Parser
                  , VeriFuzz.RandomAlt
                  , VeriFuzz.Random
                  , VeriFuzz.XST
