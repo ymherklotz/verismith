@@ -23,6 +23,8 @@ data Opts = Fuzz { fuzzOutput :: Text
                   }
           | Generate { fileName :: S.FilePath
                      }
+          | Parse { fileName :: S.FilePath
+                  }
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -89,6 +91,12 @@ genOpts = Generate . S.fromText <$> textOption
     <> value "main.v"
   )
 
+parseOpts :: Parser Opts
+parseOpts = Parse . S.fromText . T.pack <$> strArgument
+  ( metavar "FILE"
+    <> help "Verilog input file."
+  )
+
 argparse :: Parser Opts
 argparse =
   hsubparser (command "fuzz"
@@ -103,6 +111,10 @@ argparse =
                   (info genOpts
                    (progDesc "Generate a random Verilog program."))
                   <> metavar "generate")
+  <|> hsubparser (command "parse"
+                  (info parseOpts
+                   (progDesc "Parse a verilog file and output a pretty printed version."))
+                  <> metavar "parse")
 
 opts :: ParserInfo Opts
 opts = info (argparse <**> helper)
@@ -118,8 +130,15 @@ handleOpts (Fuzz _) = do
                        ("test_" <> T.pack (show x)) 0) <$> [1..num]
   sequence_ $ takeMVar <$> vars
 handleOpts (Generate f) = do
-  g <- QC.generate $ V.randomMod 5 15
+  g <- QC.generate $ V.randomMod 50 1000
   S.shelly . S.writefile f $ V.genSource g
+handleOpts (Parse f) = do
+  verilogSrc <- readFile file
+  case V.parseVerilog file verilogSrc of
+    Left l  -> print l
+    Right v -> print $ V.GenVerilog v
+  where
+    file = T.unpack . S.toTextIgnore $ f
 handleOpts (Rerun _) = undefined
 
 main :: IO ()

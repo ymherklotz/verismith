@@ -13,7 +13,8 @@ whole Verilog syntax, as the AST does not support it either.
 
 module VeriFuzz.Parser
   ( -- * Parsers
-    parseVerilogSrc
+    parseVerilog
+  , parseVerilogSrc
   , parseDescription
   , parseModDecl
   , parseContAssign
@@ -212,3 +213,6 @@ parseDescription = Description <$> lexeme parseModDecl
 
 parseVerilogSrc :: Parser VerilogSrc
 parseVerilogSrc = VerilogSrc <$> (whiteSpace *> (many parseDescription))
+
+parseVerilog :: String -> String -> Either ParseError VerilogSrc
+parseVerilog f s = parse parseVerilogSrc f s
