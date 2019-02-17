@@ -19,7 +19,8 @@ module VeriFuzz.Internal
   , module VeriFuzz.Internal.Circuit
   , module VeriFuzz.Internal.Simulator
   , module VeriFuzz.Internal.AST
-  ) where
+  )
+where
 
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T

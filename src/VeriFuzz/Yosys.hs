@@ -69,13 +69,12 @@ runEquivYosys yosys sim1 sim2 m = do
   echoP "Yosys: equivalence check"
   run_ (yosysPath yosys) [toTextIgnore checkFile]
   echoP "Yosys: equivalence done"
-  where
-    checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+  where checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
 runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv _ sim1 sim2 m = do
   root <- rootPath
-  dir <- pwd
+  dir  <- pwd
   echoP "SymbiYosys: setup"
   writefile "top.v" . genSource . initMod $ makeTopAssert m
   writefile "test.sby" $ sbyConfig root sim1 sim2 m

@@ -24,7 +24,7 @@ import           VeriFuzz.Mutate
 import           VeriFuzz.Random
 
 toId :: Int -> Identifier
-toId = Identifier . ("w"<>) . T.pack . show
+toId = Identifier . ("w" <>) . T.pack . show
 
 toPort :: Identifier -> Gen Port
 toPort ident = do
@@ -32,8 +32,7 @@ toPort ident = do
   return $ wire i ident
 
 sumSize :: [Port] -> Int
-sumSize ports =
-  sum $ ports ^.. traverse . portSize
+sumSize ports = sum $ ports ^.. traverse . portSize
 
 random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
 random ctx fun = do
@@ -44,29 +43,28 @@ randomAssigns :: [Identifier] -> [Gen ModItem]
 randomAssigns ids = random ids . ContAssign <$> ids
 
 randomOrdAssigns :: [Identifier] -> [Identifier] -> [Gen ModItem]
-randomOrdAssigns inp ids =
-  snd $ foldr gen (inp, []) ids
-  where
-    gen cid (i, o) = (cid : i, random i (ContAssign cid) : o)
+randomOrdAssigns inp ids = snd $ foldr gen (inp, []) ids
+  where gen cid (i, o) = (cid : i, random i (ContAssign cid) : o)
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
-  x <- sequence $ randomOrdAssigns start end
-  ident <-  sequence $ toPort <$> ids
+  x     <- sequence $ randomOrdAssigns start end
+  ident <- sequence $ toPort <$> ids
   let inputs_ = take inps ident
-  let other = drop inps ident
+  let other   = drop inps ident
   let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
-  let yport = [wire (sumSize other) "y"]
+  let yport   = [wire (sumSize other) "y"]
   return . initMod . declareMod other . ModDecl "test_module" yport inputs_ $ x ++ [y]
-  where
-    ids = toId <$> [1..total]
-    end = drop inps ids
-    start = take inps ids
+ where
+  ids   = toId <$> [1 .. total]
+  end   = drop inps ids
+  start = take inps ids
 
 fromGraph :: Gen ModDecl
 fromGraph = do
   gr <- rDupsCirc <$> QC.resize 100 randomCircuit
-  return $ initMod
+  return
+    $   initMod
     .   head
     $   nestUpTo 5 (generateAST gr)
     ^.. getVerilogSrc

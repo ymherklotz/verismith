@@ -18,7 +18,8 @@ module VeriFuzz.CodeGen
     GenVerilog(..)
   , genSource
   , render
-  ) where
+  )
+where
 
 import           Control.Lens      (view, (^.))
 import           Data.Foldable     (fold)
@@ -97,10 +98,8 @@ genModuleItem (Decl dir port) = maybe "" makePort dir <> genPort port <> ";\n"
   where makePort = (<> " ") . genPortDir
 
 genModConn :: ModConn -> Text
-genModConn (ModConn c) =
-  genExpr c
-genModConn (ModConnNamed n c) =
-  "." <> n ^. getIdentifier <> "(" <> genExpr c <> ")"
+genModConn (ModConn c       ) = genExpr c
+genModConn (ModConnNamed n c) = "." <> n ^. getIdentifier <> "(" <> genExpr c <> ")"
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
@@ -117,14 +116,16 @@ genFunc UnSignedFunc = "$unsigned"
 -- | Generate 'Expr' to 'Text'.
 genExpr :: Expr -> Text
 genExpr (BinOp eRhs bin eLhs) = "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
-genExpr (Number s n         ) = "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
-  where minus | signum n >= 0 = "" | otherwise = "-"
-genExpr (Id     i           ) = i ^. getIdentifier
-genExpr (Concat c           ) = "{" <> comma (genExpr <$> c) <> "}"
-genExpr (UnOp u e           ) = "(" <> genUnaryOperator u <> genExpr e <> ")"
-genExpr (Cond l t f         ) = "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
-genExpr (Func f e           ) = genFunc f <> "(" <> genExpr e <> ")"
-genExpr (Str t              ) = "\"" <> t <> "\""
+genExpr (Number s n) = "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
+ where
+  minus | signum n >= 0 = ""
+        | otherwise     = "-"
+genExpr (Id     i  ) = i ^. getIdentifier
+genExpr (Concat c  ) = "{" <> comma (genExpr <$> c) <> "}"
+genExpr (UnOp u e  ) = "(" <> genUnaryOperator u <> genExpr e <> ")"
+genExpr (Cond l t f) = "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
+genExpr (Func f e  ) = genFunc f <> "(" <> genExpr e <> ")"
+genExpr (Str t     ) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
 genBinaryOperator :: BinaryOperator -> Text

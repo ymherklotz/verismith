@@ -23,17 +23,15 @@ import           VeriFuzz.Internal
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
 inPort i m = inInput
-  where inInput = any (\a -> a ^. portName == i) $
-          m ^. modInPorts ++ m ^. modOutPorts
+  where inInput = any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
 findAssign :: Identifier -> [ModItem] -> Maybe Expr
 findAssign i items = safe last . catMaybes $ isAssign <$> items
  where
-  isAssign (ModCA (ContAssign val expr))
-    | val == i  = Just expr
-    | otherwise = Nothing
+  isAssign (ModCA (ContAssign val expr)) | val == i  = Just expr
+                                         | otherwise = Nothing
   isAssign _ = Nothing
 
 -- | Transforms an expression by replacing an Identifier with an
@@ -73,9 +71,7 @@ nestUpTo :: Int -> VerilogSrc -> VerilogSrc
 nestUpTo i src = foldl (flip nestSource) src $ Identifier . fromNode <$> [1 .. i]
 
 allVars :: ModDecl -> [Identifier]
-allVars m =
-  (m ^.. modOutPorts . traverse . portName)
-  <> (m ^.. modInPorts . traverse . portName)
+allVars m = (m ^.. modOutPorts . traverse . portName) <> (m ^.. modInPorts . traverse . portName)
 
 -- $setup
 -- >>> import VeriFuzz.CodeGen
@@ -126,9 +122,8 @@ instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
 instantiateModSpec_ :: Text -> ModDecl -> ModItem
 instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
  where
-  conns =
-    zipWith ModConnNamed ids (Id <$> instIds)
-  ids = filterChar outChar (name modOutPorts) <> name modInPorts
+  conns   = zipWith ModConnNamed ids (Id <$> instIds)
+  ids     = filterChar outChar (name modOutPorts) <> name modInPorts
   instIds = name modOutPorts <> name modInPorts
   name v = m ^.. v . traverse . portName
 
@@ -171,14 +166,12 @@ makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
  where
   assert = Always . EventCtrl e . Just $ SeqBlock
     [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
-  e = EPosEdge "clk"
+  e      = EPosEdge "clk"
   addClk = (defaultPort "clk" :)
 
 -- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl
-declareMod ports = modItems %~ (decl++)
-  where
-    decl = Decl Nothing <$> ports
+declareMod ports = modItems %~ (decl ++) where decl = Decl Nothing <$> ports
 
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until
@@ -222,10 +215,8 @@ simplify e                               = e
 -- >>> GenVerilog . removeId ["x"] $ Id "x" + Id "y"
 -- (x + (1'h0))
 removeId :: [Identifier] -> Expr -> Expr
-removeId i =
-  transform trans
-  where
-    trans (Id ident)
-      | ident `notElem` i = Number 1 0
-      | otherwise = Id ident
-    trans e = e
+removeId i = transform trans
+ where
+  trans (Id ident) | ident `notElem` i = Number 1 0
+                   | otherwise         = Id ident
+  trans e = e

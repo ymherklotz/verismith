@@ -21,8 +21,7 @@ import qualified Test.QuickCheck                   as QC
 import           VeriFuzz.Circuit
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]
-dupFolder cont ns = unique cont : ns
-  where unique (a, b, c, d) = (nub a, b, c, nub d)
+dupFolder cont ns = unique cont : ns where unique (a, b, c, d) = (nub a, b, c, nub d)
 
 -- | Remove duplicates.
 rDups :: (Eq a, Eq b) => Gr a b -> Gr a b
@@ -40,8 +39,7 @@ arbitraryEdge n = do
   y <- with $ \a -> x < a && a < n && a > 0
   z <- QC.arbitrary
   return (x, y, z)
-  where
-    with = QC.suchThat $ QC.resize n QC.arbitrary
+  where with = QC.suchThat $ QC.resize n QC.arbitrary
 
 -- | Gen instance for a random acyclic DAG.
 randomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e) => Gen (Gr l e) -- ^ The generated graph. It uses Arbitrary to

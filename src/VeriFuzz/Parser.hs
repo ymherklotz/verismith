@@ -19,7 +19,8 @@ module VeriFuzz.Parser
   , parseModDecl
   , parseContAssign
   , parseExpr
-  ) where
+  )
+where
 
 import           Data.Functor          (($>))
 import           Data.Functor.Identity (Identity)
@@ -36,13 +37,10 @@ type Parser = Parsec String ()
 type ParseOperator = Operator String () Identity
 
 sBinOp :: BinaryOperator -> Expr -> Expr -> Expr
-sBinOp = sOp BinOp
-  where
-    sOp f b a = f a b
+sBinOp = sOp BinOp where sOp f b a = f a b
 
 parseExpr' :: Parser Expr
-parseExpr' = buildExpressionParser parseTable parseTerm
-            <?> "expr"
+parseExpr' = buildExpressionParser parseTable parseTerm <?> "expr"
 
 matchHex :: Char -> Bool
 matchHex c = c == 'h' || c == 'H'
@@ -61,42 +59,43 @@ matchOct c = c == 'o' || c == 'O'
 parseNum :: Parser Expr
 parseNum = do
   size <- fromIntegral <$> decimal
-  _ <- string "'"
+  _    <- string "'"
   matchNum size
-  where
-    matchNum size = (satisfy matchHex >> Number size <$> hexadecimal)
-                    <|> (satisfy matchDec >> Number size <$> decimal)
-                    <|> (satisfy matchOct >> Number size <$> octal)
+ where
+  matchNum size =
+    (satisfy matchHex >> Number size <$> hexadecimal)
+      <|> (satisfy matchDec >> Number size <$> decimal)
+      <|> (satisfy matchOct >> Number size <$> octal)
 
 parseVar :: Parser Expr
 parseVar = Id <$> ident
 
 parseFunction :: Parser Function
-parseFunction = reserved "unsigned" $> UnSignedFunc
-                <|> reserved "signed" $> SignedFunc
+parseFunction = reserved "unsigned" $> UnSignedFunc <|> reserved "signed" $> SignedFunc
 
 parseFun :: Parser Expr
 parseFun = do
-  f <- spaces *> reservedOp "$" *> parseFunction
+  f    <- spaces *> reservedOp "$" *> parseFunction
   expr <- string "(" *> spaces *> parseExpr
-  _ <- spaces *> string ")" *> spaces
+  _    <- spaces *> string ")" *> spaces
   return $ Func f expr
 
 parseTerm :: Parser Expr
-parseTerm = parens parseExpr
-            <|> (Concat <$> aroundList (string "{") (string "}") parseExpr)
-            <|> parseFun
-            <|> lexeme parseNum
-            <|> parseVar
-            <?> "simple expr"
+parseTerm =
+  parens parseExpr
+    <|> (Concat <$> aroundList (string "{") (string "}") parseExpr)
+    <|> parseFun
+    <|> lexeme parseNum
+    <|> parseVar
+    <?> "simple expr"
 
 -- | Parses the ternary conditional operator. It will behave in a right
 -- associative way.
 parseCond :: Expr -> Parser Expr
 parseCond e = do
-  _ <- spaces *> reservedOp "?"
+  _    <- spaces *> reservedOp "?"
   expr <- spaces *> parseExpr
-  _ <- spaces *> reservedOp ":"
+  _    <- spaces *> reservedOp ":"
   Cond e expr <$> parseExpr
 
 parseExpr :: Parser Expr
@@ -108,31 +107,39 @@ parseExpr = do
 -- each.
 parseTable :: [[ParseOperator Expr]]
 parseTable =
-  [ [ prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot) ]
-  , [ prefix "&" (UnOp UnAnd), prefix "|" (UnOp UnOr), prefix "~&" (UnOp UnNand)
-    , prefix "~|" (UnOp UnNor), prefix "^" (UnOp UnXor), prefix "~^" (UnOp UnNxor)
+  [ [prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot)]
+  , [ prefix "&"  (UnOp UnAnd)
+    , prefix "|"  (UnOp UnOr)
+    , prefix "~&" (UnOp UnNand)
+    , prefix "~|" (UnOp UnNor)
+    , prefix "^"  (UnOp UnXor)
+    , prefix "~^" (UnOp UnNxor)
     , prefix "^~" (UnOp UnNxorInv)
     ]
-  , [ prefix "+" (UnOp UnPlus), prefix "-" (UnOp UnMinus) ]
-  , [ binary "**" (sBinOp BinPower) AssocRight ]
-  , [ binary "*" (sBinOp BinTimes) AssocLeft, binary "/" (sBinOp BinDiv) AssocLeft
-    , binary "%" (sBinOp BinMod) AssocLeft
+  , [prefix "+" (UnOp UnPlus), prefix "-" (UnOp UnMinus)]
+  , [binary "**" (sBinOp BinPower) AssocRight]
+  , [ binary "*" (sBinOp BinTimes) AssocLeft
+    , binary "/" (sBinOp BinDiv)   AssocLeft
+    , binary "%" (sBinOp BinMod)   AssocLeft
     ]
-  , [ binary "+" (sBinOp BinPlus) AssocLeft, binary "-" (sBinOp BinPlus) AssocLeft ]
-  , [ binary "<<" (sBinOp BinLSL) AssocLeft, binary ">>" (sBinOp BinLSR) AssocLeft ]
-  , [ binary "<<<" (sBinOp BinASL) AssocLeft, binary ">>>" (sBinOp BinASR) AssocLeft ]
-  , [ binary "<" (sBinOp BinLT) AssocNone, binary ">" (sBinOp BinGT) AssocNone
-    , binary "<=" (sBinOp BinLEq) AssocNone, binary ">=" (sBinOp BinLEq) AssocNone
+  , [binary "+" (sBinOp BinPlus) AssocLeft, binary "-" (sBinOp BinPlus) AssocLeft]
+  , [binary "<<" (sBinOp BinLSL) AssocLeft, binary ">>" (sBinOp BinLSR) AssocLeft]
+  , [binary "<<<" (sBinOp BinASL) AssocLeft, binary ">>>" (sBinOp BinASR) AssocLeft]
+  , [ binary "<"  (sBinOp BinLT)  AssocNone
+    , binary ">"  (sBinOp BinGT)  AssocNone
+    , binary "<=" (sBinOp BinLEq) AssocNone
+    , binary ">=" (sBinOp BinLEq) AssocNone
     ]
-  , [ binary "==" (sBinOp BinEq) AssocNone, binary "!=" (sBinOp BinNEq) AssocNone ]
-  , [ binary "===" (sBinOp BinEq) AssocNone, binary "!==" (sBinOp BinNEq) AssocNone ]
-  , [ binary "&" (sBinOp BinAnd) AssocLeft ]
-  , [ binary "^" (sBinOp BinXor) AssocLeft, binary "^~" (sBinOp BinXNor) AssocLeft
+  , [binary "==" (sBinOp BinEq) AssocNone, binary "!=" (sBinOp BinNEq) AssocNone]
+  , [binary "===" (sBinOp BinEq) AssocNone, binary "!==" (sBinOp BinNEq) AssocNone]
+  , [binary "&" (sBinOp BinAnd) AssocLeft]
+  , [ binary "^"  (sBinOp BinXor)     AssocLeft
+    , binary "^~" (sBinOp BinXNor)    AssocLeft
     , binary "~^" (sBinOp BinXNorInv) AssocLeft
     ]
-  , [ binary "|" (sBinOp BinOr) AssocLeft ]
-  , [ binary "&&" (sBinOp BinLAnd) AssocLeft ]
-  , [ binary "||" (sBinOp BinLOr) AssocLeft ]
+  , [binary "|" (sBinOp BinOr) AssocLeft]
+  , [binary "&&" (sBinOp BinLAnd) AssocLeft]
+  , [binary "||" (sBinOp BinLOr) AssocLeft]
   ]
 
 binary :: String -> (a -> a -> a) -> Assoc -> ParseOperator a
@@ -149,9 +156,9 @@ aroundList a b c = lexeme $ do
 
 parseContAssign :: Parser ContAssign
 parseContAssign = do
-  var <- reserved "assign" *> ident
+  var  <- reserved "assign" *> ident
   expr <- reservedOp "=" *> parseExpr
-  _ <- symbol ";"
+  _    <- symbol ";"
   return $ ContAssign var expr
 
 -- | Parse a range and return the total size. As it is inclusive, 1 has to be
@@ -160,7 +167,7 @@ parseRange :: Parser Int
 parseRange = do
   rangeH <- symbol "[" *> decimal
   rangeL <- symbol ":" *> decimal
-  _ <- symbol "]"
+  _      <- symbol "]"
   return . fromIntegral $ rangeH - rangeL + 1
 
 ident :: Parser Identifier
@@ -168,44 +175,34 @@ ident = Identifier . T.pack <$> identifier
 
 parseNetDecl :: Maybe PortDir -> Parser ModItem
 parseNetDecl pd = do
-  t <- option Wire type_
-  sign <- option False (reserved "signed" $> True)
+  t     <- option Wire type_
+  sign  <- option False (reserved "signed" $> True)
   range <- option 1 parseRange
-  name <- ident
-  _ <- symbol ";"
+  name  <- ident
+  _     <- symbol ";"
   return . Decl pd . Port t sign range $ name
-  where
-    type_ = reserved "wire" $> Wire
-            <|> reserved "reg" $> Reg
+  where type_ = reserved "wire" $> Wire <|> reserved "reg" $> Reg
 
 parsePortDir :: Parser PortDir
 parsePortDir =
-  reserved "output" $> PortOut
-  <|> reserved "input" $> PortIn
-  <|> reserved "inout" $> PortInOut
+  reserved "output" $> PortOut <|> reserved "input" $> PortIn <|> reserved "inout" $> PortInOut
 
 parseDecl :: Parser ModItem
-parseDecl =
-  (Just <$> parsePortDir >>= parseNetDecl)
-  <|> parseNetDecl Nothing
+parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
 
 parseModItem :: Parser ModItem
-parseModItem =
-  (ModCA <$> parseContAssign)
-  <|> parseDecl
+parseModItem = (ModCA <$> parseContAssign) <|> parseDecl
 
 parseModList :: Parser [Identifier]
-parseModList = list <|> spaces $> []
-  where
-    list = aroundList (string "(") (string ")") ident
+parseModList = list <|> spaces $> [] where list = aroundList (string "(") (string ")") ident
 
 parseModDecl :: Parser ModDecl
 parseModDecl = do
-  name <- reserved "module" *> ident
-  modL <- fmap defaultPort <$> parseModList
-  _ <- symbol ";"
+  name    <- reserved "module" *> ident
+  modL    <- fmap defaultPort <$> parseModList
+  _       <- symbol ";"
   modItem <- lexeme $ option [] . try $ many1 parseModItem
-  _ <- reserved "endmodule"
+  _       <- reserved "endmodule"
   return $ ModDecl name [] modL modItem
 
 parseDescription :: Parser Description

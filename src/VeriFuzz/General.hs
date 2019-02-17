@@ -63,19 +63,16 @@ bsToI = B.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
 {-# INLINE bsToI #-}
 
 noPrint :: Sh a -> Sh a
-noPrint =
-  print_stdout False . print_stderr False
+noPrint = print_stdout False . print_stderr False
 
 echoP :: Text -> Sh ()
 echoP t = do
   fn <- pwd
   echo $ bname fn <> " - " <> t
-  where
-    bname = T.pack . takeBaseName . T.unpack . toTextIgnore
+  where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 logger :: FilePath -> Text -> Sh a -> Sh a
-logger fp name =
-  log_stderr_with (l "_log.stderr.txt") . log_stdout_with (l "_log.txt")
-  where
-    l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
-    file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s
+logger fp name = log_stderr_with (l "_log.stderr.txt") . log_stdout_with (l "_log.txt")
+ where
+  l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
+  file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s

@@ -73,7 +73,7 @@ module VeriFuzz.AST
   , traverseExpr
   , ConstExpr(..)
   , constNum
-  , Function (..)
+  , Function(..)
     -- * Assignment
   , Assign(..)
   , assignReg
@@ -307,9 +307,7 @@ instance Plated Expr where
 
 exprSafeList :: [QC.Gen Expr]
 exprSafeList =
-  [ Number <$> positiveArb <*> QC.arbitrary
-    -- , Str <$> QC.arbitrary
-  ]
+  [Number <$> positiveArb <*> QC.arbitrary]
 
 exprRecList :: (Int -> QC.Gen Expr) -> [QC.Gen Expr]
 exprRecList subexpr =
@@ -325,34 +323,31 @@ exprRecList subexpr =
   ]
 
 expr :: Int -> QC.Gen Expr
-expr n
-  | n == 0 = QC.oneof $ (Id <$> QC.arbitrary) : exprSafeList
-  | n > 0 = QC.oneof $ (Id <$> QC.arbitrary) : exprRecList subexpr
-  | otherwise = expr 0
+expr n | n == 0    = QC.oneof $ (Id <$> QC.arbitrary) : exprSafeList
+       | n > 0     = QC.oneof $ (Id <$> QC.arbitrary) : exprRecList subexpr
+       | otherwise = expr 0
   where subexpr y = expr (n `div` y)
 
 exprWithContext :: [Identifier] -> Int -> QC.Gen Expr
-exprWithContext [] n
-  | n == 0 = QC.oneof exprSafeList
-  | n > 0 = QC.oneof $ exprRecList subexpr
-  | otherwise = exprWithContext [] 0
+exprWithContext [] n | n == 0    = QC.oneof exprSafeList
+                     | n > 0     = QC.oneof $ exprRecList subexpr
+                     | otherwise = exprWithContext [] 0
   where subexpr y = exprWithContext [] (n `div` y)
-exprWithContext l n
-  | n == 0 = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
-  | n > 0 = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
-  | otherwise = exprWithContext l 0
+exprWithContext l n | n == 0    = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
+                    | n > 0     = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
+                    | otherwise = exprWithContext l 0
   where subexpr y = exprWithContext l (n `div` y)
 
 instance QC.Arbitrary Expr where
   arbitrary = QC.sized expr
 
 traverseExpr :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
-traverseExpr f (Concat e    ) = Concat <$> sequenceA (f <$> e)
-traverseExpr f (UnOp u e   )  = UnOp u <$> f e
-traverseExpr f (BinOp l o r)  = BinOp <$> f l <*> pure o <*> f r
-traverseExpr f (Cond  c l  r) = Cond <$> f c <*> f l <*> f r
-traverseExpr f (Func fn e   ) = Func fn <$> f e
-traverseExpr _ e              = pure e
+traverseExpr f (Concat e   ) = Concat <$> sequenceA (f <$> e)
+traverseExpr f (UnOp u e   ) = UnOp u <$> f e
+traverseExpr f (BinOp l o r) = BinOp <$> f l <*> pure o <*> f r
+traverseExpr f (Cond  c l r) = Cond <$> f c <*> f l <*> f r
+traverseExpr f (Func fn e  ) = Func fn <$> f e
+traverseExpr _ e             = pure e
 
 makeLenses ''Expr
 
@@ -556,19 +551,18 @@ data ModDecl = ModDecl { _modId       :: Identifier
                        } deriving (Eq, Show, Data)
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
-traverseModConn f (ModConn e)        = ModConn <$> f e
+traverseModConn f (ModConn e       ) = ModConn <$> f e
 traverseModConn f (ModConnNamed a e) = ModConnNamed a <$> f e
 
 traverseModItem :: (Applicative f) => (Expr -> f Expr) -> ModItem -> f ModItem
 traverseModItem f (ModCA (ContAssign a e)) = ModCA . ContAssign a <$> f e
-traverseModItem f (ModInst a b e) = ModInst a b <$> sequenceA (traverseModConn f <$> e)
-traverseModItem _ e = pure e
+traverseModItem f (ModInst a b e         ) = ModInst a b <$> sequenceA (traverseModConn f <$> e)
+traverseModItem _ e                        = pure e
 
 makeLenses ''ModDecl
 
 modPortGen :: QC.Gen Port
-modPortGen = Port <$> QC.arbitrary <*> QC.arbitrary
-             <*> QC.arbitrary <*> QC.arbitrary
+modPortGen = Port <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary ModDecl where
   arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary

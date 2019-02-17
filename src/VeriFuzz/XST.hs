@@ -34,8 +34,7 @@ instance Synthesize Xst where
   runSynth = runSynthXst
 
 defaultXst :: Xst
-defaultXst =
-  Xst "xst" "netgen"
+defaultXst = Xst "xst" "netgen"
 
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
@@ -46,7 +45,8 @@ runSynthXst sim m outf = do
   echoP "XST: run"
   _ <- logger dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
   echoP "XST: netgen"
-  _ <- logger dir "netgen" $ run (netgenPath sim)
+  _ <- logger dir "netgen" $ run
+    (netgenPath sim)
     ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
   echoP "XST: clean"
   noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]

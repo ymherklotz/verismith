@@ -19,10 +19,7 @@ halve :: [a] -> ([a], [a])
 halve l = splitAt (length l `div` 2) l
 
 removeUninitWires :: [ModItem] -> [ModItem]
-removeUninitWires ms = ms
-  where
-    ids = ms ^.. traverse . modContAssign . contAssignNetLVal
+removeUninitWires ms = ms where ids = ms ^.. traverse . modContAssign . contAssignNetLVal
 
 halveModDecl :: ModDecl -> (ModDecl, ModDecl)
-halveModDecl m =
-  (m & modItems %~ fst . halve, m & modItems %~ snd . halve)
+halveModDecl m = (m & modItems %~ fst . halve, m & modItems %~ snd . halve)

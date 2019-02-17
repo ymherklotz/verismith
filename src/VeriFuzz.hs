@@ -26,7 +26,8 @@ module VeriFuzz
   , module VeriFuzz.Random
   , module VeriFuzz.XST
   , module VeriFuzz.Yosys
-  ) where
+  )
+where
 
 import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
@@ -85,9 +86,9 @@ runSimulation = do
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
-  rand <- genRandom 20
+  rand  <- genRandom 20
   rand2 <- QC.generate (randomMod 10 100)
-  val  <- shelly $ runSim defaultIcarus rand2 rand
+  val   <- shelly $ runSim defaultIcarus rand2 rand
   T.putStrLn $ showBS val
 
 onFailure :: Text -> RunFailed -> Sh ()
@@ -103,19 +104,17 @@ onFailure t _ = do
 
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
-  m <- QC.generate gm
+  m    <- QC.generate gm
   rand <- genRandom 20
   shellyFailDir $ do
     mkdir_p (fromText "output" </> fromText n)
     curr <- toTextIgnore <$> pwd
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText "output" </> fromText n)
-    catch_sh (runEquiv defaultYosys defaultYosys
-              (Just defaultXst) m >> echoP "Test OK") $
-      onFailure n
-    catch_sh (runSim (Icarus "iverilog" "vvp") m rand
-              >>= (\b -> echoP ("RTL Sim: " <> showBS b))) $
-      onFailure n
+    catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) m >> echoP "Test OK")
+      $ onFailure n
+    catch_sh (runSim (Icarus "iverilog" "vvp") m rand >>= (\b -> echoP ("RTL Sim: " <> showBS b)))
+      $ onFailure n
 --    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
 --              >>= (\b -> echoP ("Yosys Sim: " <> showBS b))) $
 --      onFailure n
@@ -124,6 +123,5 @@ runEquivalence gm t i = do
 --      onFailure n
     cd ".."
     rm_rf $ fromText n
-  when (i < 5) (runEquivalence gm t $ i+1)
-  where
-    n = t <> "_" <> T.pack (show i)
+  when (i < 5) (runEquivalence gm t $ i + 1)
+  where n = t <> "_" <> T.pack (show i)

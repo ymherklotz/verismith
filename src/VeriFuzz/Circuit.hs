@@ -15,7 +15,8 @@ module VeriFuzz.Circuit
     Gate(..)
   , Circuit(..)
   , CNode(..)
-  ) where
+  )
+where
 
 import           Data.Graph.Inductive (Gr, LNode)
 import           System.Random
