@@ -9,24 +9,24 @@ Portability : POSIX
 -}
 
 module VeriFuzz
-  ( runEquivalence
-  , runSimulation
-  , draw
-  , module VeriFuzz.AST
-  , module VeriFuzz.ASTGen
-  , module VeriFuzz.Circuit
-  , module VeriFuzz.CodeGen
-  , module VeriFuzz.Env
-  , module VeriFuzz.Gen
-  , module VeriFuzz.General
-  , module VeriFuzz.Icarus
-  , module VeriFuzz.Internal
-  , module VeriFuzz.Mutate
-  , module VeriFuzz.Parser
-  , module VeriFuzz.Random
-  , module VeriFuzz.XST
-  , module VeriFuzz.Yosys
-  )
+    ( runEquivalence
+    , runSimulation
+    , draw
+    , module VeriFuzz.AST
+    , module VeriFuzz.ASTGen
+    , module VeriFuzz.Circuit
+    , module VeriFuzz.CodeGen
+    , module VeriFuzz.Env
+    , module VeriFuzz.Gen
+    , module VeriFuzz.General
+    , module VeriFuzz.Icarus
+    , module VeriFuzz.Internal
+    , module VeriFuzz.Mutate
+    , module VeriFuzz.Parser
+    , module VeriFuzz.Random
+    , module VeriFuzz.XST
+    , module VeriFuzz.Yosys
+    )
 where
 
 import qualified Crypto.Random.DRBG       as C
@@ -61,19 +61,19 @@ import           VeriFuzz.Yosys
 genRand :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
 genRand gen n bytes | n == 0    = ranBytes : bytes
                     | otherwise = genRand newGen (n - 1) $ ranBytes : bytes
-  where Right (ranBytes, newGen) = C.genBytes 32 gen
+    where Right (ranBytes, newGen) = C.genBytes 32 gen
 
 genRandom :: Int -> IO [ByteString]
 genRandom n = do
-  gen <- C.newGenIO :: IO C.CtrDRBG
-  return $ genRand gen n []
+    gen <- C.newGenIO :: IO C.CtrDRBG
+    return $ genRand gen n []
 
 draw :: IO ()
 draw = do
-  gr <- QC.generate $ rDups <$> QC.resize 10 (randomDAG :: QC.Gen (G.Gr Gate ()))
-  let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
-  writeFile "file.dot" dot
-  shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
+    gr <- QC.generate $ rDups <$> QC.resize 10 (randomDAG :: QC.Gen (G.Gr Gate ()))
+    let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
+    writeFile "file.dot" dot
+    shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
 
 showBS :: ByteString -> Text
 showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
@@ -86,42 +86,44 @@ runSimulation = do
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
-  rand  <- genRandom 20
-  rand2 <- QC.generate (randomMod 10 100)
-  val   <- shelly $ runSim defaultIcarus rand2 rand
-  T.putStrLn $ showBS val
+    rand  <- genRandom 20
+    rand2 <- QC.generate (randomMod 10 100)
+    val   <- shelly $ runSim defaultIcarus rand2 rand
+    T.putStrLn $ showBS val
 
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
-  ex <- lastExitCode
-  case ex of
-    124 -> do
-      echoP "Test TIMEOUT"
-      chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
-    _ -> do
-      echoP "Test FAIL"
-      chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
+    ex <- lastExitCode
+    case ex of
+        124 -> do
+            echoP "Test TIMEOUT"
+            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
+        _ -> do
+            echoP "Test FAIL"
+            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
 
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
-  m    <- QC.generate gm
-  rand <- genRandom 20
-  shellyFailDir $ do
-    mkdir_p (fromText "output" </> fromText n)
-    curr <- toTextIgnore <$> pwd
-    setenv "VERIFUZZ_ROOT" curr
-    cd (fromText "output" </> fromText n)
-    catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) m >> echoP "Test OK")
-      $ onFailure n
-    catch_sh (runSim (Icarus "iverilog" "vvp") m rand >>= (\b -> echoP ("RTL Sim: " <> showBS b)))
-      $ onFailure n
---    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
---              >>= (\b -> echoP ("Yosys Sim: " <> showBS b))) $
---      onFailure n
---    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_xst.v" rand
---              >>= (\b -> echoP ("XST Sim: " <> showBS b))) $
---      onFailure n
-    cd ".."
-    rm_rf $ fromText n
-  when (i < 5) (runEquivalence gm t $ i + 1)
-  where n = t <> "_" <> T.pack (show i)
+    m    <- QC.generate gm
+    rand <- genRandom 20
+    shellyFailDir $ do
+        mkdir_p (fromText "output" </> fromText n)
+        curr <- toTextIgnore <$> pwd
+        setenv "VERIFUZZ_ROOT" curr
+        cd (fromText "output" </> fromText n)
+        catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) m >> echoP "Test OK")
+            $ onFailure n
+        catch_sh
+                (runSim (Icarus "iverilog" "vvp") m rand >>= (\b -> echoP ("RTL Sim: " <> showBS b))
+                )
+            $ onFailure n
+    --    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
+    --              >>= (\b -> echoP ("Yosys Sim: " <> showBS b))) $
+    --      onFailure n
+    --    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_xst.v" rand
+    --              >>= (\b -> echoP ("XST Sim: " <> showBS b))) $
+    --      onFailure n
+        cd ".."
+        rm_rf $ fromText n
+    when (i < 5) (runEquivalence gm t $ i + 1)
+    where n = t <> "_" <> T.pack (show i)

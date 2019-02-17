@@ -23,16 +23,16 @@ import           VeriFuzz.Internal
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
 inPort i m = inInput
-  where inInput = any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
+    where inInput = any (\a -> a ^. portName == i) $ m ^. modInPorts ++ m ^. modOutPorts
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
 findAssign :: Identifier -> [ModItem] -> Maybe Expr
 findAssign i items = safe last . catMaybes $ isAssign <$> items
- where
-  isAssign (ModCA (ContAssign val expr)) | val == i  = Just expr
-                                         | otherwise = Nothing
-  isAssign _ = Nothing
+  where
+    isAssign (ModCA (ContAssign val expr)) | val == i  = Just expr
+                                           | otherwise = Nothing
+    isAssign _ = Nothing
 
 -- | Transforms an expression by replacing an Identifier with an
 -- expression. This is used inside 'transformOf' and 'traverseExpr' to replace
@@ -54,13 +54,13 @@ replace = (transformOf traverseExpr .) . idTrans
 -- expression. This would require a different approach though.
 nestId :: Identifier -> ModDecl -> ModDecl
 nestId i m
-  | not $ inPort i m
-  = let expr = fromMaybe def . findAssign i $ m ^. modItems in m & get %~ replace i expr
-  | otherwise
-  = m
- where
-  get = modItems . traverse . modContAssign . contAssignExpr
-  def = Id i
+    | not $ inPort i m
+    = let expr = fromMaybe def . findAssign i $ m ^. modItems in m & get %~ replace i expr
+    | otherwise
+    = m
+  where
+    get = modItems . traverse . modContAssign . contAssignExpr
+    def = Id i
 
 -- | Replaces an identifier by a expression in all the module declaration.
 nestSource :: Identifier -> VerilogSrc -> VerilogSrc
@@ -91,12 +91,12 @@ allVars m = (m ^.. modOutPorts . traverse . portName) <> (m ^.. modInPorts . tra
 -- <BLANKLINE>
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
- where
-  out   = Decl Nothing <$> m ^. modOutPorts
-  regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg)
-  inst  = ModInst (m ^. modId) (m ^. modId <> (Identifier . showT $ count + 1)) conns
-  count = length . filter (== m ^. modId) $ main ^.. modItems . traverse . modInstId
-  conns = ModConn . Id <$> allVars m
+  where
+    out   = Decl Nothing <$> m ^. modOutPorts
+    regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg)
+    inst  = ModInst (m ^. modId) (m ^. modId <> (Identifier . showT $ count + 1)) conns
+    count = length . filter (== m ^. modId) $ main ^.. modItems . traverse . modInstId
+    conns = ModConn . Id <$> allVars m
 
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
@@ -106,12 +106,12 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
 -- <BLANKLINE>
 instantiateMod_ :: ModDecl -> ModItem
 instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
- where
-  conns =
-    ModConn
-      .   Id
-      <$> (m ^.. modOutPorts . traverse . portName)
-      ++  (m ^.. modInPorts . traverse . portName)
+  where
+    conns =
+        ModConn
+            .   Id
+            <$> (m ^.. modOutPorts . traverse . portName)
+            ++  (m ^.. modInPorts . traverse . portName)
 
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
@@ -121,15 +121,15 @@ instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
 -- <BLANKLINE>
 instantiateModSpec_ :: Text -> ModDecl -> ModItem
 instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
- where
-  conns   = zipWith ModConnNamed ids (Id <$> instIds)
-  ids     = filterChar outChar (name modOutPorts) <> name modInPorts
-  instIds = name modOutPorts <> name modInPorts
-  name v = m ^.. v . traverse . portName
+  where
+    conns   = zipWith ModConnNamed ids (Id <$> instIds)
+    ids     = filterChar outChar (name modOutPorts) <> name modInPorts
+    instIds = name modOutPorts <> name modInPorts
+    name v = m ^.. v . traverse . portName
 
 filterChar :: Text -> [Identifier] -> [Identifier]
 filterChar t ids =
-  ids & traverse . getIdentifier %~ (\x -> fromMaybe x . safe head $ T.splitOn t x)
+    ids & traverse . getIdentifier %~ (\x -> fromMaybe x . safe head $ T.splitOn t x)
 
 -- | Initialise all the inputs and outputs to a module.
 --
@@ -141,9 +141,9 @@ filterChar t ids =
 -- <BLANKLINE>
 initMod :: ModDecl -> ModDecl
 initMod m = m & modItems %~ ((out ++ inp) ++)
- where
-  out = Decl (Just PortOut) <$> (m ^. modOutPorts)
-  inp = Decl (Just PortIn) <$> (m ^. modInPorts)
+  where
+    out = Decl (Just PortOut) <$> (m ^. modOutPorts)
+    inp = Decl (Just PortIn) <$> (m ^. modInPorts)
 
 -- | Make an 'Identifier' from and existing Identifier and an object with a
 -- 'Show' instance to make it unique.
@@ -154,20 +154,20 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 -- modules to instantiate.
 makeTop :: Int -> ModDecl -> ModDecl
 makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
- where
-  ys    = yPort . flip makeIdFrom "y" <$> [1 .. i]
-  modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
-  modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [yPort (makeIdFrom n "y")]
+  where
+    ys    = yPort . flip makeIdFrom "y" <$> [1 .. i]
+    modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
+    modN n = m & modId %~ makeIdFrom n & modOutPorts .~ [yPort (makeIdFrom n "y")]
 
 -- | Make a top module with an assert that requires @y_1@ to always be equal to
 -- @y_2@, which can then be proven using a formal verification tool.
 makeTopAssert :: ModDecl -> ModDecl
 makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop 2
- where
-  assert = Always . EventCtrl e . Just $ SeqBlock
-    [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
-  e      = EPosEdge "clk"
-  addClk = (defaultPort "clk" :)
+  where
+    assert = Always . EventCtrl e . Just $ SeqBlock
+        [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
+    e      = EPosEdge "clk"
+    addClk = (defaultPort "clk" :)
 
 -- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl
@@ -216,7 +216,7 @@ simplify e                               = e
 -- (x + (1'h0))
 removeId :: [Identifier] -> Expr -> Expr
 removeId i = transform trans
- where
-  trans (Id ident) | ident `notElem` i = Number 1 0
-                   | otherwise         = Id ident
-  trans e = e
+  where
+    trans (Id ident) | ident `notElem` i = Number 1 0
+                     | otherwise         = Id ident
+    trans e = e

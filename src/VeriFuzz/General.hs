@@ -46,8 +46,8 @@ class (Simulator a) => Synthesize a where
 
 rootPath :: Sh FilePath
 rootPath = do
-  current <- pwd
-  maybe current fromText <$> get_env "VERIFUZZ_ROOT"
+    current <- pwd
+    maybe current fromText <$> get_env "VERIFUZZ_ROOT"
 
 timeout :: FilePath -> [Text] -> Sh Text
 timeout = command1 "timeout" ["300"] . toTextIgnore
@@ -67,12 +67,12 @@ noPrint = print_stdout False . print_stderr False
 
 echoP :: Text -> Sh ()
 echoP t = do
-  fn <- pwd
-  echo $ bname fn <> " - " <> t
-  where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
+    fn <- pwd
+    echo $ bname fn <> " - " <> t
+    where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 logger :: FilePath -> Text -> Sh a -> Sh a
 logger fp name = log_stderr_with (l "_log.stderr.txt") . log_stdout_with (l "_log.txt")
- where
-  l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
-  file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s
+  where
+    l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
+    file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s

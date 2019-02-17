@@ -38,20 +38,20 @@ defaultXst = Xst "xst" "netgen"
 
 runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
 runSynthXst sim m outf = do
-  dir <- pwd
-  writefile xstFile $ xstSynthConfig m
-  writefile prjFile [st|verilog work "rtl.v"|]
-  writefile "rtl.v" $ genSource m
-  echoP "XST: run"
-  _ <- logger dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
-  echoP "XST: netgen"
-  _ <- logger dir "netgen" $ run
-    (netgenPath sim)
-    ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
-  echoP "XST: clean"
-  noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
-  echoP "XST: done"
- where
-  modFile = fromText $ modName m
-  xstFile = modFile <.> "xst"
-  prjFile = modFile <.> "prj"
+    dir <- pwd
+    writefile xstFile $ xstSynthConfig m
+    writefile prjFile [st|verilog work "rtl.v"|]
+    writefile "rtl.v" $ genSource m
+    echoP "XST: run"
+    _ <- logger dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
+    echoP "XST: netgen"
+    _ <- logger dir "netgen" $ run
+        (netgenPath sim)
+        ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
+    echoP "XST: clean"
+    noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
+    echoP "XST: done"
+  where
+    modFile = fromText $ modName m
+    xstFile = modFile <.> "xst"
+    prjFile = modFile <.> "prj"

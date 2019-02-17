@@ -11,11 +11,11 @@ Definition of the circuit graph.
 -}
 
 module VeriFuzz.Circuit
-  ( -- * Circuit
-    Gate(..)
-  , Circuit(..)
-  , CNode(..)
-  )
+    ( -- * Circuit
+      Gate(..)
+    , Circuit(..)
+    , CNode(..)
+    )
 where
 
 import           Data.Graph.Inductive (Gr, LNode)

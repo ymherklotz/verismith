@@ -15,104 +15,104 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE TemplateHaskell            #-}
 
 module VeriFuzz.AST
-  ( -- * Top level types
-    VerilogSrc(..)
-  , getVerilogSrc
-  , Description(..)
-  , getDescription
+    ( -- * Top level types
+      VerilogSrc(..)
+    , getVerilogSrc
+    , Description(..)
+    , getDescription
     -- * Primitives
     -- ** Identifier
-  , Identifier(..)
-  , getIdentifier
+    , Identifier(..)
+    , getIdentifier
     -- ** Control
-  , Delay(..)
-  , getDelay
-  , Event(..)
+    , Delay(..)
+    , getDelay
+    , Event(..)
     -- ** Operators
-  , BinaryOperator(..)
-  , UnaryOperator(..)
+    , BinaryOperator(..)
+    , UnaryOperator(..)
     -- ** Task
-  , Task(..)
-  , taskName
-  , taskExpr
+    , Task(..)
+    , taskName
+    , taskExpr
     -- ** Left hand side value
-  , LVal(..)
-  , regId
-  , regExprId
-  , regExpr
-  , regSizeId
-  , regSizeMSB
-  , regSizeLSB
-  , regConc
+    , LVal(..)
+    , regId
+    , regExprId
+    , regExpr
+    , regSizeId
+    , regSizeMSB
+    , regSizeLSB
+    , regConc
     -- ** Ports
-  , PortDir(..)
-  , PortType(..)
-  , Port(..)
-  , portType
-  , portSigned
-  , portSize
-  , portName
+    , PortDir(..)
+    , PortType(..)
+    , Port(..)
+    , portType
+    , portSigned
+    , portSize
+    , portName
     -- * Expression
-  , Expr(..)
-  , exprSize
-  , exprVal
-  , exprId
-  , exprConcat
-  , exprUnOp
-  , exprPrim
-  , exprLhs
-  , exprBinOp
-  , exprRhs
-  , exprCond
-  , exprTrue
-  , exprFalse
-  , exprFunc
-  , exprBody
-  , exprStr
-  , exprWithContext
-  , traverseExpr
-  , ConstExpr(..)
-  , constNum
-  , Function(..)
+    , Expr(..)
+    , exprSize
+    , exprVal
+    , exprId
+    , exprConcat
+    , exprUnOp
+    , exprPrim
+    , exprLhs
+    , exprBinOp
+    , exprRhs
+    , exprCond
+    , exprTrue
+    , exprFalse
+    , exprFunc
+    , exprBody
+    , exprStr
+    , exprWithContext
+    , traverseExpr
+    , ConstExpr(..)
+    , constNum
+    , Function(..)
     -- * Assignment
-  , Assign(..)
-  , assignReg
-  , assignDelay
-  , assignExpr
-  , ContAssign(..)
-  , contAssignNetLVal
-  , contAssignExpr
+    , Assign(..)
+    , assignReg
+    , assignDelay
+    , assignExpr
+    , ContAssign(..)
+    , contAssignNetLVal
+    , contAssignExpr
     -- * Statment
-  , Stmnt(..)
-  , statDelay
-  , statDStat
-  , statEvent
-  , statEStat
-  , statements
-  , stmntBA
-  , stmntNBA
-  , stmntCA
-  , stmntTask
-  , stmntSysTask
+    , Stmnt(..)
+    , statDelay
+    , statDStat
+    , statEvent
+    , statEStat
+    , statements
+    , stmntBA
+    , stmntNBA
+    , stmntCA
+    , stmntTask
+    , stmntSysTask
     -- * Module
-  , ModDecl(..)
-  , modId
-  , modOutPorts
-  , modInPorts
-  , modItems
-  , ModItem(..)
-  , modContAssign
-  , modInstId
-  , modInstName
-  , modInstConns
-  , traverseModItem
-  , declDir
-  , declPort
-  , ModConn(..)
-  , modConn
-  , modConnName
-  , modExpr
-  )
+    , ModDecl(..)
+    , modId
+    , modOutPorts
+    , modInPorts
+    , modItems
+    , ModItem(..)
+    , modContAssign
+    , modInstId
+    , modInstName
+    , modInstConns
+    , traverseModItem
+    , declDir
+    , declPort
+    , ModConn(..)
+    , modConn
+    , modConnName
+    , modExpr
+    )
 where
 
 import           Control.Lens
@@ -306,37 +306,36 @@ instance Plated Expr where
   plate = uniplate
 
 exprSafeList :: [QC.Gen Expr]
-exprSafeList =
-  [Number <$> positiveArb <*> QC.arbitrary]
+exprSafeList = [Number <$> positiveArb <*> QC.arbitrary]
 
 exprRecList :: (Int -> QC.Gen Expr) -> [QC.Gen Expr]
 exprRecList subexpr =
-  [ Number <$> positiveArb <*> QC.arbitrary
-  , Concat <$> QC.listOf1 (subexpr 8)
-  , UnOp
-    <$> QC.arbitrary
-    <*> subexpr 2
+    [ Number <$> positiveArb <*> QC.arbitrary
+    , Concat <$> QC.listOf1 (subexpr 8)
+    , UnOp
+        <$> QC.arbitrary
+        <*> subexpr 2
     -- , Str <$> QC.arbitrary
-  , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
-  , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
-  , Func <$> QC.arbitrary <*> subexpr 2
-  ]
+    , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
+    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+    , Func <$> QC.arbitrary <*> subexpr 2
+    ]
 
 expr :: Int -> QC.Gen Expr
 expr n | n == 0    = QC.oneof $ (Id <$> QC.arbitrary) : exprSafeList
        | n > 0     = QC.oneof $ (Id <$> QC.arbitrary) : exprRecList subexpr
        | otherwise = expr 0
-  where subexpr y = expr (n `div` y)
+    where subexpr y = expr (n `div` y)
 
 exprWithContext :: [Identifier] -> Int -> QC.Gen Expr
 exprWithContext [] n | n == 0    = QC.oneof exprSafeList
                      | n > 0     = QC.oneof $ exprRecList subexpr
                      | otherwise = exprWithContext [] 0
-  where subexpr y = exprWithContext [] (n `div` y)
+    where subexpr y = exprWithContext [] (n `div` y)
 exprWithContext l n | n == 0    = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
                     | n > 0     = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
                     | otherwise = exprWithContext l 0
-  where subexpr y = exprWithContext l (n `div` y)
+    where subexpr y = exprWithContext l (n `div` y)
 
 instance QC.Arbitrary Expr where
   arbitrary = QC.sized expr
@@ -498,24 +497,24 @@ instance Monoid Stmnt where
 
 statement :: Int -> QC.Gen Stmnt
 statement n
-  | n == 0 = QC.oneof
-    [ BlockAssign <$> QC.arbitrary
-    , NonBlockAssign <$> QC.arbitrary
+    | n == 0 = QC.oneof
+        [ BlockAssign <$> QC.arbitrary
+        , NonBlockAssign <$> QC.arbitrary
     -- , StatCA <$> QC.arbitrary
-    , TaskEnable <$> QC.arbitrary
-    , SysTaskEnable <$> QC.arbitrary
-    ]
-  | n > 0 = QC.oneof
-    [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
-    , SeqBlock <$> QC.listOf1 (substat 4)
-    , BlockAssign <$> QC.arbitrary
-    , NonBlockAssign <$> QC.arbitrary
+        , TaskEnable <$> QC.arbitrary
+        , SysTaskEnable <$> QC.arbitrary
+        ]
+    | n > 0 = QC.oneof
+        [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
+        , SeqBlock <$> QC.listOf1 (substat 4)
+        , BlockAssign <$> QC.arbitrary
+        , NonBlockAssign <$> QC.arbitrary
     -- , StatCA <$> QC.arbitrary
-    , TaskEnable <$> QC.arbitrary
-    , SysTaskEnable <$> QC.arbitrary
-    ]
-  | otherwise = statement 0
-  where substat y = statement (n `div` y)
+        , TaskEnable <$> QC.arbitrary
+        , SysTaskEnable <$> QC.arbitrary
+        ]
+    | otherwise = statement 0
+    where substat y = statement (n `div` y)
 
 instance QC.Arbitrary Stmnt where
   arbitrary = QC.sized statement

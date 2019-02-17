@@ -12,14 +12,14 @@ whole Verilog syntax, as the AST does not support it either.
 -}
 
 module VeriFuzz.Parser
-  ( -- * Parsers
-    parseVerilog
-  , parseVerilogSrc
-  , parseDescription
-  , parseModDecl
-  , parseContAssign
-  , parseExpr
-  )
+    ( -- * Parsers
+      parseVerilog
+    , parseVerilogSrc
+    , parseDescription
+    , parseModDecl
+    , parseContAssign
+    , parseExpr
+    )
 where
 
 import           Data.Functor          (($>))
@@ -58,14 +58,14 @@ matchOct c = c == 'o' || c == 'O'
 -- binary are not supported yet.
 parseNum :: Parser Expr
 parseNum = do
-  size <- fromIntegral <$> decimal
-  _    <- string "'"
-  matchNum size
- where
-  matchNum size =
-    (satisfy matchHex >> Number size <$> hexadecimal)
-      <|> (satisfy matchDec >> Number size <$> decimal)
-      <|> (satisfy matchOct >> Number size <$> octal)
+    size <- fromIntegral <$> decimal
+    _    <- string "'"
+    matchNum size
+  where
+    matchNum size =
+        (satisfy matchHex >> Number size <$> hexadecimal)
+            <|> (satisfy matchDec >> Number size <$> decimal)
+            <|> (satisfy matchOct >> Number size <$> octal)
 
 parseVar :: Parser Expr
 parseVar = Id <$> ident
@@ -75,72 +75,72 @@ parseFunction = reserved "unsigned" $> UnSignedFunc <|> reserved "signed" $> Sig
 
 parseFun :: Parser Expr
 parseFun = do
-  f    <- spaces *> reservedOp "$" *> parseFunction
-  expr <- string "(" *> spaces *> parseExpr
-  _    <- spaces *> string ")" *> spaces
-  return $ Func f expr
+    f    <- spaces *> reservedOp "$" *> parseFunction
+    expr <- string "(" *> spaces *> parseExpr
+    _    <- spaces *> string ")" *> spaces
+    return $ Func f expr
 
 parseTerm :: Parser Expr
 parseTerm =
-  parens parseExpr
-    <|> (Concat <$> aroundList (string "{") (string "}") parseExpr)
-    <|> parseFun
-    <|> lexeme parseNum
-    <|> parseVar
-    <?> "simple expr"
+    parens parseExpr
+        <|> (Concat <$> aroundList (string "{") (string "}") parseExpr)
+        <|> parseFun
+        <|> lexeme parseNum
+        <|> parseVar
+        <?> "simple expr"
 
 -- | Parses the ternary conditional operator. It will behave in a right
 -- associative way.
 parseCond :: Expr -> Parser Expr
 parseCond e = do
-  _    <- spaces *> reservedOp "?"
-  expr <- spaces *> parseExpr
-  _    <- spaces *> reservedOp ":"
-  Cond e expr <$> parseExpr
+    _    <- spaces *> reservedOp "?"
+    expr <- spaces *> parseExpr
+    _    <- spaces *> reservedOp ":"
+    Cond e expr <$> parseExpr
 
 parseExpr :: Parser Expr
 parseExpr = do
-  e <- parseExpr'
-  option e . try $ parseCond e
+    e <- parseExpr'
+    option e . try $ parseCond e
 
 -- | Table of binary and unary operators that encode the right precedence for
 -- each.
 parseTable :: [[ParseOperator Expr]]
 parseTable =
-  [ [prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot)]
-  , [ prefix "&"  (UnOp UnAnd)
-    , prefix "|"  (UnOp UnOr)
-    , prefix "~&" (UnOp UnNand)
-    , prefix "~|" (UnOp UnNor)
-    , prefix "^"  (UnOp UnXor)
-    , prefix "~^" (UnOp UnNxor)
-    , prefix "^~" (UnOp UnNxorInv)
+    [ [prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot)]
+    , [ prefix "&"  (UnOp UnAnd)
+      , prefix "|"  (UnOp UnOr)
+      , prefix "~&" (UnOp UnNand)
+      , prefix "~|" (UnOp UnNor)
+      , prefix "^"  (UnOp UnXor)
+      , prefix "~^" (UnOp UnNxor)
+      , prefix "^~" (UnOp UnNxorInv)
+      ]
+    , [prefix "+" (UnOp UnPlus), prefix "-" (UnOp UnMinus)]
+    , [binary "**" (sBinOp BinPower) AssocRight]
+    , [ binary "*" (sBinOp BinTimes) AssocLeft
+      , binary "/" (sBinOp BinDiv)   AssocLeft
+      , binary "%" (sBinOp BinMod)   AssocLeft
+      ]
+    , [binary "+" (sBinOp BinPlus) AssocLeft, binary "-" (sBinOp BinPlus) AssocLeft]
+    , [binary "<<" (sBinOp BinLSL) AssocLeft, binary ">>" (sBinOp BinLSR) AssocLeft]
+    , [binary "<<<" (sBinOp BinASL) AssocLeft, binary ">>>" (sBinOp BinASR) AssocLeft]
+    , [ binary "<"  (sBinOp BinLT)  AssocNone
+      , binary ">"  (sBinOp BinGT)  AssocNone
+      , binary "<=" (sBinOp BinLEq) AssocNone
+      , binary ">=" (sBinOp BinLEq) AssocNone
+      ]
+    , [binary "==" (sBinOp BinEq) AssocNone, binary "!=" (sBinOp BinNEq) AssocNone]
+    , [binary "===" (sBinOp BinEq) AssocNone, binary "!==" (sBinOp BinNEq) AssocNone]
+    , [binary "&" (sBinOp BinAnd) AssocLeft]
+    , [ binary "^"  (sBinOp BinXor)     AssocLeft
+      , binary "^~" (sBinOp BinXNor)    AssocLeft
+      , binary "~^" (sBinOp BinXNorInv) AssocLeft
+      ]
+    , [binary "|" (sBinOp BinOr) AssocLeft]
+    , [binary "&&" (sBinOp BinLAnd) AssocLeft]
+    , [binary "||" (sBinOp BinLOr) AssocLeft]
     ]
-  , [prefix "+" (UnOp UnPlus), prefix "-" (UnOp UnMinus)]
-  , [binary "**" (sBinOp BinPower) AssocRight]
-  , [ binary "*" (sBinOp BinTimes) AssocLeft
-    , binary "/" (sBinOp BinDiv)   AssocLeft
-    , binary "%" (sBinOp BinMod)   AssocLeft
-    ]
-  , [binary "+" (sBinOp BinPlus) AssocLeft, binary "-" (sBinOp BinPlus) AssocLeft]
-  , [binary "<<" (sBinOp BinLSL) AssocLeft, binary ">>" (sBinOp BinLSR) AssocLeft]
-  , [binary "<<<" (sBinOp BinASL) AssocLeft, binary ">>>" (sBinOp BinASR) AssocLeft]
-  , [ binary "<"  (sBinOp BinLT)  AssocNone
-    , binary ">"  (sBinOp BinGT)  AssocNone
-    , binary "<=" (sBinOp BinLEq) AssocNone
-    , binary ">=" (sBinOp BinLEq) AssocNone
-    ]
-  , [binary "==" (sBinOp BinEq) AssocNone, binary "!=" (sBinOp BinNEq) AssocNone]
-  , [binary "===" (sBinOp BinEq) AssocNone, binary "!==" (sBinOp BinNEq) AssocNone]
-  , [binary "&" (sBinOp BinAnd) AssocLeft]
-  , [ binary "^"  (sBinOp BinXor)     AssocLeft
-    , binary "^~" (sBinOp BinXNor)    AssocLeft
-    , binary "~^" (sBinOp BinXNorInv) AssocLeft
-    ]
-  , [binary "|" (sBinOp BinOr) AssocLeft]
-  , [binary "&&" (sBinOp BinLAnd) AssocLeft]
-  , [binary "||" (sBinOp BinLOr) AssocLeft]
-  ]
 
 binary :: String -> (a -> a -> a) -> Assoc -> ParseOperator a
 binary name fun = Infix ((reservedOp name <?> "binary") >> return fun)
@@ -150,42 +150,42 @@ prefix name fun = Prefix ((reservedOp name <?> "prefix") >> return fun)
 
 aroundList :: Parser a -> Parser b -> Parser c -> Parser [c]
 aroundList a b c = lexeme $ do
-  l <- a *> spaces *> commaSep c
-  _ <- b
-  return l
+    l <- a *> spaces *> commaSep c
+    _ <- b
+    return l
 
 parseContAssign :: Parser ContAssign
 parseContAssign = do
-  var  <- reserved "assign" *> ident
-  expr <- reservedOp "=" *> parseExpr
-  _    <- symbol ";"
-  return $ ContAssign var expr
+    var  <- reserved "assign" *> ident
+    expr <- reservedOp "=" *> parseExpr
+    _    <- symbol ";"
+    return $ ContAssign var expr
 
 -- | Parse a range and return the total size. As it is inclusive, 1 has to be
 -- added to the difference.
 parseRange :: Parser Int
 parseRange = do
-  rangeH <- symbol "[" *> decimal
-  rangeL <- symbol ":" *> decimal
-  _      <- symbol "]"
-  return . fromIntegral $ rangeH - rangeL + 1
+    rangeH <- symbol "[" *> decimal
+    rangeL <- symbol ":" *> decimal
+    _      <- symbol "]"
+    return . fromIntegral $ rangeH - rangeL + 1
 
 ident :: Parser Identifier
 ident = Identifier . T.pack <$> identifier
 
 parseNetDecl :: Maybe PortDir -> Parser ModItem
 parseNetDecl pd = do
-  t     <- option Wire type_
-  sign  <- option False (reserved "signed" $> True)
-  range <- option 1 parseRange
-  name  <- ident
-  _     <- symbol ";"
-  return . Decl pd . Port t sign range $ name
-  where type_ = reserved "wire" $> Wire <|> reserved "reg" $> Reg
+    t     <- option Wire type_
+    sign  <- option False (reserved "signed" $> True)
+    range <- option 1 parseRange
+    name  <- ident
+    _     <- symbol ";"
+    return . Decl pd . Port t sign range $ name
+    where type_ = reserved "wire" $> Wire <|> reserved "reg" $> Reg
 
 parsePortDir :: Parser PortDir
 parsePortDir =
-  reserved "output" $> PortOut <|> reserved "input" $> PortIn <|> reserved "inout" $> PortInOut
+    reserved "output" $> PortOut <|> reserved "input" $> PortIn <|> reserved "inout" $> PortInOut
 
 parseDecl :: Parser ModItem
 parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
@@ -198,12 +198,12 @@ parseModList = list <|> spaces $> [] where list = aroundList (string "(") (strin
 
 parseModDecl :: Parser ModDecl
 parseModDecl = do
-  name    <- reserved "module" *> ident
-  modL    <- fmap defaultPort <$> parseModList
-  _       <- symbol ";"
-  modItem <- lexeme $ option [] . try $ many1 parseModItem
-  _       <- reserved "endmodule"
-  return $ ModDecl name [] modL modItem
+    name    <- reserved "module" *> ident
+    modL    <- fmap defaultPort <$> parseModList
+    _       <- symbol ";"
+    modItem <- lexeme $ option [] . try $ many1 parseModItem
+    _       <- reserved "endmodule"
+    return $ ModDecl name [] modL modItem
 
 parseDescription :: Parser Description
 parseDescription = Description <$> lexeme parseModDecl

@@ -11,8 +11,8 @@ Generates the AST from the graph directly.
 -}
 
 module VeriFuzz.ASTGen
-  ( generateAST
-  )
+    ( generateAST
+    )
 where
 
 import           Control.Lens              ((^..))
@@ -47,35 +47,35 @@ genAssignExpr :: Gate -> [Node] -> Maybe Expr
 genAssignExpr _ []       = Nothing
 genAssignExpr _ [n     ] = Just . Id $ frNode n
 genAssignExpr g (n : ns) = BinOp wire op <$> genAssignExpr g ns
- where
-  wire = Id $ frNode n
-  op   = fromGate g
+  where
+    wire = Id $ frNode n
+    op   = fromGate g
 
 -- | Generate the continuous assignment AST for a particular node. If it does
 -- not have any nodes that link to it then return 'Nothing', as that means that
 -- the assignment will just be empty.
 genContAssignAST :: Circuit -> LNode Gate -> Maybe ModItem
 genContAssignAST c (n, g) = ModCA . ContAssign name <$> genAssignExpr g nodes
- where
-  gr    = getCircuit c
-  nodes = G.pre gr n
-  name  = frNode n
+  where
+    gr    = getCircuit c
+    nodes = G.pre gr n
+    name  = frNode n
 
 genAssignAST :: Circuit -> [ModItem]
 genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
- where
-  gr    = getCircuit c
-  nodes = G.labNodes gr
+  where
+    gr    = getCircuit c
+    nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModDecl
 genModuleDeclAST c = ModDecl i output ports items
- where
-  i       = Identifier "gen_module"
-  ports   = genPortsAST inputsC c
-  output  = [Port Wire False 90 "y"]
-  a       = genAssignAST c
-  items   = a ++ [ModCA . ContAssign "y" . fold $ Id <$> assigns]
-  assigns = a ^.. traverse . modContAssign . contAssignNetLVal
+  where
+    i       = Identifier "gen_module"
+    ports   = genPortsAST inputsC c
+    output  = [Port Wire False 90 "y"]
+    a       = genAssignAST c
+    items   = a ++ [ModCA . ContAssign "y" . fold $ Id <$> assigns]
+    assigns = a ^.. traverse . modContAssign . contAssignNetLVal
 
 generateAST :: Circuit -> VerilogSrc
 generateAST c = VerilogSrc [Description $ genModuleDeclAST c]

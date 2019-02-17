@@ -35,22 +35,22 @@ rDupsCirc = Circuit . rDups . getCircuit
 -- `n` that is passed to it.
 arbitraryEdge :: (Arbitrary e) => Int -> Gen (LEdge e)
 arbitraryEdge n = do
-  x <- with $ \a -> a < n && a > 0 && a /= n - 1
-  y <- with $ \a -> x < a && a < n && a > 0
-  z <- QC.arbitrary
-  return (x, y, z)
-  where with = QC.suchThat $ QC.resize n QC.arbitrary
+    x <- with $ \a -> a < n && a > 0 && a /= n - 1
+    y <- with $ \a -> x < a && a < n && a > 0
+    z <- QC.arbitrary
+    return (x, y, z)
+    where with = QC.suchThat $ QC.resize n QC.arbitrary
 
 -- | Gen instance for a random acyclic DAG.
 randomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e) => Gen (Gr l e) -- ^ The generated graph. It uses Arbitrary to
                           -- generate random instances of each node
 randomDAG = do
-  list <- QC.infiniteListOf QC.arbitrary
-  l    <- QC.infiniteListOf aE
-  QC.sized (\n -> return . G.mkGraph (nodes list n) $ take (10 * n) l)
- where
-  nodes l n = zip [0 .. n] $ take n l
-  aE = QC.sized arbitraryEdge
+    list <- QC.infiniteListOf QC.arbitrary
+    l    <- QC.infiniteListOf aE
+    QC.sized (\n -> return . G.mkGraph (nodes list n) $ take (10 * n) l)
+  where
+    nodes l n = zip [0 .. n] $ take n l
+    aE = QC.sized arbitraryEdge
 
 -- | Generate a random acyclic DAG with an IO instance.
 genRandomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e) => IO (Gr l e)

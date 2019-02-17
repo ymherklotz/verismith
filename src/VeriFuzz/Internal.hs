@@ -11,15 +11,15 @@ Shared high level code used in the other modules internally.
 -}
 
 module VeriFuzz.Internal
-  ( -- * Useful functions
-    safe
-  , showT
-  , comma
+    ( -- * Useful functions
+      safe
+    , showT
+    , comma
     -- * Module Specific Internals
-  , module VeriFuzz.Internal.Circuit
-  , module VeriFuzz.Internal.Simulator
-  , module VeriFuzz.Internal.AST
-  )
+    , module VeriFuzz.Internal.Circuit
+    , module VeriFuzz.Internal.Simulator
+    , module VeriFuzz.Internal.AST
+    )
 where
 
 import           Data.Text                   (Text)

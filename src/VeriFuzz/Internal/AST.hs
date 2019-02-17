@@ -39,16 +39,16 @@ addDescription desc = getVerilogSrc %~ (:) desc
 
 testBench :: ModDecl
 testBench = ModDecl
-  "main"
-  []
-  []
-  [ regDecl "a"
-  , regDecl "b"
-  , wireDecl "c"
-  , ModInst "and" "and_gate" [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
-  , Initial $ SeqBlock
-    [ BlockAssign . Assign (RegId "a") Nothing $ Number 1 1
-    , BlockAssign . Assign (RegId "b") Nothing $ Number 1 1
+    "main"
+    []
+    []
+    [ regDecl "a"
+    , regDecl "b"
+    , wireDecl "c"
+    , ModInst "and" "and_gate" [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
+    , Initial $ SeqBlock
+        [ BlockAssign . Assign (RegId "a") Nothing $ Number 1 1
+        , BlockAssign . Assign (RegId "b") Nothing $ Number 1 1
     -- , TimeCtrl (Delay 1) . Just . SysTaskEnable $ Task "display"
     --   [ Str "%d & %d = %d"
     --   , PrimExpr $ PrimId "a"
@@ -56,8 +56,8 @@ testBench = ModDecl
     --   , PrimExpr $ PrimId "c"
     --   ]
     -- , SysTaskEnable $ Task "finish" []
+        ]
     ]
-  ]
 
 addTestBench :: VerilogSrc -> VerilogSrc
 addTestBench = addDescription $ Description testBench

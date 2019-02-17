@@ -29,5 +29,5 @@ type SimEnv = ReaderT SimMatrix IO
 
 runAll :: SimEnv ()
 runAll = do
-  _ <- asks xst
-  shelly $ run_ "echo" ["Hello World"]
+    _ <- asks xst
+    shelly $ run_ "echo" ["Hello World"]
