@@ -47,9 +47,19 @@ runSynthXst sim m outf = do
     echoP "XST: netgen"
     _ <- logger dir "netgen" $ run
         (netgenPath sim)
-        ["-w", "-ofmt", "verilog", toTextIgnore $ modFile <.> "ngc", toTextIgnore outf]
+        [ "-w"
+        , "-ofmt"
+        , "verilog"
+        , toTextIgnore $ modFile <.> "ngc"
+        , toTextIgnore outf
+        ]
     echoP "XST: clean"
-    noPrint $ run_ "sed" ["-i", "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;", toTextIgnore outf]
+    noPrint $ run_
+        "sed"
+        [ "-i"
+        , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
+        , toTextIgnore outf
+        ]
     echoP "XST: done"
   where
     modFile = fromText $ modName m

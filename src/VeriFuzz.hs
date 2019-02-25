@@ -70,7 +70,9 @@ genRandom n = do
 
 draw :: IO ()
 draw = do
-    gr <- QC.generate $ rDups <$> QC.resize 10 (randomDAG :: QC.Gen (G.Gr Gate ()))
+    gr <- QC.generate $ rDups <$> QC.resize
+        10
+        (randomDAG :: QC.Gen (G.Gr Gate ()))
     let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
     writeFile "file.dot" dot
     shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
@@ -111,10 +113,14 @@ runEquivalence gm t i = do
         curr <- toTextIgnore <$> pwd
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
-        catch_sh (runEquiv defaultYosys defaultYosys (Just defaultXst) m >> echoP "Test OK")
+        catch_sh
+                (  runEquiv defaultYosys defaultYosys (Just defaultXst) m
+                >> echoP "Test OK"
+                )
             $ onFailure n
         catch_sh
-                (runSim (Icarus "iverilog" "vvp") m rand >>= (\b -> echoP ("RTL Sim: " <> showBS b))
+                (   runSim (Icarus "iverilog" "vvp") m rand
+                >>= (\b -> echoP ("RTL Sim: " <> showBS b))
                 )
             $ onFailure n
     --    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand

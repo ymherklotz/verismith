@@ -49,7 +49,9 @@ runSynthYosys sim m outf = do
     writefile inpf $ genSource m
     echoP "Yosys: synthesis"
     _ <- logger dir "yosys"
-        $ timeout (yosysPath sim) ["-b", "verilog -noattr", "-o", out, "-S", inp]
+        $ timeout
+              (yosysPath sim)
+              ["-b", "verilog -noattr", "-o", out, "-S", inp]
     echoP "Yosys: synthesis done"
   where
     inpf = "rtl.v"
@@ -58,10 +60,12 @@ runSynthYosys sim m outf = do
   -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
 runMaybeSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
-runMaybeSynth (Just sim) m = runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
-runMaybeSynth Nothing    m = writefile "syn_rtl.v" $ genSource m
+runMaybeSynth (Just sim) m =
+    runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
+runMaybeSynth Nothing m = writefile "syn_rtl.v" $ genSource m
 
-runEquivYosys :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
+runEquivYosys
+    :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquivYosys yosys sim1 sim2 m = do
     writefile "top.v" . genSource . initMod $ makeTop 2 m
     writefile checkFile $ yosysSatConfig sim1 sim2 m
@@ -70,9 +74,12 @@ runEquivYosys yosys sim1 sim2 m = do
     echoP "Yosys: equivalence check"
     run_ (yosysPath yosys) [toTextIgnore checkFile]
     echoP "Yosys: equivalence done"
-    where checkFile = fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
+  where
+    checkFile =
+        fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
-runEquiv :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
+runEquiv
+    :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
 runEquiv _ sim1 sim2 m = do
     root <- rootPath
     dir  <- pwd

@@ -91,16 +91,19 @@ genOpts = Generate . S.fromText <$> textOption
     )
 
 parseOpts :: Parser Opts
-parseOpts =
-    Parse . S.fromText . T.pack <$> strArgument (metavar "FILE" <> help "Verilog input file.")
+parseOpts = Parse . S.fromText . T.pack <$> strArgument
+    (metavar "FILE" <> help "Verilog input file.")
 
 argparse :: Parser Opts
 argparse =
     hsubparser
             (  command
                     "fuzz"
-                    (info fuzzOpts
-                          (progDesc "Run fuzzing on the specified simulators and synthesisers.")
+                    (info
+                        fuzzOpts
+                        (progDesc
+                            "Run fuzzing on the specified simulators and synthesisers."
+                        )
                     )
             <> metavar "fuzz"
             )
@@ -109,12 +112,19 @@ argparse =
                         "rerun"
                         (info
                             rerunOpts
-                            (progDesc "Rerun a Verilog file with a simulator or a synthesiser.")
+                            (progDesc
+                                "Rerun a Verilog file with a simulator or a synthesiser."
+                            )
                         )
                 <> metavar "rerun"
                 )
         <|> hsubparser
-                (  command "generate" (info genOpts (progDesc "Generate a random Verilog program."))
+                (  command
+                        "generate"
+                        (info
+                            genOpts
+                            (progDesc "Generate a random Verilog program.")
+                        )
                 <> metavar "generate"
                 )
         <|> hsubparser
@@ -122,7 +132,9 @@ argparse =
                         "parse"
                         (info
                             parseOpts
-                            (progDesc "Parse a verilog file and output a pretty printed version.")
+                            (progDesc
+                                "Parse a verilog file and output a pretty printed version."
+                            )
                         )
                 <> metavar "parse"
                 )
@@ -130,8 +142,10 @@ argparse =
 opts :: ParserInfo Opts
 opts = info
     (argparse <**> helper)
-    (fullDesc <> progDesc "Fuzz different simulators and synthesisers." <> header
-        "VeriFuzz - A hardware simulator and synthesiser Verilog fuzzer."
+    (  fullDesc
+    <> progDesc "Fuzz different simulators and synthesisers."
+    <> header
+           "VeriFuzz - A hardware simulator and synthesiser Verilog fuzzer."
     )
 
 handleOpts :: Opts -> IO ()
@@ -139,7 +153,10 @@ handleOpts (Fuzz _) = do
     num  <- getNumCapabilities
     vars <-
         sequence
-        $   (\x -> myForkIO $ V.runEquivalence (V.randomMod 10 100) ("test_" <> T.pack (show x)) 0)
+        $   (\x -> myForkIO $ V.runEquivalence (V.randomMod 10 100)
+                                               ("test_" <> T.pack (show x))
+                                               0
+            )
         <$> [1 .. num]
     sequence_ $ takeMVar <$> vars
 handleOpts (Generate f) = do

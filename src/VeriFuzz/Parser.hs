@@ -71,7 +71,8 @@ parseVar :: Parser Expr
 parseVar = Id <$> ident
 
 parseFunction :: Parser Function
-parseFunction = reserved "unsigned" $> UnSignedFunc <|> reserved "signed" $> SignedFunc
+parseFunction =
+    reserved "unsigned" $> UnSignedFunc <|> reserved "signed" $> SignedFunc
 
 parseFun :: Parser Expr
 parseFun = do
@@ -106,41 +107,51 @@ parseExpr = do
 -- | Table of binary and unary operators that encode the right precedence for
 -- each.
 parseTable :: [[ParseOperator Expr]]
-parseTable =
-    [ [prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot)]
-    , [ prefix "&"  (UnOp UnAnd)
-      , prefix "|"  (UnOp UnOr)
-      , prefix "~&" (UnOp UnNand)
-      , prefix "~|" (UnOp UnNor)
-      , prefix "^"  (UnOp UnXor)
-      , prefix "~^" (UnOp UnNxor)
-      , prefix "^~" (UnOp UnNxorInv)
+parseTable
+    = [ [prefix "!" (UnOp UnLNot), prefix "~" (UnOp UnNot)]
+      , [ prefix "&"  (UnOp UnAnd)
+        , prefix "|"  (UnOp UnOr)
+        , prefix "~&" (UnOp UnNand)
+        , prefix "~|" (UnOp UnNor)
+        , prefix "^"  (UnOp UnXor)
+        , prefix "~^" (UnOp UnNxor)
+        , prefix "^~" (UnOp UnNxorInv)
+        ]
+      , [prefix "+" (UnOp UnPlus), prefix "-" (UnOp UnMinus)]
+      , [binary "**" (sBinOp BinPower) AssocRight]
+      , [ binary "*" (sBinOp BinTimes) AssocLeft
+        , binary "/" (sBinOp BinDiv)   AssocLeft
+        , binary "%" (sBinOp BinMod)   AssocLeft
+        ]
+      , [ binary "+" (sBinOp BinPlus) AssocLeft
+        , binary "-" (sBinOp BinPlus) AssocLeft
+        ]
+      , [ binary "<<" (sBinOp BinLSL) AssocLeft
+        , binary ">>" (sBinOp BinLSR) AssocLeft
+        ]
+      , [ binary "<<<" (sBinOp BinASL) AssocLeft
+        , binary ">>>" (sBinOp BinASR) AssocLeft
+        ]
+      , [ binary "<"  (sBinOp BinLT)  AssocNone
+        , binary ">"  (sBinOp BinGT)  AssocNone
+        , binary "<=" (sBinOp BinLEq) AssocNone
+        , binary ">=" (sBinOp BinLEq) AssocNone
+        ]
+      , [ binary "==" (sBinOp BinEq)  AssocNone
+        , binary "!=" (sBinOp BinNEq) AssocNone
+        ]
+      , [ binary "===" (sBinOp BinEq)  AssocNone
+        , binary "!==" (sBinOp BinNEq) AssocNone
+        ]
+      , [binary "&" (sBinOp BinAnd) AssocLeft]
+      , [ binary "^"  (sBinOp BinXor)     AssocLeft
+        , binary "^~" (sBinOp BinXNor)    AssocLeft
+        , binary "~^" (sBinOp BinXNorInv) AssocLeft
+        ]
+      , [binary "|" (sBinOp BinOr) AssocLeft]
+      , [binary "&&" (sBinOp BinLAnd) AssocLeft]
+      , [binary "||" (sBinOp BinLOr) AssocLeft]
       ]
-    , [prefix "+" (UnOp UnPlus), prefix "-" (UnOp UnMinus)]
-    , [binary "**" (sBinOp BinPower) AssocRight]
-    , [ binary "*" (sBinOp BinTimes) AssocLeft
-      , binary "/" (sBinOp BinDiv)   AssocLeft
-      , binary "%" (sBinOp BinMod)   AssocLeft
-      ]
-    , [binary "+" (sBinOp BinPlus) AssocLeft, binary "-" (sBinOp BinPlus) AssocLeft]
-    , [binary "<<" (sBinOp BinLSL) AssocLeft, binary ">>" (sBinOp BinLSR) AssocLeft]
-    , [binary "<<<" (sBinOp BinASL) AssocLeft, binary ">>>" (sBinOp BinASR) AssocLeft]
-    , [ binary "<"  (sBinOp BinLT)  AssocNone
-      , binary ">"  (sBinOp BinGT)  AssocNone
-      , binary "<=" (sBinOp BinLEq) AssocNone
-      , binary ">=" (sBinOp BinLEq) AssocNone
-      ]
-    , [binary "==" (sBinOp BinEq) AssocNone, binary "!=" (sBinOp BinNEq) AssocNone]
-    , [binary "===" (sBinOp BinEq) AssocNone, binary "!==" (sBinOp BinNEq) AssocNone]
-    , [binary "&" (sBinOp BinAnd) AssocLeft]
-    , [ binary "^"  (sBinOp BinXor)     AssocLeft
-      , binary "^~" (sBinOp BinXNor)    AssocLeft
-      , binary "~^" (sBinOp BinXNorInv) AssocLeft
-      ]
-    , [binary "|" (sBinOp BinOr) AssocLeft]
-    , [binary "&&" (sBinOp BinLAnd) AssocLeft]
-    , [binary "||" (sBinOp BinLOr) AssocLeft]
-    ]
 
 binary :: String -> (a -> a -> a) -> Assoc -> ParseOperator a
 binary name fun = Infix ((reservedOp name <?> "binary") >> return fun)
@@ -185,7 +196,12 @@ parseNetDecl pd = do
 
 parsePortDir :: Parser PortDir
 parsePortDir =
-    reserved "output" $> PortOut <|> reserved "input" $> PortIn <|> reserved "inout" $> PortInOut
+    reserved "output"
+        $>  PortOut
+        <|> reserved "input"
+        $>  PortIn
+        <|> reserved "inout"
+        $>  PortInOut
 
 parseDecl :: Parser ModItem
 parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
@@ -194,7 +210,8 @@ parseModItem :: Parser ModItem
 parseModItem = (ModCA <$> parseContAssign) <|> parseDecl
 
 parseModList :: Parser [Identifier]
-parseModList = list <|> spaces $> [] where list = aroundList (string "(") (string ")") ident
+parseModList = list <|> spaces $> []
+    where list = aroundList (string "(") (string ")") ident
 
 parseModDecl :: Parser ModDecl
 parseModDecl = do
@@ -209,7 +226,7 @@ parseDescription :: Parser Description
 parseDescription = Description <$> lexeme parseModDecl
 
 parseVerilogSrc :: Parser VerilogSrc
-parseVerilogSrc = VerilogSrc <$> (whiteSpace *> (many parseDescription))
+parseVerilogSrc = VerilogSrc <$> (whiteSpace *> many parseDescription)
 
 parseVerilog :: String -> String -> Either ParseError VerilogSrc
-parseVerilog f s = parse parseVerilogSrc f s
+parseVerilog = parse parseVerilogSrc

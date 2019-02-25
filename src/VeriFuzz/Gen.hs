@@ -54,7 +54,12 @@ randomMod inps total = do
     let other   = drop inps ident
     let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
     let yport   = [wire (sumSize other) "y"]
-    return . initMod . declareMod other . ModDecl "test_module" yport inputs_ $ x ++ [y]
+    return
+        .  initMod
+        .  declareMod other
+        .  ModDecl "test_module" yport inputs_
+        $  x
+        ++ [y]
   where
     ids   = toId <$> [1 .. total]
     end   = drop inps ids

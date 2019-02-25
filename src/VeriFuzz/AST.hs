@@ -332,9 +332,10 @@ exprWithContext [] n | n == 0    = QC.oneof exprSafeList
                      | n > 0     = QC.oneof $ exprRecList subexpr
                      | otherwise = exprWithContext [] 0
     where subexpr y = exprWithContext [] (n `div` y)
-exprWithContext l n | n == 0    = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
-                    | n > 0     = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
-                    | otherwise = exprWithContext l 0
+exprWithContext l n
+    | n == 0    = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
+    | n > 0     = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
+    | otherwise = exprWithContext l 0
     where subexpr y = exprWithContext l (n `div` y)
 
 instance QC.Arbitrary Expr where
@@ -555,13 +556,15 @@ traverseModConn f (ModConnNamed a e) = ModConnNamed a <$> f e
 
 traverseModItem :: (Applicative f) => (Expr -> f Expr) -> ModItem -> f ModItem
 traverseModItem f (ModCA (ContAssign a e)) = ModCA . ContAssign a <$> f e
-traverseModItem f (ModInst a b e         ) = ModInst a b <$> sequenceA (traverseModConn f <$> e)
-traverseModItem _ e                        = pure e
+traverseModItem f (ModInst a b e) =
+    ModInst a b <$> sequenceA (traverseModConn f <$> e)
+traverseModItem _ e = pure e
 
 makeLenses ''ModDecl
 
 modPortGen :: QC.Gen Port
-modPortGen = Port <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+modPortGen =
+    Port <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 instance QC.Arbitrary ModDecl where
   arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary

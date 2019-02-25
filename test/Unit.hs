@@ -11,14 +11,18 @@ import           VeriFuzz
 unitTests :: TestTree
 unitTests = testGroup
     "Unit tests"
-    [ testCase "Transformation of AST" $ assertEqual "Successful transformation"
-                                                     transformExpectedResult
-                                                     (transform trans transformTestData)
+    [ testCase "Transformation of AST" $ assertEqual
+          "Successful transformation"
+          transformExpectedResult
+          (transform trans transformTestData)
     ]
 
 transformTestData :: Expr
 transformTestData = BinOp
-    (BinOp (BinOp (Id "id1") BinAnd (Id "id2")) BinAnd (BinOp (Id "id1") BinAnd (Id "id2")))
+    (BinOp (BinOp (Id "id1") BinAnd (Id "id2"))
+           BinAnd
+           (BinOp (Id "id1") BinAnd (Id "id2"))
+    )
     BinAnd
     (BinOp
         (BinOp
@@ -74,7 +78,11 @@ transformExpectedResult = BinOp
                 [ Concat [Id "id1", Id "Replaced", Id "Replaced"]
                 , Id "Replaced"
                 , Id "Replaced"
-                , Concat [Id "Replaced", Id "Replaced", Concat [Id "id1", Id "Replaced"]]
+                , Concat
+                    [ Id "Replaced"
+                    , Id "Replaced"
+                    , Concat [Id "id1", Id "Replaced"]
+                    ]
                 , Id "Replaced"
                 ]
             , Id "id1"

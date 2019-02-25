@@ -59,7 +59,8 @@ addDisplay s = concat $ transpose
     where l = length s
 
 assignFunc :: [Port] -> ByteString -> Stmnt
-assignFunc inp bs = NonBlockAssign . Assign conc Nothing . Number (B.length bs * 8) $ bsToI bs
+assignFunc inp bs =
+    NonBlockAssign . Assign conc Nothing . Number (B.length bs * 8) $ bsToI bs
     where conc = RegConcat (portToExpr <$> inp)
 
 convert :: Text -> ByteString
@@ -96,7 +97,8 @@ runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> Sh ByteString
 runSimIcarusWithFile sim f _ = do
     dir <- pwd
     echoP "Icarus: Compile"
-    _ <- logger dir "icarus" $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
+    _ <- logger dir "icarus"
+        $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
     echoP "Icarus: Run"
     B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$> logger
         dir

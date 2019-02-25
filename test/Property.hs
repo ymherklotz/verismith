@@ -34,11 +34,13 @@ instance QC.Arbitrary AltTestGraph where
   arbitrary = AltTestGraph <$> QC.resize 100 V.randomDAG
 
 simpleGraph :: TestTree
-simpleGraph = QC.testProperty "simple graph generation check" $ \graph -> simp graph
+simpleGraph = QC.testProperty "simple graph generation check"
+    $ \graph -> simp graph
     where simp = G.isSimple . getGraph
 
 simpleAltGraph :: TestTree
-simpleAltGraph = QC.testProperty "simple alternative graph generation check" $ \graph -> simp graph
+simpleAltGraph = QC.testProperty "simple alternative graph generation check"
+    $ \graph -> simp graph
     where simp = G.isSimple . getAltGraph
 
 parserInput' :: ModDeclSub -> Bool
@@ -49,8 +51,10 @@ parserIdempotent' :: ModDeclSub -> QC.Property
 parserIdempotent' (ModDeclSub v) = p sv === (p . p) sv
   where
     vshow = show . GenVerilog
-    sv = vshow v
-    p = vshow . fromRight (error "Failed idempotent test") . parse parseModDecl "idempotent_test.v"
+    sv    = vshow v
+    p     = vshow . fromRight (error "Failed idempotent test") . parse
+        parseModDecl
+        "idempotent_test.v"
 
 parserInput :: TestTree
 parserInput = QC.testProperty "parser input" $ parserInput'
@@ -59,5 +63,6 @@ parserIdempotent :: TestTree
 parserIdempotent = QC.testProperty "parser idempotence" $ parserIdempotent'
 
 propertyTests :: TestTree
-propertyTests =
-    testGroup "Property Tests" [simpleGraph, simpleAltGraph, parserInput, parserIdempotent]
+propertyTests = testGroup
+    "Property Tests"
+    [simpleGraph, simpleAltGraph, parserInput, parserIdempotent]

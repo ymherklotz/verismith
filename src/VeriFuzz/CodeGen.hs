@@ -53,7 +53,14 @@ genDescription desc = genModuleDecl $ desc ^. getDescription
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 genModuleDecl :: ModDecl -> Text
 genModuleDecl m =
-    "module " <> m ^. modId . getIdentifier <> ports <> ";\n" <> modI <> "endmodule\n"
+    "module "
+        <> m
+        ^. modId
+        .  getIdentifier
+        <> ports
+        <> ";\n"
+        <> modI
+        <> "endmodule\n"
   where
     ports | noIn && noOut = ""
           | otherwise     = "(" <> comma (genModPort <$> outIn) <> ")"
@@ -98,8 +105,9 @@ genModuleItem (Decl dir port) = maybe "" makePort dir <> genPort port <> ";\n"
     where makePort = (<> " ") . genPortDir
 
 genModConn :: ModConn -> Text
-genModConn (ModConn c       ) = genExpr c
-genModConn (ModConnNamed n c) = "." <> n ^. getIdentifier <> "(" <> genExpr c <> ")"
+genModConn (ModConn c) = genExpr c
+genModConn (ModConnNamed n c) =
+    "." <> n ^. getIdentifier <> "(" <> genExpr c <> ")"
 
 -- | Generate continuous assignment
 genContAssign :: ContAssign -> Text
@@ -115,17 +123,20 @@ genFunc UnSignedFunc = "$unsigned"
 
 -- | Generate 'Expr' to 'Text'.
 genExpr :: Expr -> Text
-genExpr (BinOp eRhs bin eLhs) = "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
-genExpr (Number s n) = "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
+genExpr (BinOp eRhs bin eLhs) =
+    "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
+genExpr (Number s n) =
+    "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
-genExpr (Id     i  ) = i ^. getIdentifier
-genExpr (Concat c  ) = "{" <> comma (genExpr <$> c) <> "}"
-genExpr (UnOp u e  ) = "(" <> genUnaryOperator u <> genExpr e <> ")"
-genExpr (Cond l t f) = "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
-genExpr (Func f e  ) = genFunc f <> "(" <> genExpr e <> ")"
-genExpr (Str t     ) = "\"" <> t <> "\""
+genExpr (Id     i) = i ^. getIdentifier
+genExpr (Concat c) = "{" <> comma (genExpr <$> c) <> "}"
+genExpr (UnOp u e) = "(" <> genUnaryOperator u <> genExpr e <> ")"
+genExpr (Cond l t f) =
+    "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
+genExpr (Func f e) = genFunc f <> "(" <> genExpr e <> ")"
+genExpr (Str t   ) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
 genBinaryOperator :: BinaryOperator -> Text
@@ -186,7 +197,13 @@ genLVal :: LVal -> Text
 genLVal (RegId i       ) = i ^. getIdentifier
 genLVal (RegExpr i expr) = i ^. getIdentifier <> " [" <> genExpr expr <> "]"
 genLVal (RegSize i msb lsb) =
-    i ^. getIdentifier <> " [" <> genConstExpr msb <> ":" <> genConstExpr lsb <> "]"
+    i
+        ^. getIdentifier
+        <> " ["
+        <> genConstExpr msb
+        <> ":"
+        <> genConstExpr lsb
+        <> "]"
 genLVal (RegConcat e) = "{" <> comma (genExpr <$> e) <> "}"
 
 genConstExpr :: ConstExpr -> Text
@@ -197,7 +214,8 @@ genPortType Wire = "wire"
 genPortType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Text
-genAssign op (Assign r d e) = genLVal r <> op <> maybe "" genDelay d <> genExpr e
+genAssign op (Assign r d e) =
+    genLVal r <> op <> maybe "" genDelay d <> genExpr e
 
 genStmnt :: Stmnt -> Text
 genStmnt (TimeCtrl  d stat   ) = genDelay d <> " " <> defMap stat
@@ -210,8 +228,9 @@ genStmnt (TaskEnable     task) = genTask task <> ";\n"
 genStmnt (SysTaskEnable  task) = "$" <> genTask task <> ";\n"
 
 genTask :: Task -> Text
-genTask (Task name expr) | null expr = i
-                         | otherwise = i <> "(" <> comma (genExpr <$> expr) <> ")"
+genTask (Task name expr)
+    | null expr = i
+    | otherwise = i <> "(" <> comma (genExpr <$> expr) <> ")"
     where i = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
