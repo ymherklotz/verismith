@@ -225,8 +225,12 @@ parseModDecl = do
 parseDescription :: Parser Description
 parseDescription = Description <$> lexeme parseModDecl
 
+-- | Parses a 'String' into 'VerilogSrc' by skipping any beginning whitespace
+-- and then parsing multiple Verilog source.
 parseVerilogSrc :: Parser VerilogSrc
 parseVerilogSrc = VerilogSrc <$> (whiteSpace *> many parseDescription)
 
+-- | Parse a 'String' containing verilog code. The parser currently only supports
+-- the subset of Verilog that is being generated randomly.
 parseVerilog :: String -> String -> Either ParseError VerilogSrc
 parseVerilog = parse parseVerilogSrc
