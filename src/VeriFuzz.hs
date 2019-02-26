@@ -58,16 +58,20 @@ import           VeriFuzz.Random
 import           VeriFuzz.XST
 import           VeriFuzz.Yosys
 
+-- | Generate a specific number of random bytestrings of size 256.
 genRand :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
 genRand gen n bytes | n == 0    = ranBytes : bytes
                     | otherwise = genRand newGen (n - 1) $ ranBytes : bytes
     where Right (ranBytes, newGen) = C.genBytes 32 gen
 
+-- | generates the specific number of bytestring with a random seed.
 genRandom :: Int -> IO [ByteString]
 genRandom n = do
     gen <- C.newGenIO :: IO C.CtrDRBG
     return $ genRand gen n []
 
+-- | Draw a randomly generated DAG to a dot file and compile it to a png so it
+-- can be seen.
 draw :: IO ()
 draw = do
     gr <- QC.generate $ rDups <$> QC.resize
@@ -77,9 +81,11 @@ draw = do
     writeFile "file.dot" dot
     shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
 
+-- | Function to show a bytestring in a hex format.
 showBS :: ByteString -> Text
 showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
 
+-- | Run a simulation on a random DAG or a random module.
 runSimulation :: IO ()
 runSimulation = do
   -- gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
@@ -93,6 +99,9 @@ runSimulation = do
     val   <- shelly $ runSim defaultIcarus rand2 rand
     T.putStrLn $ showBS val
 
+-- | Code to be executed on a failure. Also checks if the failure was a timeout,
+-- as the timeout command will return the 124 error code if that was the
+-- case. In that case, the error will be moved to a different directory.
 onFailure :: Text -> RunFailed -> Sh ()
 onFailure t _ = do
     ex <- lastExitCode
@@ -104,6 +113,8 @@ onFailure t _ = do
             echoP "Test FAIL"
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
 
+-- | Run a fuzz run and check if all of the simulators passed by checking if the
+-- generated Verilog files are equivalent.
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
     m    <- QC.generate gm
