@@ -41,10 +41,12 @@ reduce eval src = do
             reduce eval l
         (False, True) ->
             reduce eval r
-        (True, True) ->
+        (True, True) -> do
             lreduced <- reduce eval l
             rreduced <- reduce eval r
-            return lreduced
+            if lreduced < rreduced
+            then return lreduced
+            else return rreduced
         _ ->
             return src
     where
