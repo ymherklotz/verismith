@@ -15,14 +15,13 @@ module VeriFuzz.ASTGen
     )
 where
 
-import           Control.Lens              ((^..))
-import           Data.Foldable             (fold)
 import           Data.Graph.Inductive      (LNode, Node)
 import qualified Data.Graph.Inductive      as G
 import           Data.Maybe                (catMaybes)
 import           VeriFuzz.AST
 import           VeriFuzz.Circuit
 import           VeriFuzz.Internal.Circuit
+import           VeriFuzz.Mutate
 
 -- | Converts a 'CNode' to an 'Identifier'.
 frNode :: Node -> Identifier
@@ -46,10 +45,10 @@ genPortsAST f c = port . frNode <$> f c where port = Port Wire False 4
 genAssignExpr :: Gate -> [Node] -> Maybe Expr
 genAssignExpr _ []       = Nothing
 genAssignExpr _ [n     ] = Just . Id $ frNode n
-genAssignExpr g (n : ns) = BinOp wire op <$> genAssignExpr g ns
+genAssignExpr g (n : ns) = BinOp wire oper <$> genAssignExpr g ns
   where
     wire = Id $ frNode n
-    op   = fromGate g
+    oper = fromGate g
 
 -- | Generate the continuous assignment AST for a particular node. If it does
 -- not have any nodes that link to it then return 'Nothing', as that means that
@@ -68,14 +67,13 @@ genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
     nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModDecl
-genModuleDeclAST c = ModDecl i output ports items
+genModuleDeclAST c = ModDecl i output ports $ combineAssigns yPort a
   where
-    i       = Identifier "gen_module"
-    ports   = genPortsAST inputsC c
-    output  = [Port Wire False 90 "y"]
-    a       = genAssignAST c
-    items   = a ++ [ModCA . ContAssign "y" . fold $ Id <$> assigns]
-    assigns = a ^.. traverse . modContAssign . contAssignNetLVal
+    i      = Identifier "gen_module"
+    ports  = genPortsAST inputsC c
+    output = []
+    a      = genAssignAST c
+    yPort  = Port Wire False 90 "y"
 
 generateAST :: Circuit -> VerilogSrc
 generateAST c = VerilogSrc [Description $ genModuleDeclAST c]
