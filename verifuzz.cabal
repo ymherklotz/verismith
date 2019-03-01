@@ -20,25 +20,26 @@ extra-source-files: README.md
 library
   hs-source-dirs: src
   default-language: Haskell2010
-  ghc-options: -Wall -Werror
-  other-modules: VeriFuzz.Internal
-               , VeriFuzz.Internal.Circuit
-               , VeriFuzz.Internal.Simulator
-               , VeriFuzz.Internal.AST
+  ghc-options: -Wall -Werror -Wwarn=unused-imports
   exposed-modules: VeriFuzz
-                 , VeriFuzz.ASTGen
                  , VeriFuzz.AST
+                 , VeriFuzz.Internal
+                 , VeriFuzz.Internal.AST
+                 , VeriFuzz.Internal.Circuit
+                 , VeriFuzz.Internal.Simulator
+                 , VeriFuzz.Internal.Template
+                 , VeriFuzz.ASTGen
                  , VeriFuzz.Circuit
                  , VeriFuzz.CodeGen
                  , VeriFuzz.Env
-                 , VeriFuzz.General
                  , VeriFuzz.Gen
                  , VeriFuzz.Icarus
                  , VeriFuzz.Lexer
                  , VeriFuzz.Mutate
                  , VeriFuzz.Parser
-                 , VeriFuzz.RandomAlt
                  , VeriFuzz.Random
+                 , VeriFuzz.RandomAlt
+                 , VeriFuzz.Reduce
                  , VeriFuzz.XST
                  , VeriFuzz.Yosys
   build-depends: base >=4.7 && <5
@@ -53,7 +54,6 @@ library
                , text >=1.2 && <1.3
                , bytestring >=0.10 && <0.11
                , hashable >=1.2 && <1.3
-               , transformers >=0.5 && <0.6
                , filepath >=1.4.2 && <1.5
                , binary >= 0.8.6 && <0.9
                , cryptonite >=0.25 && <0.26
