@@ -12,6 +12,7 @@ Icarus verilog module.
 
 module VeriFuzz.Icarus where
 
+import           Control.Lens
 import           Crypto.Hash            (Digest, hash)
 import           Crypto.Hash.Algorithms (SHA256)
 import           Data.Binary            (encode)
@@ -91,7 +92,7 @@ runSimIcarus sim rinfo bss = do
     let modWithTb = VerilogSrc $ Description <$> [newtb, m]
     writefile "main.v" $ genSource modWithTb
     runSimWithFile sim "main.v" bss
-    where m = mainModule rinfo
+    where m = rinfo ^. mainModule
 
 runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> Sh ByteString
 runSimIcarusWithFile sim f _ = do

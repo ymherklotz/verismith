@@ -14,6 +14,7 @@ Yosys simulator implementation.
 
 module VeriFuzz.Yosys where
 
+import           Control.Lens
 import           Prelude               hiding (FilePath)
 import           Shelly
 import           Text.Shakespeare.Text (st)
@@ -72,7 +73,7 @@ runEquivYosys
     -> SourceInfo
     -> Sh ()
 runEquivYosys yosys sim1 sim2 srcInfo = do
-    writefile "top.v" . genSource . initMod . makeTop 2 $ mainModule srcInfo
+    writefile "top.v" . genSource . initMod . makeTop 2 $ srcInfo ^. mainModule
     writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
     runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
     runMaybeSynth sim2 srcInfo
@@ -94,7 +95,12 @@ runEquiv _ sim1 sim2 srcInfo = do
     root <- rootPath
     dir  <- pwd
     echoP "SymbiYosys: setup"
-    writefile "top.v" . genSource . initMod . makeTopAssert $ mainModule srcInfo
+    writefile "top.v"
+        .  genSource
+        .  initMod
+        .  makeTopAssert
+        $  srcInfo
+        ^. mainModule
     writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
     runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
     runMaybeSynth sim2 srcInfo

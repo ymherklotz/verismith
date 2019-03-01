@@ -12,7 +12,7 @@ Class of the simulator and the synthesize tool.
 
 module VeriFuzz.Internal.Simulator where
 
-import           Control.Lens          ((^.), (^..))
+import           Control.Lens
 import           Data.Bits             (shiftL)
 import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as B
@@ -48,10 +48,19 @@ class (Tool a) => Synthesisor a where
 data SourceInfo = SourceInfo { runMainModule :: {-# UNPACK #-} !Text
                              , runSource     :: !VerilogSrc
                              }
+                  deriving (Eq, Show)
 
-mainModule :: SourceInfo -> ModDecl
-mainModule (SourceInfo main src) = head . filter ismain $ src ^.. getModule
-    where ismain v = v ^. modId . getIdentifier == main
+-- | May need to change this to Traversal to be safe. For now it will fail when
+-- the main has not been properly set with.
+mainModule :: Lens' SourceInfo ModDecl
+mainModule = lens get_ set_
+  where
+    set_ (SourceInfo top main) v =
+        SourceInfo top (main & getModule %~ update top v)
+    update top v m@(ModDecl (Identifier i) _ _ _) | i == top  = v
+                                                  | otherwise = m
+    get_ (SourceInfo top main) = head . filter (f top) $ main ^.. getModule
+    f top (ModDecl (Identifier i) _ _ _) = i == top
 
 rootPath :: Sh FilePath
 rootPath = do
