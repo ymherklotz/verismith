@@ -11,24 +11,26 @@ Portability : POSIX
 module VeriFuzz
     ( runEquivalence
     , runSimulation
+    , runReduce
     , draw
+    , SourceInfo(..)
     , module VeriFuzz.AST
     , module VeriFuzz.ASTGen
     , module VeriFuzz.Circuit
     , module VeriFuzz.CodeGen
     , module VeriFuzz.Env
     , module VeriFuzz.Gen
-    , module VeriFuzz.General
     , module VeriFuzz.Icarus
-    , module VeriFuzz.Internal
     , module VeriFuzz.Mutate
     , module VeriFuzz.Parser
     , module VeriFuzz.Random
+    , module VeriFuzz.Reduce
     , module VeriFuzz.XST
     , module VeriFuzz.Yosys
     )
 where
 
+import           Control.Lens
 import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
 import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
@@ -49,12 +51,12 @@ import           VeriFuzz.Circuit
 import           VeriFuzz.CodeGen
 import           VeriFuzz.Env
 import           VeriFuzz.Gen
-import           VeriFuzz.General
 import           VeriFuzz.Icarus
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 import           VeriFuzz.Parser
 import           VeriFuzz.Random
+import           VeriFuzz.Reduce
 import           VeriFuzz.XST
 import           VeriFuzz.Yosys
 
@@ -69,6 +71,10 @@ genRandom :: Int -> IO [ByteString]
 genRandom n = do
     gen <- C.newGenIO :: IO C.CtrDRBG
     return $ genRand gen n []
+
+makeSrcInfo :: ModDecl -> SourceInfo
+makeSrcInfo m =
+    (SourceInfo (m ^. modId . getIdentifier) (VerilogSrc [Description m]))
 
 -- | Draw a randomly generated DAG to a dot file and compile it to a png so it
 -- can be seen.
@@ -96,8 +102,9 @@ runSimulation = do
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
     rand  <- genRandom 20
     rand2 <- QC.generate (randomMod 10 100)
-    val   <- shelly $ runSim defaultIcarus rand2 rand
+    val   <- shelly $ runSim defaultIcarus (makeSrcInfo rand2) rand
     T.putStrLn $ showBS val
+
 
 -- | Code to be executed on a failure. Also checks if the failure was a timeout,
 -- as the timeout command will return the 124 error code if that was the
@@ -113,11 +120,23 @@ onFailure t _ = do
             echoP "Test FAIL"
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
 
+checkEquivalence :: SourceInfo -> Text -> IO Bool
+checkEquivalence src dir = shellyFailDir $ do
+    mkdir_p (fromText dir)
+    curr <- toTextIgnore <$> pwd
+    setenv "VERIFUZZ_ROOT" curr
+    cd (fromText dir)
+    catch_sh
+        (runEquiv defaultYosys defaultYosys (Just defaultXst) src >> return True
+        )
+        ((\_ -> return False) :: RunFailed -> Sh Bool)
+
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
 -- generated Verilog files are equivalent.
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
-    m    <- QC.generate gm
+    m <- QC.generate gm
+    let srcInfo = makeSrcInfo m
     rand <- genRandom 20
     shellyFailDir $ do
         mkdir_p (fromText "output" </> fromText n)
@@ -125,22 +144,19 @@ runEquivalence gm t i = do
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
         catch_sh
-                (  runEquiv defaultYosys defaultYosys (Just defaultXst) m
+                (  runEquiv defaultYosys defaultYosys (Just defaultXst) srcInfo
                 >> echoP "Test OK"
                 )
             $ onFailure n
         catch_sh
-                (   runSim (Icarus "iverilog" "vvp") m rand
+                (   runSim (Icarus "iverilog" "vvp") srcInfo rand
                 >>= (\b -> echoP ("RTL Sim: " <> showBS b))
                 )
             $ onFailure n
-    --    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_yosys.v" rand
-    --              >>= (\b -> echoP ("Yosys Sim: " <> showBS b))) $
-    --      onFailure n
-    --    catch_sh (runSimWithFile (Icarus "iverilog" "vvp") "syn_xst.v" rand
-    --              >>= (\b -> echoP ("XST Sim: " <> showBS b))) $
-    --      onFailure n
         cd ".."
         rm_rf $ fromText n
     when (i < 5) (runEquivalence gm t $ i + 1)
     where n = t <> "_" <> T.pack (show i)
+
+runReduce :: SourceInfo -> IO SourceInfo
+runReduce = reduce $ flip checkEquivalence "reduce"
