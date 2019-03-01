@@ -1,91 +1,91 @@
 {-|
 Module      : VeriFuzz.Internal.Simulator
-Description : Template file for different configuration files
-Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
+Description : Class of the simulator.
+Copyright   : (c) 2018-2019, Yann Herklotz Grave
+License     : BSD-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 
-Template file for different configuration files.
+Class of the simulator and the synthesize tool.
 -}
-
-{-# LANGUAGE QuasiQuotes #-}
 
 module VeriFuzz.Internal.Simulator where
 
-import           Data.Text             (Text)
-import qualified Data.Text             as T
-import           Prelude               hiding (FilePath)
+import           Control.Lens                   ( (^.)
+                                                , (^..)
+                                                )
+import           Data.Bits                      ( shiftL )
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as B
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Text.Shakespeare.Text (st)
+import           System.FilePath.Posix          ( takeBaseName )
 import           VeriFuzz.AST
-import           VeriFuzz.General
-import           VeriFuzz.Internal.AST
 
--- brittany-disable-next-binding
-yosysSatConfig :: (Simulator a, Simulator b) => a -> Maybe b -> ModDecl -> Text
-yosysSatConfig sim1 sim2 m = [st|read_verilog syn_#{toText sim1}.v
-rename #{mi} #{mi}_1
-read_verilog syn_#{idSim2}.v
-rename #{mi} #{mi}_2
-read_verilog top.v
-proc; opt_clean
-flatten #{mi}
-! touch test.#{toText sim1}.#{idSim2}.input_ok
-sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{mi}
-|]
+-- | Tool class.
+class Tool a where
+  toText :: a -> Text
+
+-- | Simulation type class.
+class (Tool a) => Simulator a where
+  runSim :: a             -- ^ Simulator instance
+         -> SourceInfo       -- ^ Run information
+         -> [ByteString]  -- ^ Inputs to simulate
+         -> Sh ByteString -- ^ Returns the value of the hash at the output of the testbench.
+  runSimWithFile :: a
+                 -> FilePath
+                 -> [ByteString]
+                 -> Sh ByteString
+
+-- | Synthesisor type class.
+class (Tool a) => Synthesisor a where
+  runSynth :: a        -- ^ Synthesisor tool instance
+           -> SourceInfo  -- ^ Run information
+           -> FilePath -- ^ Output verilog file for the module
+           -> Sh ()    -- ^ does not return any values
+
+data SourceInfo = SourceInfo { runMainModule :: {-# UNPACK #-} !Text
+                             , runSource     :: !VerilogSrc
+                             }
+
+mainModule :: SourceInfo -> ModDecl
+mainModule (SourceInfo main src) = head . filter ismain $ src ^.. getModule
+    where ismain v = v ^. modId . getIdentifier == main
+
+rootPath :: Sh FilePath
+rootPath = do
+    current <- pwd
+    maybe current fromText <$> get_env "VERIFUZZ_ROOT"
+
+timeout :: FilePath -> [Text] -> Sh Text
+timeout = command1 "timeout" ["300"] . toTextIgnore
+{-# INLINE timeout #-}
+
+timeout_ :: FilePath -> [Text] -> Sh ()
+timeout_ = command1_ "timeout" ["300"] . toTextIgnore
+{-# INLINE timeout_ #-}
+
+-- | Helper function to convert bytestrings to integers
+bsToI :: ByteString -> Integer
+bsToI = B.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
+{-# INLINE bsToI #-}
+
+noPrint :: Sh a -> Sh a
+noPrint = print_stdout False . print_stderr False
+{-# INLINE noPrint #-}
+
+echoP :: Text -> Sh ()
+echoP t = do
+    fn <- pwd
+    echo $ bname fn <> " - " <> t
+    where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
+
+logger :: FilePath -> Text -> Sh a -> Sh a
+logger fp name = log_stderr_with (l "_log.stderr.txt")
+    . log_stdout_with (l "_log.txt")
   where
-    idSim2 = maybe "rtl" toText sim2
-    mi = modName m
-
--- brittany-disable-next-binding
-yosysSimConfig :: Text
-yosysSimConfig = [st|read_verilog rtl.v; proc;;
-rename mod mod_rtl
-|]
-
--- brittany-disable-next-binding
-xstSynthConfig :: ModDecl -> Text
-xstSynthConfig m = [st|run
--ifn #{mi}.prj -ofn #{mi} -p artix7 -top #{mi}
--iobuf NO -ram_extract NO -rom_extract NO -use_dsp48 NO
--fsm_extract YES -fsm_encoding Auto
--change_error_to_warning "HDLCompiler:226 HDLCompiler:1832"
-|]
-  where
-    mi = modName m
-
--- brittany-disable-next-binding
-sbyConfig :: (Simulator a, Simulator b) => FilePath -> a -> Maybe b -> ModDecl -> Text
-sbyConfig bd sim1 sim2 m = [st|[options]
-mode prove
-
-[engines]
-smtbmc
-
-[script]
-#{readL}
-read -formal syn_#{toText sim1}.v
-rename #{mi} #{mi}_1
-read -formal syn_#{maybe "rtl" toText sim2}.v
-rename #{mi} #{mi}_2
-read -formal top.v
-prep -top #{mi}
-
-[files]
-#{depList}
-syn_#{maybe "rtl" toText sim2}.v
-syn_#{toText sim1}.v
-top.v
-|]
-  where
-    mi = modName m
-    deps = ["cells_cmos.v", "cells_cyclone_v.v", "cells_verific.v", "cells_xilinx_7.v"]
-    depList =
-      T.intercalate "\n"
-        $   toTextIgnore
-        .   ((bd </> fromText "data") </>)
-        .   fromText
-        <$> deps
-    readL = T.intercalate "\n" $ mappend "read -formal " <$> deps
+    l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
+    file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s
