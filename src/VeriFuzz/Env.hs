@@ -12,22 +12,41 @@ Environment to run the simulator and synthesisers in a matrix.
 
 module VeriFuzz.Env where
 
-import           Control.Monad.Trans.Reader
-import           Prelude                    hiding (FilePath)
+import           Prelude           hiding (FilePath)
 import           Shelly
 import           VeriFuzz.Icarus
+import           VeriFuzz.Internal
 import           VeriFuzz.XST
 import           VeriFuzz.Yosys
 
--- | Environment used to run the main
-data SimMatrix = SimMatrix { yosys  :: Yosys
-                           , xst    :: Maybe Xst
-                           , icarus :: Maybe Icarus
-                           }
+data SynthTool = XstSynth {-# UNPACK #-} !Xst
+               | YosysSynth {-# UNPACK #-} !Yosys
+               deriving (Eq, Show)
 
-type SimEnv = ReaderT SimMatrix IO
+instance Tool SynthTool where
+    toText (XstSynth xst)     = toText xst
+    toText (YosysSynth yosys) = toText yosys
 
-runAll :: SimEnv ()
-runAll = do
-    _ <- asks xst
-    shelly $ run_ "echo" ["Hello World"]
+instance Synthesisor SynthTool where
+    runSynth (XstSynth xst)     = runSynth xst
+    runSynth (YosysSynth yosys) = runSynth yosys
+
+newtype SimTool = IcarusSim Icarus
+                deriving (Eq, Show)
+
+instance Tool SimTool where
+    toText (IcarusSim icarus) = toText icarus
+
+instance Simulator SimTool where
+    runSim (IcarusSim icarus) = runSim icarus
+    runSimWithFile (IcarusSim icarus) = runSimWithFile icarus
+
+data SimEnv = SimEnv { simTools :: [SimTool]
+                     , simDir   :: FilePath
+                     }
+
+data SynthEnv = SynthEnv { synthTools :: [SynthTool]
+                         , synthDir   :: FilePath
+                         }
+
+
