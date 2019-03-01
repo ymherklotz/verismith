@@ -10,6 +10,8 @@ Portability : POSIX
 Test case reducer implementation.
 -}
 
+{-# LANGUAGE RankNTypes #-}
+
 module VeriFuzz.Reduce
     ( reduce
     )
@@ -42,12 +44,17 @@ instance Traversable Replacement where
     traverse f (Dual a b) = Dual <$> f a <*> f b
 
 -- | Split a list in two halves.
-halve :: [a] -> ([a], [a])
-halve l = splitAt (length l `div` 2) l
+halve :: [a] -> Replacement [a]
+halve []  = None
+halve [a] = Single [a]
+halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
+
+combine :: Lens' a b -> a -> (b -> Replacement b) -> Replacement a
+combine l i f = modify <$> f (i ^. l) where modify res = i & l .~ res
 
 filterExpr :: [Identifier] -> Expr -> Expr
 filterExpr ids (Id i) = if i `notElem` ids then Number 1 0 else Id i
-filterExpr _ e        = e
+filterExpr _   e      = e
 
 filterDecl :: [Identifier] -> ModItem -> Bool
 filterDecl ids (Decl Nothing (Port _ _ _ i)) = i `elem` ids
@@ -65,59 +72,77 @@ cleanUndefined ids mis =
         .  modContAssign
         .  contAssignExpr
         %~ transform (filterExpr usedWires)
-    where usedWires = mis ^.. traverse . modContAssign . contAssignNetLVal <> ids
-
-halveModAssign :: (([ModItem], [ModItem]) -> [ModItem]) -> ModDecl -> ModDecl
-halveModAssign choose m = m & modItems %~ assigns
   where
-    assigns l =
+    usedWires = mis ^.. traverse . modContAssign . contAssignNetLVal <> ids
+
+halveModAssign :: ModDecl -> Replacement ModDecl
+halveModAssign m = cleanMod m $ modify <$> assigns (m ^. modItems)
+  where
+    assigns = halve . filter (filterAssigns $ m ^. modOutPorts)
+    modify l = m & modItems .~ l
+
+cleanMod :: ModDecl -> Replacement ModDecl -> Replacement ModDecl
+cleanMod m newm = modify . change <$> newm
+  where
+    mis = m ^. modItems
+    modify l = m & modItems .~ l
+    change l =
         cleanUndefined (m ^.. modInPorts . traverse . portName)
-            . combineAssigns (head $ m ^. modOutPorts)
-            . (filter (not . filterAssigns []) l <>)
-            . choose
-            . halve
-            . filter (filterAssigns $ m ^. modOutPorts)
-            $ l
+            .  combineAssigns (head $ m ^. modOutPorts)
+            .  (filter (not . filterAssigns []) mis <>)
+            $  l
+            ^. modItems
 
 -- | Split a module declaration in half by trying to remove assign statements.
-halveAssigns :: VerilogSrc -> Replacement VerilogSrc
-halveAssigns vsrc =
-    Dual (modified fst) (modified snd)
-    where
-        modified f = vsrc & getModule %~ halveModAssign f
+halveAssigns :: SourceInfo -> Replacement SourceInfo
+halveAssigns vsrc = combine mainModule vsrc halveModAssign
 
---halveExpr :: Expr -> Replacement Expr
---halveExpr (Concat (x:xs)) = Dual x $ Concat xs
---halveExpr (BinOp e1 _ e2) = Dual e1 e2
---halveExpr (Cond _ e1 e2)  = Dual e1 e2
---halveExpr (UnOp _ e)      = Single e
---halveExpr (Func _ e)      = Single e
---halveExpr _               = None
+--halveIndExpr :: Expr -> Replacement Expr
+--halveIndExpr (Concat (x : xs)) = Dual x $ Concat xs
+--halveIndExpr (BinOp e1 _  e2 ) = Dual e1 e2
+--halveIndExpr (Cond  _  e1 e2 ) = Dual e1 e2
+--halveIndExpr (UnOp _ e       ) = Single e
+--halveIndExpr (Func _ e       ) = Single e
+--halveIndExpr _                 = None
+
+halveExpr :: SourceInfo -> Replacement SourceInfo
+halveExpr _ = None
+
+reduce_
+    :: (SourceInfo -> Replacement SourceInfo)
+    -> (SourceInfo -> IO Bool)
+    -> SourceInfo
+    -> IO SourceInfo
+reduce_ repl eval src = do
+    replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
+    case (replacement, replAnswer) of
+        (Single s, Single False    ) -> if s /= src then reduce eval s else return s
+        (Dual _ l, Dual True False ) -> reduce eval l
+        (Dual r _, Dual False True ) -> reduce eval r
+        (Dual r l, Dual False False) -> do
+            lreduced <- reduce eval l
+            rreduced <- reduce eval r
+            if runSource lreduced < runSource rreduced
+                then return lreduced
+                else return rreduced
+        (None, None) -> return src
+        _ -> return src
+  where
+    replacement = repl src
+    evalIfNotEmpty m = do
+        print
+            $   GenVerilog
+            <$> m
+            ^.. mainModule
+            .   modItems
+            .   traverse
+            .   modContAssign
+        eval m
 
 -- | Reduce an input to a minimal representation.
 reduce
     :: (SourceInfo -> IO Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.
     -> IO SourceInfo           -- ^ Reduced output.
-reduce eval srcInfo@(SourceInfo top src) = do
-    replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
-    case (replacement, replAnswer) of
-        (Single s, Single False) ->
-            reduce eval $ srcTop s
-        (Dual _ l, Dual True False) ->
-            reduce eval $ srcTop l
-        (Dual r _, Dual False True) ->
-            reduce eval $ srcTop r
-        (Dual r l, Dual False False) -> do
-            lreduced <- reduce eval $ srcTop l
-            rreduced <- reduce eval $ srcTop r
-            if runSource lreduced < runSource rreduced
-            then return lreduced
-            else return rreduced
-        _ -> return srcInfo
-  where
-    replacement = halveAssigns src
-    srcTop = SourceInfo top
-    evalIfNotEmpty m = do
-        print $ GenVerilog <$> m ^.. getModule . modItems . traverse . modContAssign
-        eval $ srcTop m
+reduce eval src = reduce_ halveAssigns eval src
+                  >>= reduce_ halveExpr eval
