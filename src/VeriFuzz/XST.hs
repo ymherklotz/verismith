@@ -14,34 +14,32 @@ Xst (ise) simulator implementation.
 
 module VeriFuzz.XST where
 
-import           Prelude                     hiding (FilePath)
+import           Prelude               hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text       (st)
-import           VeriFuzz.AST
+import           Text.Shakespeare.Text (st)
 import           VeriFuzz.CodeGen
-import           VeriFuzz.General
-import           VeriFuzz.Internal.AST
-import           VeriFuzz.Internal.Simulator
+import           VeriFuzz.Internal
 
-data Xst = Xst { xstPath    :: FilePath
-               , netgenPath :: FilePath
+data Xst = Xst { xstPath    :: {-# UNPACK #-} !FilePath
+               , netgenPath :: {-# UNPACK #-} !FilePath
                }
+           deriving (Eq, Show)
 
-instance Simulator Xst where
+instance Tool Xst where
   toText _ = "xst"
 
-instance Synthesize Xst where
+instance Synthesisor Xst where
   runSynth = runSynthXst
 
 defaultXst :: Xst
 defaultXst = Xst "xst" "netgen"
 
-runSynthXst :: Xst -> ModDecl -> FilePath -> Sh ()
-runSynthXst sim m outf = do
+runSynthXst :: Xst -> SourceInfo -> FilePath -> Sh ()
+runSynthXst sim (SourceInfo top src) outf = do
     dir <- pwd
-    writefile xstFile $ xstSynthConfig m
+    writefile xstFile $ xstSynthConfig top
     writefile prjFile [st|verilog work "rtl.v"|]
-    writefile "rtl.v" $ genSource m
+    writefile "rtl.v" $ genSource src
     echoP "XST: run"
     _ <- logger dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
     echoP "XST: netgen"
@@ -62,6 +60,6 @@ runSynthXst sim m outf = do
         ]
     echoP "XST: done"
   where
-    modFile = fromText $ modName m
+    modFile = fromText top
     xstFile = modFile <.> "xst"
     prjFile = modFile <.> "prj"

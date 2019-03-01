@@ -12,7 +12,6 @@ Icarus verilog module.
 
 module VeriFuzz.Icarus where
 
-import           Control.Lens
 import           Crypto.Hash            (Digest, hash)
 import           Crypto.Hash.Algorithms (SHA256)
 import           Data.Binary            (encode)
@@ -32,18 +31,18 @@ import           Prelude                hiding (FilePath)
 import           Shelly
 import           VeriFuzz.AST
 import           VeriFuzz.CodeGen
-import           VeriFuzz.General
-import           VeriFuzz.Internal.AST
+import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 
 data Icarus = Icarus { icarusPath :: FilePath
                      , vvpPath    :: FilePath
                      }
+              deriving (Eq, Show)
 
-instance Simulator Icarus where
+instance Tool Icarus where
   toText _ = "iverilog"
 
-instance Simulate Icarus where
+instance Simulator Icarus where
   runSim = runSimIcarus
   runSimWithFile = runSimIcarusWithFile
 
@@ -78,20 +77,21 @@ mask = T.replace "x" "0"
 callback :: ByteString -> Text -> ByteString
 callback b t = b <> convert (mask t)
 
-runSimIcarus :: Icarus -> ModDecl -> [ByteString] -> Sh ByteString
-runSimIcarus sim m bss = do
+runSimIcarus :: Icarus -> SourceInfo -> [ByteString] -> Sh ByteString
+runSimIcarus sim rinfo bss = do
     let tb = ModDecl
             "main"
             []
             []
             [ Initial
-              $  fold (addDisplay $ assignFunc (m ^. modInPorts) <$> bss)
+              $  fold (addDisplay $ assignFunc (_modInPorts m) <$> bss)
               <> (SysTaskEnable $ Task "finish" [])
             ]
     let newtb     = instantiateMod m tb
     let modWithTb = VerilogSrc $ Description <$> [newtb, m]
     writefile "main.v" $ genSource modWithTb
     runSimWithFile sim "main.v" bss
+    where m = mainModule rinfo
 
 runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> Sh ByteString
 runSimIcarusWithFile sim f _ = do

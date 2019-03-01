@@ -14,39 +14,39 @@ Yosys simulator implementation.
 
 module VeriFuzz.Yosys where
 
-import           Prelude                     hiding (FilePath)
+import           Prelude               hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text       (st)
+import           Text.Shakespeare.Text (st)
 import           VeriFuzz.AST
 import           VeriFuzz.CodeGen
-import           VeriFuzz.General
-import           VeriFuzz.Internal.Simulator
+import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 
 newtype Yosys = Yosys { yosysPath :: FilePath }
+              deriving (Eq, Show)
 
-instance Simulator Yosys where
+instance Tool Yosys where
   toText _ = "yosys"
 
-instance Synthesize Yosys where
+instance Synthesisor Yosys where
   runSynth = runSynthYosys
 
 defaultYosys :: Yosys
 defaultYosys = Yosys "yosys"
 
 writeSimFile
-    :: Yosys    -- ^ Simulator instance
-    -> ModDecl  -- ^ Current module
-    -> FilePath -- ^ Output sim file
+    :: Yosys      -- ^ Simulator instance
+    -> VerilogSrc -- ^ Current Verilog source
+    -> FilePath   -- ^ Output sim file
     -> Sh ()
-writeSimFile _ m file = do
-    writefile "rtl.v" $ genSource m
+writeSimFile _ src file = do
+    writefile "rtl.v" $ genSource src
     writefile file yosysSimConfig
 
-runSynthYosys :: Yosys -> ModDecl -> FilePath -> Sh ()
-runSynthYosys sim m outf = do
+runSynthYosys :: Yosys -> SourceInfo -> FilePath -> Sh ()
+runSynthYosys sim (SourceInfo _ src) outf = do
     dir <- pwd
-    writefile inpf $ genSource m
+    writefile inpf $ genSource src
     echoP "Yosys: synthesis"
     _ <- logger dir "yosys"
         $ timeout
@@ -57,20 +57,25 @@ runSynthYosys sim m outf = do
     inpf = "rtl.v"
     inp  = toTextIgnore inpf
     out  = toTextIgnore outf
-  -- ids = T.intercalate "," $ allVars m ^.. traverse . getIdentifier
 
-runMaybeSynth :: (Synthesize a) => Maybe a -> ModDecl -> Sh ()
-runMaybeSynth (Just sim) m =
-    runSynth sim m $ fromText [st|syn_#{toText sim}.v|]
-runMaybeSynth Nothing m = writefile "syn_rtl.v" $ genSource m
+runMaybeSynth :: (Synthesisor a) => Maybe a -> SourceInfo -> Sh ()
+runMaybeSynth (Just sim) srcInfo =
+    runSynth sim srcInfo $ fromText [st|syn_#{toText sim}.v|]
+runMaybeSynth Nothing (SourceInfo _ src) =
+    writefile "syn_rtl.v" $ genSource src
 
 runEquivYosys
-    :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
-runEquivYosys yosys sim1 sim2 m = do
-    writefile "top.v" . genSource . initMod $ makeTop 2 m
-    writefile checkFile $ yosysSatConfig sim1 sim2 m
-    runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
-    runMaybeSynth sim2 m
+    :: (Synthesisor a, Synthesisor b)
+    => Yosys
+    -> a
+    -> Maybe b
+    -> SourceInfo
+    -> Sh ()
+runEquivYosys yosys sim1 sim2 srcInfo = do
+    writefile "top.v" . genSource . initMod . makeTop 2 $ mainModule srcInfo
+    writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
+    runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
+    runMaybeSynth sim2 srcInfo
     echoP "Yosys: equivalence check"
     run_ (yosysPath yosys) [toTextIgnore checkFile]
     echoP "Yosys: equivalence done"
@@ -79,15 +84,20 @@ runEquivYosys yosys sim1 sim2 m = do
         fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
 runEquiv
-    :: (Synthesize a, Synthesize b) => Yosys -> a -> Maybe b -> ModDecl -> Sh ()
-runEquiv _ sim1 sim2 m = do
+    :: (Synthesisor a, Synthesisor b)
+    => Yosys
+    -> a
+    -> Maybe b
+    -> SourceInfo
+    -> Sh ()
+runEquiv _ sim1 sim2 srcInfo = do
     root <- rootPath
     dir  <- pwd
     echoP "SymbiYosys: setup"
-    writefile "top.v" . genSource . initMod $ makeTopAssert m
-    writefile "test.sby" $ sbyConfig root sim1 sim2 m
-    runSynth sim1 m $ fromText [st|syn_#{toText sim1}.v|]
-    runMaybeSynth sim2 m
+    writefile "top.v" . genSource . initMod . makeTopAssert $ mainModule srcInfo
+    writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
+    runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
+    runMaybeSynth sim2 srcInfo
     echoP "SymbiYosys: run"
-    _ <- logger dir "symbiyosys" $ run "sby" ["test.sby"]
+    _ <- logger dir "symbiyosys" $ run "sby" ["-f", "test.sby"]
     echoP "SymbiYosys: done"
