@@ -12,17 +12,15 @@ Class of the simulator and the synthesize tool.
 
 module VeriFuzz.Internal.Simulator where
 
-import           Control.Lens                   ( (^.)
-                                                , (^..)
-                                                )
-import           Data.Bits                      ( shiftL )
-import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString               as B
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Prelude                 hiding ( FilePath )
+import           Control.Lens          ((^.), (^..))
+import           Data.Bits             (shiftL)
+import           Data.ByteString       (ByteString)
+import qualified Data.ByteString       as B
+import           Data.Text             (Text)
+import qualified Data.Text             as T
+import           Prelude               hiding (FilePath)
 import           Shelly
-import           System.FilePath.Posix          ( takeBaseName )
+import           System.FilePath.Posix (takeBaseName)
 import           VeriFuzz.AST
 
 -- | Tool class.

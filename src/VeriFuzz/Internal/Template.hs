@@ -14,12 +14,12 @@ Template file for different configuration files.
 
 module VeriFuzz.Internal.Template where
 
-import           Control.Lens                   ( (^..) )
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Prelude                 hiding ( FilePath )
+import           Control.Lens                ((^..))
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
+import           Prelude                     hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text          ( st )
+import           Text.Shakespeare.Text       (st)
 import           VeriFuzz.AST
 import           VeriFuzz.Internal.Simulator
 
