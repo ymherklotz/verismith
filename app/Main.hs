@@ -25,6 +25,9 @@ data Opts = Fuzz { fuzzOutput :: Text
                      }
           | Parse { fileName :: S.FilePath
                   }
+          | Reduce { fileName :: S.FilePath
+                   , top      :: Text
+                   }
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -94,6 +97,21 @@ parseOpts :: Parser Opts
 parseOpts = Parse . S.fromText . T.pack <$> strArgument
     (metavar "FILE" <> help "Verilog input file.")
 
+reduceOpts :: Parser Opts
+reduceOpts =
+    Reduce
+        .   S.fromText
+        .   T.pack
+        <$> strArgument (metavar "FILE" <> help "Verilog input file.")
+        <*> textOption
+                (  short 't'
+                <> long "top"
+                <> metavar "TOP"
+                <> help "Name of top level module."
+                <> showDefault
+                <> value "main"
+                )
+
 argparse :: Parser Opts
 argparse =
     hsubparser
@@ -138,6 +156,17 @@ argparse =
                         )
                 <> metavar "parse"
                 )
+        <|> hsubparser
+                (  command
+                        "reduce"
+                        (info
+                            reduceOpts
+                            (progDesc
+                                "Reduce a Verilog file by rerunning the fuzzer on the file."
+                            )
+                        )
+                <> metavar "reduce"
+                )
 
 opts :: ParserInfo Opts
 opts = info
@@ -168,10 +197,18 @@ handleOpts (Parse f) = do
         Left  l -> print l
         Right v -> print $ V.GenVerilog v
     where file = T.unpack . S.toTextIgnore $ f
-handleOpts (Rerun _) = undefined
+handleOpts (Rerun _   ) = undefined
+handleOpts (Reduce f t) = do
+    verilogSrc <- readFile file
+    case V.parseVerilog file verilogSrc of
+        Left  l -> print l
+        Right v -> do
+            writeFile "main.v" . T.unpack $ V.genSource (V.SourceInfo t v)
+            vreduced <- V.runReduce (V.SourceInfo t v)
+            writeFile "reduced.v" . T.unpack $ V.genSource vreduced
+    where file = T.unpack $ S.toTextIgnore f
 
 main :: IO ()
- --main = sample (arbitrary :: Gen (Circuit Input))
 main = do
     optsparsed <- execParser opts
     handleOpts optsparsed
