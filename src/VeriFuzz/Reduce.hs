@@ -116,7 +116,8 @@ reduce_
 reduce_ repl eval src = do
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single False    ) -> if s /= src then reduce eval s else return s
+        (Single s, Single False) ->
+            if s /= src then reduce eval s else return s
         (Dual _ l, Dual True False ) -> reduce eval l
         (Dual r _, Dual False True ) -> reduce eval r
         (Dual r l, Dual False False) -> do
@@ -126,7 +127,7 @@ reduce_ repl eval src = do
                 then return lreduced
                 else return rreduced
         (None, None) -> return src
-        _ -> return src
+        _            -> return src
   where
     replacement = repl src
     evalIfNotEmpty m = do
@@ -144,5 +145,4 @@ reduce
     :: (SourceInfo -> IO Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.
     -> IO SourceInfo           -- ^ Reduced output.
-reduce eval src = reduce_ halveAssigns eval src
-                  >>= reduce_ halveExpr eval
+reduce eval src = reduce_ halveAssigns eval src >>= reduce_ halveExpr eval
