@@ -22,6 +22,7 @@ module VeriFuzz.Parser
     )
 where
 
+import           Control.Lens
 import           Data.Functor          (($>))
 import           Data.Functor.Identity (Identity)
 import qualified Data.Text             as T
@@ -213,14 +214,24 @@ parseModList :: Parser [Identifier]
 parseModList = list <|> spaces $> []
     where list = aroundList (string "(") (string ")") ident
 
+filterDecl :: PortDir -> ModItem -> Bool
+filterDecl p (Decl (Just p') _) = p == p'
+filterDecl _ _                  = False
+
+modPorts :: PortDir -> [ModItem] -> [Port]
+modPorts p mis = filter (filterDecl p) mis ^.. traverse . declPort
+
 parseModDecl :: Parser ModDecl
 parseModDecl = do
     name    <- reserved "module" *> ident
-    modL    <- fmap defaultPort <$> parseModList
+    _       <- fmap defaultPort <$> parseModList
     _       <- symbol ";"
     modItem <- lexeme $ option [] . try $ many1 parseModItem
     _       <- reserved "endmodule"
-    return $ ModDecl name [] modL modItem
+    return $ ModDecl name
+                     (modPorts PortOut modItem)
+                     (modPorts PortIn modItem)
+                     modItem
 
 parseDescription :: Parser Description
 parseDescription = Description <$> lexeme parseModDecl
