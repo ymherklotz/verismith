@@ -240,60 +240,63 @@ render = T.putStrLn . genSource
 -- Instances
 
 instance Source Identifier where
-  genSource = view getIdentifier
+    genSource = view getIdentifier
 
 instance Source Task where
-  genSource = genTask
+    genSource = genTask
 
 instance Source Stmnt where
-  genSource = genStmnt
+    genSource = genStmnt
 
 instance Source PortType where
-  genSource = genPortType
+    genSource = genPortType
 
 instance Source ConstExpr where
-  genSource = genConstExpr
+    genSource = genConstExpr
 
 instance Source LVal where
-  genSource = genLVal
+    genSource = genLVal
 
 instance Source Delay where
-  genSource = genDelay
+    genSource = genDelay
 
 instance Source Event where
-  genSource = genEvent
+    genSource = genEvent
 
 instance Source UnaryOperator where
-  genSource = genUnaryOperator
+    genSource = genUnaryOperator
 
 instance Source Expr where
-  genSource = genExpr
+    genSource = genExpr
 
 instance Source ContAssign where
-  genSource = genContAssign
+    genSource = genContAssign
 
 instance Source ModItem where
-  genSource = genModuleItem
+    genSource = genModuleItem
 
 instance Source PortDir where
-  genSource = genPortDir
+    genSource = genPortDir
 
 instance Source Port where
-  genSource = genPort
+    genSource = genPort
 
 instance Source ModDecl where
-  genSource = genModuleDecl
+    genSource = genModuleDecl
 
 instance Source Description where
-  genSource = genDescription
+    genSource = genDescription
 
 instance Source VerilogSrc where
-  genSource = genVerilogSrc
+    genSource = genVerilogSrc
 
 newtype GenVerilog a = GenVerilog { unGenVerilog :: a }
 
 instance (Source a) => Show (GenVerilog a) where
-  show = T.unpack . genSource . unGenVerilog
+    show = T.unpack . genSource . unGenVerilog
 
 instance (Arbitrary a) => Arbitrary (GenVerilog a) where
-  arbitrary = GenVerilog <$> arbitrary
+    arbitrary = GenVerilog <$> arbitrary
+
+instance Source SourceInfo where
+    genSource (SourceInfo _ src) = genSource src
