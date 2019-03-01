@@ -14,6 +14,7 @@ random patterns, such as nesting wires instead of creating new ones.
 module VeriFuzz.Mutate where
 
 import           Control.Lens
+import           Data.Foldable     (fold)
 import           Data.Maybe        (catMaybes, fromMaybe)
 import           Data.Text         (Text)
 import qualified Data.Text         as T
@@ -67,7 +68,7 @@ nestId i m
 
 -- | Replaces an identifier by a expression in all the module declaration.
 nestSource :: Identifier -> VerilogSrc -> VerilogSrc
-nestSource i src = src & getVerilogSrc . traverse . getDescription %~ nestId i
+nestSource i src = src & getModule %~ nestId i
 
 -- | Nest variables in the format @w[0-9]*@ up to a certain number.
 nestUpTo :: Int -> VerilogSrc -> VerilogSrc
@@ -239,3 +240,8 @@ removeId i = transform trans
     trans (Id ident) | ident `notElem` i = Number 1 0
                      | otherwise         = Id ident
     trans e = e
+
+combineAssigns :: Port -> [ModItem] -> [ModItem]
+combineAssigns p a =
+    a <> [ModCA . ContAssign (p ^. portName) . fold $ Id <$> assigns]
+    where assigns = a ^.. traverse . modContAssign . contAssignNetLVal
