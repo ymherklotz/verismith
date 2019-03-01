@@ -74,7 +74,7 @@ genRandom n = do
 
 makeSrcInfo :: ModDecl -> SourceInfo
 makeSrcInfo m =
-    (SourceInfo (m ^. modId . getIdentifier) (VerilogSrc [Description m]))
+    SourceInfo (m ^. modId . getIdentifier) (VerilogSrc [Description m])
 
 -- | Draw a randomly generated DAG to a dot file and compile it to a png so it
 -- can be seen.
