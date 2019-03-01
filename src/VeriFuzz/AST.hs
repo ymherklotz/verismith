@@ -112,6 +112,9 @@ module VeriFuzz.AST
     , modConn
     , modConnName
     , modExpr
+    -- * Useful Lenses and Traversals
+    , getModule
+    , getSourceId
     )
 where
 
@@ -151,11 +154,11 @@ instance QC.Arbitrary Delay where
   arbitrary = Delay <$> positiveArb
 
 -- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
-data Event = EId Identifier
-           | EExpr Expr
+data Event = EId {-# UNPACK #-} !Identifier
+           | EExpr !Expr
            | EAll
-           | EPosEdge Identifier
-           | ENegEdge Identifier
+           | EPosEdge {-# UNPACK #-} !Identifier
+           | ENegEdge {-# UNPACK #-} !Identifier
            deriving (Eq, Show, Ord, Data)
 
 instance QC.Arbitrary Event where
@@ -259,26 +262,26 @@ instance QC.Arbitrary Function where
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
-data Expr = Number { _exprSize :: Int
+data Expr = Number { _exprSize :: {-# UNPACK #-} !Int
                    , _exprVal  :: Integer
                    }
-          | Id { _exprId :: Identifier }
+          | Id { _exprId :: {-# UNPACK #-} !Identifier }
           | Concat { _exprConcat :: [Expr] }
-          | UnOp { _exprUnOp :: UnaryOperator
+          | UnOp { _exprUnOp :: !UnaryOperator
                  , _exprPrim :: Expr
                  }
           | BinOp { _exprLhs   :: Expr
-                  , _exprBinOp :: BinaryOperator
+                  , _exprBinOp :: !BinaryOperator
                   , _exprRhs   :: Expr
                   }
           | Cond { _exprCond  :: Expr
                  , _exprTrue  :: Expr
                  , _exprFalse :: Expr
                  }
-          | Func { _exprFunc :: Function
+          | Func { _exprFunc :: !Function
                  , _exprBody :: Expr
                  }
-          | Str { _exprStr :: Text }
+          | Str { _exprStr :: {-# UNPACK #-} !Text }
           deriving (Eq, Show, Ord, Data)
 
 instance Num Expr where
@@ -357,7 +360,7 @@ newtype ConstExpr = ConstExpr { _constNum :: Int }
 
 makeLenses ''ConstExpr
 
-data Task = Task { _taskName :: Identifier
+data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
                  , _taskExpr :: [Expr]
                  } deriving (Eq, Show, Ord, Data)
 
@@ -372,13 +375,13 @@ instance QC.Arbitrary Task where
 -- @
 -- {a, b, c} = 32'h94238;
 -- @
-data LVal = RegId { _regId :: Identifier}
-          | RegExpr { _regExprId :: Identifier
-                    , _regExpr   :: Expr
+data LVal = RegId { _regId :: {-# UNPACK #-} !Identifier }
+          | RegExpr { _regExprId :: {-# UNPACK #-} !Identifier
+                    , _regExpr   :: !Expr
                     }
-          | RegSize { _regSizeId  :: Identifier
-                    , _regSizeMSB :: ConstExpr
-                    , _regSizeLSB :: ConstExpr
+          | RegSize { _regSizeId  :: {-# UNPACK #-} !Identifier
+                    , _regSizeMSB :: !ConstExpr
+                    , _regSizeLSB :: !ConstExpr
                     }
           | RegConcat { _regConc :: [Expr] }
           deriving (Eq, Show, Ord, Data)
@@ -422,10 +425,10 @@ makeLenses ''PortType
 --
 -- This is now implemented inside 'ModDecl' itself, which uses a list of output
 -- and input ports.
-data Port = Port { _portType   :: PortType
-                 , _portSigned :: Bool
-                 , _portSize   :: Int
-                 , _portName   :: Identifier
+data Port = Port { _portType   :: !PortType
+                 , _portSigned :: !Bool
+                 , _portSize   :: {-# UNPACK #-} !Int
+                 , _portName   :: {-# UNPACK #-} !Identifier
                  } deriving (Eq, Show, Ord, Data)
 
 makeLenses ''Port
@@ -440,9 +443,9 @@ instance QC.Arbitrary Port where
 -- @
 -- mod a(.y(y1), .x1(x11), .x2(x22));
 -- @
-data ModConn = ModConn { _modConn :: Expr }
-             | ModConnNamed { _modConnName :: Identifier
-                            , _modExpr     :: Expr
+data ModConn = ModConn { _modConn :: !Expr }
+             | ModConnNamed { _modConnName :: {-# UNPACK #-} !Identifier
+                            , _modExpr     :: !Expr
                             }
              deriving (Eq, Show, Ord, Data)
 
@@ -451,9 +454,9 @@ makeLenses ''ModConn
 instance QC.Arbitrary ModConn where
   arbitrary = ModConn <$> QC.arbitrary
 
-data Assign = Assign { _assignReg   :: LVal
-                     , _assignDelay :: Maybe Delay
-                     , _assignExpr  :: Expr
+data Assign = Assign { _assignReg   :: !LVal
+                     , _assignDelay :: !(Maybe Delay)
+                     , _assignExpr  :: !Expr
                      } deriving (Eq, Show, Ord, Data)
 
 makeLenses ''Assign
@@ -461,8 +464,8 @@ makeLenses ''Assign
 instance QC.Arbitrary Assign where
   arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
-data ContAssign = ContAssign { _contAssignNetLVal :: Identifier
-                             , _contAssignExpr    :: Expr
+data ContAssign = ContAssign { _contAssignNetLVal :: {-# UNPACK #-} !Identifier
+                             , _contAssignExpr    :: !Expr
                              } deriving (Eq, Show, Ord, Data)
 
 makeLenses ''ContAssign
@@ -471,18 +474,18 @@ instance QC.Arbitrary ContAssign where
   arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
 
 -- | Statements in Verilog.
-data Stmnt = TimeCtrl { _statDelay :: Delay
-                      , _statDStat :: Maybe Stmnt
-                      }                             -- ^ Time control (@#NUM@)
-           | EventCtrl { _statEvent :: Event
-                       , _statEStat :: Maybe Stmnt
-                       }
-           | SeqBlock { _statements :: [Stmnt] }    -- ^ Sequential block (@begin ... end@)
-           | BlockAssign { _stmntBA :: Assign }     -- ^ blocking assignment (@=@)
-           | NonBlockAssign { _stmntNBA :: Assign } -- ^ Non blocking assignment (@<=@)
-           | StatCA { _stmntCA :: ContAssign }      -- ^ Stmnt continuous assignment. May not be correct.
-           | TaskEnable { _stmntTask :: Task}
-           | SysTaskEnable { _stmntSysTask :: Task}
+data Stmnt = TimeCtrl       { _statDelay :: {-# UNPACK #-} !Delay
+                            , _statDStat :: Maybe Stmnt
+                            }                                -- ^ Time control (@#NUM@)
+           | EventCtrl      { _statEvent :: !Event
+                            , _statEStat :: Maybe Stmnt
+                            }
+           | SeqBlock       { _statements   :: [Stmnt] }     -- ^ Sequential block (@begin ... end@)
+           | BlockAssign    { _stmntBA      :: !Assign }     -- ^ blocking assignment (@=@)
+           | NonBlockAssign { _stmntNBA     :: !Assign }     -- ^ Non blocking assignment (@<=@)
+           | StatCA         { _stmntCA      :: !ContAssign } -- ^ Stmnt continuous assignment. May not be correct.
+           | TaskEnable     { _stmntTask    :: !Task }
+           | SysTaskEnable  { _stmntSysTask :: !Task }
            deriving (Eq, Show, Ord, Data)
 
 makeLenses ''Stmnt
@@ -521,15 +524,15 @@ instance QC.Arbitrary Stmnt where
   arbitrary = QC.sized statement
 
 -- | Module item which is the body of the module expression.
-data ModItem = ModCA { _modContAssign :: ContAssign}
-             | ModInst { _modInstId    :: Identifier
-                       , _modInstName  :: Identifier
+data ModItem = ModCA { _modContAssign :: !ContAssign }
+             | ModInst { _modInstId    :: {-# UNPACK #-} !Identifier
+                       , _modInstName  :: {-# UNPACK #-} !Identifier
                        , _modInstConns :: [ModConn]
                        }
-             | Initial Stmnt
-             | Always Stmnt
-             | Decl { _declDir  :: Maybe PortDir
-                    , _declPort :: Port
+             | Initial !Stmnt
+             | Always !Stmnt
+             | Decl { _declDir  :: !(Maybe PortDir)
+                    , _declPort :: !Port
                     }
              deriving (Eq, Show, Ord, Data)
 
@@ -544,7 +547,7 @@ instance QC.Arbitrary ModItem where
                        ]
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
-data ModDecl = ModDecl { _modId       :: Identifier
+data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
                        , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
                        , _modItems    :: [ModItem]
@@ -580,3 +583,11 @@ newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
                    deriving (Eq, Show, Ord, Data, QC.Arbitrary, Semigroup, Monoid)
 
 makeLenses ''VerilogSrc
+
+getModule :: Traversal' VerilogSrc ModDecl
+getModule = getVerilogSrc . traverse . getDescription
+{-# INLINE getModule #-}
+
+getSourceId :: Traversal' VerilogSrc Text
+getSourceId = getModule . modId . getIdentifier
+{-# INLINE getSourceId #-}
