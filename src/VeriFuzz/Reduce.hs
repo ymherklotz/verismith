@@ -10,7 +10,8 @@ Portability : POSIX
 Test case reducer implementation.
 -}
 
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module VeriFuzz.Reduce
     ( reduce
@@ -33,6 +34,15 @@ instance Functor Replacement where
     fmap f (Single a) = Single $ f a
     fmap _ None       = None
 
+instance Applicative Replacement where
+    pure a = Single a
+    (Dual a b) <*> (Dual c d) = Dual (a c) $ b d
+    (Dual a b) <*> (Single c) = Dual (a c) $ b c
+    (Single a) <*> (Dual b c) = Dual (a b) $ a c
+    (Single a) <*> (Single b) = Single $ a b
+    None <*> _ = None
+    _ <*> None = None
+
 instance Foldable Replacement where
     foldMap _ None       = mempty
     foldMap f (Single a) = f a
@@ -49,8 +59,8 @@ halve []  = None
 halve [a] = Single [a]
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
-combine :: Lens' a b -> a -> (b -> Replacement b) -> Replacement a
-combine l i f = modify <$> f (i ^. l) where modify res = i & l .~ res
+combine :: Lens' a b -> (b -> Replacement b) -> a -> Replacement a
+combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 
 filterExpr :: [Identifier] -> Expr -> Expr
 filterExpr ids (Id i) = if i `notElem` ids then Number 1 0 else Id i
@@ -95,18 +105,25 @@ cleanMod m newm = modify . change <$> newm
 
 -- | Split a module declaration in half by trying to remove assign statements.
 halveAssigns :: SourceInfo -> Replacement SourceInfo
-halveAssigns vsrc = combine mainModule vsrc halveModAssign
+halveAssigns = combine mainModule halveModAssign
 
---halveIndExpr :: Expr -> Replacement Expr
---halveIndExpr (Concat (x : xs)) = Dual x $ Concat xs
---halveIndExpr (BinOp e1 _  e2 ) = Dual e1 e2
---halveIndExpr (Cond  _  e1 e2 ) = Dual e1 e2
---halveIndExpr (UnOp _ e       ) = Single e
---halveIndExpr (Func _ e       ) = Single e
---halveIndExpr _                 = None
+halveIndExpr :: Expr -> Replacement Expr
+halveIndExpr (Concat l)        = Concat <$> halve l
+halveIndExpr (BinOp e1 _  e2 ) = Dual e1 e2
+halveIndExpr (Cond  _  e1 e2 ) = Dual e1 e2
+halveIndExpr (UnOp _ e       ) = Single e
+halveIndExpr (Func _ e       ) = Single e
+halveIndExpr e                 = Single e
+
+halveModExpr :: ModItem -> Replacement ModItem
+halveModExpr (ModCA ca) = ModCA <$> combine contAssignExpr halveIndExpr ca
+halveModExpr a          = Single a
 
 halveExpr :: SourceInfo -> Replacement SourceInfo
-halveExpr _ = None
+halveExpr = combine contexpr $ traverse halveModExpr
+    where
+        contexpr :: Lens' SourceInfo [ModItem]
+        contexpr = mainModule . modItems
 
 reduce_
     :: (SourceInfo -> Replacement SourceInfo)
@@ -116,20 +133,31 @@ reduce_
 reduce_ repl eval src = do
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single False) ->
-            if s /= src then reduce eval s else return s
-        (Dual _ l, Dual True False ) -> reduce eval l
-        (Dual r _, Dual False True ) -> reduce eval r
+        (Single s, Single False) -> do
+            putStrLn "########## 1 ##########"
+            runIf s
+        (Dual _ l, Dual True False ) -> do
+            putStrLn "########## 2 ##########"
+            runIf l
+        (Dual r _, Dual False True ) -> do
+            putStrLn "########## 3 ##########"
+            runIf r
         (Dual r l, Dual False False) -> do
-            lreduced <- reduce eval l
-            rreduced <- reduce eval r
+            putStrLn "########## 4 ##########"
+            lreduced <- runIf l
+            rreduced <- runIf r
             if runSource lreduced < runSource rreduced
                 then return lreduced
                 else return rreduced
-        (None, None) -> return src
-        _            -> return src
+        (None, None) -> do
+            putStrLn "########## 5 ##########"
+            return src
+        _            -> do
+            putStrLn "########## 6 ##########"
+            return src
   where
     replacement = repl src
+    runIf s = if s /= src then reduce eval s else return s
     evalIfNotEmpty m = do
         print
             $   GenVerilog
