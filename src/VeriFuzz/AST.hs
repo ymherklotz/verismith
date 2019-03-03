@@ -112,6 +112,8 @@ module VeriFuzz.AST
     , modConn
     , modConnName
     , modExpr
+    -- * Useful functions
+    , positiveArb
     -- * Useful Lenses and Traversals
     , getModule
     , getSourceId

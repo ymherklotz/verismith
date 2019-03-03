@@ -191,7 +191,8 @@ makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop
 
 -- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl
-declareMod ports = modItems %~ (decl ++) where decl = Decl Nothing <$> ports
+declareMod ports = initMod . (modItems %~ (decl ++))
+    where decl = Decl Nothing <$> ports
 
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until

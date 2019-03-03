@@ -108,12 +108,12 @@ halveAssigns :: SourceInfo -> Replacement SourceInfo
 halveAssigns = combine mainModule halveModAssign
 
 halveIndExpr :: Expr -> Replacement Expr
-halveIndExpr (Concat l)        = Concat <$> halve l
-halveIndExpr (BinOp e1 _  e2 ) = Dual e1 e2
-halveIndExpr (Cond  _  e1 e2 ) = Dual e1 e2
-halveIndExpr (UnOp _ e       ) = Single e
-halveIndExpr (Func _ e       ) = Single e
-halveIndExpr e                 = Single e
+halveIndExpr (Concat l      ) = Concat <$> halve l
+halveIndExpr (BinOp e1 _  e2) = Dual e1 e2
+halveIndExpr (Cond  _  e1 e2) = Dual e1 e2
+halveIndExpr (UnOp _ e      ) = Single e
+halveIndExpr (Func _ e      ) = Single e
+halveIndExpr e                = Single e
 
 halveModExpr :: ModItem -> Replacement ModItem
 halveModExpr (ModCA ca) = ModCA <$> combine contAssignExpr halveIndExpr ca
@@ -121,9 +121,9 @@ halveModExpr a          = Single a
 
 halveExpr :: SourceInfo -> Replacement SourceInfo
 halveExpr = combine contexpr $ traverse halveModExpr
-    where
-        contexpr :: Lens' SourceInfo [ModItem]
-        contexpr = mainModule . modItems
+  where
+    contexpr :: Lens' SourceInfo [ModItem]
+    contexpr = mainModule . modItems
 
 reduce_
     :: (SourceInfo -> Replacement SourceInfo)
@@ -136,10 +136,10 @@ reduce_ repl eval src = do
         (Single s, Single False) -> do
             putStrLn "########## 1 ##########"
             runIf s
-        (Dual _ l, Dual True False ) -> do
+        (Dual _ l, Dual True False) -> do
             putStrLn "########## 2 ##########"
             runIf l
-        (Dual r _, Dual False True ) -> do
+        (Dual r _, Dual False True) -> do
             putStrLn "########## 3 ##########"
             runIf r
         (Dual r l, Dual False False) -> do
@@ -152,7 +152,7 @@ reduce_ repl eval src = do
         (None, None) -> do
             putStrLn "########## 5 ##########"
             return src
-        _            -> do
+        _ -> do
             putStrLn "########## 6 ##########"
             return src
   where
