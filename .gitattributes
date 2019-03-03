@@ -1,1 +1,2 @@
 bugs/*.v linguist-vendored=true
+data/*.v linguist-vendored=true
