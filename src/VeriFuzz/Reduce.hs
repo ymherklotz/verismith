@@ -35,7 +35,7 @@ instance Functor Replacement where
     fmap _ None       = None
 
 instance Applicative Replacement where
-    pure a = Single a
+    pure = Single
     (Dual a b) <*> (Dual c d) = Dual (a c) $ b d
     (Dual a b) <*> (Single c) = Dual (a c) $ b c
     (Single a) <*> (Dual b c) = Dual (a b) $ a c
