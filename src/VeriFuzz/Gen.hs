@@ -12,7 +12,13 @@ Various useful generators.
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module VeriFuzz.Gen where
+module VeriFuzz.Gen
+    ( -- * Generation methods
+      procedural
+    , fromGraph
+    , randomMod
+    )
+where
 
 import           Control.Lens                   hiding (Context)
 import           Control.Monad                  (replicateM)
@@ -25,13 +31,12 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
-import           VeriFuzz.CodeGen
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 import           VeriFuzz.Random
 
 data Context = Context { _variables :: [Port]
-                       , _modules   :: [ModDecl]
+--                       , _modules   :: [ModDecl]
                        }
 
 makeLenses ''Context
@@ -40,11 +45,11 @@ data ProbModItem = ProbModItem { _probAssign :: {-# UNPACK #-} !Int
                                , _probAlways :: {-# UNPACK #-} !Int
                                }
 
-makeLenses ''ProbModItem
+--makeLenses ''ProbModItem
 
 data Probabilities = Probabilities { _probModItem :: {-# UNPACK #-} !ProbModItem }
 
-makeLenses ''Probabilities
+--makeLenses ''Probabilities
 
 type StateGen =  StateT Context (ReaderT Probabilities Gen)
 
@@ -64,12 +69,12 @@ random ctx fun = do
     expr <- QC.sized (exprWithContext ctx)
     return . ModCA $ fun expr
 
-randomAssigns :: [Identifier] -> [Gen ModItem]
-randomAssigns ids = random ids . ContAssign <$> ids
+--randomAssigns :: [Identifier] -> [Gen ModItem]
+--randomAssigns ids = random ids . ContAssign <$> ids
 
 randomOrdAssigns :: [Identifier] -> [Identifier] -> [Gen ModItem]
-randomOrdAssigns inp ids = snd $ foldr gen (inp, []) ids
-    where gen cid (i, o) = (cid : i, random i (ContAssign cid) : o)
+randomOrdAssigns inp ids = snd $ foldr generate (inp, []) ids
+    where generate cid (i, o) = (cid : i, random i (ContAssign cid) : o)
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
@@ -147,4 +152,4 @@ procedural =
         <$> runReaderT (evalStateT (proceduralMod True) context) config
   where
     config  = Probabilities (ProbModItem 5 1)
-    context = Context [] []
+    context = Context []
