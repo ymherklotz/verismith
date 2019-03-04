@@ -41,17 +41,23 @@ newtype Config = Config { _configProbability :: Probability }
 makeLenses ''Config
 
 defaultValue
-  :: (Alternative r, Applicative w) =>
-     b -> Toml.Codec r w a b -> Toml.Codec r w a b
+    :: (Alternative r, Applicative w)
+    => b
+    -> Toml.Codec r w a b
+    -> Toml.Codec r w a b
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 probCodec :: TomlCodec Probability
-probCodec = Probability
-    <$> Toml.int "assign" .= _probAssign
-    <*> defaultValue 1 (Toml.int "always") .= _probAlways
+probCodec =
+    Probability
+        <$> Toml.int "assign"
+        .=  _probAssign
+        <*> defaultValue 1 (Toml.int "always")
+        .=  _probAlways
 
 configCodec :: TomlCodec Config
-configCodec = Toml.dimap _configProbability Config $ Toml.table probCodec "probability"
+configCodec =
+    Toml.dimap _configProbability Config $ Toml.table probCodec "probability"
 
 parseConfigFile :: FilePath -> IO Config
 parseConfigFile = Toml.decodeFile configCodec
