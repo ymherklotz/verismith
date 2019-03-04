@@ -31,6 +31,7 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
+import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 import           VeriFuzz.Random
@@ -41,17 +42,7 @@ data Context = Context { _variables :: [Port]
 
 makeLenses ''Context
 
-data ProbModItem = ProbModItem { _probAssign :: {-# UNPACK #-} !Int
-                               , _probAlways :: {-# UNPACK #-} !Int
-                               }
-
---makeLenses ''ProbModItem
-
-data Probabilities = Probabilities { _probModItem :: {-# UNPACK #-} !ProbModItem }
-
---makeLenses ''Probabilities
-
-type StateGen =  StateT Context (ReaderT Probabilities Gen)
+type StateGen =  StateT Context (ReaderT Probability Gen)
 
 toId :: Int -> Identifier
 toId = Identifier . ("w" <>) . T.pack . show
@@ -151,5 +142,5 @@ procedural =
         .   Description
         <$> runReaderT (evalStateT (proceduralMod True) context) config
   where
-    config  = Probabilities (ProbModItem 5 1)
+    config  = Probability 1 1
     context = Context []
