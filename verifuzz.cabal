@@ -23,6 +23,7 @@ library
   ghc-options: -Wall -Werror
   exposed-modules: VeriFuzz
                  , VeriFuzz.AST
+                 , VeriFuzz.Config
                  , VeriFuzz.Internal
                  , VeriFuzz.Internal.AST
                  , VeriFuzz.Internal.Circuit
@@ -53,7 +54,6 @@ library
                , shelly >=1.8.0 && <1.9
                , text >=1.2 && <1.3
                , bytestring >=0.10 && <0.11
-               , hashable >=1.2 && <1.3
                , filepath >=1.4.2 && <1.5
                , binary >= 0.8.6 && <0.9
                , cryptonite >=0.25 && <0.26
@@ -61,6 +61,7 @@ library
                , DRBG >=0.5 && <0.6
                , parsec >=3.1 && <3.2
                , transformers >=0.5 && <0.6
+               , tomland >=0.5 && <0.6
   default-extensions: OverloadedStrings
 
 executable verifuzz
