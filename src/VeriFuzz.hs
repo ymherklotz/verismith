@@ -15,6 +15,7 @@ module VeriFuzz
     , draw
     , SourceInfo(..)
     , module VeriFuzz.AST
+    , module VeriFuzz.Config
     , module VeriFuzz.ASTGen
     , module VeriFuzz.Circuit
     , module VeriFuzz.CodeGen
@@ -49,6 +50,7 @@ import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
 import           VeriFuzz.Circuit
 import           VeriFuzz.CodeGen
+import           VeriFuzz.Config
 import           VeriFuzz.Env
 import           VeriFuzz.Gen
 import           VeriFuzz.Icarus
