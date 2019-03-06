@@ -36,9 +36,9 @@ import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 import           VeriFuzz.Random
 
-data Context = Context { _variables :: [Port]
---                       , _modules   :: [ModDecl]
-                       }
+newtype Context = Context { _variables :: [Port]
+                          --                       , _modules   :: [ModDecl]
+                          }
 
 makeLenses ''Context
 
@@ -128,7 +128,7 @@ proceduralMod top = do
     amount   <- gen positiveArb
     mi       <- replicateM amount proceduralModItem
     context  <- get
-    let local = filter (\p -> notElem p portList) $ context ^. variables
+    let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
     let yport = Port Wire False size "y"
     return . declareMod local . ModDecl name [yport] portList $ combineAssigns
