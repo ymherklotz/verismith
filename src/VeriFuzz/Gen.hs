@@ -31,7 +31,6 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
-import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
@@ -54,7 +53,7 @@ toPort ident = do
     return $ wire i ident
 
 sumSize :: [Port] -> Int
-sumSize ports = sum $ ports ^.. traverse . portSize
+sumSize ps = sum $ ps ^.. traverse . portSize
 
 random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
 random ctx fun = do
@@ -96,28 +95,31 @@ fromGraph = do
 gen :: Gen a -> StateGen a
 gen = lift . lift
 
-proceduralContAssign :: StateGen ContAssign
-proceduralContAssign = do
+contAssign :: StateGen ContAssign
+contAssign = do
     name    <- gen QC.arbitrary
     size    <- gen positiveArb
     signed  <- gen QC.arbitrary
-    context <- get
     variables %= (Port Wire signed size name :)
-    ContAssign name
-        <$> (   gen
-            .   QC.sized
-            .   exprWithContext
-            $   context
-            ^.. variables
-            .   traverse
-            .   portName
-            )
+    ContAssign name <$> scopedExpr
+
+
+scopedExpr :: StateGen Expr
+scopedExpr = do
+    context <- get
+    gen
+        .   QC.sized
+        .   exprWithContext
+        $   context
+        ^.. variables
+        .   traverse
+        .   portName
 
 lvalFromPort :: Port -> LVal
 lvalFromPort (Port _ _ _ i) = RegId i
 
-proceduralReg :: StateGen LVal
-proceduralReg = do
+scopedReg :: StateGen LVal
+scopedReg = do
     context <- get
     gen
         .  QC.elements
@@ -129,43 +131,49 @@ proceduralReg = do
 probability :: Config -> Probability
 probability c = c ^. configProbability
 
-askProbability :: StateT Context (ReaderT Config Gen) Probability
+askProbability :: StateGen Probability
 askProbability = lift $ asks probability
 
-proceduralStatement :: StateGen Statement
-proceduralStatement = do
+assignment :: StateGen Assign
+assignment = do
+    lval <- scopedReg
+    Assign lval Nothing <$> scopedExpr
+
+statement :: StateGen Statement
+statement = do
     prob <- askProbability
+    as <- assignment
     gen $ QC.frequency
-        [ (prob ^. probBlock   , BlockAssign <$> QC.arbitrary)
-        , (prob ^. probNonBlock, NonBlockAssign <$> QC.arbitrary)
+        [ (prob ^. probBlock   , return $ BlockAssign as)
+        , (prob ^. probNonBlock, return $ NonBlockAssign as)
         ]
 
-proceduralModItem :: StateGen ModItem
-proceduralModItem = do
+modItem :: StateGen ModItem
+modItem = do
     prob      <- askProbability
     amount    <- gen positiveArb
-    statement <- fold <$> replicateM amount proceduralStatement
+    stat <- fold <$> replicateM amount statement
     event     <- gen QC.arbitrary
-    modCA     <- ModCA <$> proceduralContAssign
+    modCA     <- ModCA <$> contAssign
     gen $ QC.frequency
         [ (prob ^. probAssign, return modCA)
         , ( prob ^. probAlways
-          , return $ Always (EventCtrl event (Just statement))
+          , return $ Always (EventCtrl event (Just stat))
           )
         ]
 
-proceduralPorts :: StateGen [Port]
-proceduralPorts = do
+ports :: StateGen [Port]
+ports = do
     portList <- gen $ QC.listOf1 QC.arbitrary
     variables %= (<> portList)
     return portList
 
-proceduralMod :: Bool -> StateGen ModDecl
-proceduralMod top = do
+moduleDef :: Bool -> StateGen ModDecl
+moduleDef top = do
     name     <- if top then return "top" else gen QC.arbitrary
-    portList <- proceduralPorts
+    portList <- ports
     amount   <- gen positiveArb
-    mi       <- replicateM amount proceduralModItem
+    mi       <- replicateM amount modItem
     context  <- get
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
@@ -179,5 +187,6 @@ procedural config =
     VerilogSrc
         .   (: [])
         .   Description
-        <$> runReaderT (evalStateT (proceduralMod True) context) config
+        <$> QC.resize num (runReaderT (evalStateT (moduleDef True) context) config)
     where context = Context []
+          num = config ^. configProperty . propSize
