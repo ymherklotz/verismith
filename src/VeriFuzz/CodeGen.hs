@@ -37,10 +37,10 @@ import           VeriFuzz.Internal
 class Source a where
   genSource :: a -> Text
 
--- | Map a 'Maybe Stmnt' to 'Text'. If it is 'Just stmnt', the generated
+-- | Map a 'Maybe Statement' to 'Text'. If it is 'Just statement', the generated
 -- statements are returned. If it is 'Nothing', then @;\n@ is returned.
-defMap :: Maybe Stmnt -> Text
-defMap = maybe ";\n" genStmnt
+defMap :: Maybe Statement -> Text
+defMap = maybe ";\n" genStatement
 
 -- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
 genVerilogSrc :: VerilogSrc -> Text
@@ -99,8 +99,8 @@ genModuleItem :: ModItem -> Text
 genModuleItem (ModCA ca) = genContAssign ca
 genModuleItem (ModInst (Identifier i) (Identifier name) conn) =
     i <> " " <> name <> "(" <> comma (genModConn <$> conn) <> ")" <> ";\n"
-genModuleItem (Initial stat ) = "initial " <> genStmnt stat
-genModuleItem (Always  stat ) = "always " <> genStmnt stat
+genModuleItem (Initial stat ) = "initial " <> genStatement stat
+genModuleItem (Always  stat ) = "always " <> genStatement stat
 genModuleItem (Decl dir port) = maybe "" makePort dir <> genPort port <> ";\n"
     where makePort = (<> " ") . genPortDir
 
@@ -217,15 +217,15 @@ genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
     genLVal r <> op <> maybe "" genDelay d <> genExpr e
 
-genStmnt :: Stmnt -> Text
-genStmnt (TimeCtrl  d stat   ) = genDelay d <> " " <> defMap stat
-genStmnt (EventCtrl e stat   ) = genEvent e <> " " <> defMap stat
-genStmnt (SeqBlock       s   ) = "begin\n" <> fold (genStmnt <$> s) <> "end\n"
-genStmnt (BlockAssign    a   ) = genAssign " = " a <> ";\n"
-genStmnt (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
-genStmnt (StatCA         a   ) = genContAssign a
-genStmnt (TaskEnable     task) = genTask task <> ";\n"
-genStmnt (SysTaskEnable  task) = "$" <> genTask task <> ";\n"
+genStatement :: Statement -> Text
+genStatement (TimeCtrl  d stat   ) = genDelay d <> " " <> defMap stat
+genStatement (EventCtrl e stat   ) = genEvent e <> " " <> defMap stat
+genStatement (SeqBlock       s   ) = "begin\n" <> fold (genStatement <$> s) <> "end\n"
+genStatement (BlockAssign    a   ) = genAssign " = " a <> ";\n"
+genStatement (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
+genStatement (StatCA         a   ) = genContAssign a
+genStatement (TaskEnable     task) = genTask task <> ";\n"
+genStatement (SysTaskEnable  task) = "$" <> genTask task <> ";\n"
 
 genTask :: Task -> Text
 genTask (Task name expr)
@@ -245,8 +245,8 @@ instance Source Identifier where
 instance Source Task where
     genSource = genTask
 
-instance Source Stmnt where
-    genSource = genStmnt
+instance Source Statement where
+    genSource = genStatement
 
 instance Source PortType where
     genSource = genPortType

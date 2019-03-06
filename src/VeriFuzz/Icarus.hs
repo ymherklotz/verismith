@@ -50,7 +50,7 @@ instance Simulator Icarus where
 defaultIcarus :: Icarus
 defaultIcarus = Icarus "iverilog" "vvp"
 
-addDisplay :: [Stmnt] -> [Stmnt]
+addDisplay :: [Statement] -> [Statement]
 addDisplay s = concat $ transpose
     [ s
     , replicate l $ TimeCtrl 1 Nothing
@@ -58,7 +58,7 @@ addDisplay s = concat $ transpose
     ]
     where l = length s
 
-assignFunc :: [Port] -> ByteString -> Stmnt
+assignFunc :: [Port] -> ByteString -> Statement
 assignFunc inp bs =
     NonBlockAssign . Assign conc Nothing . Number (B.length bs * 8) $ bsToI bs
     where conc = RegConcat (portToExpr <$> inp)

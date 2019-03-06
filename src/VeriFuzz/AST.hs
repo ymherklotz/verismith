@@ -83,7 +83,7 @@ module VeriFuzz.AST
     , contAssignNetLVal
     , contAssignExpr
     -- * Statment
-    , Stmnt(..)
+    , Statement(..)
     , statDelay
     , statDStat
     , statEvent
@@ -476,32 +476,32 @@ instance QC.Arbitrary ContAssign where
   arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
 
 -- | Statements in Verilog.
-data Stmnt = TimeCtrl       { _statDelay :: {-# UNPACK #-} !Delay
-                            , _statDStat :: Maybe Stmnt
-                            }                                -- ^ Time control (@#NUM@)
-           | EventCtrl      { _statEvent :: !Event
-                            , _statEStat :: Maybe Stmnt
-                            }
-           | SeqBlock       { _statements   :: [Stmnt] }     -- ^ Sequential block (@begin ... end@)
-           | BlockAssign    { _stmntBA      :: !Assign }     -- ^ blocking assignment (@=@)
+data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
+                          , _statDStat :: Maybe Statement
+                          }                                -- ^ Time control (@#NUM@)
+           | EventCtrl { _statEvent :: !Event
+                       , _statEStat :: Maybe Statement
+                       }
+           | SeqBlock { _statements   :: [Statement] }     -- ^ Sequential block (@begin ... end@)
+           | BlockAssign { _stmntBA      :: !Assign }     -- ^ blocking assignment (@=@)
            | NonBlockAssign { _stmntNBA     :: !Assign }     -- ^ Non blocking assignment (@<=@)
-           | StatCA         { _stmntCA      :: !ContAssign } -- ^ Stmnt continuous assignment. May not be correct.
-           | TaskEnable     { _stmntTask    :: !Task }
-           | SysTaskEnable  { _stmntSysTask :: !Task }
+           | StatCA { _stmntCA      :: !ContAssign } -- ^ Statement continuous assignment. May not be correct.
+           | TaskEnable { _stmntTask    :: !Task }
+           | SysTaskEnable { _stmntSysTask :: !Task }
            deriving (Eq, Show, Ord, Data)
 
-makeLenses ''Stmnt
+makeLenses ''Statement
 
-instance Semigroup Stmnt where
+instance Semigroup Statement where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
   (SeqBlock a) <> b = SeqBlock $ a <> [b]
   a <> (SeqBlock b) = SeqBlock $ a : b
   a <> b = SeqBlock [a, b]
 
-instance Monoid Stmnt where
+instance Monoid Statement where
   mempty = SeqBlock []
 
-statement :: Int -> QC.Gen Stmnt
+statement :: Int -> QC.Gen Statement
 statement n
     | n == 0 = QC.oneof
         [ BlockAssign <$> QC.arbitrary
@@ -522,7 +522,7 @@ statement n
     | otherwise = statement 0
     where substat y = statement (n `div` y)
 
-instance QC.Arbitrary Stmnt where
+instance QC.Arbitrary Statement where
   arbitrary = QC.sized statement
 
 -- | Module item which is the body of the module expression.
@@ -531,8 +531,8 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
                        , _modInstName  :: {-# UNPACK #-} !Identifier
                        , _modInstConns :: [ModConn]
                        }
-             | Initial !Stmnt
-             | Always !Stmnt
+             | Initial !Statement
+             | Always !Statement
              | Decl { _declDir  :: !(Maybe PortDir)
                     , _declPort :: !Port
                     }
