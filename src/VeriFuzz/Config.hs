@@ -16,6 +16,8 @@ module VeriFuzz.Config
     ( Config(..)
     , defaultConfig
     , Probability(..)
+    , probBlock
+    , probNonBlock
     , probAssign
     , probAlways
     , propSize
@@ -34,8 +36,10 @@ import           Data.Text           (Text)
 import           Toml                (TomlCodec, (.=))
 import qualified Toml
 
-data Probability = Probability { _probAssign :: {-# UNPACK #-} !Int
-                               , _probAlways :: {-# UNPACK #-} !Int
+data Probability = Probability { _probAssign   :: {-# UNPACK #-} !Int
+                               , _probAlways   :: {-# UNPACK #-} !Int
+                               , _probBlock    :: {-# UNPACK #-} !Int
+                               , _probNonBlock :: {-# UNPACK #-} !Int
                                }
                  deriving (Eq, Show)
 
@@ -63,8 +67,7 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig =
-    Config (Probability 1 1) (Property 100 Nothing)
+defaultConfig = Config (Probability 1 1 1 1) (Property 100 Nothing)
 
 probCodec :: TomlCodec Probability
 probCodec =
@@ -73,8 +76,11 @@ probCodec =
         .=  _probAssign
         <*> defaultValue (defProb probAlways) (Toml.int "always")
         .=  _probAlways
-    where
-        defProb i = defaultConfig ^. configProbability . i
+        <*> defaultValue (defProb probBlock) (Toml.int "blocking")
+        .=  _probAlways
+        <*> defaultValue (defProb probNonBlock) (Toml.int "nonblocking")
+        .=  _probAlways
+    where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec Property
 propCodec =
@@ -82,30 +88,28 @@ propCodec =
         <$> defaultValue (defProp propSize) (Toml.int "size")
         .=  _propSize
         <*> Toml.dioptional (Toml.int "seed")
-        .= _propSeed
-    where
-        defProp i = defaultConfig ^. configProperty . i
+        .=  _propSeed
+    where defProp i = defaultConfig ^. configProperty . i
 
 configCodec :: TomlCodec Config
-configCodec = Config
-    <$> defaultValue (defaultConfig ^. configProbability) (Toml.table probCodec "probability")
-    .= _configProbability
-    <*> defaultValue (defaultConfig ^. configProperty) (Toml.table propCodec "property")
-    .= _configProperty
+configCodec =
+    Config
+        <$> defaultValue (defaultConfig ^. configProbability)
+                         (Toml.table probCodec "probability")
+        .=  _configProbability
+        <*> defaultValue (defaultConfig ^. configProperty)
+                         (Toml.table propCodec "property")
+        .=  _configProperty
 
 parseConfigFile :: FilePath -> IO Config
 parseConfigFile = Toml.decodeFile configCodec
 
 parseConfig :: Text -> Config
 parseConfig t = case Toml.decode configCodec t of
-    Right c -> c
-    Left Toml.TrivialError ->
-        error "Trivial error while parsing Toml config"
-    Left (Toml.KeyNotFound k) ->
-        error $ "Key " ++ show k ++ " not found"
-    Left (Toml.TableNotFound k) ->
-        error $ "Table " ++ show k ++ " not found"
+    Right c                      -> c
+    Left Toml.TrivialError -> error "Trivial error while parsing Toml config"
+    Left  (Toml.KeyNotFound   k) -> error $ "Key " ++ show k ++ " not found"
+    Left  (Toml.TableNotFound k) -> error $ "Table " ++ show k ++ " not found"
     Left (Toml.TypeMismatch k _ _) ->
         error $ "Type mismatch with key " ++ show k
-    Left (Toml.ParseError _) ->
-        error "Config file parse error"
+    Left (Toml.ParseError _) -> error "Config file parse error"

@@ -220,7 +220,7 @@ genAssign op (Assign r d e) =
 genStatement :: Statement -> Text
 genStatement (TimeCtrl  d stat   ) = genDelay d <> " " <> defMap stat
 genStatement (EventCtrl e stat   ) = genEvent e <> " " <> defMap stat
-genStatement (SeqBlock       s   ) = "begin\n" <> fold (genStatement <$> s) <> "end\n"
+genStatement (SeqBlock s) = "begin\n" <> fold (genStatement <$> s) <> "end\n"
 genStatement (BlockAssign    a   ) = genAssign " = " a <> ";\n"
 genStatement (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
 genStatement (StatCA         a   ) = genContAssign a

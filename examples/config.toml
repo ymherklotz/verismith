@@ -1,6 +1,9 @@
 [property]
-seed = 1203
+seed = 12345
+size = 100
 
 [probability]
-assign = 5
+assign = 1
 always = 1
+blocking = 1
+nonblocking = 1
