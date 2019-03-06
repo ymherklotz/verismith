@@ -1,4 +1,6 @@
-[probability]
+[property]
+seed = 1203
 
+[probability]
 assign = 5
 always = 1
