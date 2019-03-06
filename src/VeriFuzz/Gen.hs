@@ -31,6 +31,7 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
+import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
@@ -42,7 +43,7 @@ newtype Context = Context { _variables :: [Port]
 
 makeLenses ''Context
 
-type StateGen =  StateT Context (ReaderT Probability Gen)
+type StateGen =  StateT Context (ReaderT Config Gen)
 
 toId :: Int -> Identifier
 toId = Identifier . ("w" <>) . T.pack . show
@@ -112,8 +113,46 @@ proceduralContAssign = do
             .   portName
             )
 
+lvalFromPort :: Port -> LVal
+lvalFromPort (Port _ _ _ i) = RegId i
+
+proceduralReg :: StateGen LVal
+proceduralReg = do
+    context <- get
+    gen
+        .  QC.elements
+        .  fmap lvalFromPort
+        .  filter (\p -> p ^. portType == Reg)
+        $  context
+        ^. variables
+
+probability :: Config -> Probability
+probability c = c ^. configProbability
+
+askProbability :: StateT Context (ReaderT Config Gen) Probability
+askProbability = lift $ asks probability
+
+proceduralStatement :: StateGen Statement
+proceduralStatement = do
+    prob <- askProbability
+    gen $ QC.frequency
+        [ (prob ^. probBlock   , BlockAssign <$> QC.arbitrary)
+        , (prob ^. probNonBlock, NonBlockAssign <$> QC.arbitrary)
+        ]
+
 proceduralModItem :: StateGen ModItem
-proceduralModItem = ModCA <$> proceduralContAssign
+proceduralModItem = do
+    prob      <- askProbability
+    amount    <- gen positiveArb
+    statement <- fold <$> replicateM amount proceduralStatement
+    event     <- gen QC.arbitrary
+    modCA     <- ModCA <$> proceduralContAssign
+    gen $ QC.frequency
+        [ (prob ^. probAssign, return modCA)
+        , ( prob ^. probAlways
+          , return $ Always (EventCtrl event (Just statement))
+          )
+        ]
 
 proceduralPorts :: StateGen [Port]
 proceduralPorts = do
@@ -135,12 +174,10 @@ proceduralMod top = do
         yport
         mi
 
-procedural :: Gen VerilogSrc
-procedural =
+procedural :: Config -> Gen VerilogSrc
+procedural config =
     VerilogSrc
         .   (: [])
         .   Description
         <$> runReaderT (evalStateT (proceduralMod True) context) config
-  where
-    config  = Probability 1 1
-    context = Context []
+    where context = Context []
