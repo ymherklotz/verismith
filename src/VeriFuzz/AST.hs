@@ -131,7 +131,7 @@ import           Data.Traversable (sequenceA)
 import qualified Test.QuickCheck  as QC
 
 positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
-positiveArb = QC.suchThat QC.arbitrary (> 0)
+positiveArb = abs <$> QC.suchThat QC.arbitrary (/= 0)
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
