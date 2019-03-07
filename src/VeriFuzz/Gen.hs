@@ -31,6 +31,7 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
+import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
@@ -95,14 +96,21 @@ fromGraph = do
 gen :: Gen a -> StateGen a
 gen = lift . lift
 
+some :: StateGen a -> StateGen [a]
+some f = do
+    amount <- gen positiveArb
+    replicateM amount f
+
+newPort :: PortType -> StateGen Port
+newPort pt = do
+    p <- gen $ Port pt <$> QC.arbitrary <*> positiveArb <*> QC.arbitrary
+    variables %= (p :)
+    return p
+
 contAssign :: StateGen ContAssign
 contAssign = do
-    name    <- gen QC.arbitrary
-    size    <- gen positiveArb
-    signed  <- gen QC.arbitrary
-    variables %= (Port Wire signed size name :)
-    ContAssign name <$> scopedExpr
-
+    p <- newPort Wire
+    ContAssign (p ^. portName) <$> scopedExpr
 
 scopedExpr :: StateGen Expr
 scopedExpr = do
@@ -136,7 +144,7 @@ askProbability = lift $ asks probability
 
 assignment :: StateGen Assign
 assignment = do
-    lval <- scopedReg
+    lval <- lvalFromPort <$> newPort Reg
     Assign lval Nothing <$> scopedExpr
 
 statement :: StateGen Statement
@@ -162,16 +170,10 @@ modItem = do
           )
         ]
 
-ports :: StateGen [Port]
-ports = do
-    portList <- gen $ QC.listOf1 QC.arbitrary
-    variables %= (<> portList)
-    return portList
-
 moduleDef :: Bool -> StateGen ModDecl
 moduleDef top = do
     name     <- if top then return "top" else gen QC.arbitrary
-    portList <- ports
+    portList <- some $ newPort Wire
     amount   <- gen positiveArb
     mi       <- replicateM amount modItem
     context  <- get

@@ -67,7 +67,7 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability 1 1 1 1) (Property 100 Nothing)
+defaultConfig = Config (Probability 10 1 1 1) (Property 50 Nothing)
 
 probCodec :: TomlCodec Probability
 probCodec =
