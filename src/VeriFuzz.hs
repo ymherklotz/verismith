@@ -63,16 +63,16 @@ import           VeriFuzz.XST
 import           VeriFuzz.Yosys
 
 -- | Generate a specific number of random bytestrings of size 256.
-genRand :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-genRand gen n bytes | n == 0    = ranBytes : bytes
-                    | otherwise = genRand newGen (n - 1) $ ranBytes : bytes
+randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
+randomByteString gen n bytes | n == 0    = ranBytes : bytes
+                    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
     where Right (ranBytes, newGen) = C.genBytes 32 gen
 
 -- | generates the specific number of bytestring with a random seed.
-genRandom :: Int -> IO [ByteString]
-genRandom n = do
+generateByteString :: Int -> IO [ByteString]
+generateByteString n = do
     gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ genRand gen n []
+    return $ randomByteString gen n []
 
 makeSrcInfo :: ModDecl -> SourceInfo
 makeSrcInfo m =
@@ -102,7 +102,7 @@ runSimulation = do
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
-    rand  <- genRandom 20
+    rand  <- generateByteString 20
     rand2 <- QC.generate (randomMod 10 100)
     val   <- shelly $ runSim defaultIcarus (makeSrcInfo rand2) rand
     T.putStrLn $ showBS val
@@ -139,7 +139,7 @@ runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
     m <- QC.generate gm
     let srcInfo = makeSrcInfo m
-    rand <- genRandom 20
+    rand <- generateByteString 20
     shellyFailDir $ do
         mkdir_p (fromText "output" </> fromText n)
         curr <- toTextIgnore <$> pwd

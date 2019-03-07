@@ -17,16 +17,17 @@ instance Show Tool where
   show XST    = "xst"
   show Icarus = "icarus"
 
-data Opts = Fuzz { fuzzOutput :: Text
+data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
                  }
-          | Rerun { tool :: Tool
+          | Rerun { tools :: [Tool]
+                  , input :: {-# UNPACK #-} !S.FilePath
                   }
-          | Generate { fileName :: S.FilePath
+          | Generate { fileName :: {-# UNPACK #-} !S.FilePath
                      }
-          | Parse { fileName :: S.FilePath
+          | Parse { fileName :: {-# UNPACK #-} !S.FilePath
                   }
-          | Reduce { fileName :: S.FilePath
-                   , top      :: Text
+          | Reduce { fileName :: {-# UNPACK #-} !S.FilePath
+                   , top      :: {-# UNPACK #-} !Text
                    }
 
 myForkIO :: IO () -> IO (MVar ())
@@ -65,7 +66,7 @@ fuzzOpts = Fuzz <$> textOption
 rerunOpts :: Parser Opts
 rerunOpts =
     Rerun
-        <$> (   option
+        <$> some (option
                     (optReader parseSynth)
                     (  long "synth"
                     <> metavar "SYNTH"
@@ -82,6 +83,13 @@ rerunOpts =
                     <> value Icarus
                     )
             )
+        <*> (S.fromText <$> textOption
+            ( long "input"
+              <> short 'i'
+              <> metavar "FILE"
+              <> help "Verilog file input."
+              <> showDefault
+              <> value "rtl.v"))
 
 genOpts :: Parser Opts
 genOpts = Generate . S.fromText <$> textOption
@@ -197,7 +205,7 @@ handleOpts (Parse f) = do
         Left  l -> print l
         Right v -> print $ V.GenVerilog v
     where file = T.unpack . S.toTextIgnore $ f
-handleOpts (Rerun _   ) = undefined
+handleOpts (Rerun _ _) = undefined
 handleOpts (Reduce f t) = do
     verilogSrc <- readFile file
     case V.parseVerilog file verilogSrc of
