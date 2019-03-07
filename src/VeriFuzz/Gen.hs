@@ -31,7 +31,6 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
-import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
@@ -125,16 +124,6 @@ scopedExpr = do
 
 lvalFromPort :: Port -> LVal
 lvalFromPort (Port _ _ _ i) = RegId i
-
-scopedReg :: StateGen LVal
-scopedReg = do
-    context <- get
-    gen
-        .  QC.elements
-        .  fmap lvalFromPort
-        .  filter (\p -> p ^. portType == Reg)
-        $  context
-        ^. variables
 
 probability :: Config -> Probability
 probability c = c ^. configProbability
