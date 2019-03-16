@@ -3,7 +3,8 @@ seed = 12345
 size = 100
 
 [probability]
-assign = 1
+assign = 10
 always = 1
+moddecl = 1
 blocking = 1
 nonblocking = 1
