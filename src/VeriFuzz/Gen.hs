@@ -106,11 +106,6 @@ newPort pt = do
     variables %= (p :)
     return p
 
-contAssign :: StateGen ContAssign
-contAssign = do
-    p <- newPort Wire
-    ContAssign (p ^. portName) <$> scopedExpr
-
 scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
@@ -121,6 +116,11 @@ scopedExpr = do
         ^.. variables
         .   traverse
         .   portName
+
+contAssign :: StateGen ContAssign
+contAssign = do
+    p <- newPort Wire
+    ContAssign (p ^. portName) <$> scopedExpr
 
 lvalFromPort :: Port -> LVal
 lvalFromPort (Port _ _ _ i) = RegId i
@@ -145,11 +145,11 @@ statement = do
         , (prob ^. probNonBlock, return $ NonBlockAssign as)
         ]
 
+-- | Generate a random module item.
 modItem :: StateGen ModItem
 modItem = do
     prob      <- askProbability
-    amount    <- gen positiveArb
-    stat <- fold <$> replicateM amount statement
+    stat <- fold <$> some statement
     event     <- gen QC.arbitrary
     modCA     <- ModCA <$> contAssign
     gen $ QC.frequency
@@ -159,12 +159,15 @@ modItem = do
           )
         ]
 
+-- | Generates a module definition randomly. It always has one output port which
+-- is set to @y@. The size of @y@ is the total combination of all the locally
+-- defined wires, so that it correctly reflects the internal state of the
+-- module.
 moduleDef :: Bool -> StateGen ModDecl
 moduleDef top = do
     name     <- if top then return "top" else gen QC.arbitrary
     portList <- some $ newPort Wire
-    amount   <- gen positiveArb
-    mi       <- replicateM amount modItem
+    mi       <- some modItem
     context  <- get
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
@@ -173,6 +176,8 @@ moduleDef top = do
         yport
         mi
 
+-- | Procedural generation method for random Verilog. Uses internal 'Reader' and
+-- 'State' to keep track of the current Verilog code structure.
 procedural :: Config -> Gen VerilogSrc
 procedural config =
     VerilogSrc
