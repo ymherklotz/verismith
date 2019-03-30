@@ -1,7 +1,7 @@
 {-|
 Module      : VeriFuzz.Env
 Description : Environment to run the simulator and synthesisers in a matrix.
-Copyright   : (c) 2019, Yann Herklotz Grave
+Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental

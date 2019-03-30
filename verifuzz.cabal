@@ -7,15 +7,14 @@ description:
 homepage: https://github.com/ymherklotz/VeriFuzz#readme
 license: BSD3
 license-file: LICENSE
-author: Yann Herklotz Grave
-maintainer: yann [at] yannherklotzgrave [dot] com
-copyright: 2018 Yann Herklotz Grave
+author: Yann Herklotz
+maintainer: yann [at] ymhg [dot] org
+copyright: 2018 Yann Herklotz
 category: Web
 build-type: Simple
 cabal-version: >=1.10
 extra-source-files: README.md
                   , data/*.v
-                  , examples/*.v
 
 library
   hs-source-dirs: src

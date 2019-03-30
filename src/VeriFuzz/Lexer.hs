@@ -1,7 +1,7 @@
 {-|
 Module      : VeriFuzz.Lexer
 Description : Lexer for Verilog.
-Copyright   : (c) 2019, Yann Herklotz Grave
+Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental

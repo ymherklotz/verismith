@@ -1,7 +1,7 @@
 {-|
 Module      : VeriFuzz.Internal.AST
 Description : Defaults and common functions.
-Copyright   : (c) 2018-2019, Yann Herklotz Grave
+Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
