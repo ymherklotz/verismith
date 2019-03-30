@@ -40,19 +40,19 @@ class Source a where
 -- | Map a 'Maybe Statement' to 'Text'. If it is 'Just statement', the generated
 -- statements are returned. If it is 'Nothing', then @;\n@ is returned.
 defMap :: Maybe Statement -> Text
-defMap = maybe ";\n" genStatement
+defMap = maybe ";\n" statement
 
 -- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
-genVerilogSrc :: VerilogSrc -> Text
-genVerilogSrc source = fold $ genDescription <$> source ^. getVerilogSrc
+verilogSrc :: VerilogSrc -> Text
+verilogSrc source = fold $ description <$> source ^. getVerilogSrc
 
 -- | Generate the 'Description' to 'Text'.
-genDescription :: Description -> Text
-genDescription desc = genModuleDecl $ desc ^. getDescription
+description :: Description -> Text
+description desc = moduleDecl $ desc ^. getDescription
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
-genModuleDecl :: ModDecl -> Text
-genModuleDecl m =
+moduleDecl :: ModDecl -> Text
+moduleDecl m =
     "module "
         <> m
         ^. modId
@@ -63,174 +63,176 @@ genModuleDecl m =
         <> "endmodule\n"
   where
     ports | noIn && noOut = ""
-          | otherwise     = "(" <> comma (genModPort <$> outIn) <> ")"
-    modI  = fold $ genModuleItem <$> m ^. modItems
+          | otherwise     = "(" <> comma (modPort <$> outIn) <> ")"
+    modI  = fold $ moduleItem <$> m ^. modItems
     noOut = null $ m ^. modOutPorts
     noIn  = null $ m ^. modInPorts
     outIn = (m ^. modOutPorts) ++ (m ^. modInPorts)
 
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
-genModPort :: Port -> Text
-genModPort port = port ^. portName . getIdentifier
+modPort :: Port -> Text
+modPort port = port ^. portName . getIdentifier
 
 -- | Generate the 'Port' description.
-genPort :: Port -> Text
-genPort port = t <> sign <> size <> name
+port :: Port -> Text
+port port = t <> sign <> size <> name
   where
-    t = flip mappend " " . genPortType $ port ^. portType
+    t = flip mappend " " . portType $ port ^. portType
     size | port ^. portSize > 1 = "[" <> showT (port ^. portSize - 1) <> ":0] "
          | otherwise            = ""
     name = port ^. portName . getIdentifier
-    sign = genSigned $ port ^. portSigned
+    sign = signed $ port ^. portSigned
 
-genSigned :: Bool -> Text
-genSigned True = "signed "
-genSigned _    = ""
+signed :: Bool -> Text
+signed True = "signed "
+signed _    = ""
 
 -- | Convert the 'PortDir' type to 'Text'.
-genPortDir :: PortDir -> Text
-genPortDir PortIn    = "input"
-genPortDir PortOut   = "output"
-genPortDir PortInOut = "inout"
+portDir :: PortDir -> Text
+portDir PortIn    = "input"
+portDir PortOut   = "output"
+portDir PortInOut = "inout"
 
 -- | Generate a 'ModItem'.
-genModuleItem :: ModItem -> Text
-genModuleItem (ModCA ca) = genContAssign ca
-genModuleItem (ModInst (Identifier i) (Identifier name) conn) =
-    i <> " " <> name <> "(" <> comma (genModConn <$> conn) <> ")" <> ";\n"
-genModuleItem (Initial stat ) = "initial " <> genStatement stat
-genModuleItem (Always  stat ) = "always " <> genStatement stat
-genModuleItem (Decl dir port) = maybe "" makePort dir <> genPort port <> ";\n"
-    where makePort = (<> " ") . genPortDir
+moduleItem :: ModItem -> Text
+moduleItem (ModCA ca) = contAssign ca
+moduleItem (ModInst (Identifier i) (Identifier name) conn) =
+    i <> " " <> name <> "(" <> comma (modConn <$> conn) <> ")" <> ";\n"
+moduleItem (Initial stat ) = "initial " <> statement stat
+moduleItem (Always  stat ) = "always " <> statement stat
+moduleItem (Decl dir port) = maybe "" makePort dir <> port port <> ";\n"
+    where makePort = (<> " ") . portDir
 
-genModConn :: ModConn -> Text
-genModConn (ModConn c) = genExpr c
-genModConn (ModConnNamed n c) =
-    "." <> n ^. getIdentifier <> "(" <> genExpr c <> ")"
+modConn :: ModConn -> Text
+modConn (ModConn c) = expr c
+modConn (ModConnNamed n c) =
+    "." <> n ^. getIdentifier <> "(" <> expr c <> ")"
 
 -- | Generate continuous assignment
-genContAssign :: ContAssign -> Text
-genContAssign (ContAssign val e) = "assign " <> name <> " = " <> expr <> ";\n"
+contAssign :: ContAssign -> Text
+contAssign (ContAssign val e) = "assign " <> name <> " = " <> expr <> ";\n"
   where
     name = val ^. getIdentifier
-    expr = genExpr e
+    expr = expr e
 
 -- | Generate 'Function' to 'Text'
-genFunc :: Function -> Text
-genFunc SignedFunc   = "$signed"
-genFunc UnSignedFunc = "$unsigned"
+func :: Function -> Text
+func SignedFunc   = "$signed"
+func UnSignedFunc = "$unsigned"
 
 -- | Generate 'Expr' to 'Text'.
-genExpr :: Expr -> Text
-genExpr (BinOp eRhs bin eLhs) =
-    "(" <> genExpr eRhs <> genBinaryOperator bin <> genExpr eLhs <> ")"
-genExpr (Number s n) =
+expr :: Expr -> Text
+expr (BinOp eRhs bin eLhs) =
+    "(" <> expr eRhs <> binaryOp bin <> expr eLhs <> ")"
+expr (Number s n) =
     "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
-genExpr (Id     i) = i ^. getIdentifier
-genExpr (Concat c) = "{" <> comma (genExpr <$> c) <> "}"
-genExpr (UnOp u e) = "(" <> genUnaryOperator u <> genExpr e <> ")"
-genExpr (Cond l t f) =
-    "(" <> genExpr l <> " ? " <> genExpr t <> " : " <> genExpr f <> ")"
-genExpr (Func f e) = genFunc f <> "(" <> genExpr e <> ")"
-genExpr (Str t   ) = "\"" <> t <> "\""
+expr (Id     i) = i ^. getIdentifier
+expr (Concat c) = "{" <> comma (expr <$> c) <> "}"
+expr (UnOp u e) = "(" <> unaryOp u <> expr e <> ")"
+expr (Cond l t f) =
+    "(" <> expr l <> " ? " <> expr t <> " : " <> expr f <> ")"
+expr (Func f e) = func f <> "(" <> expr e <> ")"
+expr (Str t   ) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
-genBinaryOperator :: BinaryOperator -> Text
-genBinaryOperator BinPlus    = " + "
-genBinaryOperator BinMinus   = " - "
-genBinaryOperator BinTimes   = " * "
-genBinaryOperator BinDiv     = " / "
-genBinaryOperator BinMod     = " % "
-genBinaryOperator BinEq      = " == "
-genBinaryOperator BinNEq     = " != "
-genBinaryOperator BinCEq     = " === "
-genBinaryOperator BinCNEq    = " !== "
-genBinaryOperator BinLAnd    = " && "
-genBinaryOperator BinLOr     = " || "
-genBinaryOperator BinLT      = " < "
-genBinaryOperator BinLEq     = " <= "
-genBinaryOperator BinGT      = " > "
-genBinaryOperator BinGEq     = " >= "
-genBinaryOperator BinAnd     = " & "
-genBinaryOperator BinOr      = " | "
-genBinaryOperator BinXor     = " ^ "
-genBinaryOperator BinXNor    = " ^~ "
-genBinaryOperator BinXNorInv = " ~^ "
-genBinaryOperator BinPower   = " ** "
-genBinaryOperator BinLSL     = " << "
-genBinaryOperator BinLSR     = " >> "
-genBinaryOperator BinASL     = " <<< "
-genBinaryOperator BinASR     = " >>> "
+binaryOp :: BinaryOperator -> Text
+binaryOp BinPlus    = " + "
+binaryOp BinMinus   = " - "
+binaryOp BinTimes   = " * "
+binaryOp BinDiv     = " / "
+binaryOp BinMod     = " % "
+binaryOp BinEq      = " == "
+binaryOp BinNEq     = " != "
+binaryOp BinCEq     = " === "
+binaryOp BinCNEq    = " !== "
+binaryOp BinLAnd    = " && "
+binaryOp BinLOr     = " || "
+binaryOp BinLT      = " < "
+binaryOp BinLEq     = " <= "
+binaryOp BinGT      = " > "
+binaryOp BinGEq     = " >= "
+binaryOp BinAnd     = " & "
+binaryOp BinOr      = " | "
+binaryOp BinXor     = " ^ "
+binaryOp BinXNor    = " ^~ "
+binaryOp BinXNorInv = " ~^ "
+binaryOp BinPower   = " ** "
+binaryOp BinLSL     = " << "
+binaryOp BinLSR     = " >> "
+binaryOp BinASL     = " <<< "
+binaryOp BinASR     = " >>> "
 
 -- | Convert 'UnaryOperator' to 'Text'.
-genUnaryOperator :: UnaryOperator -> Text
-genUnaryOperator UnPlus    = "+"
-genUnaryOperator UnMinus   = "-"
-genUnaryOperator UnLNot    = "!"
-genUnaryOperator UnNot     = "~"
-genUnaryOperator UnAnd     = "&"
-genUnaryOperator UnNand    = "~&"
-genUnaryOperator UnOr      = "|"
-genUnaryOperator UnNor     = "~|"
-genUnaryOperator UnXor     = "^"
-genUnaryOperator UnNxor    = "~^"
-genUnaryOperator UnNxorInv = "^~"
+unaryOp :: UnaryOperator -> Text
+unaryOp UnPlus    = "+"
+unaryOp UnMinus   = "-"
+unaryOp UnLNot    = "!"
+unaryOp UnNot     = "~"
+unaryOp UnAnd     = "&"
+unaryOp UnNand    = "~&"
+unaryOp UnOr      = "|"
+unaryOp UnNor     = "~|"
+unaryOp UnXor     = "^"
+unaryOp UnNxor    = "~^"
+unaryOp UnNxorInv = "^~"
 
 -- | Generate verilog code for an 'Event'.
-genEvent :: Event -> Text
-genEvent (EId   i   ) = "@(" <> i ^. getIdentifier <> ")"
-genEvent (EExpr expr) = "@(" <> genExpr expr <> ")"
-genEvent EAll         = "@*"
-genEvent (EPosEdge i) = "@(posedge " <> i ^. getIdentifier <> ")"
-genEvent (ENegEdge i) = "@(negedge " <> i ^. getIdentifier <> ")"
+event :: Event -> Text
+event (EId   i   ) = "@(" <> i ^. getIdentifier <> ")"
+event (EExpr expr) = "@(" <> expr expr <> ")"
+event EAll         = "@*"
+event (EPosEdge i) = "@(posedge " <> i ^. getIdentifier <> ")"
+event (ENegEdge i) = "@(negedge " <> i ^. getIdentifier <> ")"
 
 -- | Generates verilog code for a 'Delay'.
-genDelay :: Delay -> Text
-genDelay (Delay i) = "#" <> showT i
+delay :: Delay -> Text
+delay (Delay i) = "#" <> showT i
 
 -- | Generate the verilog code for an 'LVal'.
-genLVal :: LVal -> Text
-genLVal (RegId i       ) = i ^. getIdentifier
-genLVal (RegExpr i expr) = i ^. getIdentifier <> " [" <> genExpr expr <> "]"
-genLVal (RegSize i msb lsb) =
+lVal :: LVal -> Text
+lVal (RegId i       ) = i ^. getIdentifier
+lVal (RegExpr i expr) = i ^. getIdentifier <> " [" <> expr expr <> "]"
+lVal (RegSize i msb lsb) =
     i
         ^. getIdentifier
         <> " ["
-        <> genConstExpr msb
+        <> constExpr msb
         <> ":"
-        <> genConstExpr lsb
+        <> constExpr lsb
         <> "]"
-genLVal (RegConcat e) = "{" <> comma (genExpr <$> e) <> "}"
+lVal (RegConcat e) = "{" <> comma (expr <$> e) <> "}"
 
-genConstExpr :: ConstExpr -> Text
-genConstExpr (ConstExpr num) = showT num
+constExpr :: ConstExpr -> Text
+constExpr (ConstExpr num) = showT num
 
-genPortType :: PortType -> Text
-genPortType Wire = "wire"
-genPortType Reg  = "reg"
+portType :: PortType -> Text
+portType Wire = "wire"
+portType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
-    genLVal r <> op <> maybe "" genDelay d <> genExpr e
+    lVal r <> op <> maybe "" delay d <> expr e
 
-genStatement :: Statement -> Text
-genStatement (TimeCtrl  d stat   ) = genDelay d <> " " <> defMap stat
-genStatement (EventCtrl e stat   ) = genEvent e <> " " <> defMap stat
-genStatement (SeqBlock s) = "begin\n" <> fold (genStatement <$> s) <> "end\n"
-genStatement (BlockAssign    a   ) = genAssign " = " a <> ";\n"
-genStatement (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
-genStatement (StatCA         a   ) = genContAssign a
-genStatement (TaskEnable     task) = genTask task <> ";\n"
-genStatement (SysTaskEnable  task) = "$" <> genTask task <> ";\n"
+statement :: Statement -> Text
+statement (TimeCtrl  d stat   ) = delay d <> " " <> defMap stat
+statement (EventCtrl e stat   ) = event e <> " " <> defMap stat
+statement (SeqBlock s) = "begin\n" <> fold (statement <$> s) <> "end\n"
+statement (BlockAssign    a   ) = genAssign " = " a <> ";\n"
+statement (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
+statement (StatCA         a   ) = contAssign a
+statement (TaskEnable     t) = task t <> ";\n"
+statement (SysTaskEnable  t) = "$" <> task t <> ";\n"
+statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")" <> defMap t
+statement (CondStmnt e t f) = "if(" <> expr e <> ") " <> defMap t <> "else " <> defMap f
 
-genTask :: Task -> Text
-genTask (Task name expr)
+task :: Task -> Text
+task (Task name expr)
     | null expr = i
-    | otherwise = i <> "(" <> comma (genExpr <$> expr) <> ")"
+    | otherwise = i <> "(" <> comma (expr <$> expr) <> ")"
     where i = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
@@ -243,52 +245,52 @@ instance Source Identifier where
     genSource = view getIdentifier
 
 instance Source Task where
-    genSource = genTask
+    genSource = task
 
 instance Source Statement where
-    genSource = genStatement
+    genSource = statement
 
 instance Source PortType where
-    genSource = genPortType
+    genSource = portType
 
 instance Source ConstExpr where
-    genSource = genConstExpr
+    genSource = constExpr
 
 instance Source LVal where
-    genSource = genLVal
+    genSource = lVal
 
 instance Source Delay where
-    genSource = genDelay
+    genSource = delay
 
 instance Source Event where
-    genSource = genEvent
+    genSource = event
 
 instance Source UnaryOperator where
-    genSource = genUnaryOperator
+    genSource = unaryOp
 
 instance Source Expr where
-    genSource = genExpr
+    genSource = expr
 
 instance Source ContAssign where
-    genSource = genContAssign
+    genSource = contAssign
 
 instance Source ModItem where
-    genSource = genModuleItem
+    genSource = moduleItem
 
 instance Source PortDir where
-    genSource = genPortDir
+    genSource = portDir
 
 instance Source Port where
-    genSource = genPort
+    genSource = port
 
 instance Source ModDecl where
-    genSource = genModuleDecl
+    genSource = moduleDecl
 
 instance Source Description where
-    genSource = genDescription
+    genSource = description
 
 instance Source VerilogSrc where
-    genSource = genVerilogSrc
+    genSource = verilogSrc
 
 newtype GenVerilog a = GenVerilog { unGenVerilog :: a }
 
