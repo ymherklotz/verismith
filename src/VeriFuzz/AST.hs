@@ -488,6 +488,10 @@ data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
            | StatCA { _stmntCA      :: !ContAssign } -- ^ Statement continuous assignment. May not be correct.
            | TaskEnable { _stmntTask    :: !Task }
            | SysTaskEnable { _stmntSysTask :: !Task }
+           | CondStmnt { _stmntCondExpr  :: Expr
+                       , _stmntCondTrue  :: Maybe Statement
+                       , _stmntCondFalse :: Maybe Statement
+                       }
            deriving (Eq, Show, Ord, Data)
 
 makeLenses ''Statement
