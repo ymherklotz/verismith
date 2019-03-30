@@ -31,14 +31,15 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
+import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
 import           VeriFuzz.Random
 
-newtype Context = Context { _variables :: [Port]
-                          --                       , _modules   :: [ModDecl]
-                          }
+data Context = Context { _variables   :: [Port]
+                       , _nameCounter :: Int
+                       }
 
 makeLenses ''Context
 
@@ -100,11 +101,28 @@ some f = do
     amount <- gen positiveArb
     replicateM amount f
 
+makeIdentifier :: T.Text -> StateGen Identifier
+makeIdentifier prefix = do
+    context <- get
+    let ident = Identifier $ prefix <> showT (context ^. nameCounter)
+    nameCounter += 1
+    return ident
+
 newPort :: PortType -> StateGen Port
 newPort pt = do
-    p <- gen $ Port pt <$> QC.arbitrary <*> positiveArb <*> QC.arbitrary
+    ident <- makeIdentifier . T.toLower $ showT pt
+    p <- gen $ Port pt <$> QC.arbitrary <*> positiveArb <*> pure ident
     variables %= (p :)
     return p
+
+select :: PortType -> StateGen Port
+select ptype = do
+    context <- get
+    case filter chooseReg $ context ^.. variables . traverse of
+        [] -> newPort ptype
+        l  -> gen $ QC.elements l
+    where
+        chooseReg (Port a _ _ _) = ptype == a
 
 scopedExpr :: StateGen Expr
 scopedExpr = do
@@ -148,14 +166,14 @@ statement = do
 -- | Generate a random module item.
 modItem :: StateGen ModItem
 modItem = do
-    prob      <- askProbability
-    stat <- fold <$> some statement
-    event     <- gen QC.arbitrary
-    modCA     <- ModCA <$> contAssign
+    prob     <- askProbability
+    stat     <- fold <$> some statement
+    eventReg <- select Reg
+    modCA    <- ModCA <$> contAssign
     gen $ QC.frequency
         [ (prob ^. probAssign, return modCA)
         , ( prob ^. probAlways
-          , return $ Always (EventCtrl event (Just stat))
+          , return $ Always (EventCtrl (EId (eventReg ^. portName)) (Just stat))
           )
         ]
 
@@ -184,5 +202,5 @@ procedural config =
         .   (: [])
         .   Description
         <$> QC.resize num (runReaderT (evalStateT (moduleDef True) context) config)
-    where context = Context []
+    where context = Context [] 0
           num = config ^. configProperty . propSize
