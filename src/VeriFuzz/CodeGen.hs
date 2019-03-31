@@ -72,17 +72,17 @@ moduleDecl m =
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
 modPort :: Port -> Text
-modPort port = port ^. portName . getIdentifier
+modPort p = p ^. portName . getIdentifier
 
 -- | Generate the 'Port' description.
 port :: Port -> Text
-port port = t <> sign <> size <> name
+port p = t <> sign <> size <> name
   where
-    t = flip mappend " " . portType $ port ^. portType
-    size | port ^. portSize > 1 = "[" <> showT (port ^. portSize - 1) <> ":0] "
+    t = flip mappend " " . pType $ p ^. portType
+    size | p ^. portSize > 1 = "[" <> showT (p ^. portSize - 1) <> ":0] "
          | otherwise            = ""
-    name = port ^. portName . getIdentifier
-    sign = signed $ port ^. portSigned
+    name = p ^. portName . getIdentifier
+    sign = signed $ p ^. portSigned
 
 signed :: Bool -> Text
 signed True = "signed "
@@ -98,23 +98,20 @@ portDir PortInOut = "inout"
 moduleItem :: ModItem -> Text
 moduleItem (ModCA ca) = contAssign ca
 moduleItem (ModInst (Identifier i) (Identifier name) conn) =
-    i <> " " <> name <> "(" <> comma (modConn <$> conn) <> ")" <> ";\n"
+    i <> " " <> name <> "(" <> comma (mConn <$> conn) <> ")" <> ";\n"
 moduleItem (Initial stat ) = "initial " <> statement stat
 moduleItem (Always  stat ) = "always " <> statement stat
-moduleItem (Decl dir port) = maybe "" makePort dir <> port port <> ";\n"
+moduleItem (Decl dir p) = maybe "" makePort dir <> port p <> ";\n"
     where makePort = (<> " ") . portDir
 
-modConn :: ModConn -> Text
-modConn (ModConn c) = expr c
-modConn (ModConnNamed n c) =
+mConn :: ModConn -> Text
+mConn (ModConn c) = expr c
+mConn (ModConnNamed n c) =
     "." <> n ^. getIdentifier <> "(" <> expr c <> ")"
 
 -- | Generate continuous assignment
 contAssign :: ContAssign -> Text
-contAssign (ContAssign val e) = "assign " <> name <> " = " <> expr <> ";\n"
-  where
-    name = val ^. getIdentifier
-    expr = expr e
+contAssign (ContAssign val e) = "assign " <> val ^. getIdentifier <> " = " <> expr e <> ";\n"
 
 -- | Generate 'Function' to 'Text'
 func :: Function -> Text
@@ -183,7 +180,7 @@ unaryOp UnNxorInv = "^~"
 -- | Generate verilog code for an 'Event'.
 event :: Event -> Text
 event (EId   i   ) = "@(" <> i ^. getIdentifier <> ")"
-event (EExpr expr) = "@(" <> expr expr <> ")"
+event (EExpr e)    = "@(" <> expr e <> ")"
 event EAll         = "@*"
 event (EPosEdge i) = "@(posedge " <> i ^. getIdentifier <> ")"
 event (ENegEdge i) = "@(negedge " <> i ^. getIdentifier <> ")"
@@ -195,7 +192,7 @@ delay (Delay i) = "#" <> showT i
 -- | Generate the verilog code for an 'LVal'.
 lVal :: LVal -> Text
 lVal (RegId i       ) = i ^. getIdentifier
-lVal (RegExpr i expr) = i ^. getIdentifier <> " [" <> expr expr <> "]"
+lVal (RegExpr i e) = i ^. getIdentifier <> " [" <> expr e <> "]"
 lVal (RegSize i msb lsb) =
     i
         ^. getIdentifier
@@ -209,9 +206,9 @@ lVal (RegConcat e) = "{" <> comma (expr <$> e) <> "}"
 constExpr :: ConstExpr -> Text
 constExpr (ConstExpr num) = showT num
 
-portType :: PortType -> Text
-portType Wire = "wire"
-portType Reg  = "reg"
+pType :: PortType -> Text
+pType Wire = "wire"
+pType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Text
 genAssign op (Assign r d e) =
@@ -230,9 +227,9 @@ statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")" <> defMap t
 statement (CondStmnt e t f) = "if(" <> expr e <> ") " <> defMap t <> "else " <> defMap f
 
 task :: Task -> Text
-task (Task name expr)
-    | null expr = i
-    | otherwise = i <> "(" <> comma (expr <$> expr) <> ")"
+task (Task name e)
+    | null e = i
+    | otherwise = i <> "(" <> comma (expr <$> e) <> ")"
     where i = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
@@ -251,7 +248,7 @@ instance Source Statement where
     genSource = statement
 
 instance Source PortType where
-    genSource = portType
+    genSource = pType
 
 instance Source ConstExpr where
     genSource = constExpr

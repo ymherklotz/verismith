@@ -19,7 +19,8 @@ extra-source-files: README.md
 library
   hs-source-dirs: src
   default-language: Haskell2010
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall 
+  build-tools: alex >=3 && <4
   exposed-modules: VeriFuzz
                  , VeriFuzz.AST
                  , VeriFuzz.Config
@@ -34,9 +35,12 @@ library
                  , VeriFuzz.Env
                  , VeriFuzz.Gen
                  , VeriFuzz.Icarus
-                 , VeriFuzz.Lexer
                  , VeriFuzz.Mutate
                  , VeriFuzz.Parser
+                 , VeriFuzz.Parser.Parser
+                 , VeriFuzz.Parser.Preprocess
+                 , VeriFuzz.Parser.Token
+                 , VeriFuzz.Parser.Lex
                  , VeriFuzz.Random
                  , VeriFuzz.RandomAlt
                  , VeriFuzz.Reduce
@@ -61,6 +65,7 @@ library
                , parsec >=3.1 && <3.2
                , transformers >=0.5 && <0.6
                , tomland >=0.5 && <0.6
+               , array >=0.5 && <0.6
   default-extensions: OverloadedStrings
 
 executable verifuzz

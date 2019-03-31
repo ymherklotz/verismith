@@ -94,6 +94,9 @@ module VeriFuzz.AST
     , stmntCA
     , stmntTask
     , stmntSysTask
+    , stmntCondExpr
+    , stmntCondTrue
+    , stmntCondFalse
     -- * Module
     , ModDecl(..)
     , modId
