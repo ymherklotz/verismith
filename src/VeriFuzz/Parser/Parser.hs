@@ -42,9 +42,7 @@ type Parser = Parsec [Token] ()
 
 type ParseOperator = Operator [Token] () Identity
 
-data Decimal = Decimal { size :: Int
-                       , num  :: Integer
-                       }
+data Decimal = Decimal Int Integer
 
 instance Num Decimal where
     (Decimal sa na) + (Decimal sb nb) = Decimal (max sa sb) (na + nb)
@@ -81,9 +79,6 @@ tok' p = tok p >> return ()
 parens :: Parser a -> Parser a
 parens = between (tok SymParenL) (tok SymParenR)
 
-brackets :: Parser a -> Parser a
-brackets = between (tok SymBrackL) (tok SymBrackR)
-
 braces :: Parser a -> Parser a
 braces = between (tok SymBraceL) (tok SymBraceR)
 
@@ -92,18 +87,6 @@ sBinOp = sOp BinOp where sOp f b a = f a b
 
 parseExpr' :: Parser Expr
 parseExpr' = buildExpressionParser parseTable parseTerm <?> "expr"
-
-matchHex :: Char -> Bool
-matchHex c = c == 'h' || c == 'H'
-
---matchBin :: Char -> Bool
---matchBin c = c == 'b' || c == 'B'
-
-matchDec :: Char -> Bool
-matchDec c = c == 'd' || c == 'D'
-
-matchOct :: Char -> Bool
-matchOct c = c == 'o' || c == 'O'
 
 decToExpr :: Decimal -> Expr
 decToExpr (Decimal s n) = Number s n
@@ -219,7 +202,7 @@ parseContAssign :: Parser ContAssign
 parseContAssign = do
     var  <- tok KWAssign *> identifier
     expr <- tok SymEq *> parseExpr
-    tok SymSemi
+    tok' SymSemi
     return $ ContAssign var expr
 
 numLit :: Parser String
@@ -240,11 +223,11 @@ number = number' <$> numLit
     where
     w = takeWhile (/= '\'') a
     b = dropWhile (/= '\'') a
-    f a
-      | isPrefixOf "'d" a = read $ drop 2 a
-      | isPrefixOf "'h" a = read $ "0x" ++ drop 2 a
-      | isPrefixOf "'b" a = foldl (\ n b -> shiftL n 1 .|. (if b == '1' then 1 else 0)) 0 (drop 2 a)
-      | otherwise         = error $ "Invalid number format: " ++ a
+    f a'
+      | isPrefixOf "'d" a' = read $ drop 2 a'
+      | isPrefixOf "'h" a' = read $ "0x" ++ drop 2 a'
+      | isPrefixOf "'b" a' = foldl (\ n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0)) 0 (drop 2 a')
+      | otherwise         = error $ "Invalid number format: " ++ a'
 
 toInteger' :: Decimal -> Integer
 toInteger' (Decimal _ n) = n

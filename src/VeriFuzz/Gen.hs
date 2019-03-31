@@ -31,7 +31,6 @@ import           Test.QuickCheck                (Gen)
 import qualified Test.QuickCheck                as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
-import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Mutate
