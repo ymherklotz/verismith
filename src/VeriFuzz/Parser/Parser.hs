@@ -125,7 +125,8 @@ systemFunc s = satisfy' matchId
 
 parseFunction :: Parser Function
 parseFunction =
-    systemFunc "unsigned" $> UnSignedFunc <|> systemFunc "signed" $> SignedFunc
+    systemFunc "$unsigned" $> UnSignedFunc
+    <|> systemFunc "$signed" $> SignedFunc
 
 parseFun :: Parser Expr
 parseFun = do

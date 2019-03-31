@@ -113,6 +113,7 @@ test-suite verifuzz-doctest
   hs-source-dirs: test
   main-is: Doctest.hs
   ghc-options: -Wall -Werror
+  build-tools: alex >=3 && <4
   build-depends: base >=4.7 && <5
                , verifuzz >=0.1 && <0.2
                , doctest >=0.16 && <0.17

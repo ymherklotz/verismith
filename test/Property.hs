@@ -11,6 +11,7 @@ import           Test.Tasty.QuickCheck             ((===))
 import qualified Test.Tasty.QuickCheck             as QC
 import           Text.Parsec
 import           VeriFuzz
+import           VeriFuzz.Parser.Lex
 import qualified VeriFuzz.RandomAlt                as V
 
 newtype TestGraph = TestGraph { getGraph :: Gr Gate () }
@@ -44,7 +45,7 @@ simpleAltGraph = QC.testProperty "simple alternative graph generation check"
     where simp = G.isSimple . getAltGraph
 
 parserInput' :: ModDeclSub -> Bool
-parserInput' (ModDeclSub v) = isRight $ parse parseModDecl "input_test.v" str
+parserInput' (ModDeclSub v) = isRight $ parse parseModDecl "input_test.v" (alexScanTokens str)
     where str = show . GenVerilog $ v
 
 parserIdempotent' :: ModDeclSub -> QC.Property
@@ -54,7 +55,7 @@ parserIdempotent' (ModDeclSub v) = p sv === (p . p) sv
     sv    = vshow v
     p     = vshow . fromRight (error "Failed idempotent test") . parse
         parseModDecl
-        "idempotent_test.v"
+        "idempotent_test.v" . alexScanTokens
 
 parserInput :: TestTree
 parserInput = QC.testProperty "parser input" $ parserInput'
