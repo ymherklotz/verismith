@@ -65,8 +65,9 @@ satisfy' :: (Token -> Maybe a) -> Parser a
 satisfy' = tokenPrim show nextPos
 
 nextPos :: SourcePos -> Token -> [Token] -> SourcePos
-nextPos pos _ (Token _ _ (Position _ l c):_) = setSourceColumn (setSourceLine pos l) c
-nextPos pos _ []                = pos
+nextPos pos _ (Token _ _ (Position _ l c) : _) =
+    setSourceColumn (setSourceLine pos l) c
+nextPos pos _ [] = pos
 
 -- | Parses given `TokenName`.
 tok :: TokenName -> Parser TokenName
@@ -101,15 +102,16 @@ parseVar = Id <$> identifier
 
 systemFunc :: String -> Parser String
 systemFunc s = satisfy' matchId
-    where
-        matchId (Token IdSystem s' _) =
-            if s == s' then Just s else Nothing
-        matchId _ = Nothing
+  where
+    matchId (Token IdSystem s' _) = if s == s' then Just s else Nothing
+    matchId _                     = Nothing
 
 parseFunction :: Parser Function
 parseFunction =
-    systemFunc "$unsigned" $> UnSignedFunc
-    <|> systemFunc "$signed" $> SignedFunc
+    systemFunc "$unsigned"
+        $>  UnSignedFunc
+        <|> systemFunc "$signed"
+        $>  SignedFunc
 
 parseFun :: Parser Expr
 parseFun = do
@@ -143,51 +145,51 @@ parseExpr = do
 -- | Table of binary and unary operators that encode the right precedence for
 -- each.
 parseTable :: [[ParseOperator Expr]]
-parseTable
-    = [ [prefix SymBang (UnOp UnLNot), prefix SymTildy (UnOp UnNot)]
-      , [ prefix SymAmp  (UnOp UnAnd)
-        , prefix SymBar  (UnOp UnOr)
-        , prefix SymTildyAmp (UnOp UnNand)
-        , prefix SymTildyBar (UnOp UnNor)
-        , prefix SymHat  (UnOp UnXor)
-        , prefix SymTildyHat (UnOp UnNxor)
-        , prefix SymHatTildy (UnOp UnNxorInv)
-        ]
-      , [prefix SymPlus (UnOp UnPlus), prefix SymDash (UnOp UnMinus)]
-      , [binary SymAsterAster (sBinOp BinPower) AssocRight]
-      , [ binary SymAster (sBinOp BinTimes) AssocLeft
-        , binary SymSlash (sBinOp BinDiv)   AssocLeft
-        , binary SymPercent (sBinOp BinMod)   AssocLeft
-        ]
-      , [ binary SymPlus (sBinOp BinPlus) AssocLeft
-        , binary SymDash (sBinOp BinPlus) AssocLeft
-        ]
-      , [ binary SymLtLt (sBinOp BinLSL) AssocLeft
-        , binary SymGtGt (sBinOp BinLSR) AssocLeft
-        ]
-      , [ binary SymLtLtLt (sBinOp BinASL) AssocLeft
-        , binary SymGtGtGt (sBinOp BinASR) AssocLeft
-        ]
-      , [ binary SymLt  (sBinOp BinLT)  AssocNone
-        , binary SymGt  (sBinOp BinGT)  AssocNone
-        , binary SymLtEq (sBinOp BinLEq) AssocNone
-        , binary SymGtEq (sBinOp BinLEq) AssocNone
-        ]
-      , [ binary SymEqEq (sBinOp BinEq)  AssocNone
-        , binary SymBangEq (sBinOp BinNEq) AssocNone
-        ]
-      , [ binary SymEqEqEq (sBinOp BinEq)  AssocNone
-        , binary SymBangEqEq (sBinOp BinNEq) AssocNone
-        ]
-      , [binary SymAmp (sBinOp BinAnd) AssocLeft]
-      , [ binary SymHat  (sBinOp BinXor)     AssocLeft
-        , binary SymHatTildy (sBinOp BinXNor)    AssocLeft
-        , binary SymTildyHat (sBinOp BinXNorInv) AssocLeft
-        ]
-      , [binary SymBar (sBinOp BinOr) AssocLeft]
-      , [binary SymAmpAmp (sBinOp BinLAnd) AssocLeft]
-      , [binary SymBarBar (sBinOp BinLOr) AssocLeft]
+parseTable =
+    [ [prefix SymBang (UnOp UnLNot), prefix SymTildy (UnOp UnNot)]
+    , [ prefix SymAmp      (UnOp UnAnd)
+      , prefix SymBar      (UnOp UnOr)
+      , prefix SymTildyAmp (UnOp UnNand)
+      , prefix SymTildyBar (UnOp UnNor)
+      , prefix SymHat      (UnOp UnXor)
+      , prefix SymTildyHat (UnOp UnNxor)
+      , prefix SymHatTildy (UnOp UnNxorInv)
       ]
+    , [prefix SymPlus (UnOp UnPlus), prefix SymDash (UnOp UnMinus)]
+    , [binary SymAsterAster (sBinOp BinPower) AssocRight]
+    , [ binary SymAster   (sBinOp BinTimes) AssocLeft
+      , binary SymSlash   (sBinOp BinDiv)   AssocLeft
+      , binary SymPercent (sBinOp BinMod)   AssocLeft
+      ]
+    , [ binary SymPlus (sBinOp BinPlus) AssocLeft
+      , binary SymDash (sBinOp BinPlus) AssocLeft
+      ]
+    , [ binary SymLtLt (sBinOp BinLSL) AssocLeft
+      , binary SymGtGt (sBinOp BinLSR) AssocLeft
+      ]
+    , [ binary SymLtLtLt (sBinOp BinASL) AssocLeft
+      , binary SymGtGtGt (sBinOp BinASR) AssocLeft
+      ]
+    , [ binary SymLt   (sBinOp BinLT)  AssocNone
+      , binary SymGt   (sBinOp BinGT)  AssocNone
+      , binary SymLtEq (sBinOp BinLEq) AssocNone
+      , binary SymGtEq (sBinOp BinLEq) AssocNone
+      ]
+    , [ binary SymEqEq   (sBinOp BinEq)  AssocNone
+      , binary SymBangEq (sBinOp BinNEq) AssocNone
+      ]
+    , [ binary SymEqEqEq   (sBinOp BinEq)  AssocNone
+      , binary SymBangEqEq (sBinOp BinNEq) AssocNone
+      ]
+    , [binary SymAmp (sBinOp BinAnd) AssocLeft]
+    , [ binary SymHat      (sBinOp BinXor)     AssocLeft
+      , binary SymHatTildy (sBinOp BinXNor)    AssocLeft
+      , binary SymTildyHat (sBinOp BinXNorInv) AssocLeft
+      ]
+    , [binary SymBar (sBinOp BinOr) AssocLeft]
+    , [binary SymAmpAmp (sBinOp BinLAnd) AssocLeft]
+    , [binary SymBarBar (sBinOp BinLOr) AssocLeft]
+    ]
 
 binary :: TokenName -> (a -> a -> a) -> Assoc -> ParseOperator a
 binary name fun = Infix ((tok name <?> "binary") >> return fun)
@@ -207,27 +209,29 @@ parseContAssign = do
 
 numLit :: Parser String
 numLit = satisfy' matchId
-    where
-        matchId (Token LitNumber s _) = Just s
-        matchId _                     = Nothing
+  where
+    matchId (Token LitNumber s _) = Just s
+    matchId _                     = Nothing
 
 number :: Parser Decimal
 number = number' <$> numLit
   where
-  number' :: String -> Decimal
-  number' a
-    | all (flip elem ['0' .. '9']) a = fromInteger $ read a
-    | head a == '\''                 = fromInteger $ f a
-    | isInfixOf  "'"  a              = Decimal (read w) (f b)
-    | otherwise                      = error $ "Invalid number format: " ++ a
-    where
-    w = takeWhile (/= '\'') a
-    b = dropWhile (/= '\'') a
-    f a'
-      | isPrefixOf "'d" a' = read $ drop 2 a'
-      | isPrefixOf "'h" a' = read $ "0x" ++ drop 2 a'
-      | isPrefixOf "'b" a' = foldl (\ n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0)) 0 (drop 2 a')
-      | otherwise         = error $ "Invalid number format: " ++ a'
+    number' :: String -> Decimal
+    number' a | all (flip elem ['0' .. '9']) a = fromInteger $ read a
+              | head a == '\''                 = fromInteger $ f a
+              | isInfixOf "'" a                = Decimal (read w) (f b)
+              | otherwise = error $ "Invalid number format: " ++ a
+      where
+        w = takeWhile (/= '\'') a
+        b = dropWhile (/= '\'') a
+        f a'
+            | isPrefixOf "'d" a' = read $ drop 2 a'
+            | isPrefixOf "'h" a' = read $ "0x" ++ drop 2 a'
+            | isPrefixOf "'b" a' = foldl
+                (\n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0))
+                0
+                (drop 2 a')
+            | otherwise = error $ "Invalid number format: " ++ a'
 
 toInteger' :: Decimal -> Integer
 toInteger' (Decimal _ n) = n
@@ -243,10 +247,10 @@ parseRange = do
 
 strId :: Parser String
 strId = satisfy' matchId
-    where
-        matchId (Token IdSimple s _)  = Just s
-        matchId (Token IdEscaped s _) = Just s
-        matchId _                     = Nothing
+  where
+    matchId (Token IdSimple  s _) = Just s
+    matchId (Token IdEscaped s _) = Just s
+    matchId _                     = Nothing
 
 identifier :: Parser Identifier
 identifier = Identifier . T.pack <$> strId
@@ -277,8 +281,7 @@ parseModItem :: Parser ModItem
 parseModItem = (ModCA <$> parseContAssign) <|> parseDecl
 
 parseModList :: Parser [Identifier]
-parseModList = list <|> return []
-    where list = parens $ commaSep identifier
+parseModList = list <|> return [] where list = parens $ commaSep identifier
 
 filterDecl :: PortDir -> ModItem -> Bool
 filterDecl p (Decl (Just p') _) = p == p'
@@ -289,8 +292,8 @@ modPorts p mis = filter (filterDecl p) mis ^.. traverse . declPort
 
 parseModDecl :: Parser ModDecl
 parseModDecl = do
-    name    <- tok KWModule *> identifier
-    _       <- fmap defaultPort <$> parseModList
+    name <- tok KWModule *> identifier
+    _    <- fmap defaultPort <$> parseModList
     tok' SymSemi
     modItem <- option [] . try $ many1 parseModItem
     tok' KWEndmodule

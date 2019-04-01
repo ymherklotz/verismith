@@ -8,5 +8,4 @@ main :: IO ()
 main = do
     traverse_ putStrLn args -- optionally print arguments
     doctest args
-  where
-    args = flags ++ pkgs ++ module_sources
+    where args = flags ++ pkgs ++ module_sources

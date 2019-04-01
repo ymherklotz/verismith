@@ -1,9 +1,10 @@
 module VeriFuzz.Parser.Token
-  ( Token     (..)
-  , TokenName (..)
-  , Position  (..)
-  , tokenString
-  ) where
+    ( Token(..)
+    , TokenName(..)
+    , Position(..)
+    , tokenString
+    )
+where
 
 import           Text.Printf
 

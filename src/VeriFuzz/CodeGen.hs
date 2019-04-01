@@ -80,7 +80,7 @@ port p = t <> sign <> size <> name
   where
     t = flip mappend " " . pType $ p ^. portType
     size | p ^. portSize > 1 = "[" <> showT (p ^. portSize - 1) <> ":0] "
-         | otherwise            = ""
+         | otherwise         = ""
     name = p ^. portName . getIdentifier
     sign = signed $ p ^. portSigned
 
@@ -99,19 +99,19 @@ moduleItem :: ModItem -> Text
 moduleItem (ModCA ca) = contAssign ca
 moduleItem (ModInst (Identifier i) (Identifier name) conn) =
     i <> " " <> name <> "(" <> comma (mConn <$> conn) <> ")" <> ";\n"
-moduleItem (Initial stat ) = "initial " <> statement stat
-moduleItem (Always  stat ) = "always " <> statement stat
-moduleItem (Decl dir p) = maybe "" makePort dir <> port p <> ";\n"
+moduleItem (Initial stat) = "initial " <> statement stat
+moduleItem (Always  stat) = "always " <> statement stat
+moduleItem (Decl dir p  ) = maybe "" makePort dir <> port p <> ";\n"
     where makePort = (<> " ") . portDir
 
 mConn :: ModConn -> Text
-mConn (ModConn c) = expr c
-mConn (ModConnNamed n c) =
-    "." <> n ^. getIdentifier <> "(" <> expr c <> ")"
+mConn (ModConn c       ) = expr c
+mConn (ModConnNamed n c) = "." <> n ^. getIdentifier <> "(" <> expr c <> ")"
 
 -- | Generate continuous assignment
 contAssign :: ContAssign -> Text
-contAssign (ContAssign val e) = "assign " <> val ^. getIdentifier <> " = " <> expr e <> ";\n"
+contAssign (ContAssign val e) =
+    "assign " <> val ^. getIdentifier <> " = " <> expr e <> ";\n"
 
 -- | Generate 'Function' to 'Text'
 func :: Function -> Text
@@ -127,13 +127,12 @@ expr (Number s n) =
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
-expr (Id     i) = i ^. getIdentifier
-expr (Concat c) = "{" <> comma (expr <$> c) <> "}"
-expr (UnOp u e) = "(" <> unaryOp u <> expr e <> ")"
-expr (Cond l t f) =
-    "(" <> expr l <> " ? " <> expr t <> " : " <> expr f <> ")"
-expr (Func f e) = func f <> "(" <> expr e <> ")"
-expr (Str t   ) = "\"" <> t <> "\""
+expr (Id     i  ) = i ^. getIdentifier
+expr (Concat c  ) = "{" <> comma (expr <$> c) <> "}"
+expr (UnOp u e  ) = "(" <> unaryOp u <> expr e <> ")"
+expr (Cond l t f) = "(" <> expr l <> " ? " <> expr t <> " : " <> expr f <> ")"
+expr (Func f e  ) = func f <> "(" <> expr e <> ")"
+expr (Str t     ) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
 binaryOp :: BinaryOperator -> Text
@@ -179,7 +178,7 @@ unaryOp UnNxorInv = "^~"
 
 -- | Generate verilog code for an 'Event'.
 event :: Event -> Text
-event (EId   i   ) = "@(" <> i ^. getIdentifier <> ")"
+event (EId   i)    = "@(" <> i ^. getIdentifier <> ")"
 event (EExpr e)    = "@(" <> expr e <> ")"
 event EAll         = "@*"
 event (EPosEdge i) = "@(posedge " <> i ^. getIdentifier <> ")"
@@ -191,16 +190,10 @@ delay (Delay i) = "#" <> showT i
 
 -- | Generate the verilog code for an 'LVal'.
 lVal :: LVal -> Text
-lVal (RegId i       ) = i ^. getIdentifier
+lVal (RegId i    ) = i ^. getIdentifier
 lVal (RegExpr i e) = i ^. getIdentifier <> " [" <> expr e <> "]"
 lVal (RegSize i msb lsb) =
-    i
-        ^. getIdentifier
-        <> " ["
-        <> constExpr msb
-        <> ":"
-        <> constExpr lsb
-        <> "]"
+    i ^. getIdentifier <> " [" <> constExpr msb <> ":" <> constExpr lsb <> "]"
 lVal (RegConcat e) = "{" <> comma (expr <$> e) <> "}"
 
 constExpr :: ConstExpr -> Text
@@ -211,25 +204,24 @@ pType Wire = "wire"
 pType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Text
-genAssign op (Assign r d e) =
-    lVal r <> op <> maybe "" delay d <> expr e
+genAssign op (Assign r d e) = lVal r <> op <> maybe "" delay d <> expr e
 
 statement :: Statement -> Text
-statement (TimeCtrl  d stat   ) = delay d <> " " <> defMap stat
-statement (EventCtrl e stat   ) = event e <> " " <> defMap stat
+statement (TimeCtrl  d stat     ) = delay d <> " " <> defMap stat
+statement (EventCtrl e stat     ) = event e <> " " <> defMap stat
 statement (SeqBlock s) = "begin\n" <> fold (statement <$> s) <> "end\n"
-statement (BlockAssign    a   ) = genAssign " = " a <> ";\n"
-statement (NonBlockAssign a   ) = genAssign " <= " a <> ";\n"
-statement (StatCA         a   ) = contAssign a
-statement (TaskEnable     t) = task t <> ";\n"
-statement (SysTaskEnable  t) = "$" <> task t <> ";\n"
+statement (BlockAssign    a     ) = genAssign " = " a <> ";\n"
+statement (NonBlockAssign a     ) = genAssign " <= " a <> ";\n"
+statement (StatCA         a     ) = contAssign a
+statement (TaskEnable     t     ) = task t <> ";\n"
+statement (SysTaskEnable  t     ) = "$" <> task t <> ";\n"
 statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")" <> defMap t
-statement (CondStmnt e t f) = "if(" <> expr e <> ") " <> defMap t <> "else " <> defMap f
+statement (CondStmnt e t f) =
+    "if(" <> expr e <> ") " <> defMap t <> "else " <> defMap f
 
 task :: Task -> Text
-task (Task name e)
-    | null e = i
-    | otherwise = i <> "(" <> comma (expr <$> e) <> ")"
+task (Task name e) | null e    = i
+                   | otherwise = i <> "(" <> comma (expr <$> e) <> ")"
     where i = name ^. getIdentifier
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.

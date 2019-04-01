@@ -66,30 +66,33 @@ fuzzOpts = Fuzz <$> textOption
 rerunOpts :: Parser Opts
 rerunOpts =
     Rerun
-        <$> some (option
-                    (optReader parseSynth)
-                    (  long "synth"
-                    <> metavar "SYNTH"
-                    <> help "Rerun using a synthesiser (yosys|xst)."
-                    <> showDefault
-                    <> value Yosys
-                    )
-            <|> option
-                    (optReader parseSim)
-                    (  long "sim"
-                    <> metavar "SIM"
-                    <> help "Rerun using a simulator (icarus)."
-                    <> showDefault
-                    <> value Icarus
-                    )
-            )
+        <$> some
+                (   option
+                        (optReader parseSynth)
+                        (  long "synth"
+                        <> metavar "SYNTH"
+                        <> help "Rerun using a synthesiser (yosys|xst)."
+                        <> showDefault
+                        <> value Yosys
+                        )
+                <|> option
+                        (optReader parseSim)
+                        (  long "sim"
+                        <> metavar "SIM"
+                        <> help "Rerun using a simulator (icarus)."
+                        <> showDefault
+                        <> value Icarus
+                        )
+                )
         <*> (S.fromText <$> textOption
-            ( long "input"
-              <> short 'i'
-              <> metavar "FILE"
-              <> help "Verilog file input."
-              <> showDefault
-              <> value "rtl.v"))
+                (  long "input"
+                <> short 'i'
+                <> metavar "FILE"
+                <> help "Verilog file input."
+                <> showDefault
+                <> value "rtl.v"
+                )
+            )
 
 genOpts :: Parser Opts
 genOpts = Generate . S.fromText <$> textOption
@@ -205,7 +208,7 @@ handleOpts (Parse f) = do
         Left  l -> print l
         Right v -> print $ V.GenVerilog v
     where file = T.unpack . S.toTextIgnore $ f
-handleOpts (Rerun _ _) = undefined
+handleOpts (Rerun  _ _) = undefined
 handleOpts (Reduce f t) = do
     verilogSrc <- readFile file
     case V.parseVerilog file verilogSrc of

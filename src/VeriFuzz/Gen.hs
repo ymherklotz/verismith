@@ -110,7 +110,7 @@ makeIdentifier prefix = do
 newPort :: PortType -> StateGen Port
 newPort pt = do
     ident <- makeIdentifier . T.toLower $ showT pt
-    p <- gen $ Port pt <$> QC.arbitrary <*> positiveArb <*> pure ident
+    p     <- gen $ Port pt <$> QC.arbitrary <*> positiveArb <*> pure ident
     variables %= (p :)
     return p
 
@@ -120,8 +120,7 @@ select ptype = do
     case filter chooseReg $ context ^.. variables . traverse of
         [] -> newPort ptype
         l  -> gen $ QC.elements l
-    where
-        chooseReg (Port a _ _ _) = ptype == a
+    where chooseReg (Port a _ _ _) = ptype == a
 
 scopedExpr :: StateGen Expr
 scopedExpr = do
@@ -156,7 +155,7 @@ assignment = do
 statement :: StateGen Statement
 statement = do
     prob <- askProbability
-    as <- assignment
+    as   <- assignment
     gen $ QC.frequency
         [ (prob ^. probBlock   , return $ BlockAssign as)
         , (prob ^. probNonBlock, return $ NonBlockAssign as)
@@ -196,10 +195,9 @@ moduleDef top = do
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
 procedural :: Config -> Gen VerilogSrc
-procedural config =
-    VerilogSrc
-        .   (: [])
-        .   Description
-        <$> QC.resize num (runReaderT (evalStateT (moduleDef True) context) config)
-    where context = Context [] 0
-          num = config ^. configProperty . propSize
+procedural config = VerilogSrc . (: []) . Description <$> QC.resize
+    num
+    (runReaderT (evalStateT (moduleDef True) context) config)
+  where
+    context = Context [] 0
+    num     = config ^. configProperty . propSize

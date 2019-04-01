@@ -64,8 +64,9 @@ import           VeriFuzz.Yosys
 
 -- | Generate a specific number of random bytestrings of size 256.
 randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes | n == 0    = ranBytes : bytes
-                    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
+randomByteString gen n bytes
+    | n == 0    = ranBytes : bytes
+    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
     where Right (ranBytes, newGen) = C.genBytes 32 gen
 
 -- | generates the specific number of bytestring with a random seed.
