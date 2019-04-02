@@ -27,7 +27,6 @@ import           Data.Text         (Text)
 import qualified Data.Text         as T
 import qualified Data.Text.IO      as T
 import           Numeric           (showHex)
-import           Test.QuickCheck   (Arbitrary, arbitrary)
 import           VeriFuzz.AST
 import           VeriFuzz.Internal
 
@@ -286,8 +285,8 @@ newtype GenVerilog a = GenVerilog { unGenVerilog :: a }
 instance (Source a) => Show (GenVerilog a) where
     show = T.unpack . genSource . unGenVerilog
 
-instance (Arbitrary a) => Arbitrary (GenVerilog a) where
-    arbitrary = GenVerilog <$> arbitrary
+instance (Arb a) => Arb (GenVerilog a) where
+    arb = GenVerilog <$> arb
 
 instance Source SourceInfo where
     genSource (SourceInfo _ src) = genSource src
