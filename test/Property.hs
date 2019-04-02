@@ -3,57 +3,44 @@ module Property
     )
 where
 
-import           Data.Either                       (fromRight, isRight)
-import qualified Data.Graph.Inductive              as G
-import           Data.Graph.Inductive.PatriciaTree (Gr)
+import           Data.Either          (fromRight, isRight)
+import qualified Data.Graph.Inductive as G
+import           Hedgehog             (Gen, (===))
+import qualified Hedgehog             as Hog
+import qualified Hedgehog.Gen         as Hog
 import           Test.Tasty
-import           Test.Tasty.QuickCheck             ((===))
-import qualified Test.Tasty.QuickCheck             as QC
+import           Test.Tasty.Hedgehog
 import           Text.Parsec
 import           VeriFuzz
 import           VeriFuzz.Parser.Lex
-import qualified VeriFuzz.RandomAlt                as V
 
-newtype TestGraph = TestGraph { getGraph :: Gr Gate () }
-                  deriving (Show)
+randomMod' :: Gen ModDecl
+randomMod' = Hog.resize 20 (randomMod 3 10)
 
-newtype AltTestGraph = AltTestGraph { getAltGraph :: Gr Gate () }
-                  deriving (Show)
-
-newtype ModDeclSub = ModDeclSub { getModDecl :: ModDecl }
-
-instance Show ModDeclSub where
-  show = show . GenVerilog . getModDecl
-
-instance QC.Arbitrary ModDeclSub where
-  arbitrary = ModDeclSub <$> QC.resize 20 (randomMod 3 10)
-
-instance QC.Arbitrary TestGraph where
-  arbitrary = TestGraph <$> QC.resize 30 randomDAG
-
-instance QC.Arbitrary AltTestGraph where
-  arbitrary = AltTestGraph <$> QC.resize 100 V.randomDAG
+randomDAG' :: Gen Circuit
+randomDAG' = Hog.resize 30 randomDAG
 
 simpleGraph :: TestTree
-simpleGraph = QC.testProperty "simple graph generation check"
-    $ \graph -> simp graph
-    where simp = G.isSimple . getGraph
+simpleGraph = testProperty "simple graph generation check" . Hog.property $ do
+    xs <- Hog.forAllWith (const "") randomDAG'
+    Hog.assert $ simp xs
+    where simp = G.isSimple . getCircuit
 
-simpleAltGraph :: TestTree
-simpleAltGraph = QC.testProperty "simple alternative graph generation check"
-    $ \graph -> simp graph
-    where simp = G.isSimple . getAltGraph
+parserInput' :: Hog.Property
+parserInput' = Hog.property $ do
+    v <- Hog.forAll randomMod'
+    Hog.assert . isRight $ parse parseModDecl
+                                 "input_test.v"
+                                 (alexScanTokens $ str v)
+    where str = show . GenVerilog
 
-parserInput' :: ModDeclSub -> Bool
-parserInput' (ModDeclSub v) = isRight
-    $ parse parseModDecl "input_test.v" (alexScanTokens str)
-    where str = show . GenVerilog $ v
-
-parserIdempotent' :: ModDeclSub -> QC.Property
-parserIdempotent' (ModDeclSub v) = p sv === (p . p) sv
+parserIdempotent' :: Hog.Property
+parserIdempotent' = Hog.property $ do
+    v <- Hog.forAll randomMod'
+    let sv = vshow v
+    p sv === (p . p) sv
   where
     vshow = show . GenVerilog
-    sv    = vshow v
     p =
         vshow
             . fromRight (error "Failed idempotent test")
@@ -61,12 +48,11 @@ parserIdempotent' (ModDeclSub v) = p sv === (p . p) sv
             . alexScanTokens
 
 parserInput :: TestTree
-parserInput = QC.testProperty "parser input" $ parserInput'
+parserInput = testProperty "parser input" $ parserInput'
 
 parserIdempotent :: TestTree
-parserIdempotent = QC.testProperty "parser idempotence" $ parserIdempotent'
+parserIdempotent = testProperty "parser idempotence" $ parserIdempotent'
 
 propertyTests :: TestTree
-propertyTests = testGroup
-    "Property Tests"
-    [simpleGraph, simpleAltGraph, parserInput, parserIdempotent]
+propertyTests =
+    testGroup "Property Tests" [simpleGraph, parserInput, parserIdempotent]
