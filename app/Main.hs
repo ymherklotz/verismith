@@ -5,7 +5,6 @@ import           Data.Text           (Text)
 import qualified Data.Text           as T
 import           Options.Applicative
 import qualified Shelly              as S
-import qualified Test.QuickCheck     as QC
 import qualified VeriFuzz            as V
 
 data Tool = Yosys
@@ -199,10 +198,8 @@ handleOpts (Fuzz _) = do
             )
         <$> [1 .. num]
     sequence_ $ takeMVar <$> vars
-handleOpts (Generate f) = do
-    g <- QC.generate $ V.randomMod 50 1000
-    S.shelly . S.writefile f $ V.genSource g
-handleOpts (Parse f) = do
+handleOpts (Generate _) = error "Not implemented"
+handleOpts (Parse    f) = do
     verilogSrc <- readFile file
     case V.parseVerilog file verilogSrc of
         Left  l -> print l
