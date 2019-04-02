@@ -42,10 +42,10 @@ import           Data.Text                (Text)
 import qualified Data.Text                as T
 import           Data.Text.Encoding       (decodeUtf8)
 import qualified Data.Text.IO             as T
+import           Hedgehog                 (Gen)
+import qualified Hedgehog.Gen             as Hog
 import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Test.QuickCheck          (Gen)
-import qualified Test.QuickCheck          as QC
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
 import           VeriFuzz.Circuit
@@ -83,9 +83,7 @@ makeSrcInfo m =
 -- can be seen.
 draw :: IO ()
 draw = do
-    gr <- QC.generate $ rDups <$> QC.resize
-        10
-        (randomDAG :: QC.Gen (G.Gr Gate ()))
+    gr <- Hog.sample $ rDups . getCircuit <$> Hog.resize 10 randomDAG
     let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
     writeFile "file.dot" dot
     shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
@@ -97,14 +95,14 @@ showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
 -- | Run a simulation on a random DAG or a random module.
 runSimulation :: IO ()
 runSimulation = do
-  -- gr <- QC.generate $ rDups <$> QC.resize 100 (randomDAG :: QC.Gen (G.Gr Gate ()))
+  -- gr <- Hog.generate $ rDups <$> Hog.resize 100 (randomDAG :: Gen (G.Gr Gate ()))
   -- let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
   -- writeFile "file.dot" dot
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
     rand  <- generateByteString 20
-    rand2 <- QC.generate (randomMod 10 100)
+    rand2 <- Hog.sample (randomMod 10 100)
     val   <- shelly $ runSim defaultIcarus (makeSrcInfo rand2) rand
     T.putStrLn $ showBS val
 
@@ -138,7 +136,7 @@ checkEquivalence src dir = shellyFailDir $ do
 -- generated Verilog files are equivalent.
 runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
 runEquivalence gm t i = do
-    m <- QC.generate gm
+    m <- Hog.sample gm
     let srcInfo = makeSrcInfo m
     rand <- generateByteString 20
     shellyFailDir $ do
