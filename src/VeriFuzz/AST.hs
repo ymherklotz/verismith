@@ -115,26 +115,28 @@ module VeriFuzz.AST
     , modConn
     , modConnName
     , modExpr
-    -- * Useful functions
-    , positiveArb
     -- * Useful Lenses and Traversals
     , getModule
     , getSourceId
+    -- * Arbitrary
+    , Arb
+    , arb
+    , genPositive
     )
 where
 
 import           Control.Lens
-import           Control.Monad    (replicateM)
+import           Control.Monad      (replicateM)
 import           Data.Data
 import           Data.Data.Lens
-import           Data.String      (IsString, fromString)
-import           Data.Text        (Text)
-import qualified Data.Text        as T
-import           Data.Traversable (sequenceA)
-import qualified Test.QuickCheck  as QC
-
-positiveArb :: (QC.Arbitrary a, Ord a, Num a) => QC.Gen a
-positiveArb = abs <$> QC.suchThat QC.arbitrary (/= 0)
+import           Data.List.NonEmpty (toList)
+import           Data.String        (IsString, fromString)
+import           Data.Text          (Text)
+import qualified Data.Text          as T
+import           Data.Traversable   (sequenceA)
+import           Hedgehog           (Gen)
+import qualified Hedgehog.Gen       as Hog
+import qualified Hedgehog.Range     as Hog
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -142,21 +144,9 @@ positiveArb = abs <$> QC.suchThat QC.arbitrary (/= 0)
 newtype Identifier = Identifier { _getIdentifier :: Text }
                    deriving (Eq, Show, Ord, Data, IsString, Semigroup, Monoid)
 
-makeLenses ''Identifier
-
-instance QC.Arbitrary Identifier where
-  arbitrary = do
-    l <- QC.choose (2, 10)
-    Identifier . T.pack <$> replicateM l (QC.elements ['a'..'z'])
-
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _getDelay :: Int }
                 deriving (Eq, Show, Ord, Data, Num)
-
-makeLenses ''Delay
-
-instance QC.Arbitrary Delay where
-  arbitrary = Delay <$> positiveArb
 
 -- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
 data Event = EId {-# UNPACK #-} !Identifier
@@ -165,9 +155,6 @@ data Event = EId {-# UNPACK #-} !Identifier
            | EPosEdge {-# UNPACK #-} !Identifier
            | ENegEdge {-# UNPACK #-} !Identifier
            deriving (Eq, Show, Ord, Data)
-
-instance QC.Arbitrary Event where
-  arbitrary = EId <$> QC.arbitrary
 
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
@@ -197,35 +184,6 @@ data BinaryOperator = BinPlus    -- ^ @+@
                     | BinASR     -- ^ @>>>@
                     deriving (Eq, Show, Ord, Data)
 
-instance QC.Arbitrary BinaryOperator where
-  arbitrary = QC.elements
-    [ BinPlus
-    , BinMinus
-    , BinTimes
---    , BinDiv
---    , BinMod
-    , BinEq
-    , BinNEq
---    , BinCEq
---    , BinCNEq
-    , BinLAnd
-    , BinLOr
-    , BinLT
-    , BinLEq
-    , BinGT
-    , BinGEq
-    , BinAnd
-    , BinOr
-    , BinXor
-    , BinXNor
-    , BinXNorInv
---    , BinPower
-    , BinLSL
-    , BinLSR
-    , BinASL
-    , BinASR
-    ]
-
 -- | Unary operators that are currently supported by the generator.
 data UnaryOperator = UnPlus    -- ^ @+@
                    | UnMinus   -- ^ @-@
@@ -240,30 +198,9 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnNxorInv -- ^ @^~@
                    deriving (Eq, Show, Ord, Data)
 
-instance QC.Arbitrary UnaryOperator where
-  arbitrary = QC.elements
-    [ UnPlus
-    , UnMinus
-    , UnNot
-    , UnLNot
-    , UnAnd
-    , UnNand
-    , UnOr
-    , UnNor
-    , UnXor
-    , UnNxor
-    , UnNxorInv
-    ]
-
 data Function = SignedFunc
               | UnSignedFunc
               deriving (Eq, Show, Ord, Data)
-
-instance QC.Arbitrary Function where
-  arbitrary = QC.elements
-    [ SignedFunc
-    , UnSignedFunc
-    ]
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
@@ -313,42 +250,6 @@ instance IsString Expr where
 instance Plated Expr where
   plate = uniplate
 
-exprSafeList :: [QC.Gen Expr]
-exprSafeList = [Number <$> positiveArb <*> QC.arbitrary]
-
-exprRecList :: (Int -> QC.Gen Expr) -> [QC.Gen Expr]
-exprRecList subexpr =
-    [ Number <$> positiveArb <*> QC.arbitrary
-    , Concat <$> QC.listOf1 (subexpr 8)
-    , UnOp
-        <$> QC.arbitrary
-        <*> subexpr 2
-    -- , Str <$> QC.arbitrary
-    , BinOp <$> subexpr 2 <*> QC.arbitrary <*> subexpr 2
-    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
-    , Func <$> QC.arbitrary <*> subexpr 2
-    ]
-
-expr :: Int -> QC.Gen Expr
-expr n | n == 0    = QC.oneof $ (Id <$> QC.arbitrary) : exprSafeList
-       | n > 0     = QC.oneof $ (Id <$> QC.arbitrary) : exprRecList subexpr
-       | otherwise = expr 0
-    where subexpr y = expr (n `div` y)
-
-exprWithContext :: [Identifier] -> Int -> QC.Gen Expr
-exprWithContext [] n | n == 0    = QC.oneof exprSafeList
-                     | n > 0     = QC.oneof $ exprRecList subexpr
-                     | otherwise = exprWithContext [] 0
-    where subexpr y = exprWithContext [] (n `div` y)
-exprWithContext l n
-    | n == 0    = QC.oneof $ (Id <$> QC.elements l) : exprSafeList
-    | n > 0     = QC.oneof $ (Id <$> QC.elements l) : exprRecList subexpr
-    | otherwise = exprWithContext l 0
-    where subexpr y = exprWithContext l (n `div` y)
-
-instance QC.Arbitrary Expr where
-  arbitrary = QC.sized expr
-
 traverseExpr :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 traverseExpr f (Concat e   ) = Concat <$> sequenceA (f <$> e)
 traverseExpr f (UnOp u e   ) = UnOp u <$> f e
@@ -357,22 +258,13 @@ traverseExpr f (Cond  c l r) = Cond <$> f c <*> f l <*> f r
 traverseExpr f (Func fn e  ) = Func fn <$> f e
 traverseExpr _ e             = pure e
 
-makeLenses ''Expr
-
 -- | Constant expression, which are known before simulation at compilation time.
 newtype ConstExpr = ConstExpr { _constNum :: Int }
-                  deriving (Eq, Show, Ord, Data, Num, QC.Arbitrary)
-
-makeLenses ''ConstExpr
+                  deriving (Eq, Show, Ord, Data, Num)
 
 data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
                  , _taskExpr :: [Expr]
                  } deriving (Eq, Show, Ord, Data)
-
-makeLenses ''Task
-
-instance QC.Arbitrary Task where
-  arbitrary = Task <$> QC.arbitrary <*> QC.arbitrary
 
 -- | Type that represents the left hand side of an assignment, which can be a
 -- concatenation such as in:
@@ -391,14 +283,6 @@ data LVal = RegId { _regId :: {-# UNPACK #-} !Identifier }
           | RegConcat { _regConc :: [Expr] }
           deriving (Eq, Show, Ord, Data)
 
-makeLenses ''LVal
-
-instance QC.Arbitrary LVal where
-  arbitrary = QC.oneof [ RegId <$> QC.arbitrary
-                       , RegExpr <$> QC.arbitrary <*> QC.arbitrary
-                       , RegSize <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-                       ]
-
 instance IsString LVal where
   fromString = RegId . fromString
 
@@ -408,19 +292,11 @@ data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortInOut -- ^ Inout direction for port (@inout@).
              deriving (Eq, Show, Ord, Data)
 
-instance QC.Arbitrary PortDir where
-  arbitrary = QC.elements [PortIn, PortOut, PortInOut]
-
 -- | Currently, only @wire@ and @reg@ are supported, as the other net types are
 -- not that common and not a priority.
 data PortType = Wire
               | Reg
               deriving (Eq, Show, Ord, Data)
-
-instance QC.Arbitrary PortType where
-  arbitrary = QC.elements [Wire, Reg]
-
-makeLenses ''PortType
 
 -- | Port declaration. It contains information about the type of the port, the
 -- size, and the port name. It used to also contain information about if it was
@@ -436,12 +312,6 @@ data Port = Port { _portType   :: !PortType
                  , _portName   :: {-# UNPACK #-} !Identifier
                  } deriving (Eq, Show, Ord, Data)
 
-makeLenses ''Port
-
-instance QC.Arbitrary Port where
-  arbitrary = Port <$> QC.arbitrary <*> QC.arbitrary
-              <*> positiveArb <*> QC.arbitrary
-
 -- | This is currently a type because direct module declaration should also be
 -- added:
 --
@@ -454,29 +324,14 @@ data ModConn = ModConn { _modConn :: !Expr }
                             }
              deriving (Eq, Show, Ord, Data)
 
-makeLenses ''ModConn
-
-instance QC.Arbitrary ModConn where
-  arbitrary = ModConn <$> QC.arbitrary
-
 data Assign = Assign { _assignReg   :: !LVal
                      , _assignDelay :: !(Maybe Delay)
                      , _assignExpr  :: !Expr
                      } deriving (Eq, Show, Ord, Data)
 
-makeLenses ''Assign
-
-instance QC.Arbitrary Assign where
-  arbitrary = Assign <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-
 data ContAssign = ContAssign { _contAssignNetLVal :: {-# UNPACK #-} !Identifier
                              , _contAssignExpr    :: !Expr
                              } deriving (Eq, Show, Ord, Data)
-
-makeLenses ''ContAssign
-
-instance QC.Arbitrary ContAssign where
-  arbitrary = ContAssign <$> QC.arbitrary <*> QC.arbitrary
 
 -- | Statements in Verilog.
 data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
@@ -497,8 +352,6 @@ data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
                        }
            deriving (Eq, Show, Ord, Data)
 
-makeLenses ''Statement
-
 instance Semigroup Statement where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
   (SeqBlock a) <> b = SeqBlock $ a <> [b]
@@ -507,30 +360,6 @@ instance Semigroup Statement where
 
 instance Monoid Statement where
   mempty = SeqBlock []
-
-statement :: Int -> QC.Gen Statement
-statement n
-    | n == 0 = QC.oneof
-        [ BlockAssign <$> QC.arbitrary
-        , NonBlockAssign <$> QC.arbitrary
-    -- , StatCA <$> QC.arbitrary
-        , TaskEnable <$> QC.arbitrary
-        , SysTaskEnable <$> QC.arbitrary
-        ]
-    | n > 0 = QC.oneof
-        [ TimeCtrl <$> QC.arbitrary <*> (Just <$> substat 2)
-        , SeqBlock <$> QC.listOf1 (substat 4)
-        , BlockAssign <$> QC.arbitrary
-        , NonBlockAssign <$> QC.arbitrary
-    -- , StatCA <$> QC.arbitrary
-        , TaskEnable <$> QC.arbitrary
-        , SysTaskEnable <$> QC.arbitrary
-        ]
-    | otherwise = statement 0
-    where substat y = statement (n `div` y)
-
-instance QC.Arbitrary Statement where
-  arbitrary = QC.sized statement
 
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA { _modContAssign :: !ContAssign }
@@ -544,16 +373,6 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
                     , _declPort :: !Port
                     }
              deriving (Eq, Show, Ord, Data)
-
-makeLenses ''ModItem
-
-instance QC.Arbitrary ModItem where
-  arbitrary = QC.oneof [ ModCA <$> QC.arbitrary
-                       , ModInst <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-                       , Initial <$> QC.arbitrary
-                       , Always <$> (EventCtrl <$> QC.arbitrary <*> QC.arbitrary)
-                       , Decl <$> pure Nothing <*> QC.arbitrary
-                       ]
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
@@ -572,25 +391,29 @@ traverseModItem f (ModInst a b e) =
     ModInst a b <$> sequenceA (traverseModConn f <$> e)
 traverseModItem _ e = pure e
 
-makeLenses ''ModDecl
-
-modPortGen :: QC.Gen Port
-modPortGen =
-    Port <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-
-instance QC.Arbitrary ModDecl where
-  arbitrary = ModDecl <$> QC.arbitrary <*> QC.arbitrary <*> QC.listOf1 modPortGen <*> QC.arbitrary
-
 -- | Description of the Verilog module.
 newtype Description = Description { _getDescription :: ModDecl }
-                    deriving (Eq, Show, Ord, Data, QC.Arbitrary)
-
-makeLenses ''Description
+                    deriving (Eq, Show, Ord, Data)
 
 -- | The complete sourcetext for the Verilog module.
 newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
-                   deriving (Eq, Show, Ord, Data, QC.Arbitrary, Semigroup, Monoid)
+                   deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
 
+makeLenses ''Identifier
+makeLenses ''Delay
+makeLenses ''Expr
+makeLenses ''ConstExpr
+makeLenses ''Task
+makeLenses ''LVal
+makeLenses ''PortType
+makeLenses ''Port
+makeLenses ''ModConn
+makeLenses ''Assign
+makeLenses ''ContAssign
+makeLenses ''Statement
+makeLenses ''ModItem
+makeLenses ''ModDecl
+makeLenses ''Description
 makeLenses ''VerilogSrc
 
 getModule :: Traversal' VerilogSrc ModDecl
@@ -600,3 +423,195 @@ getModule = getVerilogSrc . traverse . getDescription
 getSourceId :: Traversal' VerilogSrc Text
 getSourceId = getModule . modId . getIdentifier
 {-# INLINE getSourceId #-}
+
+listOf1 :: Gen a -> Gen [a]
+listOf1 a = toList <$> Hog.nonEmpty (Hog.linear 0 100) a
+
+listOf :: Gen a -> Gen [a]
+listOf = Hog.list (Hog.linear 0 100)
+
+genPositive :: Gen Int
+genPositive = Hog.filter (>= 0) $ Hog.int (Hog.linear 1 99)
+
+integral :: Gen Integer
+integral = Hog.integral (Hog.linear 0 100)
+
+class Arb a where
+    arb :: Gen a
+
+instance Arb Identifier where
+    arb = do
+        l <- genPositive
+        Identifier . T.pack <$> replicateM (l + 1) (Hog.element ['a'..'z'])
+
+instance Arb Delay where
+    arb = Delay <$> genPositive
+
+instance Arb Event where
+    arb = EId <$> arb
+
+instance Arb BinaryOperator where
+    arb = Hog.element
+        [ BinPlus
+        , BinMinus
+        , BinTimes
+        -- , BinDiv
+        -- , BinMod
+        , BinEq
+        , BinNEq
+        -- , BinCEq
+        -- , BinCNEq
+        , BinLAnd
+        , BinLOr
+        , BinLT
+        , BinLEq
+        , BinGT
+        , BinGEq
+        , BinAnd
+        , BinOr
+        , BinXor
+        , BinXNor
+        , BinXNorInv
+        -- , BinPower
+        , BinLSL
+        , BinLSR
+        , BinASL
+        , BinASR
+        ]
+
+instance Arb UnaryOperator where
+    arb = Hog.element
+        [ UnPlus
+        , UnMinus
+        , UnNot
+        , UnLNot
+        , UnAnd
+        , UnNand
+        , UnOr
+        , UnNor
+        , UnXor
+        , UnNxor
+        , UnNxorInv
+        ]
+
+instance Arb Function where
+    arb = Hog.element
+        [ SignedFunc
+        , UnSignedFunc
+        ]
+
+instance Arb Expr where
+    arb = Hog.sized expr
+
+exprSafeList :: [Gen Expr]
+exprSafeList = [Number <$> genPositive <*> integral]
+
+exprRecList :: (Hog.Size -> Gen Expr) -> [Gen Expr]
+exprRecList subexpr =
+    [ Number <$> genPositive <*> integral
+    , Concat <$> listOf1 (subexpr 8)
+    , UnOp
+        <$> arb
+        <*> subexpr 2
+    -- , Str <$> arb
+    , BinOp <$> subexpr 2 <*> arb <*> subexpr 2
+    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+    , Func <$> arb <*> subexpr 2
+    ]
+
+expr :: Hog.Size -> Gen Expr
+expr n | n == 0    = Hog.choice $ (Id <$> arb) : exprSafeList
+       | n > 0     = Hog.choice $ (Id <$> arb) : exprRecList subexpr
+       | otherwise = expr 0
+    where subexpr y = expr (n `div` y)
+
+exprWithContext :: [Identifier] -> Hog.Size -> Gen Expr
+exprWithContext [] n | n == 0    = Hog.choice exprSafeList
+                     | n > 0     = Hog.choice $ exprRecList subexpr
+                     | otherwise = exprWithContext [] 0
+    where subexpr y = exprWithContext [] (n `div` y)
+exprWithContext l n
+    | n == 0    = Hog.choice $ (Id <$> Hog.element l) : exprSafeList
+    | n > 0     = Hog.choice $ (Id <$> Hog.element l) : exprRecList subexpr
+    | otherwise = exprWithContext l 0
+    where subexpr y = exprWithContext l (n `div` y)
+
+instance Arb Int where
+    arb = Hog.int (Hog.linear 0 100)
+
+instance Arb ConstExpr where
+    arb = ConstExpr <$> Hog.int (Hog.linear 0 100)
+
+instance Arb Task where
+    arb = Task <$> arb <*> listOf arb
+
+instance Arb LVal where
+    arb = Hog.choice [ RegId <$> arb
+                     , RegExpr <$> arb <*> arb
+                     , RegSize <$> arb <*> arb <*> arb
+                     ]
+
+instance Arb PortDir where
+    arb = Hog.element [PortIn, PortOut, PortInOut]
+
+instance Arb PortType where
+    arb = Hog.element [Wire, Reg]
+
+instance Arb Port where
+    arb = Port <$> arb <*> arb <*> genPositive <*> arb
+
+instance Arb ModConn where
+    arb = ModConn <$> arb
+
+instance Arb Assign where
+    arb = Assign <$> arb <*> Hog.maybe arb <*> arb
+
+instance Arb ContAssign where
+  arb = ContAssign <$> arb <*> arb
+
+instance Arb Statement where
+    arb = Hog.sized statement
+
+statement :: Hog.Size -> Gen Statement
+statement n
+    | n == 0 = Hog.choice
+        [ BlockAssign <$> arb
+        , NonBlockAssign <$> arb
+    -- , StatCA <$> arb
+        , TaskEnable <$> arb
+        , SysTaskEnable <$> arb
+        ]
+    | n > 0 = Hog.choice
+        [ TimeCtrl <$> arb <*> (Just <$> substat 2)
+        , SeqBlock <$> listOf1 (substat 4)
+        , BlockAssign <$> arb
+        , NonBlockAssign <$> arb
+    -- , StatCA <$> arb
+        , TaskEnable <$> arb
+        , SysTaskEnable <$> arb
+        ]
+    | otherwise = statement 0
+    where substat y = statement (n `div` y)
+
+instance Arb ModItem where
+    arb = Hog.choice [ ModCA <$> arb
+                     , ModInst <$> arb <*> arb <*> listOf arb
+                     , Initial <$> arb
+                     , Always <$> (EventCtrl <$> arb <*> Hog.maybe arb)
+                     , Decl <$> pure Nothing <*> arb
+                     ]
+
+modPortGen :: Gen Port
+modPortGen = Port <$> arb <*> arb <*> arb <*> arb
+
+instance Arb ModDecl where
+    arb = ModDecl <$> arb <*> listOf arb <*> listOf1 modPortGen <*> listOf arb
+
+instance Arb Description where
+    arb = Description <$> arb
+
+instance Arb VerilogSrc where
+    arb = VerilogSrc <$> listOf1 arb
+
+instance Arb Bool where
+    arb = Hog.element [True, False]
