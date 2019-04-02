@@ -59,14 +59,3 @@ randomDAG = do
 -- | Generate a random acyclic DAG with an IO instance.
 genRandomDAG :: IO Circuit
 genRandomDAG = Hog.sample randomDAG
-
--- fromGraph :: Gen ModDecl
--- fromGraph = do
---     gr <- rDupsCirc <$> Hog.resize 100 randomCircuit
---     return
---         $   initMod
---         .   head
---         $   nestUpTo 5 (generateAST gr)
---         ^.. getVerilogSrc
---         .   traverse
---         .   getDescription

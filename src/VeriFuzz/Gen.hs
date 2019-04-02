@@ -27,8 +27,8 @@ import           Control.Monad.Trans.Reader     hiding (local)
 import           Control.Monad.Trans.State.Lazy
 import           Data.Foldable                  (fold)
 import qualified Data.Text                      as T
-import           Test.QuickCheck                (Gen)
-import qualified Test.QuickCheck                as QC
+import           Hedgehog                       (Gen)
+import qualified Hedgehog.Gen                   as Hog
 import           VeriFuzz.AST
 import           VeriFuzz.ASTGen
 import           VeriFuzz.Config
@@ -38,6 +38,7 @@ import           VeriFuzz.Random
 
 data Context = Context { _variables   :: [Port]
                        , _nameCounter :: Int
+                       , _stmntDepth  :: Int
                        }
 
 makeLenses ''Context
@@ -49,7 +50,7 @@ toId = Identifier . ("w" <>) . T.pack . show
 
 toPort :: Identifier -> Gen Port
 toPort ident = do
-    i <- abs <$> QC.arbitrary
+    i <- genPositive
     return $ wire i ident
 
 sumSize :: [Port] -> Int
@@ -57,7 +58,7 @@ sumSize ps = sum $ ps ^.. traverse . portSize
 
 random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
 random ctx fun = do
-    expr <- QC.sized (exprWithContext ctx)
+    expr <- Hog.sized (exprWithContext ctx)
     return . ModCA $ fun expr
 
 --randomAssigns :: [Identifier] -> [Gen ModItem]
@@ -66,6 +67,17 @@ random ctx fun = do
 randomOrdAssigns :: [Identifier] -> [Identifier] -> [Gen ModItem]
 randomOrdAssigns inp ids = snd $ foldr generate (inp, []) ids
     where generate cid (i, o) = (cid : i, random i (ContAssign cid) : o)
+
+fromGraph :: Gen ModDecl
+fromGraph = do
+    gr <- rDupsCirc <$> Hog.resize 100 randomDAG
+    return
+        $   initMod
+        .   head
+        $   nestUpTo 5 (generateAST gr)
+        ^.. getVerilogSrc
+        .   traverse
+        .   getDescription
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
@@ -81,23 +93,12 @@ randomMod inps total = do
     end   = drop inps ids
     start = take inps ids
 
-fromGraph :: Gen ModDecl
-fromGraph = do
-    gr <- rDupsCirc <$> QC.resize 100 randomCircuit
-    return
-        $   initMod
-        .   head
-        $   nestUpTo 5 (generateAST gr)
-        ^.. getVerilogSrc
-        .   traverse
-        .   getDescription
-
 gen :: Gen a -> StateGen a
 gen = lift . lift
 
 some :: StateGen a -> StateGen [a]
 some f = do
-    amount <- gen positiveArb
+    amount <- gen genPositive
     replicateM amount f
 
 makeIdentifier :: T.Text -> StateGen Identifier
@@ -110,7 +111,7 @@ makeIdentifier prefix = do
 newPort :: PortType -> StateGen Port
 newPort pt = do
     ident <- makeIdentifier . T.toLower $ showT pt
-    p     <- gen $ Port pt <$> QC.arbitrary <*> positiveArb <*> pure ident
+    p     <- gen $ Port pt <$> arb <*> genPositive <*> pure ident
     variables %= (p :)
     return p
 
@@ -119,14 +120,14 @@ select ptype = do
     context <- get
     case filter chooseReg $ context ^.. variables . traverse of
         [] -> newPort ptype
-        l  -> gen $ QC.elements l
+        l  -> gen $ Hog.element l
     where chooseReg (Port a _ _ _) = ptype == a
 
 scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
     gen
-        .   QC.sized
+        .   Hog.sized
         .   exprWithContext
         $   context
         ^.. variables
@@ -152,14 +153,24 @@ assignment = do
     lval <- lvalFromPort <$> newPort Reg
     Assign lval Nothing <$> scopedExpr
 
+conditional :: StateGen Statement
+conditional = do
+    expr <- scopedExpr
+    stmntDepth -= 1
+    tstat <- fold <$> some statement
+    stmntDepth += 1
+    return $ CondStmnt expr (Just tstat) Nothing
+
 statement :: StateGen Statement
 statement = do
     prob <- askProbability
-    as   <- assignment
-    gen $ QC.frequency
-        [ (prob ^. probBlock   , return $ BlockAssign as)
-        , (prob ^. probNonBlock, return $ NonBlockAssign as)
+    cont <- get
+    Hog.frequency
+        [ (prob ^. probBlock              , BlockAssign <$> assignment)
+        , (prob ^. probNonBlock           , NonBlockAssign <$> assignment)
+        , (onDepth cont (prob ^. probCond), conditional)
         ]
+    where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
 -- | Generate a random module item.
 modItem :: StateGen ModItem
@@ -168,7 +179,7 @@ modItem = do
     stat     <- fold <$> some statement
     eventReg <- select Reg
     modCA    <- ModCA <$> contAssign
-    gen $ QC.frequency
+    gen $ Hog.frequency
         [ (prob ^. probAssign, return modCA)
         , ( prob ^. probAlways
           , return $ Always (EventCtrl (EId (eventReg ^. portName)) (Just stat))
@@ -181,7 +192,7 @@ modItem = do
 -- module.
 moduleDef :: Bool -> StateGen ModDecl
 moduleDef top = do
-    name     <- if top then return "top" else gen QC.arbitrary
+    name     <- if top then return "top" else gen arb
     portList <- some $ newPort Wire
     mi       <- some modItem
     context  <- get
@@ -195,9 +206,9 @@ moduleDef top = do
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
 procedural :: Config -> Gen VerilogSrc
-procedural config = VerilogSrc . (: []) . Description <$> QC.resize
+procedural config = VerilogSrc . (: []) . Description <$> Hog.resize
     num
     (runReaderT (evalStateT (moduleDef True) context) config)
   where
-    context = Context [] 0
-    num     = config ^. configProperty . propSize
+    context = Context [] 0 5
+    num     = fromIntegral $ config ^. configProperty . propSize
