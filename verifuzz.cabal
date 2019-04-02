@@ -54,7 +54,6 @@ library
   build-depends: base >=4.7 && <5
                , hedgehog >= 0.6 && <0.7
                , fgl >=5.7 && <5.8
-               , fgl-arbitrary >=0.2 && <0.3
                , fgl-visualize >=0.1 && <0.2
                , lens >=4.17 && <4.18
                , random >=1.1 && <1.2
