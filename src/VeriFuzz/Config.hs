@@ -130,7 +130,7 @@ parseConfig t = case Toml.decode configCodec t of
     Left (Toml.ParseError _) -> error "Config file parse error"
 
 configEncode :: Config -> Text
-configEncode c = Toml.encode configCodec c
+configEncode = Toml.encode configCodec
 
 configToFile :: FilePath -> Config -> IO ()
 configToFile f = T.writeFile f . configEncode

@@ -48,10 +48,10 @@ parserIdempotent' = Hog.property $ do
             . alexScanTokens
 
 parserInput :: TestTree
-parserInput = testProperty "parser input" $ parserInput'
+parserInput = testProperty "parser input" parserInput'
 
 parserIdempotent :: TestTree
-parserIdempotent = testProperty "parser idempotence" $ parserIdempotent'
+parserIdempotent = testProperty "parser idempotence" parserIdempotent'
 
 propertyTests :: TestTree
 propertyTests =

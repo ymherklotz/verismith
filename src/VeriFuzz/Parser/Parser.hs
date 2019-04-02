@@ -23,6 +23,7 @@ module VeriFuzz.Parser.Parser
 where
 
 import           Control.Lens
+import           Control.Monad              (void)
 import           Data.Functor               (($>))
 import           Data.Functor.Identity      (Identity)
 import qualified Data.Text                  as T
@@ -75,7 +76,7 @@ tok t = satisfy (\(Token t' _ _) -> t' == t) <?> show t
 
 -- | Parse without returning the `TokenName`.
 tok' :: TokenName -> Parser ()
-tok' p = tok p >> return ()
+tok' p = void $ tok p
 
 parens :: Parser a -> Parser a
 parens = between (tok SymParenL) (tok SymParenR)
@@ -217,17 +218,17 @@ number :: Parser Decimal
 number = number' <$> numLit
   where
     number' :: String -> Decimal
-    number' a | all (flip elem ['0' .. '9']) a = fromInteger $ read a
+    number' a | all (`elem` ['0' .. '9']) a = fromInteger $ read a
               | head a == '\''                 = fromInteger $ f a
-              | isInfixOf "'" a                = Decimal (read w) (f b)
+              | "'" `isInfixOf` a                = Decimal (read w) (f b)
               | otherwise = error $ "Invalid number format: " ++ a
       where
         w = takeWhile (/= '\'') a
         b = dropWhile (/= '\'') a
         f a'
-            | isPrefixOf "'d" a' = read $ drop 2 a'
-            | isPrefixOf "'h" a' = read $ "0x" ++ drop 2 a'
-            | isPrefixOf "'b" a' = foldl
+            | "'d" `isPrefixOf` a' = read $ drop 2 a'
+            | "'h" `isPrefixOf` a' = read $ "0x" ++ drop 2 a'
+            | "'b" `isPrefixOf` a' = foldl
                 (\n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0))
                 0
                 (drop 2 a')
