@@ -12,12 +12,13 @@ Define the random generation for the directed acyclic graph.
 
 module VeriFuzz.Random where
 
-import           Data.Graph.Inductive              (Context, LEdge)
+import           Data.Graph.Inductive              (Context)
 import qualified Data.Graph.Inductive              as G
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Data.List                         (nub)
-import           Test.QuickCheck                   (Arbitrary, Gen)
-import qualified Test.QuickCheck                   as QC
+import           Hedgehog                          (Gen)
+import qualified Hedgehog.Gen                      as Hog
+import qualified Hedgehog.Range                    as Hog
 import           VeriFuzz.Circuit
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]
@@ -34,29 +35,38 @@ rDupsCirc = Circuit . rDups . getCircuit
 
 -- | Gen instance to create an arbitrary edge, where the edges are limited by
 -- `n` that is passed to it.
-arbitraryEdge :: (Arbitrary e) => Int -> Gen (LEdge e)
+arbitraryEdge :: Hog.Size -> Gen CEdge
 arbitraryEdge n = do
     x <- with $ \a -> a < n && a > 0 && a /= n - 1
     y <- with $ \a -> x < a && a < n && a > 0
-    z <- QC.arbitrary
-    return (x, y, z)
-    where with = QC.suchThat $ QC.resize n QC.arbitrary
+    return $ CEdge (fromIntegral x, fromIntegral y, ())
+  where
+    with = flip Hog.filter $ fromIntegral <$> Hog.resize
+        n
+        (Hog.int (Hog.linear 0 100))
 
 -- | Gen instance for a random acyclic DAG.
-randomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e) => Gen (Gr l e) -- ^ The generated graph. It uses Arbitrary to
-                          -- generate random instances of each node
+randomDAG :: Gen Circuit -- ^ The generated graph. It uses Arbitrary to generate
+                         -- random instances of each node
 randomDAG = do
-    list <- QC.infiniteListOf QC.arbitrary
-    l    <- QC.infiniteListOf aE
-    QC.sized (\n -> return . G.mkGraph (nodes list n) $ take (10 * n) l)
+    list <- Hog.list (Hog.linear 1 100) $ Hog.enum minBound maxBound
+    l    <- Hog.list (Hog.linear 10 1000) aE
+    return . Circuit $ G.mkGraph (nodes list) l
   where
-    nodes l n = zip [0 .. n] $ take n l
-    aE = QC.sized arbitraryEdge
+    nodes l = zip [0 .. length l - 1] l
+    aE = getCEdge <$> Hog.sized arbitraryEdge
 
 -- | Generate a random acyclic DAG with an IO instance.
-genRandomDAG :: (Arbitrary l, Arbitrary e, Eq l, Eq e) => IO (Gr l e)
-genRandomDAG = QC.generate randomDAG
+genRandomDAG :: IO Circuit
+genRandomDAG = Hog.sample randomDAG
 
--- | Generate a random circuit instead of a random graph
-randomCircuit :: Gen Circuit
-randomCircuit = Circuit <$> randomDAG
+-- fromGraph :: Gen ModDecl
+-- fromGraph = do
+--     gr <- rDupsCirc <$> Hog.resize 100 randomCircuit
+--     return
+--         $   initMod
+--         .   head
+--         $   nestUpTo 5 (generateAST gr)
+--         ^.. getVerilogSrc
+--         .   traverse
+--         .   getDescription
