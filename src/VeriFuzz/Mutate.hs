@@ -67,11 +67,11 @@ nestId i m
     def = Id i
 
 -- | Replaces an identifier by a expression in all the module declaration.
-nestSource :: Identifier -> VerilogSrc -> VerilogSrc
+nestSource :: Identifier -> Verilog -> Verilog
 nestSource i src = src & getModule %~ nestId i
 
 -- | Nest variables in the format @w[0-9]*@ up to a certain number.
-nestUpTo :: Int -> VerilogSrc -> VerilogSrc
+nestUpTo :: Int -> Verilog -> Verilog
 nestUpTo i src =
     foldl (flip nestSource) src $ Identifier . fromNode <$> [1 .. i]
 

@@ -11,8 +11,11 @@ Parser module for Verilog.
 -}
 
 module VeriFuzz.Parser
-    ( module VeriFuzz.Parser.Parser
+    ( parseVerilog
+    , uncomment
+    , preprocess
     )
 where
 
 import           VeriFuzz.Parser.Parser
+import           VeriFuzz.Parser.Preprocess

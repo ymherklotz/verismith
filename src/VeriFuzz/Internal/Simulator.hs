@@ -46,7 +46,7 @@ class (Tool a) => Synthesisor a where
            -> Sh ()    -- ^ does not return any values
 
 data SourceInfo = SourceInfo { runMainModule :: {-# UNPACK #-} !Text
-                             , runSource     :: !VerilogSrc
+                             , runSource     :: !Verilog
                              }
                   deriving (Eq, Show)
 

@@ -41,9 +41,9 @@ class Source a where
 defMap :: Maybe Statement -> Text
 defMap = maybe ";\n" statement
 
--- | Convert the 'VerilogSrc' type to 'Text' so that it can be rendered.
-verilogSrc :: VerilogSrc -> Text
-verilogSrc source = fold $ description <$> source ^. getVerilogSrc
+-- | Convert the 'Verilog' type to 'Text' so that it can be rendered.
+verilogSrc :: Verilog -> Text
+verilogSrc source = fold $ description <$> source ^. getVerilog
 
 -- | Generate the 'Description' to 'Text'.
 description :: Description -> Text
@@ -277,7 +277,7 @@ instance Source ModDecl where
 instance Source Description where
     genSource = description
 
-instance Source VerilogSrc where
+instance Source Verilog where
     genSource = verilogSrc
 
 newtype GenVerilog a = GenVerilog { unGenVerilog :: a }

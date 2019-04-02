@@ -34,8 +34,8 @@ setModName str = modId .~ Identifier str
 addModPort :: Port -> ModDecl -> ModDecl
 addModPort port = modInPorts %~ (:) port
 
-addDescription :: Description -> VerilogSrc -> VerilogSrc
-addDescription desc = getVerilogSrc %~ (:) desc
+addDescription :: Description -> Verilog -> Verilog
+addDescription desc = getVerilog %~ (:) desc
 
 testBench :: ModDecl
 testBench = ModDecl
@@ -61,7 +61,7 @@ testBench = ModDecl
         ]
     ]
 
-addTestBench :: VerilogSrc -> VerilogSrc
+addTestBench :: Verilog -> Verilog
 addTestBench = addDescription $ Description testBench
 
 defaultPort :: Identifier -> Port

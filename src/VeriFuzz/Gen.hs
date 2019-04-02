@@ -75,7 +75,7 @@ fromGraph = do
         $   initMod
         .   head
         $   nestUpTo 5 (generateAST gr)
-        ^.. getVerilogSrc
+        ^.. getVerilog
         .   traverse
         .   getDescription
 
@@ -206,8 +206,8 @@ moduleDef top = do
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
-procedural :: Config -> Gen VerilogSrc
-procedural config = VerilogSrc . (: []) . Description <$> Hog.resize
+procedural :: Config -> Gen Verilog
+procedural config = Verilog . (: []) . Description <$> Hog.resize
     num
     (runReaderT (evalStateT (moduleDef True) context) config)
   where

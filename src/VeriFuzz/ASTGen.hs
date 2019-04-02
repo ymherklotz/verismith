@@ -75,5 +75,5 @@ genModuleDeclAST c = ModDecl i output ports $ combineAssigns yPort a
     a      = genAssignAST c
     yPort  = Port Wire False 90 "y"
 
-generateAST :: Circuit -> VerilogSrc
-generateAST c = VerilogSrc [Description $ genModuleDeclAST c]
+generateAST :: Circuit -> Verilog
+generateAST c = Verilog [Description $ genModuleDeclAST c]

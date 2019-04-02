@@ -16,8 +16,8 @@ Defines the types to build a Verilog AST.
 
 module VeriFuzz.AST
     ( -- * Top level types
-      VerilogSrc(..)
-    , getVerilogSrc
+      Verilog(..)
+    , getVerilog
     , Description(..)
     , getDescription
     -- * Primitives
@@ -396,7 +396,7 @@ newtype Description = Description { _getDescription :: ModDecl }
                     deriving (Eq, Show, Ord, Data)
 
 -- | The complete sourcetext for the Verilog module.
-newtype VerilogSrc = VerilogSrc { _getVerilogSrc :: [Description] }
+newtype Verilog = Verilog { _getVerilog :: [Description] }
                    deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
 
 makeLenses ''Identifier
@@ -414,13 +414,13 @@ makeLenses ''Statement
 makeLenses ''ModItem
 makeLenses ''ModDecl
 makeLenses ''Description
-makeLenses ''VerilogSrc
+makeLenses ''Verilog
 
-getModule :: Traversal' VerilogSrc ModDecl
-getModule = getVerilogSrc . traverse . getDescription
+getModule :: Traversal' Verilog ModDecl
+getModule = getVerilog . traverse . getDescription
 {-# INLINE getModule #-}
 
-getSourceId :: Traversal' VerilogSrc Text
+getSourceId :: Traversal' Verilog Text
 getSourceId = getModule . modId . getIdentifier
 {-# INLINE getSourceId #-}
 
@@ -610,8 +610,8 @@ instance Arb ModDecl where
 instance Arb Description where
     arb = Description <$> arb
 
-instance Arb VerilogSrc where
-    arb = VerilogSrc <$> listOf1 arb
+instance Arb Verilog where
+    arb = Verilog <$> listOf1 arb
 
 instance Arb Bool where
     arb = Hog.element [True, False]

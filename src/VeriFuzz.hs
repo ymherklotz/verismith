@@ -77,7 +77,7 @@ generateByteString n = do
 
 makeSrcInfo :: ModDecl -> SourceInfo
 makeSrcInfo m =
-    SourceInfo (m ^. modId . getIdentifier) (VerilogSrc [Description m])
+    SourceInfo (m ^. modId . getIdentifier) (Verilog [Description m])
 
 -- | Draw a randomly generated DAG to a dot file and compile it to a png so it
 -- can be seen.
@@ -100,7 +100,7 @@ runSimulation = do
   -- writeFile "file.dot" dot
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
-  --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilogSrc . traverse . getDescription
+  --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
     rand  <- generateByteString 20
     rand2 <- Hog.sample (randomMod 10 100)
     val   <- shelly $ runSim defaultIcarus (makeSrcInfo rand2) rand

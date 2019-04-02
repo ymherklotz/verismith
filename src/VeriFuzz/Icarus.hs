@@ -89,7 +89,7 @@ runSimIcarus sim rinfo bss = do
               <> (SysTaskEnable $ Task "finish" [])
             ]
     let newtb     = instantiateMod m tb
-    let modWithTb = VerilogSrc $ Description <$> [newtb, m]
+    let modWithTb = Verilog $ Description <$> [newtb, m]
     writefile "main.v" $ genSource modWithTb
     runSimWithFile sim "main.v" bss
     where m = rinfo ^. mainModule

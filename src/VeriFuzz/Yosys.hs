@@ -37,7 +37,7 @@ defaultYosys = Yosys "yosys"
 
 writeSimFile
     :: Yosys      -- ^ Simulator instance
-    -> VerilogSrc -- ^ Current Verilog source
+    -> Verilog -- ^ Current Verilog source
     -> FilePath   -- ^ Output sim file
     -> Sh ()
 writeSimFile _ src file = do

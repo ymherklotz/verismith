@@ -12,18 +12,14 @@ whole Verilog syntax, as the AST does not support it either.
 -}
 
 module VeriFuzz.Parser.Parser
-    ( -- * Parsers
+    ( -- * Parser
       parseVerilog
-    , parseVerilogSrc
-    , parseDescription
-    , parseModDecl
-    , parseContAssign
-    , parseExpr
     )
 where
 
 import           Control.Lens
 import           Control.Monad              (void)
+import           Data.Bifunctor             (bimap)
 import           Data.Functor               (($>))
 import           Data.Functor.Identity      (Identity)
 import qualified Data.Text                  as T
@@ -306,12 +302,15 @@ parseModDecl = do
 parseDescription :: Parser Description
 parseDescription = Description <$> parseModDecl
 
--- | Parses a 'String' into 'VerilogSrc' by skipping any beginning whitespace
+-- | Parses a 'String' into 'Verilog' by skipping any beginning whitespace
 -- and then parsing multiple Verilog source.
-parseVerilogSrc :: Parser VerilogSrc
-parseVerilogSrc = VerilogSrc <$> many parseDescription
+parseVerilogSrc :: Parser Verilog
+parseVerilogSrc = Verilog <$> many parseDescription
 
 -- | Parse a 'String' containing verilog code. The parser currently only supports
 -- the subset of Verilog that is being generated randomly.
-parseVerilog :: String -> String -> Either ParseError VerilogSrc
-parseVerilog s = parse parseVerilogSrc s . alexScanTokens . preprocess [] s
+parseVerilog :: String -- ^ Name of parsed object.
+             -> String -- ^ Content to be parsed.
+             -> Either String Verilog -- ^ Returns 'String' with error
+                                         -- message if parse fails.
+parseVerilog s = bimap show id . parse parseVerilogSrc s . alexScanTokens . preprocess [] s
