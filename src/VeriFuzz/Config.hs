@@ -20,6 +20,7 @@ module VeriFuzz.Config
     , probNonBlock
     , probAssign
     , probAlways
+    , probCond
     , propSize
     , propSeed
     , configProbability
@@ -40,6 +41,7 @@ data Probability = Probability { _probAssign   :: {-# UNPACK #-} !Int
                                , _probAlways   :: {-# UNPACK #-} !Int
                                , _probBlock    :: {-# UNPACK #-} !Int
                                , _probNonBlock :: {-# UNPACK #-} !Int
+                               , _probCond     :: {-# UNPACK #-} !Int
                                }
                  deriving (Eq, Show)
 
@@ -67,7 +69,7 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability 10 1 1 1) (Property 50 Nothing)
+defaultConfig = Config (Probability 10 1 5 1 1) (Property 50 Nothing)
 
 probCodec :: TomlCodec Probability
 probCodec =
@@ -80,6 +82,8 @@ probCodec =
         .=  _probAlways
         <*> defaultValue (defProb probNonBlock) (Toml.int "nonblocking")
         .=  _probAlways
+        <*> defaultValue (defProb probNonBlock) (Toml.int "conditional")
+        .=  _probCond
     where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec Property
