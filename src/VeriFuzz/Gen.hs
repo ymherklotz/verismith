@@ -150,14 +150,15 @@ askProbability = lift $ asks probability
 
 assignment :: StateGen Assign
 assignment = do
+    expr <- scopedExpr
     lval <- lvalFromPort <$> newPort Reg
-    Assign lval Nothing <$> scopedExpr
+    return $ Assign lval Nothing expr
 
 conditional :: StateGen Statement
 conditional = do
     expr <- scopedExpr
     stmntDepth -= 1
-    tstat <- fold <$> some statement
+    tstat <- SeqBlock <$> some statement
     stmntDepth += 1
     return $ CondStmnt expr (Just tstat) Nothing
 
@@ -210,5 +211,5 @@ procedural config = VerilogSrc . (: []) . Description <$> Hog.resize
     num
     (runReaderT (evalStateT (moduleDef True) context) config)
   where
-    context = Context [] 0 5
+    context = Context [] 0 $ config ^. configProperty . propDepth
     num     = fromIntegral $ config ^. configProperty . propSize

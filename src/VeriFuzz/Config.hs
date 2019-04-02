@@ -23,17 +23,22 @@ module VeriFuzz.Config
     , probCond
     , propSize
     , propSeed
+    , propDepth
     , configProbability
     , configProperty
     , parseConfigFile
     , parseConfig
+    , configEncode
+    , configToFile
     )
 where
 
 import           Control.Applicative (Alternative)
 import           Control.Lens        hiding ((.=))
+import           Data.List.NonEmpty  (NonEmpty (..))
 import           Data.Maybe          (fromMaybe)
 import           Data.Text           (Text)
+import qualified Data.Text.IO        as T (writeFile)
 import           Toml                (TomlCodec, (.=))
 import qualified Toml
 
@@ -47,8 +52,9 @@ data Probability = Probability { _probAssign   :: {-# UNPACK #-} !Int
 
 makeLenses ''Probability
 
-data Property = Property { _propSize :: {-# UNPACK #-} !Int
-                         , _propSeed :: !(Maybe Int)
+data Property = Property { _propSize  :: {-# UNPACK #-} !Int
+                         , _propSeed  :: !(Maybe Int)
+                         , _propDepth :: {-# UNPACK #-} !Int
                          }
               deriving (Eq, Show)
 
@@ -69,20 +75,23 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability 10 1 5 1 1) (Property 50 Nothing)
+defaultConfig = Config (Probability 10 1 5 1 1) (Property 50 Nothing 3)
+
+twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
+twoKey a b = Toml.Key (a :| [b])
 
 probCodec :: TomlCodec Probability
 probCodec =
     Probability
-        <$> defaultValue (defProb probAssign) (Toml.int "assign")
+        <$> defaultValue (defProb probAssign) (Toml.int $ twoKey "moditem" "assign")
         .=  _probAssign
-        <*> defaultValue (defProb probAlways) (Toml.int "always")
+        <*> defaultValue (defProb probAlways) (Toml.int $ twoKey "moditem" "always")
         .=  _probAlways
-        <*> defaultValue (defProb probBlock) (Toml.int "blocking")
-        .=  _probAlways
-        <*> defaultValue (defProb probNonBlock) (Toml.int "nonblocking")
-        .=  _probAlways
-        <*> defaultValue (defProb probNonBlock) (Toml.int "conditional")
+        <*> defaultValue (defProb probBlock) (Toml.int $ twoKey "statement" "blocking")
+        .=  _probBlock
+        <*> defaultValue (defProb probNonBlock) (Toml.int $ twoKey "statement" "nonblocking")
+        .=  _probNonBlock
+        <*> defaultValue (defProb probNonBlock) (Toml.int $ twoKey "statement" "conditional")
         .=  _probCond
     where defProb i = defaultConfig ^. configProbability . i
 
@@ -93,6 +102,8 @@ propCodec =
         .=  _propSize
         <*> Toml.dioptional (Toml.int "seed")
         .=  _propSeed
+        <*> defaultValue (defProp propDepth) (Toml.int "depth")
+        .= _propDepth
     where defProp i = defaultConfig ^. configProperty . i
 
 configCodec :: TomlCodec Config
@@ -117,3 +128,9 @@ parseConfig t = case Toml.decode configCodec t of
     Left (Toml.TypeMismatch k _ _) ->
         error $ "Type mismatch with key " ++ show k
     Left (Toml.ParseError _) -> error "Config file parse error"
+
+configEncode :: Config -> Text
+configEncode c = Toml.encode configCodec c
+
+configToFile :: FilePath -> Config -> IO ()
+configToFile f = T.writeFile f . configEncode

@@ -1,10 +1,11 @@
-[property]
-seed = 12345
-size = 100
 
 [probability]
-assign = 10
-always = 1
-moddecl = 1
-blocking = 1
-nonblocking = 1
+  moditem.always = 1
+  moditem.assign = 10
+  statement.blocking = 5
+  statement.conditional = 1
+  statement.nonblocking = 1
+
+[property]
+  depth = 3
+  size = 50
