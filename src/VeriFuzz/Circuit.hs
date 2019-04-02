@@ -15,12 +15,12 @@ module VeriFuzz.Circuit
       Gate(..)
     , Circuit(..)
     , CNode(..)
+    , CEdge(..)
     )
 where
 
-import           Data.Graph.Inductive (Gr, LNode)
+import           Data.Graph.Inductive (Gr, LEdge, LNode)
 import           System.Random
-import           Test.QuickCheck
 
 -- | The types for all the gates.
 data Gate = And
@@ -33,12 +33,11 @@ newtype Circuit = Circuit { getCircuit :: Gr Gate () }
 
 newtype CNode = CNode { getCNode :: LNode Gate }
 
+newtype CEdge = CEdge { getCEdge :: LEdge () }
+
 instance Random Gate where
   randomR (a, b) g =
     case randomR (fromEnum a, fromEnum b) g of
       (x, g') -> (toEnum x, g')
 
   random = randomR (minBound, maxBound)
-
-instance Arbitrary Gate where
-  arbitrary = elements [And, Or, Xor]
