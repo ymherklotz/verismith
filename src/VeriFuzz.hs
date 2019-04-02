@@ -14,20 +14,10 @@ module VeriFuzz
     , runReduce
     , draw
     , SourceInfo(..)
-    , module VeriFuzz.AST
+    , module VeriFuzz.Verilog
     , module VeriFuzz.Config
-    , module VeriFuzz.ASTGen
     , module VeriFuzz.Circuit
-    , module VeriFuzz.CodeGen
-    , module VeriFuzz.Env
-    , module VeriFuzz.Gen
-    , module VeriFuzz.Icarus
-    , module VeriFuzz.Mutate
-    , module VeriFuzz.Parser
-    , module VeriFuzz.Random
-    , module VeriFuzz.Reduce
-    , module VeriFuzz.XST
-    , module VeriFuzz.Yosys
+    , module VeriFuzz.Sim
     )
 where
 
@@ -46,21 +36,10 @@ import           Hedgehog                 (Gen)
 import qualified Hedgehog.Gen             as Hog
 import           Prelude                  hiding (FilePath)
 import           Shelly
-import           VeriFuzz.AST
-import           VeriFuzz.ASTGen
 import           VeriFuzz.Circuit
-import           VeriFuzz.CodeGen
 import           VeriFuzz.Config
-import           VeriFuzz.Env
-import           VeriFuzz.Gen
-import           VeriFuzz.Icarus
-import           VeriFuzz.Internal
-import           VeriFuzz.Mutate
-import           VeriFuzz.Parser
-import           VeriFuzz.Random
-import           VeriFuzz.Reduce
-import           VeriFuzz.XST
-import           VeriFuzz.Yosys
+import           VeriFuzz.Sim
+import           VeriFuzz.Verilog
 
 -- | Generate a specific number of random bytestrings of size 256.
 randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
@@ -128,7 +107,7 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText dir)
     catch_sh
-        (runEquiv defaultYosys defaultYosys (Just defaultXst) src >> return True
+        (runEquiv defaultYosys defaultYosys (Just defaultXST) src >> return True
         )
         ((\_ -> return False) :: RunFailed -> Sh Bool)
 
@@ -145,7 +124,7 @@ runEquivalence gm t i = do
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
         catch_sh
-                (  runEquiv defaultYosys defaultYosys (Just defaultXst) srcInfo
+                (  runEquiv defaultYosys defaultYosys (Just defaultXST) srcInfo
                 >> echoP "Test OK"
                 )
             $ onFailure n

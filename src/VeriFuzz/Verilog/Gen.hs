@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Gen
+Module      : VeriFuzz.Verilog.Gen
 Description : Various useful generators.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -12,10 +12,9 @@ Various useful generators.
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module VeriFuzz.Gen
+module VeriFuzz.Verilog.Gen
     ( -- * Generation methods
       procedural
-    , fromGraph
     , randomMod
     )
 where
@@ -29,12 +28,11 @@ import           Data.Foldable                  (fold)
 import qualified Data.Text                      as T
 import           Hedgehog                       (Gen)
 import qualified Hedgehog.Gen                   as Hog
-import           VeriFuzz.AST
-import           VeriFuzz.ASTGen
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
-import           VeriFuzz.Mutate
-import           VeriFuzz.Random
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.Internal
+import           VeriFuzz.Verilog.Mutate
 
 data Context = Context { _variables   :: [Port]
                        , _nameCounter :: Int
@@ -67,17 +65,6 @@ random ctx fun = do
 randomOrdAssigns :: [Identifier] -> [Identifier] -> [Gen ModItem]
 randomOrdAssigns inp ids = snd $ foldr generate (inp, []) ids
     where generate cid (i, o) = (cid : i, random i (ContAssign cid) : o)
-
-fromGraph :: Gen ModDecl
-fromGraph = do
-    gr <- rDupsCirc <$> Hog.resize 100 randomDAG
-    return
-        $   initMod
-        .   head
-        $   nestUpTo 5 (generateAST gr)
-        ^.. getVerilog
-        .   traverse
-        .   getDescription
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do

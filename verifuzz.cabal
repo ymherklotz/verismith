@@ -28,29 +28,31 @@ library
   ghc-options: -Wall -Werror
   build-tools: alex >=3 && <4
   exposed-modules: VeriFuzz
-                 , VeriFuzz.AST
+                 , VeriFuzz.Circuit
+                 , VeriFuzz.Circuit.Base
+                 , VeriFuzz.Circuit.Gen
+                 , VeriFuzz.Circuit.Internal
+                 , VeriFuzz.Circuit.Random
                  , VeriFuzz.Config
                  , VeriFuzz.Internal
-                 , VeriFuzz.Internal.AST
-                 , VeriFuzz.Internal.Circuit
-                 , VeriFuzz.Internal.Simulator
-                 , VeriFuzz.Internal.Template
-                 , VeriFuzz.ASTGen
-                 , VeriFuzz.Circuit
-                 , VeriFuzz.CodeGen
-                 , VeriFuzz.Env
-                 , VeriFuzz.Gen
-                 , VeriFuzz.Icarus
-                 , VeriFuzz.Mutate
-                 , VeriFuzz.Parser
-                 , VeriFuzz.Parser.Parser
-                 , VeriFuzz.Parser.Preprocess
-                 , VeriFuzz.Parser.Token
-                 , VeriFuzz.Parser.Lex
-                 , VeriFuzz.Random
-                 , VeriFuzz.Reduce
-                 , VeriFuzz.XST
-                 , VeriFuzz.Yosys
+                 , VeriFuzz.Sim
+                 , VeriFuzz.Sim.Env
+                 , VeriFuzz.Sim.Icarus
+                 , VeriFuzz.Sim.Internal
+                 , VeriFuzz.Sim.Reduce
+                 , VeriFuzz.Sim.Template
+                 , VeriFuzz.Sim.XST
+                 , VeriFuzz.Sim.Yosys
+                 , VeriFuzz.Verilog
+                 , VeriFuzz.Verilog.AST
+                 , VeriFuzz.Verilog.CodeGen
+                 , VeriFuzz.Verilog.Gen
+                 , VeriFuzz.Verilog.Internal
+                 , VeriFuzz.Verilog.Lex
+                 , VeriFuzz.Verilog.Mutate
+                 , VeriFuzz.Verilog.Parser
+                 , VeriFuzz.Verilog.Preprocess
+                 , VeriFuzz.Verilog.Token
   build-depends: base >=4.7 && <5
                , hedgehog >= 0.6 && <0.7
                , fgl >=5.7 && <5.8

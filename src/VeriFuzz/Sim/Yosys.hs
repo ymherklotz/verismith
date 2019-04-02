@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Yosys
+Module      : VeriFuzz.Sim.Yosys
 Description : Yosys simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,16 +12,22 @@ Yosys simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Yosys where
+module VeriFuzz.Sim.Yosys
+    ( Yosys(..)
+    , defaultYosys
+    , runEquiv
+    , runEquivYosys
+    )
+where
 
 import           Control.Lens
-import           Prelude               hiding (FilePath)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text (st)
-import           VeriFuzz.AST
-import           VeriFuzz.CodeGen
-import           VeriFuzz.Internal
-import           VeriFuzz.Mutate
+import           Text.Shakespeare.Text    (st)
+import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Sim.Template
+import           VeriFuzz.Verilog.CodeGen
+import           VeriFuzz.Verilog.Mutate
 
 newtype Yosys = Yosys { yosysPath :: FilePath }
               deriving (Eq, Show)
@@ -34,15 +40,6 @@ instance Synthesisor Yosys where
 
 defaultYosys :: Yosys
 defaultYosys = Yosys "yosys"
-
-writeSimFile
-    :: Yosys      -- ^ Simulator instance
-    -> Verilog -- ^ Current Verilog source
-    -> FilePath   -- ^ Output sim file
-    -> Sh ()
-writeSimFile _ src file = do
-    writefile "rtl.v" $ genSource src
-    writefile file yosysSimConfig
 
 runSynthYosys :: Yosys -> SourceInfo -> FilePath -> Sh ()
 runSynthYosys sim (SourceInfo _ src) outf = do

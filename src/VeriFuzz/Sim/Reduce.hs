@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Reduce
+Module      : VeriFuzz.Sim.Reduce
 Description : Test case reducer implementation.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -13,16 +13,16 @@ Test case reducer implementation.
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module VeriFuzz.Reduce
+module VeriFuzz.Sim.Reduce
     ( reduce
     )
 where
 
 import           Control.Lens
-import           VeriFuzz.AST
-import           VeriFuzz.CodeGen
-import           VeriFuzz.Internal
-import           VeriFuzz.Mutate
+import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.CodeGen
+import           VeriFuzz.Verilog.Mutate
 
 data Replacement a = Dual a a
                    | Single a
@@ -133,28 +133,17 @@ reduce_
 reduce_ repl eval src = do
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single False) -> do
-            putStrLn "########## 1 ##########"
-            runIf s
-        (Dual _ l, Dual True False) -> do
-            putStrLn "########## 2 ##########"
-            runIf l
-        (Dual r _, Dual False True) -> do
-            putStrLn "########## 3 ##########"
-            runIf r
+        (Single s, Single False) -> runIf s
+        (Dual _ l, Dual True False) -> runIf l
+        (Dual r _, Dual False True) -> runIf r
         (Dual r l, Dual False False) -> do
-            putStrLn "########## 4 ##########"
             lreduced <- runIf l
             rreduced <- runIf r
             if runSource lreduced < runSource rreduced
                 then return lreduced
                 else return rreduced
-        (None, None) -> do
-            putStrLn "########## 5 ##########"
-            return src
-        _ -> do
-            putStrLn "########## 6 ##########"
-            return src
+        (None, None) -> return src
+        _ -> return src
   where
     replacement = repl src
     runIf s = if s /= src then reduce eval s else return s

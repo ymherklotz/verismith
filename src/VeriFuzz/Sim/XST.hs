@@ -1,41 +1,46 @@
 {-|
-Module      : VeriFuzz.XST
-Description : Xst (ise) simulator implementation.
+Module      : VeriFuzz.Sim.XST
+Description : XST (ise) simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 
-Xst (ise) simulator implementation.
+XST (ise) simulator implementation.
 -}
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.XST where
+module VeriFuzz.Sim.XST
+    ( XST(..)
+    , defaultXST
+    )
+where
 
-import           Prelude               hiding (FilePath)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text (st)
-import           VeriFuzz.CodeGen
-import           VeriFuzz.Internal
+import           Text.Shakespeare.Text    (st)
+import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Sim.Template
+import           VeriFuzz.Verilog.CodeGen
 
-data Xst = Xst { xstPath    :: {-# UNPACK #-} !FilePath
+data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath
                , netgenPath :: {-# UNPACK #-} !FilePath
                }
            deriving (Eq, Show)
 
-instance Tool Xst where
+instance Tool XST where
   toText _ = "xst"
 
-instance Synthesisor Xst where
-  runSynth = runSynthXst
+instance Synthesisor XST where
+  runSynth = runSynthXST
 
-defaultXst :: Xst
-defaultXst = Xst "xst" "netgen"
+defaultXST :: XST
+defaultXST = XST "xst" "netgen"
 
-runSynthXst :: Xst -> SourceInfo -> FilePath -> Sh ()
-runSynthXst sim (SourceInfo top src) outf = do
+runSynthXST :: XST -> SourceInfo -> FilePath -> Sh ()
+runSynthXST sim (SourceInfo top src) outf = do
     dir <- pwd
     writefile xstFile $ xstSynthConfig top
     writefile prjFile [st|verilog work "rtl.v"|]

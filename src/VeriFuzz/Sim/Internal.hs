@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Internal.Simulator
+Module      : VeriFuzz.Sim.Internal
 Description : Class of the simulator.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,21 @@ Portability : POSIX
 Class of the simulator and the synthesize tool.
 -}
 
-module VeriFuzz.Internal.Simulator where
+module VeriFuzz.Sim.Internal
+    ( Tool(..)
+    , Simulator(..)
+    , Synthesisor(..)
+    , SourceInfo(..)
+    , mainModule
+    , rootPath
+    , timeout
+    , timeout_
+    , bsToI
+    , noPrint
+    , echoP
+    , logger
+    )
+where
 
 import           Control.Lens
 import           Data.Bits             (shiftL)
@@ -21,7 +35,7 @@ import qualified Data.Text             as T
 import           Prelude               hiding (FilePath)
 import           Shelly
 import           System.FilePath.Posix (takeBaseName)
-import           VeriFuzz.AST
+import           VeriFuzz.Verilog.AST
 
 -- | Tool class.
 class Tool a where

@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Icarus
+Module      : VeriFuzz.Sim.Icarus
 Description : Icarus verilog module.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,30 +10,35 @@ Portability : POSIX
 Icarus verilog module.
 -}
 
-module VeriFuzz.Icarus where
+module VeriFuzz.Sim.Icarus
+    ( Icarus(..)
+    , defaultIcarus
+    )
+where
 
 import           Control.Lens
-import           Crypto.Hash            (Digest, hash)
-import           Crypto.Hash.Algorithms (SHA256)
-import           Data.Binary            (encode)
-import qualified Data.ByteArray         as BA (convert)
-import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as B
-import           Data.ByteString.Lazy   (toStrict)
-import qualified Data.ByteString.Lazy   as L (ByteString)
-import           Data.Char              (digitToInt)
-import           Data.Foldable          (fold)
-import           Data.List              (transpose)
-import           Data.Maybe             (listToMaybe)
-import           Data.Text              (Text)
-import qualified Data.Text              as T
-import           Numeric                (readInt)
-import           Prelude                hiding (FilePath)
+import           Crypto.Hash               (Digest, hash)
+import           Crypto.Hash.Algorithms    (SHA256)
+import           Data.Binary               (encode)
+import qualified Data.ByteArray            as BA (convert)
+import           Data.ByteString           (ByteString)
+import qualified Data.ByteString           as B
+import           Data.ByteString.Lazy      (toStrict)
+import qualified Data.ByteString.Lazy      as L (ByteString)
+import           Data.Char                 (digitToInt)
+import           Data.Foldable             (fold)
+import           Data.List                 (transpose)
+import           Data.Maybe                (listToMaybe)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import           Numeric                   (readInt)
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           VeriFuzz.AST
-import           VeriFuzz.CodeGen
-import           VeriFuzz.Internal
-import           VeriFuzz.Mutate
+import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.CodeGen
+import           VeriFuzz.Verilog.Internal
+import           VeriFuzz.Verilog.Mutate
 
 data Icarus = Icarus { icarusPath :: FilePath
                      , vvpPath    :: FilePath

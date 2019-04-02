@@ -1,10 +1,10 @@
 {
 {-# OPTIONS_GHC -w #-}
-module VeriFuzz.Parser.Lex
+module VeriFuzz.Verilog.Lex
   ( alexScanTokens
   ) where
 
-import VeriFuzz.Parser.Token
+import VeriFuzz.Verilog.Token
 
 }
 

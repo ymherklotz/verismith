@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Internal.Circuit
+Module      : VeriFuzz.Circuit.Internal
 Description : Internal helpers for generation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,14 @@ Portability : POSIX
 Internal helpers for generation.
 -}
 
-module VeriFuzz.Internal.Circuit where
+module VeriFuzz.Circuit.Internal
+    ( fromNode
+    , filterGr
+    , only
+    , inputs
+    , outputs
+    )
+where
 
 import           Data.Graph.Inductive (Graph, Node)
 import qualified Data.Graph.Inductive as G

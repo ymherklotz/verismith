@@ -3,16 +3,17 @@ module Property
     )
 where
 
-import           Data.Either          (fromRight, isRight)
-import qualified Data.Graph.Inductive as G
-import           Hedgehog             (Gen, (===))
-import qualified Hedgehog             as Hog
-import qualified Hedgehog.Gen         as Hog
+import           Data.Either             (fromRight, isRight)
+import qualified Data.Graph.Inductive    as G
+import           Hedgehog                (Gen, (===))
+import qualified Hedgehog                as Hog
+import qualified Hedgehog.Gen            as Hog
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Text.Parsec
 import           VeriFuzz
-import           VeriFuzz.Parser.Lex
+import           VeriFuzz.Verilog.Lex
+import           VeriFuzz.Verilog.Parser
 
 randomMod' :: Gen ModDecl
 randomMod' = Hog.resize 20 (randomMod 3 10)

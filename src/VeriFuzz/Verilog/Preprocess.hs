@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Parser.Preprocess
+Module      : VeriFuzz.Verilog.Preprocess
 Description : Simple preprocessor for `define and comments.
 Copyright   : (c) 2011-2015 Tom Hawkins, 2019 Yann Herklotz
 License     : GPL-3
@@ -14,7 +14,7 @@ The code is from https://github.com/tomahawkins/verilog.
 Edits to the original code are warning fixes and formatting changes.
 -}
 
-module VeriFuzz.Parser.Preprocess
+module VeriFuzz.Verilog.Preprocess
     ( uncomment
     , preprocess
     )

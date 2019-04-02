@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Parser.Parser
+Module      : VeriFuzz.Verilog.Parser
 Description : Minimal Verilog parser to reconstruct the AST.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -11,28 +11,28 @@ Minimal Verilog parser to reconstruct the AST. This parser does not support the
 whole Verilog syntax, as the AST does not support it either.
 -}
 
-module VeriFuzz.Parser.Parser
+module VeriFuzz.Verilog.Parser
     ( -- * Parser
       parseVerilog
+    , parseModDecl
     )
 where
 
 import           Control.Lens
-import           Control.Monad              (void)
-import           Data.Bifunctor             (bimap)
-import           Data.Functor               (($>))
-import           Data.Functor.Identity      (Identity)
-import qualified Data.Text                  as T
-import           Text.Parsec                hiding (satisfy)
-import           Text.Parsec.Expr
-import           VeriFuzz.AST
---import           VeriFuzz.CodeGen
+import           Control.Monad               (void)
+import           Data.Bifunctor              (bimap)
 import           Data.Bits
-import           Data.List                  (isInfixOf, isPrefixOf)
-import           VeriFuzz.Internal
-import           VeriFuzz.Parser.Lex
-import           VeriFuzz.Parser.Preprocess
-import           VeriFuzz.Parser.Token
+import           Data.Functor                (($>))
+import           Data.Functor.Identity       (Identity)
+import           Data.List                   (isInfixOf, isPrefixOf)
+import qualified Data.Text                   as T
+import           Text.Parsec                 hiding (satisfy)
+import           Text.Parsec.Expr
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.Internal
+import           VeriFuzz.Verilog.Lex
+import           VeriFuzz.Verilog.Preprocess
+import           VeriFuzz.Verilog.Token
 
 
 type Parser = Parsec [Token] ()

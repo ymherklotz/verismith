@@ -16,28 +16,31 @@ module VeriFuzz.Circuit
     , Circuit(..)
     , CNode(..)
     , CEdge(..)
+    , fromGraph
+    , generateAST
+    , rDups
+    , rDupsCirc
+    , randomDAG
+    , genRandomDAG
     )
 where
 
-import           Data.Graph.Inductive (Gr, LEdge, LNode)
-import           System.Random
+import           Control.Lens
+import           Hedgehog                (Gen)
+import qualified Hedgehog.Gen            as Hog
+import           VeriFuzz.Circuit.Base
+import           VeriFuzz.Circuit.Gen
+import           VeriFuzz.Circuit.Random
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.Mutate
 
--- | The types for all the gates.
-data Gate = And
-          | Or
-          | Xor
-          deriving (Show, Eq, Enum, Bounded, Ord)
-
--- | Newtype for the Circuit which implements a Graph from fgl.
-newtype Circuit = Circuit { getCircuit :: Gr Gate () }
-
-newtype CNode = CNode { getCNode :: LNode Gate }
-
-newtype CEdge = CEdge { getCEdge :: LEdge () }
-
-instance Random Gate where
-  randomR (a, b) g =
-    case randomR (fromEnum a, fromEnum b) g of
-      (x, g') -> (toEnum x, g')
-
-  random = randomR (minBound, maxBound)
+fromGraph :: Gen ModDecl
+fromGraph = do
+    gr <- rDupsCirc <$> Hog.resize 100 randomDAG
+    return
+        $   initMod
+        .   head
+        $   nestUpTo 5 (generateAST gr)
+        ^.. getVerilog
+        .   traverse
+        .   getDescription

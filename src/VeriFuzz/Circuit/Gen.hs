@@ -1,16 +1,16 @@
 {-|
-Module      : VeriFuzz.ASTGen
-Description : Generates the AST from the graph directly.
-Copyright   : (c) 2018-2019, Yann Herklotz
-License     : BSD-3
+Module      : Verilog.Circuit.Gen
+Description : Generate verilog from circuit.
+Copyright   : (c) 2019, Yann Herklotz Grave
+License     : GPL-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 
-Generates the AST from the graph directly.
+Generate verilog from circuit.
 -}
 
-module VeriFuzz.ASTGen
+module VeriFuzz.Circuit.Gen
     ( generateAST
     )
 where
@@ -18,10 +18,10 @@ where
 import           Data.Graph.Inductive      (LNode, Node)
 import qualified Data.Graph.Inductive      as G
 import           Data.Maybe                (catMaybes)
-import           VeriFuzz.AST
-import           VeriFuzz.Circuit
-import           VeriFuzz.Internal.Circuit
-import           VeriFuzz.Mutate
+import           VeriFuzz.Circuit.Base
+import           VeriFuzz.Circuit.Internal
+import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.Mutate
 
 -- | Converts a 'CNode' to an 'Identifier'.
 frNode :: Node -> Identifier
