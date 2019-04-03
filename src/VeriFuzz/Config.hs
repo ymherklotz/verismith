@@ -83,15 +83,20 @@ twoKey a b = Toml.Key (a :| [b])
 probCodec :: TomlCodec Probability
 probCodec =
     Probability
-        <$> defaultValue (defProb probAssign) (Toml.int $ twoKey "moditem" "assign")
+        <$> defaultValue (defProb probAssign)
+                         (Toml.int $ twoKey "moditem" "assign")
         .=  _probAssign
-        <*> defaultValue (defProb probAlways) (Toml.int $ twoKey "moditem" "always")
+        <*> defaultValue (defProb probAlways)
+                         (Toml.int $ twoKey "moditem" "always")
         .=  _probAlways
-        <*> defaultValue (defProb probBlock) (Toml.int $ twoKey "statement" "blocking")
+        <*> defaultValue (defProb probBlock)
+                         (Toml.int $ twoKey "statement" "blocking")
         .=  _probBlock
-        <*> defaultValue (defProb probNonBlock) (Toml.int $ twoKey "statement" "nonblocking")
+        <*> defaultValue (defProb probNonBlock)
+                         (Toml.int $ twoKey "statement" "nonblocking")
         .=  _probNonBlock
-        <*> defaultValue (defProb probNonBlock) (Toml.int $ twoKey "statement" "conditional")
+        <*> defaultValue (defProb probNonBlock)
+                         (Toml.int $ twoKey "statement" "conditional")
         .=  _probCond
     where defProb i = defaultConfig ^. configProbability . i
 
@@ -103,7 +108,7 @@ propCodec =
         <*> Toml.dioptional (Toml.int "seed")
         .=  _propSeed
         <*> defaultValue (defProp propDepth) (Toml.int "depth")
-        .= _propDepth
+        .=  _propDepth
     where defProp i = defaultConfig ^. configProperty . i
 
 configCodec :: TomlCodec Config

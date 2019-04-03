@@ -215,8 +215,8 @@ number = number' <$> numLit
   where
     number' :: String -> Decimal
     number' a | all (`elem` ['0' .. '9']) a = fromInteger $ read a
-              | head a == '\''                 = fromInteger $ f a
-              | "'" `isInfixOf` a                = Decimal (read w) (f b)
+              | head a == '\''              = fromInteger $ f a
+              | "'" `isInfixOf` a           = Decimal (read w) (f b)
               | otherwise = error $ "Invalid number format: " ++ a
       where
         w = takeWhile (/= '\'') a
@@ -309,8 +309,10 @@ parseVerilogSrc = Verilog <$> many parseDescription
 
 -- | Parse a 'String' containing verilog code. The parser currently only supports
 -- the subset of Verilog that is being generated randomly.
-parseVerilog :: String -- ^ Name of parsed object.
-             -> String -- ^ Content to be parsed.
-             -> Either String Verilog -- ^ Returns 'String' with error
+parseVerilog
+    :: String -- ^ Name of parsed object.
+    -> String -- ^ Content to be parsed.
+    -> Either String Verilog -- ^ Returns 'String' with error
                                          -- message if parse fails.
-parseVerilog s = bimap show id . parse parseVerilogSrc s . alexScanTokens . preprocess [] s
+parseVerilog s =
+    bimap show id . parse parseVerilogSrc s . alexScanTokens . preprocess [] s
