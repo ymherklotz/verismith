@@ -133,9 +133,9 @@ reduce_
 reduce_ repl eval src = do
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single False) -> runIf s
-        (Dual _ l, Dual True False) -> runIf l
-        (Dual r _, Dual False True) -> runIf r
+        (Single s, Single False    ) -> runIf s
+        (Dual _ l, Dual True False ) -> runIf l
+        (Dual r _, Dual False True ) -> runIf r
         (Dual r l, Dual False False) -> do
             lreduced <- runIf l
             rreduced <- runIf r
@@ -143,7 +143,7 @@ reduce_ repl eval src = do
                 then return lreduced
                 else return rreduced
         (None, None) -> return src
-        _ -> return src
+        _            -> return src
   where
     replacement = repl src
     runIf s = if s /= src then reduce eval s else return s

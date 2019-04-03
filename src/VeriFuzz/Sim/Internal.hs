@@ -23,10 +23,12 @@ module VeriFuzz.Sim.Internal
     , noPrint
     , echoP
     , logger
+    , logger_
     )
 where
 
 import           Control.Lens
+import           Control.Monad         (void)
 import           Data.Bits             (shiftL)
 import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as B
@@ -107,6 +109,14 @@ echoP t = do
 logger :: FilePath -> Text -> Sh a -> Sh a
 logger fp name = log_stderr_with (l "_log.stderr.txt")
     . log_stdout_with (l "_log.txt")
+  where
+    l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
+    file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s
+
+logger_ :: FilePath -> Text -> Sh a -> Sh ()
+logger_ fp name =
+    void . log_stderr_with (l "_log.stderr.txt") . log_stdout_with
+        (l "_log.txt")
   where
     l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
     file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s

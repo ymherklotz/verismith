@@ -46,7 +46,7 @@ runSynthYosys sim (SourceInfo _ src) outf = do
     dir <- pwd
     writefile inpf $ genSource src
     echoP "Yosys: synthesis"
-    _ <- logger dir "yosys"
+    logger_ dir "yosys"
         $ timeout
               (yosysPath sim)
               ["-b", "verilog -noattr", "-o", out, "-S", inp]
@@ -102,5 +102,5 @@ runEquiv _ sim1 sim2 srcInfo = do
     runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
     runMaybeSynth sim2 srcInfo
     echoP "SymbiYosys: run"
-    _ <- logger dir "symbiyosys" $ run "sby" ["-f", "test.sby"]
+    logger_ dir "symbiyosys" $ run "sby" ["-f", "test.sby"]
     echoP "SymbiYosys: done"

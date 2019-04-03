@@ -103,8 +103,7 @@ runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> Sh ByteString
 runSimIcarusWithFile sim f _ = do
     dir <- pwd
     echoP "Icarus: Compile"
-    _ <- logger dir "icarus"
-        $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
+    logger_ dir "icarus" $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
     echoP "Icarus: Run"
     B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$> logger
         dir

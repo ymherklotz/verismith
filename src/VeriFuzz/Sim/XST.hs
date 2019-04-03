@@ -28,13 +28,13 @@ import           VeriFuzz.Verilog.CodeGen
 data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath
                , netgenPath :: {-# UNPACK #-} !FilePath
                }
-           deriving (Eq, Show)
+         deriving (Eq, Show)
 
 instance Tool XST where
-  toText _ = "xst"
+    toText _ = "xst"
 
 instance Synthesisor XST where
-  runSynth = runSynthXST
+    runSynth = runSynthXST
 
 defaultXST :: XST
 defaultXST = XST "xst" "netgen"
@@ -46,9 +46,9 @@ runSynthXST sim (SourceInfo top src) outf = do
     writefile prjFile [st|verilog work "rtl.v"|]
     writefile "rtl.v" $ genSource src
     echoP "XST: run"
-    _ <- logger dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
+    logger_ dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
     echoP "XST: netgen"
-    _ <- logger dir "netgen" $ run
+    logger_ dir "netgen" $ run
         (netgenPath sim)
         [ "-w"
         , "-ofmt"
@@ -65,6 +65,6 @@ runSynthXST sim (SourceInfo top src) outf = do
         ]
     echoP "XST: done"
   where
-    modFile = fromText top
+    modFile = "xst_" <> fromText top
     xstFile = modFile <.> "xst"
     prjFile = modFile <.> "prj"
