@@ -110,7 +110,7 @@ top.v
 |]
   where
     mis = src ^.. getSourceId
-    deps = ["cells_cmos.v", "cells_cyclone_v.v", "cells_verific.v", "cells_xilinx_7.v"]
+    deps = ["cells_cmos.v", "cells_cyclone_v.v", "cells_verific.v", "cells_xilinx_7.v", "cells_yosys.v"]
     depList =
       T.intercalate "\n"
         $   toTextIgnore
