@@ -160,27 +160,32 @@ statement = do
         ]
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
+always :: StateGen ModItem
+always = do
+    stat     <- SeqBlock <$> some statement
+    eventReg <- select Reg
+    return $ Always (EventCtrl (EId (eventReg ^. portName)) (Just stat))
+
 -- | Generate a random module item.
 modItem :: StateGen ModItem
 modItem = do
-    prob     <- askProbability
-    stat     <- fold <$> some statement
-    eventReg <- select Reg
-    modCA    <- ModCA <$> contAssign
-    gen $ Hog.frequency
-        [ (prob ^. probAssign, return modCA)
-        , ( prob ^. probAlways
-          , return $ Always (EventCtrl (EId (eventReg ^. portName)) (Just stat))
-          )
+    prob <- askProbability
+    Hog.frequency
+        [ (prob ^. probAssign, ModCA <$> contAssign)
+        , (prob ^. probAlways, always)
         ]
+
+moduleName :: Maybe Identifier -> StateGen Identifier
+moduleName (Just t) = return t
+moduleName Nothing  = gen arb
 
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
 -- defined wires, so that it correctly reflects the internal state of the
 -- module.
-moduleDef :: Bool -> StateGen ModDecl
+moduleDef :: Maybe Identifier -> StateGen ModDecl
 moduleDef top = do
-    name     <- if top then return "top" else gen arb
+    name     <- moduleName top
     portList <- some $ newPort Wire
     mi       <- some modItem
     context  <- get
@@ -196,7 +201,7 @@ moduleDef top = do
 procedural :: Config -> Gen Verilog
 procedural config = Verilog . (: []) . Description <$> Hog.resize
     num
-    (runReaderT (evalStateT (moduleDef True) context) config)
+    (runReaderT (evalStateT (moduleDef (Just "top")) context) config)
   where
     context = Context [] 0 $ config ^. configProperty . propDepth
     num     = fromIntegral $ config ^. configProperty . propSize

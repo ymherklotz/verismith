@@ -75,7 +75,7 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability 10 1 5 1 1) (Property 50 Nothing 3)
+defaultConfig = Config (Probability 5 1 5 1 1) (Property 20 Nothing 3)
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
