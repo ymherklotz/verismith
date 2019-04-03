@@ -41,6 +41,7 @@ library
                  , VeriFuzz.Sim.Internal
                  , VeriFuzz.Sim.Reduce
                  , VeriFuzz.Sim.Template
+                 , VeriFuzz.Sim.Vivado
                  , VeriFuzz.Sim.XST
                  , VeriFuzz.Sim.Yosys
                  , VeriFuzz.Verilog
