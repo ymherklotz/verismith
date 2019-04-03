@@ -39,10 +39,11 @@ runSynthVivado sim (SourceInfo top src) outf = do
     dir <- pwd
     writefile vivadoTcl . vivadoSynthConfig top $ toTextIgnore outf
     writefile "rtl.v" $ genSource src
+    run_ "sed" ["s/^module/(* use_dsp48=\"no\" *) module/;", "-i", "rtl.v"]
     echoP "Vivado: run"
     logger_ dir "vivado"
         $ timeout
               (vivadoPath sim)
               ["-mode", "batch", "-source", toTextIgnore vivadoTcl]
     echoP "Vivado: done"
-    where vivadoTcl = "vivado_" <> fromText top <.> "tcl"
+    where vivadoTcl = fromText ("vivado_" <> top) <.> "tcl"

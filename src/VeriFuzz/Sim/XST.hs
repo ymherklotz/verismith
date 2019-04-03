@@ -65,6 +65,6 @@ runSynthXST sim (SourceInfo top src) outf = do
         ]
     echoP "XST: done"
   where
-    modFile = "xst_" <> fromText top
+    modFile = fromText $ "xst_" <> top
     xstFile = modFile <.> "xst"
     prjFile = modFile <.> "prj"
