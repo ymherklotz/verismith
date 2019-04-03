@@ -192,7 +192,7 @@ handleOpts (Fuzz _) = do
     num  <- getNumCapabilities
     vars <-
         sequence
-        $   (\x -> myForkIO $ V.runEquivalence (V.randomMod 10 100)
+        $   (\x -> myForkIO $ V.runEquivalence (V.procedural V.defaultConfig)
                                                ("test_" <> T.pack (show x))
                                                0
             )

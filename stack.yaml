@@ -3,7 +3,6 @@ packages:
   - .
 extra-deps:
   - DRBG-0.5.5@sha256:3b8040bed356e2b63927a27fb6d5adbd19d70c9e1d1bb66111bbeb33e56900eb
-  - QuickCheck-2.9.2@sha256:93cebf9f9c55e8a941bd3166272680d67b80d9b5d95bd836765e3d4a4ef278d0
   - fgl-visualize-0.1.0.1@sha256:e682066053a6e75478a08fd6822dd0143a3b8ea23244bdb01dd389a266447c5e
   - tasty-hedgehog-0.2.0.0@sha256:83a8b777fa472040979e44dba43c32441f55d5ddb9641a4d53deee4b0e09fa34
 resolver: lts-13.14

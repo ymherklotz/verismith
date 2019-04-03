@@ -113,10 +113,10 @@ checkEquivalence src dir = shellyFailDir $ do
 
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
 -- generated Verilog files are equivalent.
-runEquivalence :: Gen ModDecl -> Text -> Int -> IO ()
+runEquivalence :: Gen Verilog -> Text -> Int -> IO ()
 runEquivalence gm t i = do
     m <- Hog.sample gm
-    let srcInfo = makeSrcInfo m
+    let srcInfo = SourceInfo "top" m
     rand <- generateByteString 20
     shellyFailDir $ do
         mkdir_p (fromText "output" </> fromText n)
