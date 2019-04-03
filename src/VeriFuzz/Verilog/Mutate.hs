@@ -105,7 +105,7 @@ allVars m =
         <> (m ^.. modInPorts . traverse . portName)
 
 -- $setup
--- >>> import VeriFuzz.CodeGen
+-- >>> import VeriFuzz.Verilog.CodeGen
 -- >>> let m = (ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [])
 -- >>> let main = (ModDecl "main" [] [] [])
 

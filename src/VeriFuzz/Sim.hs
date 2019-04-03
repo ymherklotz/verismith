@@ -21,12 +21,15 @@ module VeriFuzz.Sim
     -- ** Icarus
     , Icarus(..)
     , defaultIcarus
-    -- ** XST
-    , XST(..)
-    , defaultXST
     -- ** Yosys
     , Yosys(..)
     , defaultYosys
+    -- ** Vivado
+    , Vivado(..)
+    , defaultVivado
+    -- ** XST
+    , XST(..)
+    , defaultXST
     -- * Reducer
     , reduce
     -- * Equivalence
@@ -43,5 +46,6 @@ import           VeriFuzz.Sim.Env
 import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Reduce
+import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
