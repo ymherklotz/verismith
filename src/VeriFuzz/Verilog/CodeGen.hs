@@ -215,9 +215,9 @@ statement (NonBlockAssign a     ) = genAssign " <= " a <> ";\n"
 statement (StatCA         a     ) = contAssign a
 statement (TaskEnable     t     ) = task t <> ";\n"
 statement (SysTaskEnable  t     ) = "$" <> task t <> ";\n"
-statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")" <> defMap t
+statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")\n" <> defMap t
 statement (CondStmnt e t f) =
-    "if(" <> expr e <> ") " <> defMap t <> "else " <> defMap f
+    "if(" <> expr e <> ")\n" <> defMap t <> "else\n" <> defMap f
 
 task :: Task -> Text
 task (Task name e) | null e    = i
