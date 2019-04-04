@@ -89,6 +89,7 @@ write_verilog -force #{outf}
 sbyConfig :: (Tool a, Tool b) => FilePath -> a -> Maybe b -> SourceInfo -> Text
 sbyConfig bd sim1 sim2 (SourceInfo top src) = [st|[options]
 mode prove
+multiclock on
 
 [engines]
 smtbmc
