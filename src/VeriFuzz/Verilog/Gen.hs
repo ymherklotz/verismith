@@ -102,13 +102,15 @@ newPort pt = do
     variables %= (p :)
     return p
 
+choose :: PortType -> Port -> Bool
+choose ptype (Port a _ _ _) = ptype == a
+
 select :: PortType -> StateGen Port
 select ptype = do
     context <- get
-    case filter chooseReg $ context ^.. variables . traverse of
+    case filter (choose Reg) $ context ^.. variables . traverse of
         [] -> newPort ptype
-        l  -> gen $ Hog.element l
-    where chooseReg (Port a _ _ _) = ptype == a
+        l  -> Hog.element l
 
 scopedExpr :: StateGen Expr
 scopedExpr = do
@@ -123,8 +125,9 @@ scopedExpr = do
 
 contAssign :: StateGen ContAssign
 contAssign = do
+    expr <- scopedExpr
     p <- newPort Wire
-    ContAssign (p ^. portName) <$> scopedExpr
+    return $ ContAssign (p ^. portName) expr
 
 lvalFromPort :: Port -> LVal
 lvalFromPort (Port _ _ _ i) = RegId i
@@ -146,8 +149,9 @@ conditional = do
     expr <- scopedExpr
     stmntDepth -= 1
     tstat <- SeqBlock <$> some statement
+    fstat <- Hog.maybe $ SeqBlock <$> some statement
     stmntDepth += 1
-    return $ CondStmnt expr (Just tstat) Nothing
+    return $ CondStmnt (BinOp expr BinEq 0) (Just tstat) fstat
 
 statement :: StateGen Statement
 statement = do
@@ -179,6 +183,14 @@ moduleName :: Maybe Identifier -> StateGen Identifier
 moduleName (Just t) = return t
 moduleName Nothing  = gen arb
 
+initialBlock :: StateGen ModItem
+initialBlock = do
+    context <- get
+    let l = filter (choose Reg) $ context ^.. variables . traverse
+    return . Initial . SeqBlock $ makeAssign <$> l
+    where
+        makeAssign p = NonBlockAssign $ Assign (lvalFromPort p) Nothing 0
+
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
 -- defined wires, so that it correctly reflects the internal state of the
@@ -189,12 +201,12 @@ moduleDef top = do
     portList <- some $ newPort Wire
     mi       <- some modItem
     context  <- get
+    initBlock <- initialBlock
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
     let yport = Port Wire False size "y"
-    return . declareMod local . ModDecl name [yport] portList $ combineAssigns
-        yport
-        mi
+    let comb = combineAssigns_ yport local
+    return . declareMod local . ModDecl name [yport] portList $ initBlock : mi <> [comb]
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
