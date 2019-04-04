@@ -1,8 +1,10 @@
 module Main where
 
 import           Control.Concurrent
+import           Control.Monad       (when)
 import           Data.Text           (Text)
 import qualified Data.Text           as T
+import qualified Data.Text.IO        as T
 import           Options.Applicative
 import qualified Shelly              as S
 import qualified VeriFuzz            as V
@@ -17,6 +19,9 @@ instance Show Tool where
   show Icarus = "icarus"
 
 data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
+                 , configFile :: !(Maybe FilePath)
+                 , forced     :: !Bool
+                 , keepAll    :: !Bool
                  }
           | Rerun { tools :: [Tool]
                   , input :: {-# UNPACK #-} !S.FilePath
@@ -28,6 +33,7 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
           | Reduce { fileName :: {-# UNPACK #-} !S.FilePath
                    , top      :: {-# UNPACK #-} !Text
                    }
+          | Config { writeDefaultConfig :: !(Maybe FilePath) }
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -55,12 +61,27 @@ parseSim val | val == "icarus" = Just Icarus
 fuzzOpts :: Parser Opts
 fuzzOpts = Fuzz <$> textOption
     (  long "output"
-    <> short 'o'
-    <> metavar "DIR"
-    <> help "Output directory that the fuzz run takes place in."
-    <> showDefault
-    <> value "output"
-    )
+       <> short 'o'
+       <> metavar "DIR"
+       <> help "Output directory that the fuzz run takes place in."
+       <> showDefault
+       <> value "output"
+    ) <*> (optional . strOption $
+              long "config"
+              <> short 'c'
+              <> metavar "FILE"
+              <> help "Config file for the current fuzz run."
+          )
+    <*> (switch $
+            long "force"
+            <> short 'f'
+            <> help "Overwrite the specified directory."
+        )
+    <*> (switch $
+            long "keep"
+            <> short 'k'
+            <> help "Keep all the directories."
+        )
 
 rerunOpts :: Parser Opts
 rerunOpts =
@@ -122,6 +143,15 @@ reduceOpts =
                 <> value "main"
                 )
 
+configOpts :: Parser Opts
+configOpts =
+    Config <$> (optional . strOption $
+                   long "output"
+                   <> short 'o'
+                   <> metavar "FILE"
+                   <> help "Output to a TOML Config file."
+               )
+
 argparse :: Parser Opts
 argparse =
     hsubparser
@@ -177,6 +207,17 @@ argparse =
                         )
                 <> metavar "reduce"
                 )
+        <|> hsubparser
+                (  command
+                        "config"
+                        (info
+                            configOpts
+                            (progDesc
+                                "Print the current configuration of the fuzzer."
+                            )
+                        )
+                <> metavar "config"
+                )
 
 opts :: ParserInfo Opts
 opts = info
@@ -188,12 +229,18 @@ opts = info
     )
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz _) = do
+handleOpts (Fuzz out configF force keep) = do
     num  <- getNumCapabilities
+    config <- maybe (return V.defaultConfig) V.parseConfigFile configF
+    S.shellyFailDir $ do
+        when force . S.rm_rf $ S.fromText out
+        S.mkdir_p $ S.fromText out
     vars <-
         sequence
-        $   (\x -> myForkIO $ V.runEquivalence (V.procedural V.defaultConfig)
+        $   (\x -> myForkIO $ V.runEquivalence (V.procedural config)
                                                ("test_" <> T.pack (show x))
+                                               out
+                                               keep
                                                0
             )
         <$> [1 .. num]
@@ -215,6 +262,8 @@ handleOpts (Reduce f t) = do
             vreduced <- V.runReduce (V.SourceInfo t v)
             writeFile "reduced.v" . T.unpack $ V.genSource vreduced
     where file = T.unpack $ S.toTextIgnore f
+handleOpts (Config c) = maybe (T.putStrLn . V.configEncode $ V.defaultConfig)
+    (`V.configToFile` V.defaultConfig) c
 
 main :: IO ()
 main = do
