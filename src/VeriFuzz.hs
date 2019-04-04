@@ -113,13 +113,18 @@ checkEquivalence src dir = shellyFailDir $ do
 
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
 -- generated Verilog files are equivalent.
-runEquivalence :: Gen Verilog -> Text -> Int -> IO ()
-runEquivalence gm t i = do
+runEquivalence :: Gen Verilog -- ^ Generator for the Verilog file.
+               -> Text        -- ^ Name of the folder on each thread.
+               -> Text        -- ^ Name of the general folder being used.
+               -> Bool        -- ^ Keep flag.
+               -> Int         -- ^ Used to track the recursion.
+               -> IO ()
+runEquivalence gm t d k i = do
     m <- Hog.sample gm
     let srcInfo = SourceInfo "top" m
     rand <- generateByteString 20
     shellyFailDir $ do
-        mkdir_p (fromText "output" </> fromText n)
+        mkdir_p (fromText d </> fromText n)
         curr <- toTextIgnore <$> pwd
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
@@ -134,8 +139,8 @@ runEquivalence gm t i = do
                 )
             $ onFailure n
         cd ".."
-        rm_rf $ fromText n
-    when (i < 5) (runEquivalence gm t $ i + 1)
+        unless k . rm_rf $ fromText n
+    when (i < 5) (runEquivalence gm t d k $ i + 1)
     where n = t <> "_" <> T.pack (show i)
 
 runReduce :: SourceInfo -> IO SourceInfo
