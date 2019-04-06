@@ -1,13 +1,19 @@
-// Taken from yosys verilog files.
+// Taken from yosys simcells.v
 
 module \$_DLATCH_N_ (E, D, Q);
-   wire [1023:0] _TECHMAP_DO_ = "simplemap; opt";
-   input         E, D;
-   output        Q = !E ? D : Q;
+   input E, D;
+   output reg Q;
+   always @* begin
+	  if (E == 0)
+		Q <= D;
+   end
 endmodule
 
 module \$_DLATCH_P_ (E, D, Q);
-   wire [1023:0] _TECHMAP_DO_ = "simplemap; opt";
-   input         E, D;
-   output        Q = E ? D : Q;
+   input E, D;
+   output reg Q;
+   always @* begin
+	  if (E == 1)
+		Q <= D;
+   end
 endmodule

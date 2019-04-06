@@ -146,3 +146,67 @@ module LDCE (Q, CLR, D, G, GE);
      else if (G_in && GE)
        Q <= D;
 endmodule
+
+module BUFG (O, I);
+   output O;
+   input  I;
+   buf B1 (O, I);
+endmodule
+
+module FDRE (Q, C, CE, D, R);
+
+   parameter [0:0] INIT = 1'b0;
+   parameter [0:0] IS_C_INVERTED = 1'b0;
+   parameter [0:0] IS_D_INVERTED = 1'b0;
+   parameter [0:0] IS_R_INVERTED = 1'b0;
+
+   output Q;
+   reg    Q = INIT;
+
+   input  C, CE, D, R;
+   wire   C_in, D_in, R_in;
+
+   assign C_in = C ^ IS_C_INVERTED;
+   assign D_in = D ^ IS_D_INVERTED;
+   assign R_in = R ^ IS_R_INVERTED;
+
+   always @(posedge C_in)
+     if (R_in)
+       Q <= 0;
+     else if (CE)
+       Q <= D_in;
+
+endmodule
+
+module FDSE (Q, C, CE, D, S);
+
+   parameter INIT = 1'b1;
+   parameter [0:0] IS_C_INVERTED = 1'b0;
+   parameter [0:0] IS_S_INVERTED = 1'b0;
+   parameter [0:0] IS_D_INVERTED = 1'b0;
+
+   output Q;
+
+   input  C, CE, D, S;
+
+   wire   Q;
+   wire   C_in;
+   wire   S_in;
+   wire   D_in;
+   wire   rst_int = 0;
+   wire   set_int = S;
+   reg    q_out;
+
+   initial q_out = INIT;
+
+   assign Q = q_out;
+   assign C_in = IS_C_INVERTED ^ C;
+   assign S_in = IS_S_INVERTED ^ S;
+   assign D_in = IS_D_INVERTED ^ D;
+
+   always @(posedge C_in)
+	 if (S_in)
+	   q_out <=  1;
+	 else if (CE)
+	   q_out <=  D_in;
+endmodule
