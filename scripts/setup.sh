@@ -6,7 +6,7 @@ sudo yum -y install git gcc gcc-c++ tcl-devel python3 \
      tmux
 
 sudo mkdir -p /mnt/tools
-sudo mount /dev/sdf /mnt/tools
+sudo mount /dev/sdf1 /mnt/tools
 
 sudo chown -R $USER:$USER /mnt/tools/home/ec2-user
 
