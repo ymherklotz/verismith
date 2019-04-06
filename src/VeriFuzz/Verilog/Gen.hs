@@ -105,13 +105,6 @@ newPort pt = do
 choose :: PortType -> Port -> Bool
 choose ptype (Port a _ _ _) = ptype == a
 
-select :: PortType -> StateGen Port
-select ptype = do
-    context <- get
-    case filter (choose Reg) $ context ^.. variables . traverse of
-        [] -> newPort ptype
-        l  -> Hog.element l
-
 scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
@@ -166,9 +159,8 @@ statement = do
 
 always :: StateGen ModItem
 always = do
-    stat     <- SeqBlock <$> some statement
-    eventReg <- select Reg
-    return $ Always (EventCtrl (EId (eventReg ^. portName)) (Just stat))
+    stat <- SeqBlock <$> some statement
+    return $ Always (EventCtrl (EPosEdge "clk") (Just stat))
 
 -- | Generate a random module item.
 modItem :: StateGen ModItem
@@ -204,9 +196,10 @@ moduleDef top = do
     initBlock <- initialBlock
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
+    let clock = Port Wire False 1 "clk"
     let yport = Port Wire False size "y"
     let comb = combineAssigns_ yport local
-    return . declareMod local . ModDecl name [yport] portList $ initBlock : mi <> [comb]
+    return . declareMod local . ModDecl name [yport] (clock:portList) $ initBlock : mi <> [comb]
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.

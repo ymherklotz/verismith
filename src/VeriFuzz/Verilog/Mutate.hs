@@ -206,13 +206,12 @@ makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
 -- | Make a top module with an assert that requires @y_1@ to always be equal to
 -- @y_2@, which can then be proven using a formal verification tool.
 makeTopAssert :: ModDecl -> ModDecl
-makeTopAssert = (modItems %~ (++ [assert])) . (modInPorts %~ addClk) . makeTop
+makeTopAssert = (modItems %~ (++ [assert])) . makeTop
     2
   where
     assert = Always . EventCtrl e . Just $ SeqBlock
         [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
     e      = EPosEdge "clk"
-    addClk = (defaultPort "clk" :)
 
 -- | Provide declarations for all the ports that are passed to it.
 declareMod :: [Port] -> ModDecl -> ModDecl
