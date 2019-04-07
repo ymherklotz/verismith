@@ -30,8 +30,10 @@ data Gate = And
 -- | Newtype for the Circuit which implements a Graph from fgl.
 newtype Circuit = Circuit { getCircuit :: Gr Gate () }
 
+-- | Newtype for a node in the circuit, which is an 'LNode Gate'.
 newtype CNode = CNode { getCNode :: LNode Gate }
 
+-- | Newtype for a named edge which is empty, as it does not need a label.
 newtype CEdge = CEdge { getCEdge :: LEdge () }
 
 instance Random Gate where
