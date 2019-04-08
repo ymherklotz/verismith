@@ -21,14 +21,15 @@ module VeriFuzz.Verilog.CodeGen
     )
 where
 
-import           Control.Lens          (view, (^.))
-import           Data.Foldable         (fold)
-import           Data.Text             (Text)
-import qualified Data.Text             as T
-import qualified Data.Text.IO          as T
-import           Numeric               (showHex)
+import           Control.Lens               (view, (^.))
+import           Data.Foldable              (fold)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import qualified Data.Text.IO               as T
+import           Numeric                    (showHex)
 import           VeriFuzz.Internal
 import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 
 -- | 'Source' class which determines that source code is able to be generated

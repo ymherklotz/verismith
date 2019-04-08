@@ -45,6 +45,7 @@ library
                  , VeriFuzz.Sim.XST
                  , VeriFuzz.Sim.Yosys
                  , VeriFuzz.Verilog
+                 , VeriFuzz.Verilog.Arbitrary
                  , VeriFuzz.Verilog.AST
                  , VeriFuzz.Verilog.CodeGen
                  , VeriFuzz.Verilog.Gen

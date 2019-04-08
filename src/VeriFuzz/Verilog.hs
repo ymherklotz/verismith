@@ -69,7 +69,6 @@ module VeriFuzz.Verilog
     , exprFunc
     , exprBody
     , exprStr
-    , exprWithContext
     , traverseExpr
     , ConstExpr(..)
     , constNum
@@ -122,9 +121,11 @@ module VeriFuzz.Verilog
     , Arb
     , arb
     , genPositive
+    , exprWithContext
     )
 where
 
+import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Gen

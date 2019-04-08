@@ -30,6 +30,7 @@ import           Hedgehog                       (Gen)
 import qualified Hedgehog.Gen                   as Hog
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
+import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
