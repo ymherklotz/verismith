@@ -117,7 +117,6 @@ module VeriFuzz.Verilog
     , Arb
     , arb
     , genPositive
-    , exprWithContext
     )
 where
 

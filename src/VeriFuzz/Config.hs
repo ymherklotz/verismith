@@ -115,7 +115,7 @@ defaultConfig :: Config
 defaultConfig = Config (Probability defModItem defStmnt defExpr) (Property 20 Nothing 3)
     where defModItem = ProbModItem 5 1
           defStmnt = ProbStatement 5 5 1
-          defExpr = ProbExpr 1 1 1 1 1 1 1 1 1
+          defExpr = ProbExpr 1 1 1 1 1 1 0 1 1
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])

@@ -129,7 +129,7 @@ contAssign (ContAssign val e) =
 -- | Generate 'Function' to 'Text'
 func :: Function -> Text
 func SignedFunc   = "$signed"
-func UnSignedFunc = "$unsigned"
+func UnsignedFunc = "$unsigned"
 
 -- | Generate 'Expr' to 'Text'.
 expr :: Expr -> Text

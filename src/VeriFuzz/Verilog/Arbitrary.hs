@@ -16,7 +16,6 @@ module VeriFuzz.Verilog.Arbitrary
       Arb
     , arb
     , genPositive
-    , exprWithContext
     , listOf1
     , listOf
     )
@@ -109,7 +108,7 @@ instance Arb UnaryOperator where
 instance Arb Function where
     arb = Hog.element
         [ SignedFunc
-        , UnSignedFunc
+        , UnsignedFunc
         ]
 
 instance Arb Expr where
@@ -136,17 +135,6 @@ expr n | n == 0    = Hog.choice $ (Id <$> arb) : exprSafeList
        | n > 0     = Hog.choice $ (Id <$> arb) : exprRecList subexpr
        | otherwise = expr 0
     where subexpr y = expr (n `div` y)
-
-exprWithContext :: [Identifier] -> Hog.Size -> Gen Expr
-exprWithContext [] n | n == 0    = Hog.choice exprSafeList
-                     | n > 0     = Hog.choice $ exprRecList subexpr
-                     | otherwise = exprWithContext [] 0
-    where subexpr y = exprWithContext [] (n `div` y)
-exprWithContext l n
-    | n == 0    = Hog.choice $ (Id <$> Hog.element l) : exprSafeList
-    | n > 0     = Hog.choice $ (Id <$> Hog.element l) : exprRecList subexpr
-    | otherwise = exprWithContext l 0
-    where subexpr y = exprWithContext l (n `div` y)
 
 constExpr :: Gen ConstExpr
 constExpr = Hog.recursive Hog.choice

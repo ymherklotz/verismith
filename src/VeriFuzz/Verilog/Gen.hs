@@ -59,7 +59,7 @@ sumSize ps = sum $ ps ^.. traverse . portSize
 
 random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
 random ctx fun = do
-    expr <- Hog.sized (exprWithContext ctx)
+    expr <- Hog.sized (exprWithContext (ProbExpr 1 1 1 1 1 1 0 1 1) ctx)
     return . ModCA $ fun expr
 
 --randomAssigns :: [Identifier] -> [Gen ModItem]
@@ -85,6 +85,49 @@ randomMod inps total = do
 
 gen :: Gen a -> StateGen a
 gen = lift . lift
+
+constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
+constExprWithContext ps prob size
+    | size == 0 = Hog.frequency
+                  [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+                  , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
+                  ]
+    | size > 0 = Hog.frequency
+                 [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+                 , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
+                 , (prob ^. probExprUnOp, ConstUnOp <$> arb <*> subexpr 2)
+                 , (prob ^. probExprBinOp, ConstBinOp <$> subexpr 2 <*> arb <*> subexpr 2)
+                 , (prob ^. probExprCond, ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
+                 , (prob ^. probExprConcat, ConstConcat <$> listOf1 (subexpr 8))
+                 ]
+    | otherwise = constExprWithContext ps prob 0
+    where subexpr y = constExprWithContext ps prob $ size `div` y
+
+exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
+exprSafeList prob = [(prob ^. probExprNum, Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100))]
+
+exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
+exprRecList prob subexpr =
+    [ (prob ^. probExprNum, Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100))
+    , (prob ^. probExprConcat, Concat <$> listOf1 (subexpr 8))
+    , (prob ^. probExprUnOp, UnOp <$> arb <*> subexpr 2)
+    , (prob ^. probExprStr, Str <$> Hog.text (Hog.linear 0 100) Hog.alphaNum)
+    , (prob ^. probExprBinOp, BinOp <$> subexpr 2 <*> arb <*> subexpr 2)
+    , (prob ^. probExprCond, Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
+    , (prob ^. probExprSigned, Func <$> pure SignedFunc <*> subexpr 2)
+    , (prob ^. probExprUnsigned, Func <$> pure UnsignedFunc <*> subexpr 2)
+    ]
+
+exprWithContext :: ProbExpr -> [Identifier] -> Hog.Size -> Gen Expr
+exprWithContext prob [] n | n == 0    = Hog.frequency $ exprSafeList prob
+                          | n > 0     = Hog.frequency $ exprRecList prob subexpr
+                          | otherwise = exprWithContext prob [] 0
+    where subexpr y = exprWithContext prob [] $ n `div` y
+exprWithContext prob l n
+    | n == 0    = Hog.frequency $ (prob ^. probExprId, Id <$> Hog.element l) : exprSafeList prob
+    | n > 0     = Hog.frequency $ (prob ^. probExprId, Id <$> Hog.element l) : exprRecList prob subexpr
+    | otherwise = exprWithContext prob l 0
+    where subexpr y = exprWithContext prob l $ n `div` y
 
 some :: StateGen a -> StateGen [a]
 some f = do
@@ -116,9 +159,10 @@ choose ptype (Port a _ _ _) = ptype == a
 scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
+    prob <- askProbability
     gen
         .   Hog.sized
-        .   exprWithContext
+        .   exprWithContext (prob ^. probExpr)
         $   context
         ^.. variables
         .   traverse
@@ -192,23 +236,6 @@ initialBlock = do
     return . Initial . SeqBlock $ makeAssign <$> l
     where
         makeAssign p = NonBlockAssign $ Assign (lvalFromPort p) Nothing 0
-
-constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
-constExprWithContext ps prob size
-    | size == 0 = Hog.frequency
-                  [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
-                  , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
-                  ]
-    | size > 0 = Hog.frequency
-                 [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
-                 , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
-                 , (prob ^. probExprUnOp, ConstUnOp <$> arb <*> subexpr 2)
-                 , (prob ^. probExprBinOp, ConstBinOp <$> subexpr 2 <*> arb <*> subexpr 2)
-                 , (prob ^. probExprCond, ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
-                 , (prob ^. probExprConcat, ConstConcat <$> listOf1 (subexpr 8))
-                 ]
-    | otherwise = constExprWithContext ps prob 0
-    where subexpr y = constExprWithContext ps prob $ size `div` y
 
 constExpr :: StateGen ConstExpr
 constExpr = do

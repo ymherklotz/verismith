@@ -211,7 +211,7 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    deriving (Eq, Show, Ord, Data)
 
 data Function = SignedFunc
-              | UnSignedFunc
+              | UnsignedFunc
               deriving (Eq, Show, Ord, Data)
 
 -- | Verilog expression, which can either be a primary expression, unary
