@@ -18,8 +18,6 @@ module VeriFuzz.Verilog
     , GenVerilog(..)
     , genSource
     , getVerilog
-    , Description(..)
-    , getDescription
     -- * Primitives
     -- ** Identifier
     , Identifier(..)
@@ -69,7 +67,6 @@ module VeriFuzz.Verilog
     , exprFunc
     , exprBody
     , exprStr
-    , traverseExpr
     , ConstExpr(..)
     , constNum
     , Function(..)
@@ -90,7 +87,6 @@ module VeriFuzz.Verilog
     , statements
     , stmntBA
     , stmntNBA
-    , stmntCA
     , stmntTask
     , stmntSysTask
     , stmntCondExpr

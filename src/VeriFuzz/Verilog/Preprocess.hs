@@ -20,7 +20,9 @@ module VeriFuzz.Verilog.Preprocess
     )
 where
 
--- | Remove comments from code.
+-- | Remove comments from code. There is no difference between @(* *)@ and
+-- @/* */@, therefore in this implementation, @*/@ could close @(*@ and vice-versa,
+-- This will be fixed in an upcoming version.
 uncomment :: FilePath -> String -> String
 uncomment file = uncomment'
   where
@@ -28,6 +30,7 @@ uncomment file = uncomment'
         ""               -> ""
         '/' : '/' : rest -> "  " ++ removeEOL rest
         '/' : '*' : rest -> "  " ++ remove rest
+        '(' : '*' : rest -> "  " ++ remove rest
         '"'       : rest -> '"' : ignoreString rest
         b         : rest -> b : uncomment' rest
 
@@ -43,6 +46,7 @@ uncomment file = uncomment'
         '\n'      : rest -> '\n' : remove rest
         '\t'      : rest -> '\t' : remove rest
         '*' : '/' : rest -> "  " ++ uncomment' rest
+        '*' : ')' : rest -> "  " ++ uncomment' rest
         _         : rest -> " " ++ remove rest
 
     removeString a = case a of
@@ -105,4 +109,3 @@ ppLine env ('`' : a) = case lookup name env of
         a
     rest = drop (length name) a
 ppLine env (a : b) = a : ppLine env b
-

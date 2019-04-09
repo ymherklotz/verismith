@@ -72,7 +72,7 @@ idTrans _ _ e = e
 
 -- | Replaces the identifier recursively in an expression.
 replace :: Identifier -> Expr -> Expr -> Expr
-replace = (transformOf traverseExpr .) . idTrans
+replace = (transform .) . idTrans
 
 -- | Nest expressions for a specific 'Identifier'. If the 'Identifier' is not
 -- found, the AST is not changed.
@@ -107,8 +107,8 @@ allVars m =
 
 -- $setup
 -- >>> import VeriFuzz.Verilog.CodeGen
--- >>> let m = (ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [])
--- >>> let main = (ModDecl "main" [] [] [])
+-- >>> let m = (ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [] [])
+-- >>> let main = (ModDecl "main" [] [] [] [])
 
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
 -- it to the body of the second module. It first has to make all the inputs into
@@ -196,7 +196,7 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 -- | Make top level module for equivalence verification. Also takes in how many
 -- modules to instantiate.
 makeTop :: Int -> ModDecl -> ModDecl
-makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt
+makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt []
   where
     ys    = yPort . flip makeIdFrom "y" <$> [1 .. i]
     modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]

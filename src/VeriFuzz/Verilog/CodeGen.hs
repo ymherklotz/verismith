@@ -23,6 +23,7 @@ where
 
 import           Control.Lens               (view, (^.))
 import           Data.Foldable              (fold)
+import           Data.List.NonEmpty         (NonEmpty (..), toList)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Data.Text.IO               as T
@@ -45,30 +46,40 @@ defMap = maybe ";\n" statement
 
 -- | Convert the 'Verilog' type to 'Text' so that it can be rendered.
 verilogSrc :: Verilog -> Text
-verilogSrc source = fold $ description <$> source ^. getVerilog
-
--- | Generate the 'Description' to 'Text'.
-description :: Description -> Text
-description desc = moduleDecl $ desc ^. getDescription
+verilogSrc (Verilog modules) = fold $ moduleDecl <$> modules
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 moduleDecl :: ModDecl -> Text
-moduleDecl m =
+moduleDecl (ModDecl i outP inP items ps) =
     "module "
-        <> m
-        ^. modId
-        .  getIdentifier
-        <> ports
-        <> ";\n"
-        <> modI
+        <> identifier i <> params ps <> ports <> ";\n" <> modI
         <> "endmodule\n"
   where
-    ports | noIn && noOut = ""
+    ports | null outP && null inP = ""
           | otherwise     = "(" <> comma (modPort <$> outIn) <> ")"
-    modI  = fold $ moduleItem <$> m ^. modItems
-    noOut = null $ m ^. modOutPorts
-    noIn  = null $ m ^. modInPorts
-    outIn = (m ^. modOutPorts) ++ (m ^. modInPorts)
+    modI  = fold $ moduleItem <$> items
+    outIn = outP ++ inP
+    params []      = ""
+    params (p:pps) = "#(\n" <> paramList (p :| pps) <> "\n)\n"
+
+-- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
+paramList :: NonEmpty Parameter -> Text
+paramList ps = "parameter " <> (commaNL . toList $ parameter <$> ps)
+
+-- | Generates a localparam list. Can only be called with a 'NonEmpty' list.
+localParamList :: NonEmpty LocalParam -> Text
+localParamList ps = "localparam " <> (commaNL . toList $ localParam <$> ps)
+
+-- | Generates the assignment for a 'Parameter'.
+parameter :: Parameter -> Text
+parameter (Parameter name val) = identifier name <> " = " <> constExpr val
+
+-- | Generates the assignment for a 'LocalParam'.
+localParam :: LocalParam -> Text
+localParam (LocalParam name val) = identifier name <> " = " <> constExpr val
+
+identifier :: Identifier -> Text
+identifier (Identifier i) = i
 
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
@@ -104,6 +115,8 @@ moduleItem (Initial stat) = "initial " <> statement stat
 moduleItem (Always  stat) = "always " <> statement stat
 moduleItem (Decl dir p  ) = maybe "" makePort dir <> port p <> ";\n"
     where makePort = (<> " ") . portDir
+moduleItem (ParamDecl p) = paramList p <> ";\n"
+moduleItem (LocalParamDecl p) = localParamList p <> ";\n"
 
 mConn :: ModConn -> Text
 mConn (ModConn c       ) = expr c
@@ -123,17 +136,28 @@ func UnSignedFunc = "$unsigned"
 expr :: Expr -> Text
 expr (BinOp eRhs bin eLhs) =
     "(" <> expr eRhs <> binaryOp bin <> expr eLhs <> ")"
-expr (Number s n) =
-    "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
-  where
-    minus | signum n >= 0 = ""
-          | otherwise     = "-"
+expr (Number s n) = showNum s n
 expr (Id     i  ) = i ^. getIdentifier
 expr (Concat c  ) = "{" <> comma (expr <$> c) <> "}"
 expr (UnOp u e  ) = "(" <> unaryOp u <> expr e <> ")"
 expr (Cond l t f) = "(" <> expr l <> " ? " <> expr t <> " : " <> expr f <> ")"
 expr (Func f e  ) = func f <> "(" <> expr e <> ")"
 expr (Str t     ) = "\"" <> t <> "\""
+
+showNum :: Int -> Integer -> Text
+showNum s n = "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
+  where
+    minus | signum n >= 0 = ""
+          | otherwise     = "-"
+
+constExpr :: ConstExpr -> Text
+constExpr (ConstNum s n)  = showNum s n
+constExpr (ParamId i)    = identifier i
+constExpr (ConstConcat c) = "{" <> comma (constExpr <$> c) <> "}"
+constExpr (ConstUnOp u e) = "(" <> unaryOp u <> constExpr e <> ")"
+constExpr (ConstBinOp eRhs bin eLhs) = "(" <> constExpr eRhs <> binaryOp bin <> constExpr eLhs <> ")"
+constExpr (ConstCond l t f) = "(" <> constExpr l <> " ? " <> constExpr t <> " : " <> constExpr f <> ")"
+constExpr (ConstStr t     ) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
 binaryOp :: BinaryOperator -> Text
@@ -197,9 +221,6 @@ lVal (RegSize i msb lsb) =
     i ^. getIdentifier <> " [" <> constExpr msb <> ":" <> constExpr lsb <> "]"
 lVal (RegConcat e) = "{" <> comma (expr <$> e) <> "}"
 
-constExpr :: ConstExpr -> Text
-constExpr (ConstExpr num) = showT num
-
 pType :: PortType -> Text
 pType Wire = "wire"
 pType Reg  = "reg"
@@ -213,12 +234,15 @@ statement (EventCtrl e stat     ) = event e <> " " <> defMap stat
 statement (SeqBlock s) = "begin\n" <> fold (statement <$> s) <> "end\n"
 statement (BlockAssign    a     ) = genAssign " = " a <> ";\n"
 statement (NonBlockAssign a     ) = genAssign " <= " a <> ";\n"
-statement (StatCA         a     ) = contAssign a
 statement (TaskEnable     t     ) = task t <> ";\n"
 statement (SysTaskEnable  t     ) = "$" <> task t <> ";\n"
 statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")\n" <> defMap t
 statement (CondStmnt e t f) =
     "if(" <> expr e <> ")\n" <> defMap t <> "else\n" <> defMap f
+statement (ForLoop a e incr stmnt) =
+    "for(" <> genAssign " = " a
+    <> "; " <> expr e <> "; " <> genAssign " = " incr
+    <> ")\n" <> statement stmnt
 
 task :: Task -> Text
 task (Task name e) | null e    = i
@@ -275,9 +299,6 @@ instance Source Port where
 
 instance Source ModDecl where
     genSource = moduleDecl
-
-instance Source Description where
-    genSource = description
 
 instance Source Verilog where
     genSource = verilogSrc

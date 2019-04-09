@@ -16,7 +16,7 @@ module VeriFuzz.Verilog.Internal
     , emptyMod
     , setModName
     , addModPort
-    , addDescription
+    , addModDecl
     , testBench
     , addTestBench
     , defaultPort
@@ -40,7 +40,7 @@ wireDecl = Decl Nothing . Port Wire False 1
 
 -- | Create an empty module.
 emptyMod :: ModDecl
-emptyMod = ModDecl "" [] [] []
+emptyMod = ModDecl "" [] [] [] []
 
 -- | Set a module name for a module declaration.
 setModName :: Text -> ModDecl -> ModDecl
@@ -50,8 +50,8 @@ setModName str = modId .~ Identifier str
 addModPort :: Port -> ModDecl -> ModDecl
 addModPort port = modInPorts %~ (:) port
 
-addDescription :: Description -> Verilog -> Verilog
-addDescription desc = getVerilog %~ (:) desc
+addModDecl :: ModDecl -> Verilog -> Verilog
+addModDecl desc = getVerilog %~ (:) desc
 
 testBench :: ModDecl
 testBench = ModDecl
@@ -75,10 +75,10 @@ testBench = ModDecl
     --   ]
     -- , SysTaskEnable $ Task "finish" []
         ]
-    ]
+    ] []
 
 addTestBench :: Verilog -> Verilog
-addTestBench = addDescription $ Description testBench
+addTestBench = addModDecl testBench
 
 defaultPort :: Identifier -> Port
 defaultPort = Port Wire False 1

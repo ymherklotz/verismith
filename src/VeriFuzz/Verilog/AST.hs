@@ -18,8 +18,6 @@ module VeriFuzz.Verilog.AST
     ( -- * Top level types
       Verilog(..)
     , getVerilog
-    , Description(..)
-    , getDescription
     -- * Primitives
     -- ** Identifier
     , Identifier(..)
@@ -69,9 +67,20 @@ module VeriFuzz.Verilog.AST
     , exprFunc
     , exprBody
     , exprStr
-    , traverseExpr
     , ConstExpr(..)
+    , constSize
     , constNum
+    , constParamId
+    , constConcat
+    , constUnOp
+    , constPrim
+    , constLhs
+    , constBinOp
+    , constRhs
+    , constCond
+    , constTrue
+    , constFalse
+    , constStr
     , Function(..)
     -- * Assignment
     , Assign(..)
@@ -81,6 +90,13 @@ module VeriFuzz.Verilog.AST
     , ContAssign(..)
     , contAssignNetLVal
     , contAssignExpr
+    -- ** Parameters
+    , Parameter(..)
+    , paramIdent
+    , paramValue
+    , LocalParam(..)
+    , localParamIdent
+    , localParamValue
     -- * Statment
     , Statement(..)
     , statDelay
@@ -90,23 +106,29 @@ module VeriFuzz.Verilog.AST
     , statements
     , stmntBA
     , stmntNBA
-    , stmntCA
     , stmntTask
     , stmntSysTask
     , stmntCondExpr
     , stmntCondTrue
     , stmntCondFalse
+    , forAssign
+    , forExpr
+    , forIncr
+    , forStmnt
     -- * Module
     , ModDecl(..)
     , modId
     , modOutPorts
     , modInPorts
     , modItems
+    , modParams
     , ModItem(..)
     , modContAssign
     , modInstId
     , modInstName
     , modInstConns
+    , paramDecl
+    , localParamDecl
     , traverseModItem
     , declDir
     , declPort
@@ -123,9 +145,10 @@ where
 import           Control.Lens
 import           Data.Data
 import           Data.Data.Lens
-import           Data.String      (IsString, fromString)
-import           Data.Text        (Text)
-import           Data.Traversable (sequenceA)
+import           Data.List.NonEmpty (NonEmpty)
+import           Data.String        (IsString, fromString)
+import           Data.Text          (Text)
+import           Data.Traversable   (sequenceA)
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -239,17 +262,49 @@ instance IsString Expr where
 instance Plated Expr where
   plate = uniplate
 
-traverseExpr :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
-traverseExpr f (Concat e   ) = Concat <$> sequenceA (f <$> e)
-traverseExpr f (UnOp u e   ) = UnOp u <$> f e
-traverseExpr f (BinOp l o r) = BinOp <$> f l <*> pure o <*> f r
-traverseExpr f (Cond  c l r) = Cond <$> f c <*> f l <*> f r
-traverseExpr f (Func fn e  ) = Func fn <$> f e
-traverseExpr _ e             = pure e
+-- | Constant expression, which are known before simulation at compile time.
+data ConstExpr = ConstNum { _constSize :: Int
+                          , _constNum  :: Integer
+                          }
+               | ParamId { _constParamId :: {-# UNPACK #-} !Identifier }
+               | ConstConcat { _constConcat :: [ConstExpr] }
+               | ConstUnOp { _constUnOp :: !UnaryOperator
+                           , _constPrim :: ConstExpr
+                           }
+               | ConstBinOp { _constLhs   :: ConstExpr
+                            , _constBinOp :: !BinaryOperator
+                            , _constRhs   :: ConstExpr
+                            }
+               | ConstCond { _constCond  :: ConstExpr
+                           , _constTrue  :: ConstExpr
+                           , _constFalse :: ConstExpr
+                           }
+               | ConstStr { _constStr :: {-# UNPACK #-} !Text }
+               deriving (Eq, Show, Ord, Data)
 
--- | Constant expression, which are known before simulation at compilation time.
-newtype ConstExpr = ConstExpr { _constNum :: Int }
-                  deriving (Eq, Show, Ord, Data, Num)
+instance Num ConstExpr where
+  a + b = ConstBinOp a BinPlus b
+  a - b = ConstBinOp a BinMinus b
+  a * b = ConstBinOp a BinTimes b
+  negate = ConstUnOp UnMinus
+  abs = undefined
+  signum = undefined
+  fromInteger = ConstNum 32 . fromInteger
+
+instance Semigroup ConstExpr where
+  (ConstConcat a) <> (ConstConcat b) = ConstConcat $ a <> b
+  (ConstConcat a) <> b = ConstConcat $ a <> [b]
+  a <> (ConstConcat b) = ConstConcat $ a : b
+  a <> b = ConstConcat [a, b]
+
+instance Monoid ConstExpr where
+  mempty = ConstConcat []
+
+instance IsString ConstExpr where
+  fromString = ConstStr . fromString
+
+instance Plated ConstExpr where
+  plate = uniplate
 
 data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
                  , _taskExpr :: [Expr]
@@ -332,13 +387,17 @@ data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
            | SeqBlock { _statements   :: [Statement] }     -- ^ Sequential block (@begin ... end@)
            | BlockAssign { _stmntBA      :: !Assign }     -- ^ blocking assignment (@=@)
            | NonBlockAssign { _stmntNBA     :: !Assign }     -- ^ Non blocking assignment (@<=@)
-           | StatCA { _stmntCA      :: !ContAssign } -- ^ Statement continuous assignment. May not be correct.
            | TaskEnable { _stmntTask    :: !Task }
            | SysTaskEnable { _stmntSysTask :: !Task }
            | CondStmnt { _stmntCondExpr  :: Expr
                        , _stmntCondTrue  :: Maybe Statement
                        , _stmntCondFalse :: Maybe Statement
                        }
+           | ForLoop { _forAssign :: !Assign
+                     , _forExpr   :: Expr
+                     , _forIncr   :: !Assign
+                     , _forStmnt  :: Statement
+                     } -- ^ Loop bounds shall be statically computable for a for loop.
            deriving (Eq, Show, Ord, Data)
 
 instance Semigroup Statement where
@@ -349,6 +408,19 @@ instance Semigroup Statement where
 
 instance Monoid Statement where
   mempty = SeqBlock []
+
+-- | Parameter that can be assigned in blocks or modules using @parameter@.
+data Parameter = Parameter { _paramIdent :: {-# UNPACK #-} !Identifier
+                           , _paramValue :: ConstExpr
+                           }
+               deriving (Eq, Show, Ord, Data)
+
+-- | Local parameter that can be assigned anywhere using @localparam@. It cannot
+-- be changed by initialising the module.
+data LocalParam = LocalParam { _localParamIdent :: {-# UNPACK #-} !Identifier
+                             , _localParamValue :: ConstExpr
+                             }
+                deriving (Eq, Show, Ord, Data)
 
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA { _modContAssign :: !ContAssign }
@@ -361,6 +433,8 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
              | Decl { _declDir  :: !(Maybe PortDir)
                     , _declPort :: !Port
                     }
+             | ParamDecl { _paramDecl :: NonEmpty Parameter }
+             | LocalParamDecl { _localParamDecl :: NonEmpty LocalParam }
              deriving (Eq, Show, Ord, Data)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
@@ -368,7 +442,9 @@ data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
                        , _modOutPorts :: [Port]
                        , _modInPorts  :: [Port]
                        , _modItems    :: [ModItem]
-                       } deriving (Eq, Show, Ord, Data)
+                       , _modParams   :: [Parameter]
+                       }
+             deriving (Eq, Show, Ord, Data)
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e       ) = ModConn <$> f e
@@ -380,12 +456,8 @@ traverseModItem f (ModInst a b e) =
     ModInst a b <$> sequenceA (traverseModConn f <$> e)
 traverseModItem _ e = pure e
 
--- | Description of the Verilog module.
-newtype Description = Description { _getDescription :: ModDecl }
-                    deriving (Eq, Show, Ord, Data)
-
 -- | The complete sourcetext for the Verilog module.
-newtype Verilog = Verilog { _getVerilog :: [Description] }
+newtype Verilog = Verilog { _getVerilog :: [ModDecl] }
                    deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
 
 makeLenses ''Identifier
@@ -401,12 +473,13 @@ makeLenses ''Assign
 makeLenses ''ContAssign
 makeLenses ''Statement
 makeLenses ''ModItem
+makeLenses ''Parameter
+makeLenses ''LocalParam
 makeLenses ''ModDecl
-makeLenses ''Description
 makeLenses ''Verilog
 
 getModule :: Traversal' Verilog ModDecl
-getModule = getVerilog . traverse . getDescription
+getModule = getVerilog . traverse
 {-# INLINE getModule #-}
 
 getSourceId :: Traversal' Verilog Text

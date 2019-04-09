@@ -67,7 +67,7 @@ genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
     nodes = G.labNodes gr
 
 genModuleDeclAST :: Circuit -> ModDecl
-genModuleDeclAST c = ModDecl i output ports $ combineAssigns yPort a
+genModuleDeclAST c = ModDecl i output ports (combineAssigns yPort a) []
   where
     i      = Identifier "gen_module"
     ports  = genPortsAST inputsC c
@@ -76,4 +76,4 @@ genModuleDeclAST c = ModDecl i output ports $ combineAssigns yPort a
     yPort  = Port Wire False 90 "y"
 
 generateAST :: Circuit -> Verilog
-generateAST c = Verilog [Description $ genModuleDeclAST c]
+generateAST c = Verilog [genModuleDeclAST c]

@@ -43,4 +43,3 @@ fromGraph = do
         $   nestUpTo 5 (generateAST gr)
         ^.. getVerilog
         .   traverse
-        .   getDescription

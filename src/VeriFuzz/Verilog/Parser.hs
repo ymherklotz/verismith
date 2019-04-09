@@ -298,14 +298,12 @@ parseModDecl = do
                      (modPorts PortOut modItem)
                      (modPorts PortIn modItem)
                      modItem
-
-parseDescription :: Parser Description
-parseDescription = Description <$> parseModDecl
+                     []
 
 -- | Parses a 'String' into 'Verilog' by skipping any beginning whitespace
 -- and then parsing multiple Verilog source.
 parseVerilogSrc :: Parser Verilog
-parseVerilogSrc = Verilog <$> many parseDescription
+parseVerilogSrc = Verilog <$> many parseModDecl
 
 -- | Parse a 'String' containing verilog code. The parser currently only supports
 -- the subset of Verilog that is being generated randomly.

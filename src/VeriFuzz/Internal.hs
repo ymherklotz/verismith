@@ -15,6 +15,7 @@ module VeriFuzz.Internal
       safe
     , showT
     , comma
+    , commaNL
     )
 where
 
@@ -33,3 +34,7 @@ showT = T.pack . show
 -- | Inserts commas between '[Text]' and except the last one.
 comma :: [Text] -> Text
 comma = T.intercalate ", "
+
+-- | Inserts commas and newlines between '[Text]' and except the last one.
+commaNL :: [Text] -> Text
+commaNL = T.intercalate ",\n"

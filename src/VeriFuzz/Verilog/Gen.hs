@@ -75,7 +75,7 @@ randomMod inps total = do
     let other   = drop inps ident
     let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
     let yport   = [wire (sumSize other) "y"]
-    return . declareMod other . ModDecl "test_module" yport inputs_ $ x ++ [y]
+    return . declareMod other $ ModDecl "test_module" yport inputs_ (x ++ [y]) []
   where
     ids   = toId <$> [1 .. total]
     end   = drop inps ids
@@ -200,12 +200,12 @@ moduleDef top = do
     let clock = Port Wire False 1 "clk"
     let yport = Port Wire False size "y"
     let comb = combineAssigns_ yport local
-    return . declareMod local . ModDecl name [yport] (clock:portList) $ initBlock : mi <> [comb]
+    return . declareMod local $ ModDecl name [yport] (clock:portList) (initBlock : mi <> [comb]) []
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
 procedural :: Config -> Gen Verilog
-procedural config = Verilog . (: []) . Description <$> Hog.resize
+procedural config = Verilog . (: []) <$> Hog.resize
     num
     (runReaderT (evalStateT (moduleDef (Just "top")) context) config)
   where

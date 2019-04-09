@@ -48,6 +48,12 @@ instance Arb Identifier where
         l <- genPositive
         Identifier . T.pack <$> replicateM (l + 1) (Hog.element ['a'..'z'])
 
+instance Arb Int where
+    arb = Hog.int (Hog.linear 0 100)
+
+instance Arb Integer where
+    arb = integral
+
 instance Arb Delay where
     arb = Delay <$> genPositive
 
@@ -140,11 +146,18 @@ exprWithContext l n
     | otherwise = exprWithContext l 0
     where subexpr y = exprWithContext l (n `div` y)
 
-instance Arb Int where
-    arb = Hog.int (Hog.linear 0 100)
+constExpr :: Gen ConstExpr
+constExpr = Hog.recursive Hog.choice
+            [ ConstNum <$> genPositive <*> arb
+            , ParamId <$> arb
+            ]
+            [ Hog.subtermM constExpr (\e -> ConstUnOp <$> arb <*> pure e)
+            , Hog.subtermM2 constExpr constExpr (\a b -> ConstBinOp <$> pure a <*> arb <*> pure b)
+            , Hog.subterm3 constExpr constExpr constExpr ConstCond
+            ]
 
 instance Arb ConstExpr where
-    arb = ConstExpr <$> Hog.int (Hog.linear 0 100)
+    arb = constExpr
 
 instance Arb Task where
     arb = Task <$> arb <*> listOf arb
@@ -181,7 +194,6 @@ statement n
     | n == 0 = Hog.choice
         [ BlockAssign <$> arb
         , NonBlockAssign <$> arb
-    -- , StatCA <$> arb
         , TaskEnable <$> arb
         , SysTaskEnable <$> arb
         ]
@@ -190,7 +202,6 @@ statement n
         , SeqBlock <$> listOf1 (substat 4)
         , BlockAssign <$> arb
         , NonBlockAssign <$> arb
-    -- , StatCA <$> arb
         , TaskEnable <$> arb
         , SysTaskEnable <$> arb
         ]
@@ -208,11 +219,14 @@ instance Arb ModItem where
 modPortGen :: Gen Port
 modPortGen = Port <$> arb <*> arb <*> arb <*> arb
 
-instance Arb ModDecl where
-    arb = ModDecl <$> arb <*> listOf arb <*> listOf1 modPortGen <*> listOf arb
+instance Arb Parameter where
+    arb = Parameter <$> arb <*> arb
 
-instance Arb Description where
-    arb = Description <$> arb
+instance Arb LocalParam where
+    arb = LocalParam <$> arb <*> arb
+
+instance Arb ModDecl where
+    arb = ModDecl <$> arb <*> listOf arb <*> listOf1 modPortGen <*> listOf arb <*> listOf arb
 
 instance Arb Verilog where
     arb = Verilog <$> listOf1 arb
