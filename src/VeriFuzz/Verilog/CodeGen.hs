@@ -21,16 +21,15 @@ module VeriFuzz.Verilog.CodeGen
     )
 where
 
-import           Control.Lens               (view, (^.))
-import           Data.Foldable              (fold)
-import           Data.List.NonEmpty         (NonEmpty (..), toList)
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import qualified Data.Text.IO               as T
-import           Numeric                    (showHex)
+import           Control.Lens          (view, (^.))
+import           Data.Foldable         (fold)
+import           Data.List.NonEmpty    (NonEmpty (..), toList)
+import           Data.Text             (Text)
+import qualified Data.Text             as T
+import qualified Data.Text.IO          as T
+import           Numeric               (showHex)
 import           VeriFuzz.Internal
 import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 
 -- | 'Source' class which determines that source code is able to be generated
@@ -60,7 +59,7 @@ moduleDecl (ModDecl i outP inP items ps) =
     modI  = fold $ moduleItem <$> items
     outIn = outP ++ inP
     params []      = ""
-    params (p:pps) = "#(\n" <> paramList (p :| pps) <> "\n)\n"
+    params (p:pps) = "\n#(\n" <> paramList (p :| pps) <> "\n)\n"
 
 -- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
 paramList :: NonEmpty Parameter -> Text
@@ -303,13 +302,10 @@ instance Source ModDecl where
 instance Source Verilog where
     genSource = verilogSrc
 
+instance Source SourceInfo where
+    genSource (SourceInfo _ src) = genSource src
+
 newtype GenVerilog a = GenVerilog { unGenVerilog :: a }
 
 instance (Source a) => Show (GenVerilog a) where
     show = T.unpack . genSource . unGenVerilog
-
-instance (Arb a) => Arb (GenVerilog a) where
-    arb = GenVerilog <$> arb
-
-instance Source SourceInfo where
-    genSource (SourceInfo _ src) = genSource src

@@ -17,6 +17,8 @@ module VeriFuzz.Verilog.Arbitrary
     , arb
     , genPositive
     , exprWithContext
+    , listOf1
+    , listOf
     )
 where
 

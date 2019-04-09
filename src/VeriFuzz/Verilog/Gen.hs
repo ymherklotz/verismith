@@ -28,6 +28,7 @@ import           Data.Foldable                  (fold)
 import qualified Data.Text                      as T
 import           Hedgehog                       (Gen)
 import qualified Hedgehog.Gen                   as Hog
+import qualified Hedgehog.Range                 as Hog
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.Arbitrary
@@ -36,6 +37,7 @@ import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
 
 data Context = Context { _variables   :: [Port]
+                       , _parameters  :: [Parameter]
                        , _nameCounter :: Int
                        , _stmntDepth  :: Int
                        }
@@ -87,6 +89,11 @@ gen = lift . lift
 some :: StateGen a -> StateGen [a]
 some f = do
     amount <- gen genPositive
+    replicateM amount f
+
+many :: StateGen a -> StateGen [a]
+many f = do
+    amount <- gen $ Hog.int (Hog.linear 0 10)
     replicateM amount f
 
 makeIdentifier :: T.Text -> StateGen Identifier
@@ -151,10 +158,11 @@ statement :: StateGen Statement
 statement = do
     prob <- askProbability
     cont <- get
+    let defProb i = prob ^. probStmnt . i
     Hog.frequency
-        [ (prob ^. probBlock              , BlockAssign <$> assignment)
-        , (prob ^. probNonBlock           , NonBlockAssign <$> assignment)
-        , (onDepth cont (prob ^. probCond), conditional)
+        [ (defProb probStmntBlock              , BlockAssign <$> assignment)
+        , (defProb probStmntNonBlock           , NonBlockAssign <$> assignment)
+        , (onDepth cont (defProb probStmntCond), conditional)
         ]
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
@@ -167,9 +175,10 @@ always = do
 modItem :: StateGen ModItem
 modItem = do
     prob <- askProbability
+    let defProb i = prob ^. probModItem . i
     Hog.frequency
-        [ (prob ^. probAssign, ModCA <$> contAssign)
-        , (prob ^. probAlways, always)
+        [ (defProb probModItemAssign, ModCA <$> contAssign)
+        , (defProb probModItemAlways, always)
         ]
 
 moduleName :: Maybe Identifier -> StateGen Identifier
@@ -183,6 +192,37 @@ initialBlock = do
     return . Initial . SeqBlock $ makeAssign <$> l
     where
         makeAssign p = NonBlockAssign $ Assign (lvalFromPort p) Nothing 0
+
+constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
+constExprWithContext ps prob size
+    | size == 0 = Hog.frequency
+                  [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+                  , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
+                  ]
+    | size > 0 = Hog.frequency
+                 [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+                 , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
+                 , (prob ^. probExprUnOp, ConstUnOp <$> arb <*> subexpr 2)
+                 , (prob ^. probExprBinOp, ConstBinOp <$> subexpr 2 <*> arb <*> subexpr 2)
+                 , (prob ^. probExprCond, ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
+                 , (prob ^. probExprConcat, ConstConcat <$> listOf1 (subexpr 8))
+                 ]
+    | otherwise = constExprWithContext ps prob 0
+    where subexpr y = constExprWithContext ps prob $ size `div` y
+
+constExpr :: StateGen ConstExpr
+constExpr = do
+    prob <- askProbability
+    context <- get
+    gen . Hog.sized $ constExprWithContext (context ^. parameters) (prob ^. probExpr)
+
+parameter :: StateGen Parameter
+parameter = do
+    ident <- makeIdentifier "param"
+    cexpr <- constExpr
+    let param = Parameter ident cexpr
+    parameters %= (param :)
+    return $ param
 
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
@@ -200,7 +240,7 @@ moduleDef top = do
     let clock = Port Wire False 1 "clk"
     let yport = Port Wire False size "y"
     let comb = combineAssigns_ yport local
-    return . declareMod local $ ModDecl name [yport] (clock:portList) (initBlock : mi <> [comb]) []
+    declareMod local . ModDecl name [yport] (clock:portList) (initBlock : mi <> [comb]) <$> many parameter
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
@@ -209,5 +249,5 @@ procedural config = Verilog . (: []) <$> Hog.resize
     num
     (runReaderT (evalStateT (moduleDef (Just "top")) context) config)
   where
-    context = Context [] 0 $ config ^. configProperty . propDepth
+    context = Context [] [] 0 $ config ^. configProperty . propDepth
     num     = fromIntegral $ config ^. configProperty . propSize
