@@ -23,10 +23,8 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
                  , forced     :: !Bool
                  , keepAll    :: !Bool
                  }
-          | Rerun { tools :: [Tool]
-                  , input :: {-# UNPACK #-} !S.FilePath
-                  }
-          | Generate { fileName :: {-# UNPACK #-} !S.FilePath
+          | Generate { mFileName  :: !(Maybe FilePath)
+                     , configFile :: !(Maybe FilePath)
                      }
           | Parse { fileName :: {-# UNPACK #-} !S.FilePath
                   }
@@ -59,70 +57,47 @@ parseSim val | val == "icarus" = Just Icarus
              | otherwise       = Nothing
 
 fuzzOpts :: Parser Opts
-fuzzOpts = Fuzz <$> textOption
-    (  long "output"
-       <> short 'o'
-       <> metavar "DIR"
-       <> help "Output directory that the fuzz run takes place in."
-       <> showDefault
-       <> value "output"
-    ) <*> (optional . strOption $
-              long "config"
-              <> short 'c'
-              <> metavar "FILE"
-              <> help "Config file for the current fuzz run."
-          )
-    <*> (switch $
-            long "force"
-            <> short 'f'
-            <> help "Overwrite the specified directory."
-        )
-    <*> (switch $
-            long "keep"
-            <> short 'k'
-            <> help "Keep all the directories."
-        )
-
-rerunOpts :: Parser Opts
-rerunOpts =
-    Rerun
-        <$> some
-                (   option
-                        (optReader parseSynth)
-                        (  long "synth"
-                        <> metavar "SYNTH"
-                        <> help "Rerun using a synthesiser (yosys|xst)."
-                        <> showDefault
-                        <> value Yosys
-                        )
-                <|> option
-                        (optReader parseSim)
-                        (  long "sim"
-                        <> metavar "SIM"
-                        <> help "Rerun using a simulator (icarus)."
-                        <> showDefault
-                        <> value Icarus
-                        )
-                )
-        <*> (S.fromText <$> textOption
-                (  long "input"
-                <> short 'i'
-                <> metavar "FILE"
-                <> help "Verilog file input."
+fuzzOpts =
+    Fuzz
+        <$> textOption
+                (  long "output"
+                <> short 'o'
+                <> metavar "DIR"
+                <> help "Output directory that the fuzz run takes place in."
                 <> showDefault
-                <> value "rtl.v"
+                <> value "output"
                 )
+        <*> (  optional
+            .  strOption
+            $  long "config"
+            <> short 'c'
+            <> metavar "FILE"
+            <> help "Config file for the current fuzz run."
+            )
+        <*> (switch $ long "force" <> short 'f' <> help
+                "Overwrite the specified directory."
+            )
+        <*> (switch $ long "keep" <> short 'k' <> help
+                "Keep all the directories."
             )
 
 genOpts :: Parser Opts
-genOpts = Generate . S.fromText <$> textOption
-    (  long "output"
-    <> short 'o'
-    <> metavar "FILE"
-    <> help "Verilog output file."
-    <> showDefault
-    <> value "main.v"
-    )
+genOpts =
+    Generate
+        <$> (  optional
+            .  strOption
+            $  long "output"
+            <> short 'o'
+            <> metavar "FILE"
+            <> help "Output to a verilog file instead."
+            )
+        <*> (  optional
+            .  strOption
+            $  long "config"
+            <> short 'c'
+            <> metavar "FILE"
+            <> help "Config file for the generation run."
+            )
 
 parseOpts :: Parser Opts
 parseOpts = Parse . S.fromText . T.pack <$> strArgument
@@ -145,12 +120,14 @@ reduceOpts =
 
 configOpts :: Parser Opts
 configOpts =
-    Config <$> (optional . strOption $
-                   long "output"
-                   <> short 'o'
-                   <> metavar "FILE"
-                   <> help "Output to a TOML Config file."
-               )
+    Config
+        <$> (  optional
+            .  strOption
+            $  long "output"
+            <> short 'o'
+            <> metavar "FILE"
+            <> help "Output to a TOML Config file."
+            )
 
 argparse :: Parser Opts
 argparse =
@@ -165,17 +142,6 @@ argparse =
                     )
             <> metavar "fuzz"
             )
-        <|> hsubparser
-                (  command
-                        "rerun"
-                        (info
-                            rerunOpts
-                            (progDesc
-                                "Rerun a Verilog file with a simulator or a synthesiser."
-                            )
-                        )
-                <> metavar "rerun"
-                )
         <|> hsubparser
                 (  command
                         "generate"
@@ -228,10 +194,13 @@ opts = info
            "VeriFuzz - A hardware simulator and synthesiser Verilog fuzzer."
     )
 
+getConfig :: Maybe FilePath -> IO V.Config
+getConfig = maybe (return V.defaultConfig) V.parseConfigFile
+
 handleOpts :: Opts -> IO ()
 handleOpts (Fuzz out configF force keep) = do
-    num  <- getNumCapabilities
-    config <- maybe (return V.defaultConfig) V.parseConfigFile configF
+    num    <- getNumCapabilities
+    config <- getConfig configF
     S.shellyFailDir $ do
         when force . S.rm_rf $ S.fromText out
         S.mkdir_p $ S.fromText out
@@ -245,14 +214,18 @@ handleOpts (Fuzz out configF force keep) = do
             )
         <$> [1 .. num]
     sequence_ $ takeMVar <$> vars
-handleOpts (Generate _) = error "Not implemented"
-handleOpts (Parse    f) = do
+handleOpts (Generate f c) = do
+    config <- getConfig c
+    source <- V.proceduralIO config
+    maybe (T.putStrLn $ V.genSource source)
+          (flip T.writeFile (V.genSource source))
+          f
+handleOpts (Parse f) = do
     verilogSrc <- readFile file
     case V.parseVerilog file verilogSrc of
         Left  l -> print l
         Right v -> print $ V.GenVerilog v
     where file = T.unpack . S.toTextIgnore $ f
-handleOpts (Rerun  _ _) = undefined
 handleOpts (Reduce f t) = do
     verilogSrc <- readFile file
     case V.parseVerilog file verilogSrc of
@@ -262,8 +235,10 @@ handleOpts (Reduce f t) = do
             vreduced <- V.runReduce (V.SourceInfo t v)
             writeFile "reduced.v" . T.unpack $ V.genSource vreduced
     where file = T.unpack $ S.toTextIgnore f
-handleOpts (Config c) = maybe (T.putStrLn . V.configEncode $ V.defaultConfig)
-    (`V.configToFile` V.defaultConfig) c
+handleOpts (Config c) = maybe
+    (T.putStrLn . V.configEncode $ V.defaultConfig)
+    (`V.configToFile` V.defaultConfig)
+    c
 
 main :: IO ()
 main = do

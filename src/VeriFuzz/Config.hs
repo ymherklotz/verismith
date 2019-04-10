@@ -34,13 +34,16 @@ module VeriFuzz.Config
     , ProbModItem(..)
     , probModItemAssign
     , probModItemAlways
+    , probModItemInst
     , ProbStatement(..)
     , probStmntBlock
     , probStmntNonBlock
     , probStmntCond
     , propSize
     , propSeed
-    , propDepth
+    , propStmntDepth
+    , propModDepth
+    , propMaxModules
     , parseConfigFile
     , parseConfig
     , configEncode
@@ -71,6 +74,7 @@ data ProbExpr = ProbExpr { _probExprNum      :: {-# UNPACK #-} !Int
 
 data ProbModItem = ProbModItem { _probModItemAssign :: {-# UNPACK #-} !Int
                                , _probModItemAlways :: {-# UNPACK #-} !Int
+                               , _probModItemInst   :: {-# UNPACK #-} !Int
                                }
                  deriving (Eq, Show)
 
@@ -86,9 +90,11 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                }
                  deriving (Eq, Show)
 
-data Property = Property { _propSize  :: {-# UNPACK #-} !Int
-                         , _propSeed  :: !(Maybe Int)
-                         , _propDepth :: {-# UNPACK #-} !Int
+data Property = Property { _propSize       :: {-# UNPACK #-} !Int
+                         , _propSeed       :: !(Maybe Int)
+                         , _propStmntDepth :: {-# UNPACK #-} !Int
+                         , _propModDepth   :: {-# UNPACK #-} !Int
+                         , _propMaxModules :: {-# UNPACK #-} !Int
                          }
               deriving (Eq, Show)
 
@@ -112,10 +118,12 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability defModItem defStmnt defExpr) (Property 20 Nothing 3)
-    where defModItem = ProbModItem 5 1
-          defStmnt = ProbStatement 5 5 1
-          defExpr = ProbExpr 1 1 1 1 1 1 0 1 1
+defaultConfig = Config (Probability defModItem defStmnt defExpr)
+                       (Property 20 Nothing 3 2 5)
+  where
+    defModItem = ProbModItem 5 1 1
+    defStmnt   = ProbStatement 5 5 1
+    defExpr    = ProbExpr 1 1 1 1 1 1 0 1 1
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
@@ -126,72 +134,63 @@ int a = Toml.int . twoKey a
 exprCodec :: TomlCodec ProbExpr
 exprCodec =
     ProbExpr
-    <$> defaultValue (defProb probExprNum)
-                     (intE "number")
-    .=  _probExprNum
-    <*> defaultValue (defProb probExprId)
-                     (intE "variable")
-    .=  _probExprId
-    <*> defaultValue (defProb probExprUnOp)
-                     (intE "unary")
-    .=  _probExprUnOp
-    <*> defaultValue (defProb probExprBinOp)
-                     (intE "binary")
-    .=  _probExprBinOp
-    <*> defaultValue (defProb probExprCond)
-                     (intE "ternary")
-    .=  _probExprCond
-    <*> defaultValue (defProb probExprConcat)
-                     (intE "concatenation")
-    .=  _probExprConcat
-    <*> defaultValue (defProb probExprStr)
-                     (intE "string")
-    .=  _probExprStr
-    <*> defaultValue (defProb probExprSigned)
-                     (intE "signed")
-    .=  _probExprSigned
-    <*> defaultValue (defProb probExprUnsigned)
-                     (intE "unsigned")
-    .=  _probExprUnsigned
-    where defProb i = defaultConfig ^. configProbability . probExpr . i
-          intE = int "expr"
+        <$> defaultValue (defProb probExprNum) (intE "number")
+        .=  _probExprNum
+        <*> defaultValue (defProb probExprId) (intE "variable")
+        .=  _probExprId
+        <*> defaultValue (defProb probExprUnOp) (intE "unary")
+        .=  _probExprUnOp
+        <*> defaultValue (defProb probExprBinOp) (intE "binary")
+        .=  _probExprBinOp
+        <*> defaultValue (defProb probExprCond) (intE "ternary")
+        .=  _probExprCond
+        <*> defaultValue (defProb probExprConcat) (intE "concatenation")
+        .=  _probExprConcat
+        <*> defaultValue (defProb probExprStr) (intE "string")
+        .=  _probExprStr
+        <*> defaultValue (defProb probExprSigned) (intE "signed")
+        .=  _probExprSigned
+        <*> defaultValue (defProb probExprUnsigned) (intE "unsigned")
+        .=  _probExprUnsigned
+  where
+    defProb i = defaultConfig ^. configProbability . probExpr . i
+    intE = int "expr"
 
 stmntCodec :: TomlCodec ProbStatement
 stmntCodec =
     ProbStatement
-    <$> defaultValue (defProb probStmntBlock)
-                     (intS "blocking")
-    .=  _probStmntBlock
-    <*> defaultValue (defProb probStmntNonBlock)
-                     (intS "nonblocking")
-    .=  _probStmntNonBlock
-    <*> defaultValue (defProb probStmntCond)
-                     (intS "conditional")
-    .=  _probStmntCond
-    where defProb i = defaultConfig ^. configProbability . probStmnt . i
-          intS = int "statement"
+        <$> defaultValue (defProb probStmntBlock) (intS "blocking")
+        .=  _probStmntBlock
+        <*> defaultValue (defProb probStmntNonBlock) (intS "nonblocking")
+        .=  _probStmntNonBlock
+        <*> defaultValue (defProb probStmntCond) (intS "conditional")
+        .=  _probStmntCond
+  where
+    defProb i = defaultConfig ^. configProbability . probStmnt . i
+    intS = int "statement"
 
 modItemCodec :: TomlCodec ProbModItem
 modItemCodec =
     ProbModItem
-    <$> defaultValue (defProb probModItemAssign)
-                     (intM "assign")
-    .=  _probModItemAssign
-    <*> defaultValue (defProb probModItemAlways)
-                     (intM "always")
-    .=  _probModItemAlways
-    where defProb i = defaultConfig ^. configProbability . probModItem . i
-          intM = int "moditem"
+        <$> defaultValue (defProb probModItemAssign) (intM "assign")
+        .=  _probModItemAssign
+        <*> defaultValue (defProb probModItemAlways) (intM "always")
+        .=  _probModItemAlways
+        <*> defaultValue (defProb probModItemInst) (intM "instantiation")
+        .=  _probModItemInst
+  where
+    defProb i = defaultConfig ^. configProbability . probModItem . i
+    intM = int "moditem"
 
 probCodec :: TomlCodec Probability
 probCodec =
     Probability
-    <$> defaultValue (defProb probModItem) modItemCodec
-    .= _probModItem
-    <*> defaultValue (defProb probStmnt) stmntCodec
-    .= _probStmnt
-    <*> defaultValue (defProb probExpr) exprCodec
-    .= _probExpr
+        <$> defaultValue (defProb probModItem) modItemCodec
+        .=  _probModItem
+        <*> defaultValue (defProb probStmnt) stmntCodec
+        .=  _probStmnt
+        <*> defaultValue (defProb probExpr) exprCodec
+        .=  _probExpr
     where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec Property
@@ -201,8 +200,12 @@ propCodec =
         .=  _propSize
         <*> Toml.dioptional (Toml.int "seed")
         .=  _propSeed
-        <*> defaultValue (defProp propDepth) (Toml.int "depth")
-        .=  _propDepth
+        <*> defaultValue (defProp propStmntDepth) (int "statement" "depth")
+        .=  _propStmntDepth
+        <*> defaultValue (defProp propModDepth) (int "module" "depth")
+        .=  _propModDepth
+        <*> defaultValue (defProp propMaxModules) (int "module" "max")
+        .=  _propMaxModules
     where defProp i = defaultConfig ^. configProperty . i
 
 configCodec :: TomlCodec Config

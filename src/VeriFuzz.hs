@@ -55,8 +55,7 @@ generateByteString n = do
     return $ randomByteString gen n []
 
 makeSrcInfo :: ModDecl -> SourceInfo
-makeSrcInfo m =
-    SourceInfo (m ^. modId . getIdentifier) (Verilog [m])
+makeSrcInfo m = SourceInfo (m ^. modId . getIdentifier) (Verilog [m])
 
 -- | Draw a randomly generated DAG to a dot file and compile it to a png so it
 -- can be seen.
@@ -107,18 +106,20 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText dir)
     catch_sh
-        (runEquiv defaultYosys defaultYosys (Just defaultVivado) src >> return True
+        (  runEquiv defaultYosys defaultYosys (Just defaultVivado) src
+        >> return True
         )
         ((\_ -> return False) :: RunFailed -> Sh Bool)
 
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
 -- generated Verilog files are equivalent.
-runEquivalence :: Gen Verilog -- ^ Generator for the Verilog file.
-               -> Text        -- ^ Name of the folder on each thread.
-               -> Text        -- ^ Name of the general folder being used.
-               -> Bool        -- ^ Keep flag.
-               -> Int         -- ^ Used to track the recursion.
-               -> IO ()
+runEquivalence
+    :: Gen Verilog -- ^ Generator for the Verilog file.
+    -> Text        -- ^ Name of the folder on each thread.
+    -> Text        -- ^ Name of the general folder being used.
+    -> Bool        -- ^ Keep flag.
+    -> Int         -- ^ Used to track the recursion.
+    -> IO ()
 runEquivalence gm t d k i = do
     m <- Hog.sample gm
     let srcInfo = SourceInfo "top" m
@@ -129,7 +130,7 @@ runEquivalence gm t d k i = do
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
         catch_sh
-                (  runEquiv defaultYosys defaultYosys (Just defaultVivado) srcInfo
+                (runEquiv defaultYosys defaultYosys (Just defaultVivado) srcInfo
                 >> echoP "Test OK"
                 )
             $ onFailure n

@@ -132,6 +132,7 @@ module VeriFuzz.Verilog.AST
     , traverseModItem
     , declDir
     , declPort
+    , declVal
     , ModConn(..)
     , modConn
     , modConnName
@@ -432,6 +433,7 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
              | Always !Statement
              | Decl { _declDir  :: !(Maybe PortDir)
                     , _declPort :: !Port
+                    , _declVal  :: Maybe ConstExpr
                     }
              | ParamDecl { _paramDecl :: NonEmpty Parameter }
              | LocalParamDecl { _localParamDecl :: NonEmpty LocalParam }

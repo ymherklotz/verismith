@@ -15,6 +15,7 @@ Various useful generators.
 module VeriFuzz.Verilog.Gen
     ( -- * Generation methods
       procedural
+    , proceduralIO
     , randomMod
     )
 where
@@ -38,8 +39,10 @@ import           VeriFuzz.Verilog.Mutate
 
 data Context = Context { _variables   :: [Port]
                        , _parameters  :: [Parameter]
-                       , _nameCounter :: Int
-                       , _stmntDepth  :: Int
+                       , _modules     :: [ModDecl]
+                       , _nameCounter :: {-# UNPACK #-} !Int
+                       , _stmntDepth  :: {-# UNPACK #-} !Int
+                       , _modDepth    :: {-# UNPACK #-} !Int
                        }
 
 makeLenses ''Context
@@ -77,7 +80,11 @@ randomMod inps total = do
     let other   = drop inps ident
     let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
     let yport   = [wire (sumSize other) "y"]
-    return . declareMod other $ ModDecl "test_module" yport inputs_ (x ++ [y]) []
+    return . declareMod other $ ModDecl "test_module"
+                                        yport
+                                        inputs_
+                                        (x ++ [y])
+                                        []
   where
     ids   = toId <$> [1 .. total]
     end   = drop inps ids
@@ -89,32 +96,46 @@ gen = lift . lift
 constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
 constExprWithContext ps prob size
     | size == 0 = Hog.frequency
-                  [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
-                  , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
-                  ]
+        [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+        , ( if null ps then 0 else prob ^. probExprId
+          , ParamId . view paramIdent <$> Hog.element ps
+          )
+        ]
     | size > 0 = Hog.frequency
-                 [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
-                 , (if null ps then 0 else prob ^. probExprId, ParamId . view paramIdent <$> Hog.element ps)
-                 , (prob ^. probExprUnOp, ConstUnOp <$> arb <*> subexpr 2)
-                 , (prob ^. probExprBinOp, ConstBinOp <$> subexpr 2 <*> arb <*> subexpr 2)
-                 , (prob ^. probExprCond, ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
-                 , (prob ^. probExprConcat, ConstConcat <$> listOf1 (subexpr 8))
-                 ]
+        [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+        , ( if null ps then 0 else prob ^. probExprId
+          , ParamId . view paramIdent <$> Hog.element ps
+          )
+        , (prob ^. probExprUnOp, ConstUnOp <$> arb <*> subexpr 2)
+        , ( prob ^. probExprBinOp
+          , ConstBinOp <$> subexpr 2 <*> arb <*> subexpr 2
+          )
+        , ( prob ^. probExprCond
+          , ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+          )
+        , (prob ^. probExprConcat, ConstConcat <$> listOf1 (subexpr 8))
+        ]
     | otherwise = constExprWithContext ps prob 0
     where subexpr y = constExprWithContext ps prob $ size `div` y
 
 exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
-exprSafeList prob = [(prob ^. probExprNum, Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100))]
+exprSafeList prob =
+    [ ( prob ^. probExprNum
+      , Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100)
+      )
+    ]
 
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
-    [ (prob ^. probExprNum, Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100))
-    , (prob ^. probExprConcat, Concat <$> listOf1 (subexpr 8))
-    , (prob ^. probExprUnOp, UnOp <$> arb <*> subexpr 2)
+    [ ( prob ^. probExprNum
+      , Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100)
+      )
+    , (prob ^. probExprConcat  , Concat <$> listOf1 (subexpr 8))
+    , (prob ^. probExprUnOp    , UnOp <$> arb <*> subexpr 2)
     , (prob ^. probExprStr, Str <$> Hog.text (Hog.linear 0 100) Hog.alphaNum)
-    , (prob ^. probExprBinOp, BinOp <$> subexpr 2 <*> arb <*> subexpr 2)
-    , (prob ^. probExprCond, Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
-    , (prob ^. probExprSigned, Func <$> pure SignedFunc <*> subexpr 2)
+    , (prob ^. probExprBinOp   , BinOp <$> subexpr 2 <*> arb <*> subexpr 2)
+    , (prob ^. probExprCond    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
+    , (prob ^. probExprSigned  , Func <$> pure SignedFunc <*> subexpr 2)
     , (prob ^. probExprUnsigned, Func <$> pure UnsignedFunc <*> subexpr 2)
     ]
 
@@ -124,9 +145,16 @@ exprWithContext prob [] n | n == 0    = Hog.frequency $ exprSafeList prob
                           | otherwise = exprWithContext prob [] 0
     where subexpr y = exprWithContext prob [] $ n `div` y
 exprWithContext prob l n
-    | n == 0    = Hog.frequency $ (prob ^. probExprId, Id <$> Hog.element l) : exprSafeList prob
-    | n > 0     = Hog.frequency $ (prob ^. probExprId, Id <$> Hog.element l) : exprRecList prob subexpr
-    | otherwise = exprWithContext prob l 0
+    | n == 0
+    = Hog.frequency
+        $ (prob ^. probExprId, Id <$> Hog.element l)
+        : exprSafeList prob
+    | n > 0
+    = Hog.frequency
+        $ (prob ^. probExprId, Id <$> Hog.element l)
+        : exprRecList prob subexpr
+    | otherwise
+    = exprWithContext prob l 0
     where subexpr y = exprWithContext prob l $ n `div` y
 
 some :: StateGen a -> StateGen [a]
@@ -136,7 +164,7 @@ some f = do
 
 many :: StateGen a -> StateGen [a]
 many f = do
-    amount <- gen $ Hog.int (Hog.linear 0 10)
+    amount <- gen $ Hog.int (Hog.linear 0 30)
     replicateM amount f
 
 makeIdentifier :: T.Text -> StateGen Identifier
@@ -153,13 +181,10 @@ newPort pt = do
     variables %= (p :)
     return p
 
-choose :: PortType -> Port -> Bool
-choose ptype (Port a _ _ _) = ptype == a
-
 scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
-    prob <- askProbability
+    prob    <- askProbability
     gen
         .   Hog.sized
         .   exprWithContext (prob ^. probExpr)
@@ -171,7 +196,7 @@ scopedExpr = do
 contAssign :: StateGen ContAssign
 contAssign = do
     expr <- scopedExpr
-    p <- newPort Wire
+    p    <- newPort Wire
     return $ ContAssign (p ^. portName) expr
 
 lvalFromPort :: Port -> LVal
@@ -215,33 +240,90 @@ always = do
     stat <- SeqBlock <$> some statement
     return $ Always (EventCtrl (EPosEdge "clk") (Just stat))
 
+instantiate :: ModDecl -> StateGen ModItem
+instantiate (ModDecl i outP inP _ _) = do
+    context <- get
+    outs    <-
+        fmap (Id . view portName) <$> (replicateM (length outP) $ newPort Wire)
+    ins <-
+        (Id "clk" :)
+        .   fmap (Id . view portName)
+        .   take (length inP - 1)
+        <$> (Hog.shuffle $ context ^. variables)
+    ident <- makeIdentifier "modinst"
+    Hog.choice
+        [ return . ModInst i ident $ ModConn <$> outs <> ins
+        , ModInst i ident
+            <$> Hog.shuffle (zipWith ModConnNamed (view portName <$> outP <> inP) (outs <> ins))
+        ]
+
+-- | Generates a module instance by also generating a new module if there are
+-- not enough modules currently in the context. It keeps generating new modules
+-- for every instance and for every level until either the deepest level is
+-- achieved, or the maximum number of modules are reached.
+--
+-- If the maximum number of levels are reached, it will always pick an instance
+-- from the current context. The problem with this approach is that at the end
+-- there may be many more than the max amount of modules, as the modules are
+-- always set to empty when entering a new level. This is to fix recursive
+-- definitions of modules, which are not defined.
+--
+-- One way to fix that is to also decrement the max modules for every level,
+-- depending on how many modules have already been generated. This would mean
+-- there would be moments when the module cannot generate a new instance but
+-- also not take a module from the current context. A fix for that may be to
+-- have a default definition of a simple module that is used instead.
+--
+-- Another different way to handle this would be to have a probability of taking
+-- a module from a context or generating a new one.
+modInst :: StateGen ModItem
+modInst = do
+    prob    <- lift ask
+    context <- get
+    let maxMods = prob ^. configProperty . propMaxModules
+    if length (context ^. modules) < maxMods
+        then do
+            let currMods = context ^. modules
+            let params   = context ^. parameters
+            let vars     = context ^. variables
+            modules .= []
+            variables .= []
+            parameters .= []
+            modDepth -= 1
+            chosenMod <- moduleDef Nothing
+            ncont <- get
+            let genMods = ncont ^. modules
+            modDepth += 1
+            parameters .= params
+            variables .= vars
+            modules .= chosenMod : currMods <> genMods
+            instantiate chosenMod
+        else Hog.element (context ^. modules) >>= instantiate
+
 -- | Generate a random module item.
 modItem :: StateGen ModItem
 modItem = do
-    prob <- askProbability
+    prob    <- askProbability
+    context <- get
     let defProb i = prob ^. probModItem . i
     Hog.frequency
         [ (defProb probModItemAssign, ModCA <$> contAssign)
         , (defProb probModItemAlways, always)
+        , ( if context ^. modDepth > 0 then defProb probModItemInst else 0
+          , modInst
+          )
         ]
 
 moduleName :: Maybe Identifier -> StateGen Identifier
 moduleName (Just t) = return t
-moduleName Nothing  = gen arb
-
-initialBlock :: StateGen ModItem
-initialBlock = do
-    context <- get
-    let l = filter (choose Reg) $ context ^.. variables . traverse
-    return . Initial . SeqBlock $ makeAssign <$> l
-    where
-        makeAssign p = NonBlockAssign $ Assign (lvalFromPort p) Nothing 0
+moduleName Nothing  = makeIdentifier "module"
 
 constExpr :: StateGen ConstExpr
 constExpr = do
-    prob <- askProbability
+    prob    <- askProbability
     context <- get
-    gen . Hog.sized $ constExprWithContext (context ^. parameters) (prob ^. probExpr)
+    gen . Hog.sized $ constExprWithContext (context ^. parameters)
+                                           (prob ^. probExpr)
 
 parameter :: StateGen Parameter
 parameter = do
@@ -249,7 +331,7 @@ parameter = do
     cexpr <- constExpr
     let param = Parameter ident cexpr
     parameters %= (param :)
-    return $ param
+    return param
 
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
@@ -261,20 +343,27 @@ moduleDef top = do
     portList <- some $ newPort Wire
     mi       <- some modItem
     context  <- get
-    initBlock <- initialBlock
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
     let clock = Port Wire False 1 "clk"
     let yport = Port Wire False size "y"
-    let comb = combineAssigns_ yport local
-    declareMod local . ModDecl name [yport] (clock:portList) (initBlock : mi <> [comb]) <$> many parameter
+    let comb  = combineAssigns_ yport local
+    declareMod local
+        .   ModDecl name [yport] (clock : portList) (mi <> [comb])
+        <$> many parameter
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
 procedural :: Config -> Gen Verilog
-procedural config = Verilog . (: []) <$> Hog.resize
-    num
-    (runReaderT (evalStateT (moduleDef (Just "top")) context) config)
+procedural config = do
+    (mainMod, st) <- Hog.resize num
+        $ runReaderT (runStateT (moduleDef (Just "top")) context) config
+    return . Verilog $ mainMod : st ^. modules
   where
-    context = Context [] [] 0 $ config ^. configProperty . propDepth
-    num     = fromIntegral $ config ^. configProperty . propSize
+    context =
+        Context [] [] [] 0 (confProp propStmntDepth) $ confProp propModDepth
+    num = fromIntegral $ confProp propSize
+    confProp i = config ^. configProperty . i
+
+proceduralIO :: Config -> IO Verilog
+proceduralIO = Hog.sample . procedural

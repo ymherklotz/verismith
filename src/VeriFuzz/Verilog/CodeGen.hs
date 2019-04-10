@@ -51,15 +51,19 @@ verilogSrc (Verilog modules) = fold $ moduleDecl <$> modules
 moduleDecl :: ModDecl -> Text
 moduleDecl (ModDecl i outP inP items ps) =
     "module "
-        <> identifier i <> params ps <> ports <> ";\n" <> modI
+        <> identifier i
+        <> params ps
+        <> ports
+        <> ";\n"
+        <> modI
         <> "endmodule\n"
   where
     ports | null outP && null inP = ""
-          | otherwise     = "(" <> comma (modPort <$> outIn) <> ")"
+          | otherwise             = "(" <> comma (modPort <$> outIn) <> ")"
     modI  = fold $ moduleItem <$> items
     outIn = outP ++ inP
-    params []      = ""
-    params (p:pps) = "\n#(\n" <> paramList (p :| pps) <> "\n)\n"
+    params []        = ""
+    params (p : pps) = "\n#(\n" <> paramList (p :| pps) <> "\n)\n"
 
 -- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
 paramList :: NonEmpty Parameter -> Text
@@ -112,9 +116,10 @@ moduleItem (ModInst (Identifier i) (Identifier name) conn) =
     i <> " " <> name <> "(" <> comma (mConn <$> conn) <> ")" <> ";\n"
 moduleItem (Initial stat) = "initial " <> statement stat
 moduleItem (Always  stat) = "always " <> statement stat
-moduleItem (Decl dir p  ) = maybe "" makePort dir <> port p <> ";\n"
+moduleItem (Decl dir p ini ) = maybe "" makePort dir <> port p <> maybe "" makeIni ini <> ";\n"
     where makePort = (<> " ") . portDir
-moduleItem (ParamDecl p) = paramList p <> ";\n"
+          makeIni = (" = " <>) . constExpr
+moduleItem (ParamDecl      p) = paramList p <> ";\n"
 moduleItem (LocalParamDecl p) = localParamList p <> ";\n"
 
 mConn :: ModConn -> Text
@@ -144,19 +149,22 @@ expr (Func f e  ) = func f <> "(" <> expr e <> ")"
 expr (Str t     ) = "\"" <> t <> "\""
 
 showNum :: Int -> Integer -> Text
-showNum s n = "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
+showNum s n =
+    "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
 
 constExpr :: ConstExpr -> Text
-constExpr (ConstNum s n)  = showNum s n
-constExpr (ParamId i)    = identifier i
+constExpr (ConstNum s n ) = showNum s n
+constExpr (ParamId     i) = identifier i
 constExpr (ConstConcat c) = "{" <> comma (constExpr <$> c) <> "}"
 constExpr (ConstUnOp u e) = "(" <> unaryOp u <> constExpr e <> ")"
-constExpr (ConstBinOp eRhs bin eLhs) = "(" <> constExpr eRhs <> binaryOp bin <> constExpr eLhs <> ")"
-constExpr (ConstCond l t f) = "(" <> constExpr l <> " ? " <> constExpr t <> " : " <> constExpr f <> ")"
-constExpr (ConstStr t     ) = "\"" <> t <> "\""
+constExpr (ConstBinOp eRhs bin eLhs) =
+    "(" <> constExpr eRhs <> binaryOp bin <> constExpr eLhs <> ")"
+constExpr (ConstCond l t f) =
+    "(" <> constExpr l <> " ? " <> constExpr t <> " : " <> constExpr f <> ")"
+constExpr (ConstStr t) = "\"" <> t <> "\""
 
 -- | Convert 'BinaryOperator' to 'Text'.
 binaryOp :: BinaryOperator -> Text
@@ -239,9 +247,14 @@ statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")\n" <> defMap t
 statement (CondStmnt e t f) =
     "if(" <> expr e <> ")\n" <> defMap t <> "else\n" <> defMap f
 statement (ForLoop a e incr stmnt) =
-    "for(" <> genAssign " = " a
-    <> "; " <> expr e <> "; " <> genAssign " = " incr
-    <> ")\n" <> statement stmnt
+    "for("
+        <> genAssign " = " a
+        <> "; "
+        <> expr e
+        <> "; "
+        <> genAssign " = " incr
+        <> ")\n"
+        <> statement stmnt
 
 task :: Task -> Text
 task (Task name e) | null e    = i

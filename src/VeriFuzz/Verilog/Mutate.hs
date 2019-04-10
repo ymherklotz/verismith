@@ -124,8 +124,8 @@ allVars m =
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
   where
-    out   = Decl Nothing <$> m ^. modOutPorts
-    regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg)
+    out   = Decl Nothing <$> m ^. modOutPorts <*> pure Nothing
+    regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg) <*> pure Nothing
     inst  = ModInst (m ^. modId)
                     (m ^. modId <> (Identifier . showT $ count + 1))
                     conns
@@ -185,8 +185,8 @@ filterChar t ids =
 initMod :: ModDecl -> ModDecl
 initMod m = m & modItems %~ ((out ++ inp) ++)
   where
-    out = Decl (Just PortOut) <$> (m ^. modOutPorts)
-    inp = Decl (Just PortIn) <$> (m ^. modInPorts)
+    out = Decl (Just PortOut) <$> (m ^. modOutPorts) <*> pure Nothing
+    inp = Decl (Just PortIn) <$> (m ^. modInPorts) <*> pure Nothing
 
 -- | Make an 'Identifier' from and existing Identifier and an object with a
 -- 'Show' instance to make it unique.
@@ -206,17 +206,19 @@ makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt []
 -- | Make a top module with an assert that requires @y_1@ to always be equal to
 -- @y_2@, which can then be proven using a formal verification tool.
 makeTopAssert :: ModDecl -> ModDecl
-makeTopAssert = (modItems %~ (++ [assert])) . makeTop
-    2
+makeTopAssert = (modItems %~ (++ [assert])) . makeTop 2
   where
     assert = Always . EventCtrl e . Just $ SeqBlock
         [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
-    e      = EPosEdge "clk"
+    e = EPosEdge "clk"
 
--- | Provide declarations for all the ports that are passed to it.
+-- | Provide declarations for all the ports that are passed to it. If they are
+-- registers, it should assign them to 0.
 declareMod :: [Port] -> ModDecl -> ModDecl
 declareMod ports = initMod . (modItems %~ (decl ++))
-    where decl = Decl Nothing <$> ports
+    where decl = declf <$> ports
+          declf p@(Port Reg _ _ _) = Decl Nothing p (Just 0)
+          declf p                  = Decl Nothing p Nothing
 
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until
@@ -273,4 +275,10 @@ combineAssigns p a =
 
 combineAssigns_ :: Port -> [Port] -> ModItem
 combineAssigns_ p ps =
-    ModCA . ContAssign (p ^. portName) . fold $ Id <$> ps ^.. traverse . portName
+    ModCA
+        .   ContAssign (p ^. portName)
+        .   fold
+        $   Id
+        <$> ps
+        ^.. traverse
+        .   portName

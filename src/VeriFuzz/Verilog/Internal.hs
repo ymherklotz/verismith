@@ -33,10 +33,10 @@ import           Data.Text            (Text)
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem
-regDecl = Decl Nothing . Port Reg False 1
+regDecl i = Decl Nothing (Port Reg False 1 i) Nothing
 
 wireDecl :: Identifier -> ModItem
-wireDecl = Decl Nothing . Port Wire False 1
+wireDecl i = Decl Nothing (Port Wire False 1 i) Nothing
 
 -- | Create an empty module.
 emptyMod :: ModDecl
@@ -75,7 +75,8 @@ testBench = ModDecl
     --   ]
     -- , SysTaskEnable $ Task "finish" []
         ]
-    ] []
+    ]
+    []
 
 addTestBench :: Verilog -> Verilog
 addTestBench = addModDecl testBench

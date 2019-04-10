@@ -74,7 +74,7 @@ mainModule = lens get_ set_
     set_ (SourceInfo top main) v =
         SourceInfo top (main & getModule %~ update top v)
     update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
-                                                  | otherwise = m
+                                                    | otherwise = m
     get_ (SourceInfo top main) = head . filter (f top) $ main ^.. getModule
     f top (ModDecl (Identifier i) _ _ _ _) = i == top
 

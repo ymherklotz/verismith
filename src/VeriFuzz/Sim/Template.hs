@@ -91,7 +91,7 @@ sbyConfig bd sim1 sim2 (SourceInfo top src) = [st|[options]
 mode prove
 
 [engines]
-smtbmc
+smtbmc z3
 
 [script]
 #{readL}

@@ -137,14 +137,15 @@ expr n | n == 0    = Hog.choice $ (Id <$> arb) : exprSafeList
     where subexpr y = expr (n `div` y)
 
 constExpr :: Gen ConstExpr
-constExpr = Hog.recursive Hog.choice
-            [ ConstNum <$> genPositive <*> arb
-            , ParamId <$> arb
-            ]
-            [ Hog.subtermM constExpr (\e -> ConstUnOp <$> arb <*> pure e)
-            , Hog.subtermM2 constExpr constExpr (\a b -> ConstBinOp <$> pure a <*> arb <*> pure b)
-            , Hog.subterm3 constExpr constExpr constExpr ConstCond
-            ]
+constExpr = Hog.recursive
+    Hog.choice
+    [ConstNum <$> genPositive <*> arb, ParamId <$> arb]
+    [ Hog.subtermM constExpr (\e -> ConstUnOp <$> arb <*> pure e)
+    , Hog.subtermM2 constExpr
+                    constExpr
+                    (\a b -> ConstBinOp <$> pure a <*> arb <*> pure b)
+    , Hog.subterm3 constExpr constExpr constExpr ConstCond
+    ]
 
 instance Arb ConstExpr where
     arb = constExpr
@@ -203,7 +204,7 @@ instance Arb ModItem where
                      , ModInst <$> arb <*> arb <*> listOf arb
                      , Initial <$> arb
                      , Always <$> (EventCtrl <$> arb <*> Hog.maybe arb)
-                     , Decl <$> pure Nothing <*> arb
+                     , Decl <$> pure Nothing <*> arb <*> pure Nothing
                      ]
 
 modPortGen :: Gen Port

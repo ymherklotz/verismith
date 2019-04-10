@@ -259,7 +259,7 @@ parseNetDecl pd = do
     range <- option 1 parseRange
     name  <- identifier
     tok' SymSemi
-    return . Decl pd . Port t sign range $ name
+    return $ Decl pd (Port t sign range name) Nothing
     where type_ = tok KWWire $> Wire <|> tok KWReg $> Reg
 
 parsePortDir :: Parser PortDir
@@ -281,8 +281,8 @@ parseModList :: Parser [Identifier]
 parseModList = list <|> return [] where list = parens $ commaSep identifier
 
 filterDecl :: PortDir -> ModItem -> Bool
-filterDecl p (Decl (Just p') _) = p == p'
-filterDecl _ _                  = False
+filterDecl p (Decl (Just p') _ _) = p == p'
+filterDecl _ _                    = False
 
 modPorts :: PortDir -> [ModItem] -> [Port]
 modPorts p mis = filter (filterDecl p) mis ^.. traverse . declPort

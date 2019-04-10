@@ -14,6 +14,7 @@ module VeriFuzz.Verilog
     ( Verilog(..)
     , parseVerilog
     , procedural
+    , proceduralIO
     , randomMod
     , GenVerilog(..)
     , genSource

@@ -92,7 +92,8 @@ runSimIcarus sim rinfo bss = do
             [ Initial
               $  fold (addDisplay $ assignFunc (_modInPorts m) <$> bss)
               <> (SysTaskEnable $ Task "finish" [])
-            ] []
+            ]
+            []
     let newtb     = instantiateMod m tb
     let modWithTb = Verilog [newtb, m]
     writefile "main.v" $ genSource modWithTb
