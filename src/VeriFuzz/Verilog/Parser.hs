@@ -259,7 +259,7 @@ parseNetDecl pd = do
     range <- option 1 parseRange
     name  <- identifier
     tok' SymSemi
-    return $ Decl pd (Port t sign range name) Nothing
+    return $ Decl pd (Port t sign 0 range name) Nothing
     where type_ = tok KWWire $> Wire <|> tok KWReg $> Reg
 
 parsePortDir :: Parser PortDir

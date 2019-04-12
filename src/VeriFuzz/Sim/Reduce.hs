@@ -67,8 +67,8 @@ filterExpr ids (Id i) = if i `notElem` ids then Number 1 0 else Id i
 filterExpr _   e      = e
 
 filterDecl :: [Identifier] -> ModItem -> Bool
-filterDecl ids (Decl Nothing (Port _ _ _ i) _) = i `elem` ids
-filterDecl _   _                               = True
+filterDecl ids (Decl Nothing (Port _ _ _ _ i) _) = i `elem` ids
+filterDecl _   _                                 = True
 
 filterAssigns :: [Port] -> ModItem -> Bool
 filterAssigns out (ModCA (ContAssign i _)) =

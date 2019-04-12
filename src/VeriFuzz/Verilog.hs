@@ -114,14 +114,9 @@ module VeriFuzz.Verilog
     -- * Useful Lenses and Traversals
     , getModule
     , getSourceId
-    -- * Arbitrary
-    , Arb
-    , arb
-    , genPositive
     )
 where
 
-import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Gen

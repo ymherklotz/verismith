@@ -38,7 +38,7 @@ inputsC :: Circuit -> [Node]
 inputsC c = inputs (getCircuit c)
 
 genPortsAST :: (Circuit -> [Node]) -> Circuit -> [Port]
-genPortsAST f c = port . frNode <$> f c where port = Port Wire False 4
+genPortsAST f c = port . frNode <$> f c where port = Port Wire False 0 4
 
 -- | Generates the nested expression AST, so that it can then generate the
 -- assignment expressions.
@@ -73,7 +73,7 @@ genModuleDeclAST c = ModDecl i output ports (combineAssigns yPort a) []
     ports  = genPortsAST inputsC c
     output = []
     a      = genAssignAST c
-    yPort  = Port Wire False 90 "y"
+    yPort  = Port Wire False 0 90 "y"
 
 generateAST :: Circuit -> Verilog
 generateAST c = Verilog [genModuleDeclAST c]

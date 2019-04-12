@@ -124,11 +124,14 @@ allVars m =
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
   where
-    out   = Decl Nothing <$> m ^. modOutPorts <*> pure Nothing
-    regIn = Decl Nothing <$> (m ^. modInPorts & traverse . portType .~ Reg) <*> pure Nothing
-    inst  = ModInst (m ^. modId)
-                    (m ^. modId <> (Identifier . showT $ count + 1))
-                    conns
+    out = Decl Nothing <$> m ^. modOutPorts <*> pure Nothing
+    regIn =
+        Decl Nothing
+            <$> (m ^. modInPorts & traverse . portType .~ Reg)
+            <*> pure Nothing
+    inst = ModInst (m ^. modId)
+                   (m ^. modId <> (Identifier . showT $ count + 1))
+                   conns
     count =
         length
             .   filter (== m ^. modId)
@@ -216,9 +219,10 @@ makeTopAssert = (modItems %~ (++ [assert])) . makeTop 2
 -- registers, it should assign them to 0.
 declareMod :: [Port] -> ModDecl -> ModDecl
 declareMod ports = initMod . (modItems %~ (decl ++))
-    where decl = declf <$> ports
-          declf p@(Port Reg _ _ _) = Decl Nothing p (Just 0)
-          declf p                  = Decl Nothing p Nothing
+  where
+    decl = declf <$> ports
+    declf p@(Port Reg _ _ _ _) = Decl Nothing p (Just 0)
+    declf p                    = Decl Nothing p Nothing
 
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until
