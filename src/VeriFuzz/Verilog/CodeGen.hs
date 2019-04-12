@@ -91,13 +91,11 @@ modPort p = p ^. portName . getIdentifier
 
 -- | Generate the 'Port' description.
 port :: Port -> Text
-port p = t <> sign <> size <> name
+port (Port tp sgn low sz (Identifier name)) = t <> sign <> size <> name
   where
-    t = flip mappend " " . pType $ p ^. portType
-    size | p ^. portSize > 1 = "[" <> showT (p ^. portSize - 1) <> ":0] "
-         | otherwise         = ""
-    name = p ^. portName . getIdentifier
-    sign = signed $ p ^. portSigned
+    t = flip mappend " " $ pType tp
+    size = "[" <> showT (low+sz-1) <> ":" <> showT low <> "] "
+    sign = signed sgn
 
 signed :: Bool -> Text
 signed True = "signed "
@@ -116,9 +114,11 @@ moduleItem (ModInst (Identifier i) (Identifier name) conn) =
     i <> " " <> name <> "(" <> comma (mConn <$> conn) <> ")" <> ";\n"
 moduleItem (Initial stat) = "initial " <> statement stat
 moduleItem (Always  stat) = "always " <> statement stat
-moduleItem (Decl dir p ini ) = maybe "" makePort dir <> port p <> maybe "" makeIni ini <> ";\n"
-    where makePort = (<> " ") . portDir
-          makeIni = (" = " <>) . constExpr
+moduleItem (Decl dir p ini) =
+    maybe "" makePort dir <> port p <> maybe "" makeIni ini <> ";\n"
+  where
+    makePort = (<> " ") . portDir
+    makeIni  = (" = " <>) . constExpr
 moduleItem (ParamDecl      p) = paramList p <> ";\n"
 moduleItem (LocalParamDecl p) = localParamList p <> ";\n"
 

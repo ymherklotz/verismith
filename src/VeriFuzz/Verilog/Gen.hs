@@ -26,13 +26,13 @@ import           Control.Monad.Trans.Class      (lift)
 import           Control.Monad.Trans.Reader     hiding (local)
 import           Control.Monad.Trans.State.Lazy
 import           Data.Foldable                  (fold)
+import           Data.List.NonEmpty             (toList)
 import qualified Data.Text                      as T
 import           Hedgehog                       (Gen)
 import qualified Hedgehog.Gen                   as Hog
 import qualified Hedgehog.Range                 as Hog
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
-import           VeriFuzz.Verilog.Arbitrary
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
@@ -54,7 +54,7 @@ toId = Identifier . ("w" <>) . T.pack . show
 
 toPort :: Identifier -> Gen Port
 toPort ident = do
-    i <- genPositive
+    i <- Hog.int $ Hog.linear 0 100
     return $ wire i ident
 
 sumSize :: [Port] -> Int
@@ -93,22 +93,80 @@ randomMod inps total = do
 gen :: Gen a -> StateGen a
 gen = lift . lift
 
+listOf1 :: Gen a -> Gen [a]
+listOf1 a = toList <$> Hog.nonEmpty (Hog.linear 0 100) a
+
+--listOf :: Gen a -> Gen [a]
+--listOf = Hog.list (Hog.linear 0 100)
+
+largeNum :: Gen Int
+largeNum = Hog.int Hog.linearBounded
+
+wireSize :: Gen Int
+wireSize = Hog.int $ Hog.linear 2 200
+
+binOp :: Gen BinaryOperator
+binOp =
+    Hog.element
+        [ BinPlus
+        , BinMinus
+        , BinTimes
+        -- , BinDiv
+        -- , BinMod
+        , BinEq
+        , BinNEq
+        -- , BinCEq
+        -- , BinCNEq
+        , BinLAnd
+        , BinLOr
+        , BinLT
+        , BinLEq
+        , BinGT
+        , BinGEq
+        , BinAnd
+        , BinOr
+        , BinXor
+        , BinXNor
+        , BinXNorInv
+        -- , BinPower
+        , BinLSL
+        , BinLSR
+        , BinASL
+        , BinASR
+        ]
+
+unOp :: Gen UnaryOperator
+unOp =
+    Hog.element
+        [ UnPlus
+        , UnMinus
+        , UnNot
+        , UnLNot
+        , UnAnd
+        , UnNand
+        , UnOr
+        , UnNor
+        , UnXor
+        , UnNxor
+        , UnNxorInv
+        ]
+
 constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
 constExprWithContext ps prob size
     | size == 0 = Hog.frequency
-        [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+        [ (prob ^. probExprNum, ConstNum <$> wireSize <*> fmap fromIntegral largeNum)
         , ( if null ps then 0 else prob ^. probExprId
           , ParamId . view paramIdent <$> Hog.element ps
           )
         ]
     | size > 0 = Hog.frequency
-        [ (prob ^. probExprNum, ConstNum <$> genPositive <*> arb)
+        [ (prob ^. probExprNum, ConstNum <$> wireSize <*> fmap fromIntegral largeNum)
         , ( if null ps then 0 else prob ^. probExprId
           , ParamId . view paramIdent <$> Hog.element ps
           )
-        , (prob ^. probExprUnOp, ConstUnOp <$> arb <*> subexpr 2)
+        , (prob ^. probExprUnOp, ConstUnOp <$> unOp <*> subexpr 2)
         , ( prob ^. probExprBinOp
-          , ConstBinOp <$> subexpr 2 <*> arb <*> subexpr 2
+          , ConstBinOp <$> subexpr 2 <*> binOp <*> subexpr 2
           )
         , ( prob ^. probExprCond
           , ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
@@ -121,19 +179,19 @@ constExprWithContext ps prob size
 exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
 exprSafeList prob =
     [ ( prob ^. probExprNum
-      , Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100)
+      , Number <$> wireSize <*> fmap fromIntegral largeNum
       )
     ]
 
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
     [ ( prob ^. probExprNum
-      , Number <$> genPositive <*> Hog.integral (Hog.linearFrom 0 (-100) 100)
+      , Number <$> wireSize <*> fmap fromIntegral largeNum
       )
     , (prob ^. probExprConcat  , Concat <$> listOf1 (subexpr 8))
-    , (prob ^. probExprUnOp    , UnOp <$> arb <*> subexpr 2)
+    , (prob ^. probExprUnOp    , UnOp <$> unOp <*> subexpr 2)
     , (prob ^. probExprStr, Str <$> Hog.text (Hog.linear 0 100) Hog.alphaNum)
-    , (prob ^. probExprBinOp   , BinOp <$> subexpr 2 <*> arb <*> subexpr 2)
+    , (prob ^. probExprBinOp   , BinOp <$> subexpr 2 <*> binOp <*> subexpr 2)
     , (prob ^. probExprCond    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
     , (prob ^. probExprSigned  , Func <$> pure SignedFunc <*> subexpr 2)
     , (prob ^. probExprUnsigned, Func <$> pure UnsignedFunc <*> subexpr 2)
@@ -159,12 +217,12 @@ exprWithContext prob l n
 
 some :: StateGen a -> StateGen [a]
 some f = do
-    amount <- gen genPositive
+    amount <- gen $ Hog.int (Hog.linear 1 100)
     replicateM amount f
 
 many :: StateGen a -> StateGen [a]
 many f = do
-    amount <- gen $ Hog.int (Hog.linear 0 30)
+    amount <- gen $ Hog.int (Hog.linear 0 100)
     replicateM amount f
 
 makeIdentifier :: T.Text -> StateGen Identifier
@@ -177,7 +235,7 @@ makeIdentifier prefix = do
 newPort :: PortType -> StateGen Port
 newPort pt = do
     ident <- makeIdentifier . T.toLower $ showT pt
-    p     <- gen $ Port pt <$> arb <*> genPositive <*> pure ident
+    p     <- gen $ Port pt <$> Hog.bool <*> pure 0 <*> wireSize <*> pure ident
     variables %= (p :)
     return p
 
@@ -185,13 +243,11 @@ scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
     prob    <- askProbability
-    gen
-        .   Hog.sized
-        .   exprWithContext (prob ^. probExpr)
-        $   context
-        ^.. variables
-        .   traverse
-        .   portName
+    gen . Hog.sized . exprWithContext (prob ^. probExpr) $ vars context
+  where
+    vars cont =
+        (cont ^.. variables . traverse . portName)
+            <> (cont ^.. parameters . traverse . paramIdent)
 
 contAssign :: StateGen ContAssign
 contAssign = do
@@ -200,7 +256,7 @@ contAssign = do
     return $ ContAssign (p ^. portName) expr
 
 lvalFromPort :: Port -> LVal
-lvalFromPort (Port _ _ _ i) = RegId i
+lvalFromPort (Port _ _ _ _ i) = RegId i
 
 probability :: Config -> Probability
 probability c = c ^. configProbability
@@ -214,14 +270,40 @@ assignment = do
     lval <- lvalFromPort <$> newPort Reg
     return $ Assign lval Nothing expr
 
-conditional :: StateGen Statement
-conditional = do
-    expr <- scopedExpr
+seqBlock :: StateGen Statement
+seqBlock = do
     stmntDepth -= 1
     tstat <- SeqBlock <$> some statement
-    fstat <- Hog.maybe $ SeqBlock <$> some statement
     stmntDepth += 1
-    return $ CondStmnt (BinOp expr BinEq 0) (Just tstat) fstat
+    return tstat
+
+conditional :: StateGen Statement
+conditional = do
+    expr  <- scopedExpr
+    tstat <- seqBlock
+    fstat <- Hog.maybe seqBlock
+    return $ CondStmnt expr (Just tstat) fstat
+
+--constToExpr :: ConstExpr -> Expr
+--constToExpr (ConstNum s n    ) = Number s n
+--constToExpr (ParamId     i   ) = Id i
+--constToExpr (ConstConcat c   ) = Concat $ constToExpr <$> c
+--constToExpr (ConstUnOp u p   ) = UnOp u (constToExpr p)
+--constToExpr (ConstBinOp a b c) = BinOp (constToExpr a) b (constToExpr c)
+--constToExpr (ConstCond a b c) =
+--    Cond (constToExpr a) (constToExpr b) (constToExpr c)
+--constToExpr (ConstStr s) = Str s
+
+forLoop :: StateGen Statement
+forLoop = do
+    num <- Hog.int (Hog.linear 0 20)
+    var     <- lvalFromPort <$> newPort Reg
+    stats   <- seqBlock
+    return $ ForLoop (Assign var Nothing 0)
+                     (BinOp (varId var) BinLT $ fromIntegral num)
+                     (Assign var Nothing $ BinOp (varId var) BinPlus 1)
+                     stats
+    where varId v = Id (v ^. regId)
 
 statement :: StateGen Statement
 statement = do
@@ -232,6 +314,7 @@ statement = do
         [ (defProb probStmntBlock              , BlockAssign <$> assignment)
         , (defProb probStmntNonBlock           , NonBlockAssign <$> assignment)
         , (onDepth cont (defProb probStmntCond), conditional)
+        , (onDepth cont (defProb probStmntFor) , forLoop)
         ]
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
@@ -253,8 +336,8 @@ instantiate (ModDecl i outP inP _ _) = do
     ident <- makeIdentifier "modinst"
     Hog.choice
         [ return . ModInst i ident $ ModConn <$> outs <> ins
-        , ModInst i ident
-            <$> Hog.shuffle (zipWith ModConnNamed (view portName <$> outP <> inP) (outs <> ins))
+        , ModInst i ident <$> Hog.shuffle
+            (zipWith ModConnNamed (view portName <$> outP <> inP) (outs <> ins))
         ]
 
 -- | Generates a module instance by also generating a new module if there are
@@ -291,7 +374,7 @@ modInst = do
             parameters .= []
             modDepth -= 1
             chosenMod <- moduleDef Nothing
-            ncont <- get
+            ncont     <- get
             let genMods = ncont ^. modules
             modDepth += 1
             parameters .= params
@@ -341,12 +424,12 @@ moduleDef :: Maybe Identifier -> StateGen ModDecl
 moduleDef top = do
     name     <- moduleName top
     portList <- some $ newPort Wire
-    mi       <- some modItem
+    mi       <- Hog.list (Hog.linear 4 100) modItem
     context  <- get
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
-    let clock = Port Wire False 1 "clk"
-    let yport = Port Wire False size "y"
+    let clock = Port Wire False 0 1 "clk"
+    let yport = Port Wire False 0 size "y"
     let comb  = combineAssigns_ yport local
     declareMod local
         .   ModDecl name [yport] (clock : portList) (mi <> [comb])

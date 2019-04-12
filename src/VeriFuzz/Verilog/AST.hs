@@ -48,6 +48,7 @@ module VeriFuzz.Verilog.AST
     , Port(..)
     , portType
     , portSigned
+    , portSizeLower
     , portSize
     , portName
     -- * Expression
@@ -351,10 +352,11 @@ data PortType = Wire
 --
 -- This is now implemented inside 'ModDecl' itself, which uses a list of output
 -- and input ports.
-data Port = Port { _portType   :: !PortType
-                 , _portSigned :: !Bool
-                 , _portSize   :: {-# UNPACK #-} !Int
-                 , _portName   :: {-# UNPACK #-} !Identifier
+data Port = Port { _portType      :: !PortType
+                 , _portSigned    :: !Bool
+                 , _portSizeLower :: {-# UNPACK #-} !Int
+                 , _portSize      :: {-# UNPACK #-} !Int
+                 , _portName      :: {-# UNPACK #-} !Identifier
                  } deriving (Eq, Show, Ord, Data)
 
 -- | This is currently a type because direct module declaration should also be
