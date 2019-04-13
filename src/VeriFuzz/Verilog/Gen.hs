@@ -54,7 +54,7 @@ toId = Identifier . ("w" <>) . T.pack . show
 
 toPort :: Identifier -> Gen Port
 toPort ident = do
-    i <- Hog.int $ Hog.linear 0 100
+    i <- Hog.int $ Hog.linear 1 100
     return $ wire i ident
 
 sumSize :: [Port] -> Int

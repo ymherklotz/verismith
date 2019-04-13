@@ -3,7 +3,7 @@ module Property
     )
 where
 
-import           Data.Either             (fromRight, isRight)
+import           Data.Either             (either, isRight)
 import qualified Data.Graph.Inductive    as G
 import           Hedgehog                (Gen, (===))
 import qualified Hedgehog                as Hog
@@ -42,11 +42,9 @@ parserIdempotent' = Hog.property $ do
     p sv === (p . p) sv
   where
     vshow = show . GenVerilog
-    p =
-        vshow
-            . fromRight (error "Failed idempotent test")
-            . parse parseModDecl "idempotent_test.v"
-            . alexScanTokens
+    p sv = either (\x -> show x <> "\n" <> sv) vshow
+        . parse parseModDecl "idempotent_test.v"
+        $ alexScanTokens sv
 
 parserInput :: TestTree
 parserInput = testProperty "parser input" parserInput'

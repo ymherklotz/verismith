@@ -107,7 +107,7 @@ allVars m =
 
 -- $setup
 -- >>> import VeriFuzz.Verilog.CodeGen
--- >>> let m = (ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [] [])
+-- >>> let m = (ModDecl (Identifier "m") [Port Wire False 0 5 (Identifier "y")] [Port Wire False 0 5 "x"] [] [])
 -- >>> let main = (ModDecl "main" [] [] [] [])
 
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
