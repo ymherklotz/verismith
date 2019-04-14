@@ -36,6 +36,7 @@ import           Prelude                   hiding (FilePath)
 import           Shelly
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
@@ -65,7 +66,11 @@ addDisplay s = concat $ transpose
 
 assignFunc :: [Port] -> ByteString -> Statement
 assignFunc inp bs =
-    NonBlockAssign . Assign conc Nothing . Number (B.length bs * 8) $ bsToI bs
+    NonBlockAssign
+        . Assign conc Nothing
+        . Number
+        . BitVec (B.length bs * 8)
+        $ bsToI bs
     where conc = RegConcat (portToExpr <$> inp)
 
 convert :: Text -> ByteString
