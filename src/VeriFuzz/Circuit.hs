@@ -41,5 +41,5 @@ fromGraph = do
         $   initMod
         .   head
         $   nestUpTo 5 (generateAST gr)
-        ^.. getVerilog
+        ^.. _Wrapped
         .   traverse

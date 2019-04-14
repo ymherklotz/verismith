@@ -55,7 +55,7 @@ generateByteString n = do
     return $ randomByteString gen n []
 
 makeSrcInfo :: ModDecl -> SourceInfo
-makeSrcInfo m = SourceInfo (m ^. modId . getIdentifier) (Verilog [m])
+makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])
 
 -- | Draw a randomly generated DAG to a dot file and compile it to a png so it
 -- can be seen.

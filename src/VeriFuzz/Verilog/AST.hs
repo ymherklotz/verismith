@@ -11,20 +11,23 @@ Defines the types to build a Verilog AST.
 -}
 
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module VeriFuzz.Verilog.AST
     ( -- * Top level types
       Verilog(..)
-    , getVerilog
     -- * Primitives
     -- ** Identifier
     , Identifier(..)
-    , getIdentifier
     -- ** Control
     , Delay(..)
-    , getDelay
     , Event(..)
     -- ** Operators
     , BinaryOperator(..)
@@ -39,8 +42,7 @@ module VeriFuzz.Verilog.AST
     , regExprId
     , regExpr
     , regSizeId
-    , regSizeMSB
-    , regSizeLSB
+    , regSizeRange
     , regConc
     -- ** Ports
     , PortDir(..)
@@ -48,28 +50,13 @@ module VeriFuzz.Verilog.AST
     , Port(..)
     , portType
     , portSigned
-    , portSizeLower
     , portSize
     , portName
     -- * Expression
     , Expr(..)
-    , exprSize
-    , exprVal
-    , exprId
-    , exprConcat
-    , exprUnOp
-    , exprPrim
-    , exprLhs
-    , exprBinOp
-    , exprRhs
-    , exprCond
-    , exprTrue
-    , exprFalse
-    , exprFunc
-    , exprBody
-    , exprStr
     , ConstExpr(..)
-    , constSize
+    , ConstExprF(..)
+    , Range(..)
     , constNum
     , constParamId
     , constConcat
@@ -82,7 +69,6 @@ module VeriFuzz.Verilog.AST
     , constTrue
     , constFalse
     , constStr
-    , Function(..)
     -- * Assignment
     , Assign(..)
     , assignReg
@@ -147,15 +133,17 @@ where
 import           Control.Lens
 import           Data.Data
 import           Data.Data.Lens
-import           Data.List.NonEmpty (NonEmpty)
-import           Data.String        (IsString, fromString)
-import           Data.Text          (Text)
-import           Data.Traversable   (sequenceA)
+import           Data.Functor.Foldable.TH (makeBaseFunctor)
+import           Data.List.NonEmpty       (NonEmpty)
+import           Data.String              (IsString, fromString)
+import           Data.Text                (Text)
+import           Data.Traversable         (sequenceA)
+import           VeriFuzz.Verilog.BitVec
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
-newtype Identifier = Identifier { _getIdentifier :: Text }
+newtype Identifier = Identifier { getIdentifier :: Text }
                    deriving (Eq, Show, Ord, Data, IsString, Semigroup, Monoid)
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
@@ -212,32 +200,19 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnNxorInv -- ^ @^~@
                    deriving (Eq, Show, Ord, Data)
 
-data Function = SignedFunc
-              | UnsignedFunc
-              deriving (Eq, Show, Ord, Data)
-
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
-data Expr = Number { _exprSize :: {-# UNPACK #-} !Int
-                   , _exprVal  :: Integer
-                   }
-          | Id { _exprId :: {-# UNPACK #-} !Identifier }
-          | Concat { _exprConcat :: [Expr] }
-          | UnOp { _exprUnOp :: !UnaryOperator
-                 , _exprPrim :: Expr
-                 }
-          | BinOp { _exprLhs   :: Expr
-                  , _exprBinOp :: !BinaryOperator
-                  , _exprRhs   :: Expr
-                  }
-          | Cond { _exprCond  :: Expr
-                 , _exprTrue  :: Expr
-                 , _exprFalse :: Expr
-                 }
-          | Func { _exprFunc :: !Function
-                 , _exprBody :: Expr
-                 }
-          | Str { _exprStr :: {-# UNPACK #-} !Text }
+data Expr = Number {-# UNPACK #-} !BitVec
+          -- ^ Number implementation containing the size and the value itself
+          | Id {-# UNPACK #-} !Identifier
+          -- ^ Symbols
+          | Concat ![Expr]
+          -- ^ Bit-wise concatenation of expressions represented by braces.
+          | UnOp !UnaryOperator !Expr
+          | BinOp !Expr !BinaryOperator !Expr
+          | Cond !Expr !Expr !Expr
+          | Appl !Identifier !Expr
+          | Str {-# UNPACK #-} !Text
           deriving (Eq, Show, Ord, Data)
 
 instance Num Expr where
@@ -247,7 +222,7 @@ instance Num Expr where
   negate = UnOp UnMinus
   abs = undefined
   signum = undefined
-  fromInteger = Number 32 . fromInteger
+  fromInteger = Number . fromInteger
 
 instance Semigroup Expr where
   (Concat a) <> (Concat b) = Concat $ a <> b
@@ -265,21 +240,19 @@ instance Plated Expr where
   plate = uniplate
 
 -- | Constant expression, which are known before simulation at compile time.
-data ConstExpr = ConstNum { _constSize :: Int
-                          , _constNum  :: Integer
-                          }
+data ConstExpr = ConstNum { _constNum :: {-# UNPACK #-} !BitVec }
                | ParamId { _constParamId :: {-# UNPACK #-} !Identifier }
-               | ConstConcat { _constConcat :: [ConstExpr] }
+               | ConstConcat { _constConcat :: ![ConstExpr] }
                | ConstUnOp { _constUnOp :: !UnaryOperator
-                           , _constPrim :: ConstExpr
+                           , _constPrim :: !ConstExpr
                            }
-               | ConstBinOp { _constLhs   :: ConstExpr
+               | ConstBinOp { _constLhs   :: !ConstExpr
                             , _constBinOp :: !BinaryOperator
-                            , _constRhs   :: ConstExpr
+                            , _constRhs   :: !ConstExpr
                             }
-               | ConstCond { _constCond  :: ConstExpr
-                           , _constTrue  :: ConstExpr
-                           , _constFalse :: ConstExpr
+               | ConstCond { _constCond  :: !ConstExpr
+                           , _constTrue  :: !ConstExpr
+                           , _constFalse :: !ConstExpr
                            }
                | ConstStr { _constStr :: {-# UNPACK #-} !Text }
                deriving (Eq, Show, Ord, Data)
@@ -291,7 +264,7 @@ instance Num ConstExpr where
   negate = ConstUnOp UnMinus
   abs = undefined
   signum = undefined
-  fromInteger = ConstNum 32 . fromInteger
+  fromInteger = ConstNum . fromInteger
 
 instance Semigroup ConstExpr where
   (ConstConcat a) <> (ConstConcat b) = ConstConcat $ a <> b
@@ -322,9 +295,8 @@ data LVal = RegId { _regId :: {-# UNPACK #-} !Identifier }
           | RegExpr { _regExprId :: {-# UNPACK #-} !Identifier
                     , _regExpr   :: !Expr
                     }
-          | RegSize { _regSizeId  :: {-# UNPACK #-} !Identifier
-                    , _regSizeMSB :: !ConstExpr
-                    , _regSizeLSB :: !ConstExpr
+          | RegSize { _regSizeId    :: {-# UNPACK #-} !Identifier
+                    , _regSizeRange :: {-# UNPACK #-} !Range
                     }
           | RegConcat { _regConc :: [Expr] }
           deriving (Eq, Show, Ord, Data)
@@ -344,6 +316,23 @@ data PortType = Wire
               | Reg
               deriving (Eq, Show, Ord, Data)
 
+-- | Range that can be associated with any port or left hand side. Contains the
+-- msb and lsb bits as 'ConstExpr'. This means that they can be generated using
+-- parameters, which can in turn be changed at synthesis time.
+data Range = Range { rangeMSB :: !ConstExpr
+                   , rangeLSB :: !ConstExpr
+                   }
+             deriving (Eq, Show, Ord, Data)
+
+instance Num Range where
+    (Range s1 a) + (Range s2 b) = Range (s1 + s2) $ a + b
+    (Range s1 a) - (Range s2 b) = Range (s1 - s2) . max 0 $ a - b
+    (Range s1 a) * (Range s2 b) = Range (s1 * s2) $ a * b
+    negate = undefined
+    abs = id
+    signum _ = 1
+    fromInteger = flip Range 0 . fromInteger . (-) 1
+
 -- | Port declaration. It contains information about the type of the port, the
 -- size, and the port name. It used to also contain information about if it was
 -- an input or output port. However, this is not always necessary and was more
@@ -352,11 +341,10 @@ data PortType = Wire
 --
 -- This is now implemented inside 'ModDecl' itself, which uses a list of output
 -- and input ports.
-data Port = Port { _portType      :: !PortType
-                 , _portSigned    :: !Bool
-                 , _portSizeLower :: {-# UNPACK #-} !Int
-                 , _portSize      :: {-# UNPACK #-} !Int
-                 , _portName      :: {-# UNPACK #-} !Identifier
+data Port = Port { _portType   :: !PortType
+                 , _portSigned :: !Bool
+                 , _portSize   :: {-# UNPACK #-} !Range
+                 , _portName   :: {-# UNPACK #-} !Identifier
                  } deriving (Eq, Show, Ord, Data)
 
 -- | This is currently a type because direct module declaration should also be
@@ -443,10 +431,10 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
-                       , _modOutPorts :: [Port]
-                       , _modInPorts  :: [Port]
-                       , _modItems    :: [ModItem]
-                       , _modParams   :: [Parameter]
+                       , _modOutPorts :: ![Port]
+                       , _modInPorts  :: ![Port]
+                       , _modItems    :: ![ModItem]
+                       , _modParams   :: ![Parameter]
                        }
              deriving (Eq, Show, Ord, Data)
 
@@ -464,28 +452,31 @@ traverseModItem _ e = pure e
 newtype Verilog = Verilog { _getVerilog :: [ModDecl] }
                    deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
 
-makeLenses ''Identifier
-makeLenses ''Delay
-makeLenses ''Expr
-makeLenses ''ConstExpr
-makeLenses ''Task
-makeLenses ''LVal
-makeLenses ''PortType
-makeLenses ''Port
-makeLenses ''ModConn
-makeLenses ''Assign
-makeLenses ''ContAssign
-makeLenses ''Statement
-makeLenses ''ModItem
-makeLenses ''Parameter
-makeLenses ''LocalParam
-makeLenses ''ModDecl
-makeLenses ''Verilog
+$(makeLenses ''Expr)
+$(makeLenses ''ConstExpr)
+$(makeLenses ''Task)
+$(makeLenses ''LVal)
+$(makeLenses ''PortType)
+$(makeLenses ''Port)
+$(makeLenses ''ModConn)
+$(makeLenses ''Assign)
+$(makeLenses ''ContAssign)
+$(makeLenses ''Statement)
+$(makeLenses ''ModItem)
+$(makeLenses ''Parameter)
+$(makeLenses ''LocalParam)
+$(makeLenses ''ModDecl)
+$(makeWrapped ''Verilog)
+$(makeWrapped ''Identifier)
+$(makeWrapped ''Delay)
+
+$(makeBaseFunctor ''Expr)
+$(makeBaseFunctor ''ConstExpr)
 
 getModule :: Traversal' Verilog ModDecl
-getModule = getVerilog . traverse
+getModule = _Wrapped . traverse
 {-# INLINE getModule #-}
 
 getSourceId :: Traversal' Verilog Text
-getSourceId = getModule . modId . getIdentifier
+getSourceId = getModule . modId . _Wrapped
 {-# INLINE getSourceId #-}
