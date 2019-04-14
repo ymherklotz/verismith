@@ -55,30 +55,16 @@ cata :: Functor f => Algebra f a -> Term f -> a
 cata fn = para' $ const fn
 
 ana :: Functor f => Coalgebra f a -> a -> Term f
-ana fn =
-    fn
-    >>> fmap (ana fn)
-    >>> In
+ana fn = fn >>> fmap (ana fn) >>> In
 
 para :: Functor f => RAlgebra f a -> Term f -> a
-para ralg =
-    out
-    >>> fmap (id &&& para ralg)
-    >>> ralg
+para ralg = out >>> fmap (id &&& para ralg) >>> ralg
 
 para' :: Functor f => RAlgebra' f a -> Term f -> a
 para' ralg t = out t & fmap (para' ralg) & ralg t
 
 apo :: Functor f => RCoalgebra f a -> a -> Term f
-apo rcoalg =
-    rcoalg
-    >>> fmap (id ||| apo rcoalg)
-    >>> In
+apo rcoalg = rcoalg >>> fmap (id ||| apo rcoalg) >>> In
 
 histo :: Functor f => CVAlgebra f a -> Term f -> a
-histo cv =
-    out
-    >>> fmap worker
-    >>> cv
-    where
-        worker t = undefined
+histo cv = out >>> fmap worker >>> cv where worker t = undefined
