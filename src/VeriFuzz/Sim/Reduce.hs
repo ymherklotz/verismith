@@ -63,12 +63,12 @@ combine :: Lens' a b -> (b -> Replacement b) -> a -> Replacement a
 combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 
 filterExpr :: [Identifier] -> Expr -> Expr
-filterExpr ids (Id i) = if i `notElem` ids then Number 1 0 else Id i
+filterExpr ids (Id i) = if i `notElem` ids then Number 0 else Id i
 filterExpr _   e      = e
 
 filterDecl :: [Identifier] -> ModItem -> Bool
-filterDecl ids (Decl Nothing (Port _ _ _ _ i) _) = i `elem` ids
-filterDecl _   _                                 = True
+filterDecl ids (Decl Nothing (Port _ _ _ i) _) = i `elem` ids
+filterDecl _   _                               = True
 
 filterAssigns :: [Port] -> ModItem -> Bool
 filterAssigns out (ModCA (ContAssign i _)) =
@@ -112,7 +112,7 @@ halveIndExpr (Concat l      ) = Concat <$> halve l
 halveIndExpr (BinOp e1 _  e2) = Dual e1 e2
 halveIndExpr (Cond  _  e1 e2) = Dual e1 e2
 halveIndExpr (UnOp _ e      ) = Single e
-halveIndExpr (Func _ e      ) = Single e
+halveIndExpr (Appl _ e      ) = Single e
 halveIndExpr e                = Single e
 
 halveModExpr :: ModItem -> Replacement ModItem
