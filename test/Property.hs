@@ -5,7 +5,7 @@ where
 
 import           Data.Either             (either, isRight)
 import qualified Data.Graph.Inductive    as G
-import           Hedgehog                (Gen, (===))
+import           Hedgehog                (Gen, Property, (===))
 import qualified Hedgehog                as Hog
 import qualified Hedgehog.Gen            as Hog
 import           Test.Tasty
@@ -21,37 +21,36 @@ randomMod' = Hog.resize 20 (randomMod 3 10)
 randomDAG' :: Gen Circuit
 randomDAG' = Hog.resize 30 randomDAG
 
-simpleGraph :: TestTree
-simpleGraph = testProperty "simple graph generation check" . Hog.property $ do
+simpleGraph :: Property
+simpleGraph = Hog.property $ do
     xs <- Hog.forAllWith (const "") randomDAG'
     Hog.assert $ simp xs
     where simp = G.isSimple . getCircuit
 
-parserInput' :: Hog.Property
-parserInput' = Hog.property $ do
+parserInput :: Property
+parserInput = Hog.property $ do
     v <- Hog.forAll randomMod'
     Hog.assert . isRight $ parse parseModDecl
                                  "input_test.v"
                                  (alexScanTokens $ str v)
     where str = show . GenVerilog
 
-parserIdempotent' :: Hog.Property
-parserIdempotent' = Hog.property $ do
+parserIdempotent :: Property
+parserIdempotent = Hog.property $ do
     v <- Hog.forAll randomMod'
     let sv = vshow v
     p sv === (p . p) sv
   where
     vshow = show . GenVerilog
-    p sv = either (\x -> show x <> "\n" <> sv) vshow
-        . parse parseModDecl "idempotent_test.v"
-        $ alexScanTokens sv
-
-parserInput :: TestTree
-parserInput = testProperty "parser input" parserInput'
-
-parserIdempotent :: TestTree
-parserIdempotent = testProperty "parser idempotence" parserIdempotent'
+    p sv =
+        either (\x -> show x <> "\n" <> sv) vshow
+            . parse parseModDecl "idempotent_test.v"
+            $ alexScanTokens sv
 
 propertyTests :: TestTree
-propertyTests =
-    testGroup "Property Tests" [simpleGraph, parserInput, parserIdempotent]
+propertyTests = testGroup
+    "Property Tests"
+    [ testProperty "simple graph generation check" simpleGraph
+    , testProperty "parser input"                  parserInput
+    , testProperty "parser idempotence"            parserIdempotent
+    ]
