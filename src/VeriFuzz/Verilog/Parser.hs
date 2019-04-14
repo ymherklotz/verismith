@@ -29,11 +29,11 @@ import qualified Data.Text                   as T
 import           Text.Parsec                 hiding (satisfy)
 import           Text.Parsec.Expr
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Lex
 import           VeriFuzz.Verilog.Preprocess
 import           VeriFuzz.Verilog.Token
-
 
 type Parser = Parsec [Token] ()
 
@@ -87,7 +87,7 @@ parseExpr' :: Parser Expr
 parseExpr' = buildExpressionParser parseTable parseTerm <?> "expr"
 
 decToExpr :: Decimal -> Expr
-decToExpr (Decimal s n) = Number s n
+decToExpr (Decimal s n) = Number $ bitVec s n
 
 -- | Parse a Number depending on if it is in a hex or decimal form. Octal and
 -- binary are not supported yet.
@@ -97,24 +97,17 @@ parseNum = decToExpr <$> number
 parseVar :: Parser Expr
 parseVar = Id <$> identifier
 
-systemFunc :: String -> Parser String
-systemFunc s = satisfy' matchId
+systemFunc :: Parser String
+systemFunc = satisfy' matchId
   where
-    matchId (Token IdSystem s' _) = if s == s' then Just s else Nothing
-    matchId _                     = Nothing
-
-parseFunction :: Parser Function
-parseFunction =
-    systemFunc "$unsigned"
-        $>  UnsignedFunc
-        <|> systemFunc "$signed"
-        $>  SignedFunc
+    matchId (Token IdSystem s _) = Just s
+    matchId _                    = Nothing
 
 parseFun :: Parser Expr
 parseFun = do
-    f    <- parseFunction
+    f    <- systemFunc
     expr <- parens parseExpr
-    return $ Func f expr
+    return $ Appl (Identifier $ T.pack f) expr
 
 parseTerm :: Parser Expr
 parseTerm =
@@ -259,7 +252,7 @@ parseNetDecl pd = do
     range <- option 1 parseRange
     name  <- identifier
     tok' SymSemi
-    return $ Decl pd (Port t sign 0 range name) Nothing
+    return $ Decl pd (Port t sign (fromIntegral range) name) Nothing
     where type_ = tok KWWire $> Wire <|> tok KWReg $> Reg
 
 parsePortDir :: Parser PortDir

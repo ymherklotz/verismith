@@ -21,16 +21,16 @@ module VeriFuzz.Verilog.CodeGen
     )
 where
 
-import           Control.Lens          (view, (^.))
-import           Data.Foldable         (fold)
-import           Data.List.NonEmpty    (NonEmpty (..), toList)
-import           Data.Text             (Text)
-import qualified Data.Text             as T
-import qualified Data.Text.IO          as T
-import           Numeric               (showHex)
+import           Data.Foldable           (fold)
+import           Data.List.NonEmpty      (NonEmpty (..), toList)
+import           Data.Text               (Text)
+import qualified Data.Text               as T
+import qualified Data.Text.IO            as T
+import           Numeric                 (showHex)
 import           VeriFuzz.Internal
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.BitVec
 
 -- | 'Source' class which determines that source code is able to be generated
 -- from the data structure using 'genSource'. This will be stored in 'Text' and
@@ -87,15 +87,17 @@ identifier (Identifier i) = i
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
 modPort :: Port -> Text
-modPort p = p ^. portName . getIdentifier
+modPort (Port _ _ _ (Identifier i)) = i
 
 -- | Generate the 'Port' description.
 port :: Port -> Text
-port (Port tp sgn low sz (Identifier name)) = t <> sign <> size <> name
+port (Port tp sgn r (Identifier name)) = t <> sign <> range r <> name
   where
-    t = flip mappend " " $ pType tp
-    size = "[" <> showT (low+sz-1) <> ":" <> showT low <> "] "
+    t    = flip mappend " " $ pType tp
     sign = signed sgn
+
+range :: Range -> Text
+range (Range msb lsb) = "[" <> constExpr msb <> ":" <> constExpr lsb <> "] "
 
 signed :: Bool -> Text
 signed True = "signed "
@@ -124,39 +126,34 @@ moduleItem (LocalParamDecl p) = localParamList p <> ";\n"
 
 mConn :: ModConn -> Text
 mConn (ModConn c       ) = expr c
-mConn (ModConnNamed n c) = "." <> n ^. getIdentifier <> "(" <> expr c <> ")"
+mConn (ModConnNamed n c) = "." <> getIdentifier n <> "(" <> expr c <> ")"
 
 -- | Generate continuous assignment
 contAssign :: ContAssign -> Text
 contAssign (ContAssign val e) =
-    "assign " <> val ^. getIdentifier <> " = " <> expr e <> ";\n"
-
--- | Generate 'Function' to 'Text'
-func :: Function -> Text
-func SignedFunc   = "$signed"
-func UnsignedFunc = "$unsigned"
+    "assign " <> getIdentifier val <> " = " <> expr e <> ";\n"
 
 -- | Generate 'Expr' to 'Text'.
 expr :: Expr -> Text
 expr (BinOp eRhs bin eLhs) =
     "(" <> expr eRhs <> binaryOp bin <> expr eLhs <> ")"
-expr (Number s n) = showNum s n
-expr (Id     i  ) = i ^. getIdentifier
-expr (Concat c  ) = "{" <> comma (expr <$> c) <> "}"
-expr (UnOp u e  ) = "(" <> unaryOp u <> expr e <> ")"
+expr (Number b             ) = showNum b
+expr (Id     i             ) = getIdentifier i
+expr (Concat c             ) = "{" <> comma (expr <$> c) <> "}"
+expr (UnOp u e             ) = "(" <> unaryOp u <> expr e <> ")"
 expr (Cond l t f) = "(" <> expr l <> " ? " <> expr t <> " : " <> expr f <> ")"
-expr (Func f e  ) = func f <> "(" <> expr e <> ")"
-expr (Str t     ) = "\"" <> t <> "\""
+expr (Appl (Identifier f) e) = f <> "(" <> expr e <> ")"
+expr (Str t                ) = "\"" <> t <> "\""
 
-showNum :: Int -> Integer -> Text
-showNum s n =
+showNum :: BitVec -> Text
+showNum (BitVec s n) =
     "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
 
 constExpr :: ConstExpr -> Text
-constExpr (ConstNum s n ) = showNum s n
+constExpr (ConstNum    b) = showNum b
 constExpr (ParamId     i) = identifier i
 constExpr (ConstConcat c) = "{" <> comma (constExpr <$> c) <> "}"
 constExpr (ConstUnOp u e) = "(" <> unaryOp u <> constExpr e <> ")"
@@ -210,11 +207,11 @@ unaryOp UnNxorInv = "^~"
 
 -- | Generate verilog code for an 'Event'.
 event :: Event -> Text
-event (EId   i)    = "@(" <> i ^. getIdentifier <> ")"
+event (EId   i)    = "@(" <> getIdentifier i <> ")"
 event (EExpr e)    = "@(" <> expr e <> ")"
 event EAll         = "@*"
-event (EPosEdge i) = "@(posedge " <> i ^. getIdentifier <> ")"
-event (ENegEdge i) = "@(negedge " <> i ^. getIdentifier <> ")"
+event (EPosEdge i) = "@(posedge " <> getIdentifier i <> ")"
+event (ENegEdge i) = "@(negedge " <> getIdentifier i <> ")"
 
 -- | Generates verilog code for a 'Delay'.
 delay :: Delay -> Text
@@ -222,10 +219,9 @@ delay (Delay i) = "#" <> showT i
 
 -- | Generate the verilog code for an 'LVal'.
 lVal :: LVal -> Text
-lVal (RegId i    ) = i ^. getIdentifier
-lVal (RegExpr i e) = i ^. getIdentifier <> " [" <> expr e <> "]"
-lVal (RegSize i msb lsb) =
-    i ^. getIdentifier <> " [" <> constExpr msb <> ":" <> constExpr lsb <> "]"
+lVal (RegId i    ) = getIdentifier i
+lVal (RegExpr i e) = getIdentifier i <> " [" <> expr e <> "]"
+lVal (RegSize i r) = getIdentifier i <> " " <> range r
 lVal (RegConcat e) = "{" <> comma (expr <$> e) <> "}"
 
 pType :: PortType -> Text
@@ -257,9 +253,8 @@ statement (ForLoop a e incr stmnt) =
         <> statement stmnt
 
 task :: Task -> Text
-task (Task name e) | null e    = i
-                   | otherwise = i <> "(" <> comma (expr <$> e) <> ")"
-    where i = name ^. getIdentifier
+task (Task (Identifier i) e) | null e    = i
+                             | otherwise = i <> "(" <> comma (expr <$> e) <> ")"
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: (Source a) => a -> IO ()
@@ -268,7 +263,7 @@ render = T.putStrLn . genSource
 -- Instances
 
 instance Source Identifier where
-    genSource = view getIdentifier
+    genSource = getIdentifier
 
 instance Source Task where
     genSource = task

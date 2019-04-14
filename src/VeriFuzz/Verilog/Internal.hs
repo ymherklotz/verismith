@@ -33,10 +33,10 @@ import           Data.Text            (Text)
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem
-regDecl i = Decl Nothing (Port Reg False 0 1 i) Nothing
+regDecl i = Decl Nothing (Port Reg False (Range 1 0) i) Nothing
 
 wireDecl :: Identifier -> ModItem
-wireDecl i = Decl Nothing (Port Wire False 0 1 i) Nothing
+wireDecl i = Decl Nothing (Port Wire False (Range 1 0) i) Nothing
 
 -- | Create an empty module.
 emptyMod :: ModDecl
@@ -51,7 +51,7 @@ addModPort :: Port -> ModDecl -> ModDecl
 addModPort port = modInPorts %~ (:) port
 
 addModDecl :: ModDecl -> Verilog -> Verilog
-addModDecl desc = getVerilog %~ (:) desc
+addModDecl desc = _Wrapped %~ (:) desc
 
 testBench :: ModDecl
 testBench = ModDecl
@@ -65,15 +65,8 @@ testBench = ModDecl
               "and_gate"
               [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
     , Initial $ SeqBlock
-        [ BlockAssign . Assign (RegId "a") Nothing $ Number 1 1
-        , BlockAssign . Assign (RegId "b") Nothing $ Number 1 1
-    -- , TimeCtrl (Delay 1) . Just . SysTaskEnable $ Task "display"
-    --   [ Str "%d & %d = %d"
-    --   , PrimExpr $ PrimId "a"
-    --   , PrimExpr $ PrimId "b"
-    --   , PrimExpr $ PrimId "c"
-    --   ]
-    -- , SysTaskEnable $ Task "finish" []
+        [ BlockAssign . Assign (RegId "a") Nothing $ Number 1
+        , BlockAssign . Assign (RegId "b") Nothing $ Number 1
         ]
     ]
     []
@@ -82,19 +75,19 @@ addTestBench :: Verilog -> Verilog
 addTestBench = addModDecl testBench
 
 defaultPort :: Identifier -> Port
-defaultPort = Port Wire False 0 1
+defaultPort = Port Wire False (Range 1 0)
 
 portToExpr :: Port -> Expr
-portToExpr (Port _ _ _ _ i) = Id i
+portToExpr (Port _ _ _ i) = Id i
 
 modName :: ModDecl -> Text
-modName = view $ modId . getIdentifier
+modName = getIdentifier . view modId
 
 yPort :: Identifier -> Port
-yPort = Port Wire False 0 90
+yPort = Port Wire False (Range 90 0)
 
-wire :: Int -> Identifier -> Port
-wire = Port Wire False 0
+wire :: Range -> Identifier -> Port
+wire = Port Wire False
 
-reg :: Int -> Identifier -> Port
-reg = Port Reg False 0
+reg :: Range -> Identifier -> Port
+reg = Port Reg False

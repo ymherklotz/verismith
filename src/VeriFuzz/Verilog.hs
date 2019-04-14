@@ -18,14 +18,11 @@ module VeriFuzz.Verilog
     , randomMod
     , GenVerilog(..)
     , genSource
-    , getVerilog
     -- * Primitives
     -- ** Identifier
     , Identifier(..)
-    , getIdentifier
     -- ** Control
     , Delay(..)
-    , getDelay
     , Event(..)
     -- ** Operators
     , BinaryOperator(..)
@@ -40,8 +37,7 @@ module VeriFuzz.Verilog
     , regExprId
     , regExpr
     , regSizeId
-    , regSizeMSB
-    , regSizeLSB
+    , regSizeRange
     , regConc
     -- ** Ports
     , PortDir(..)
@@ -53,24 +49,8 @@ module VeriFuzz.Verilog
     , portName
     -- * Expression
     , Expr(..)
-    , exprSize
-    , exprVal
-    , exprId
-    , exprConcat
-    , exprUnOp
-    , exprPrim
-    , exprLhs
-    , exprBinOp
-    , exprRhs
-    , exprCond
-    , exprTrue
-    , exprFalse
-    , exprFunc
-    , exprBody
-    , exprStr
     , ConstExpr(..)
     , constNum
-    , Function(..)
     -- * Assignment
     , Assign(..)
     , assignReg

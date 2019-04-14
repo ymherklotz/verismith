@@ -44,6 +44,7 @@ import qualified Data.Text                 as T
 import           VeriFuzz.Circuit.Internal
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Internal
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
@@ -172,10 +173,7 @@ instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
 
 filterChar :: Text -> [Identifier] -> [Identifier]
 filterChar t ids =
-    ids
-        &  traverse
-        .  getIdentifier
-        %~ (\x -> fromMaybe x . safe head $ T.splitOn t x)
+    ids & traverse . _Wrapped %~ (\x -> fromMaybe x . safe head $ T.splitOn t x)
 
 -- | Initialise all the inputs and outputs to a module.
 --
@@ -221,8 +219,8 @@ declareMod :: [Port] -> ModDecl -> ModDecl
 declareMod ports = initMod . (modItems %~ (decl ++))
   where
     decl = declf <$> ports
-    declf p@(Port Reg _ _ _ _) = Decl Nothing p (Just 0)
-    declf p                    = Decl Nothing p Nothing
+    declf p@(Port Reg _ _ _) = Decl Nothing p (Just 0)
+    declf p                  = Decl Nothing p Nothing
 
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until
@@ -234,30 +232,30 @@ declareMod ports = initMod . (modItems %~ (decl ++))
 -- >>> GenVerilog . simplify $ (Id "y") + (Id "x")
 -- (y + x)
 simplify :: Expr -> Expr
-simplify (BinOp (Number _ 1) BinAnd e)   = e
-simplify (BinOp e BinAnd (Number _ 1))   = e
-simplify (BinOp (Number _ 0) BinAnd _)   = Number 1 0
-simplify (BinOp _ BinAnd (Number _ 0))   = Number 1 0
-simplify (BinOp e BinPlus (Number _ 0))  = e
-simplify (BinOp (Number _ 0) BinPlus e)  = e
-simplify (BinOp e BinMinus (Number _ 0)) = e
-simplify (BinOp (Number _ 0) BinMinus e) = e
-simplify (BinOp e BinTimes (Number _ 1)) = e
-simplify (BinOp (Number _ 1) BinTimes e) = e
-simplify (BinOp _ BinTimes (Number _ 0)) = Number 1 0
-simplify (BinOp (Number _ 0) BinTimes _) = Number 1 0
-simplify (BinOp e BinOr (Number _ 0))    = e
-simplify (BinOp (Number _ 0) BinOr e)    = e
-simplify (BinOp e BinLSL (Number _ 0))   = e
-simplify (BinOp (Number _ 0) BinLSL e)   = e
-simplify (BinOp e BinLSR (Number _ 0))   = e
-simplify (BinOp (Number _ 0) BinLSR e)   = e
-simplify (BinOp e BinASL (Number _ 0))   = e
-simplify (BinOp (Number _ 0) BinASL e)   = e
-simplify (BinOp e BinASR (Number _ 0))   = e
-simplify (BinOp (Number _ 0) BinASR e)   = e
-simplify (UnOp UnPlus e)                 = e
-simplify e                               = e
+simplify (BinOp (Number (BitVec _ 1)) BinAnd e)   = e
+simplify (BinOp e BinAnd (Number (BitVec _ 1)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinAnd _)   = Number 0
+simplify (BinOp _ BinAnd (Number (BitVec _ 0)))   = Number 0
+simplify (BinOp e BinPlus (Number (BitVec _ 0)))  = e
+simplify (BinOp (Number (BitVec _ 0)) BinPlus e)  = e
+simplify (BinOp e BinMinus (Number (BitVec _ 0))) = e
+simplify (BinOp (Number (BitVec _ 0)) BinMinus e) = e
+simplify (BinOp e BinTimes (Number (BitVec _ 1))) = e
+simplify (BinOp (Number (BitVec _ 1)) BinTimes e) = e
+simplify (BinOp _ BinTimes (Number (BitVec _ 0))) = Number 0
+simplify (BinOp (Number (BitVec _ 0)) BinTimes _) = Number 0
+simplify (BinOp e BinOr (Number (BitVec _ 0)))    = e
+simplify (BinOp (Number (BitVec _ 0)) BinOr e)    = e
+simplify (BinOp e BinLSL (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinLSL e)   = e
+simplify (BinOp e BinLSR (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinLSR e)   = e
+simplify (BinOp e BinASL (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinASL e)   = e
+simplify (BinOp e BinASR (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinASR e)   = e
+simplify (UnOp UnPlus e)                          = e
+simplify e                                        = e
 
 -- | Remove all 'Identifier' that do not appeare in the input list from an
 -- 'Expr'. The identifier will be replaced by @1'b0@, which can then later be
@@ -268,7 +266,7 @@ simplify e                               = e
 removeId :: [Identifier] -> Expr -> Expr
 removeId i = transform trans
   where
-    trans (Id ident) | ident `notElem` i = Number 1 0
+    trans (Id ident) | ident `notElem` i = Number 0
                      | otherwise         = Id ident
     trans e = e
 

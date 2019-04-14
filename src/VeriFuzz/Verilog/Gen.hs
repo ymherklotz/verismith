@@ -34,6 +34,7 @@ import qualified Hedgehog.Range                 as Hog
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
 
@@ -54,10 +55,10 @@ toId = Identifier . ("w" <>) . T.pack . show
 
 toPort :: Identifier -> Gen Port
 toPort ident = do
-    i <- Hog.int $ Hog.linear 1 100
+    i <- range
     return $ wire i ident
 
-sumSize :: [Port] -> Int
+sumSize :: [Port] -> Range
 sumSize ps = sum $ ps ^.. traverse . portSize
 
 random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
@@ -105,62 +106,66 @@ largeNum = Hog.int Hog.linearBounded
 wireSize :: Gen Int
 wireSize = Hog.int $ Hog.linear 2 200
 
+range :: Gen Range
+range = Range <$> fmap fromIntegral wireSize <*> pure 0
+
+genBitVec :: Gen BitVec
+genBitVec = BitVec <$> wireSize <*> fmap fromIntegral largeNum
+
 binOp :: Gen BinaryOperator
-binOp =
-    Hog.element
-        [ BinPlus
-        , BinMinus
-        , BinTimes
+binOp = Hog.element
+    [ BinPlus
+    , BinMinus
+    , BinTimes
         -- , BinDiv
         -- , BinMod
-        , BinEq
-        , BinNEq
+    , BinEq
+    , BinNEq
         -- , BinCEq
         -- , BinCNEq
-        , BinLAnd
-        , BinLOr
-        , BinLT
-        , BinLEq
-        , BinGT
-        , BinGEq
-        , BinAnd
-        , BinOr
-        , BinXor
-        , BinXNor
-        , BinXNorInv
+    , BinLAnd
+    , BinLOr
+    , BinLT
+    , BinLEq
+    , BinGT
+    , BinGEq
+    , BinAnd
+    , BinOr
+    , BinXor
+    , BinXNor
+    , BinXNorInv
         -- , BinPower
-        , BinLSL
-        , BinLSR
-        , BinASL
-        , BinASR
-        ]
+    , BinLSL
+    , BinLSR
+    , BinASL
+    , BinASR
+    ]
 
 unOp :: Gen UnaryOperator
-unOp =
-    Hog.element
-        [ UnPlus
-        , UnMinus
-        , UnNot
-        , UnLNot
-        , UnAnd
-        , UnNand
-        , UnOr
-        , UnNor
-        , UnXor
-        , UnNxor
-        , UnNxorInv
-        ]
+unOp = Hog.element
+    [ UnPlus
+    , UnMinus
+    , UnNot
+    , UnLNot
+    , UnAnd
+    , UnNand
+    , UnOr
+    , UnNor
+    , UnXor
+    , UnNxor
+    , UnNxorInv
+    ]
 
 constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
 constExprWithContext ps prob size
     | size == 0 = Hog.frequency
-        [ (prob ^. probExprNum, ConstNum <$> wireSize <*> fmap fromIntegral largeNum)
+        [ (prob ^. probExprNum, ConstNum <$> genBitVec)
         , ( if null ps then 0 else prob ^. probExprId
           , ParamId . view paramIdent <$> Hog.element ps
           )
         ]
     | size > 0 = Hog.frequency
-        [ (prob ^. probExprNum, ConstNum <$> wireSize <*> fmap fromIntegral largeNum)
+        [ (prob ^. probExprNum, ConstNum <$> genBitVec)
         , ( if null ps then 0 else prob ^. probExprId
           , ParamId . view paramIdent <$> Hog.element ps
           )
@@ -177,24 +182,18 @@ constExprWithContext ps prob size
     where subexpr y = constExprWithContext ps prob $ size `div` y
 
 exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
-exprSafeList prob =
-    [ ( prob ^. probExprNum
-      , Number <$> wireSize <*> fmap fromIntegral largeNum
-      )
-    ]
+exprSafeList prob = [(prob ^. probExprNum, Number <$> genBitVec)]
 
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
-    [ ( prob ^. probExprNum
-      , Number <$> wireSize <*> fmap fromIntegral largeNum
-      )
+    [ (prob ^. probExprNum     , Number <$> genBitVec)
     , (prob ^. probExprConcat  , Concat <$> listOf1 (subexpr 8))
     , (prob ^. probExprUnOp    , UnOp <$> unOp <*> subexpr 2)
     , (prob ^. probExprStr, Str <$> Hog.text (Hog.linear 0 100) Hog.alphaNum)
     , (prob ^. probExprBinOp   , BinOp <$> subexpr 2 <*> binOp <*> subexpr 2)
     , (prob ^. probExprCond    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
-    , (prob ^. probExprSigned  , Func <$> pure SignedFunc <*> subexpr 2)
-    , (prob ^. probExprUnsigned, Func <$> pure UnsignedFunc <*> subexpr 2)
+    , (prob ^. probExprSigned  , Appl <$> pure "$signed" <*> subexpr 2)
+    , (prob ^. probExprUnsigned, Appl <$> pure "$unsigned" <*> subexpr 2)
     ]
 
 exprWithContext :: ProbExpr -> [Identifier] -> Hog.Size -> Gen Expr
@@ -235,7 +234,7 @@ makeIdentifier prefix = do
 newPort :: PortType -> StateGen Port
 newPort pt = do
     ident <- makeIdentifier . T.toLower $ showT pt
-    p     <- gen $ Port pt <$> Hog.bool <*> pure 0 <*> wireSize <*> pure ident
+    p     <- gen $ Port pt <$> Hog.bool <*> range <*> pure ident
     variables %= (p :)
     return p
 
@@ -256,7 +255,7 @@ contAssign = do
     return $ ContAssign (p ^. portName) expr
 
 lvalFromPort :: Port -> LVal
-lvalFromPort (Port _ _ _ _ i) = RegId i
+lvalFromPort (Port _ _ _ i) = RegId i
 
 probability :: Config -> Probability
 probability c = c ^. configProbability
@@ -296,9 +295,9 @@ conditional = do
 
 forLoop :: StateGen Statement
 forLoop = do
-    num <- Hog.int (Hog.linear 0 20)
-    var     <- lvalFromPort <$> newPort Reg
-    stats   <- seqBlock
+    num   <- Hog.int (Hog.linear 0 20)
+    var   <- lvalFromPort <$> newPort Reg
+    stats <- seqBlock
     return $ ForLoop (Assign var Nothing 0)
                      (BinOp (varId var) BinLT $ fromIntegral num)
                      (Assign var Nothing $ BinOp (varId var) BinPlus 1)
@@ -428,8 +427,8 @@ moduleDef top = do
     context  <- get
     let local = filter (`notElem` portList) $ context ^. variables
     let size  = sum $ local ^.. traverse . portSize
-    let clock = Port Wire False 0 1 "clk"
-    let yport = Port Wire False 0 size "y"
+    let clock = Port Wire False 1 "clk"
+    let yport = Port Wire False size "y"
     let comb  = combineAssigns_ yport local
     declareMod local
         .   ModDecl name [yport] (clock : portList) (mi <> [comb])
