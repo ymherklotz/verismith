@@ -34,9 +34,11 @@ import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as B
 import           Data.Text             (Text)
 import qualified Data.Text             as T
+import           Data.Time.LocalTime   (getZonedTime)
 import           Prelude               hiding (FilePath)
 import           Shelly
 import           System.FilePath.Posix (takeBaseName)
+import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
 
 -- | Tool class.
@@ -102,8 +104,9 @@ noPrint = print_stdout False . print_stderr False
 
 echoP :: Text -> Sh ()
 echoP t = do
-    fn <- pwd
-    echo $ bname fn <> " - " <> t
+    fn          <- pwd
+    currentTime <- liftIO getZonedTime
+    echo $ bname fn <> " [" <> showT currentTime <> "] - " <> t
     where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 logger :: FilePath -> Text -> Sh a -> Sh a
