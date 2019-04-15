@@ -19,6 +19,7 @@ where
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
 newtype Quartus = Quartus { quartusBin :: Maybe FilePath }

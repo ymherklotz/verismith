@@ -14,8 +14,6 @@ module VeriFuzz.Sim.Internal
     ( Tool(..)
     , Simulator(..)
     , Synthesiser(..)
-    , SourceInfo(..)
-    , mainModule
     , rootPath
     , timeout
     , timeout_
@@ -27,7 +25,6 @@ module VeriFuzz.Sim.Internal
     )
 where
 
-import           Control.Lens
 import           Control.Monad         (void)
 import           Data.Bits             (shiftL)
 import           Data.ByteString       (ByteString)
@@ -62,23 +59,6 @@ class (Tool a) => Synthesiser a where
            -> SourceInfo  -- ^ Run information
            -> FilePath -- ^ Output verilog file for the module
            -> Sh ()    -- ^ does not return any values
-
-data SourceInfo = SourceInfo { runMainModule :: {-# UNPACK #-} !Text
-                             , runSource     :: !Verilog
-                             }
-                  deriving (Eq, Show)
-
--- | May need to change this to Traversal to be safe. For now it will fail when
--- the main has not been properly set with.
-mainModule :: Lens' SourceInfo ModDecl
-mainModule = lens get_ set_
-  where
-    set_ (SourceInfo top main) v =
-        SourceInfo top (main & getModule %~ update top v)
-    update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
-                                                    | otherwise = m
-    get_ (SourceInfo top main) = head . filter (f top) $ main ^.. getModule
-    f top (ModDecl (Identifier i) _ _ _ _) = i == top
 
 rootPath :: Sh FilePath
 rootPath = do

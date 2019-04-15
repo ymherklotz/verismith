@@ -22,7 +22,8 @@ Defines the types to build a Verilog AST.
 
 module VeriFuzz.Verilog.AST
     ( -- * Top level types
-      Verilog(..)
+      SourceInfo(..)
+    , Verilog(..)
     -- * Primitives
     -- ** Identifier
     , Identifier(..)
@@ -127,6 +128,7 @@ module VeriFuzz.Verilog.AST
     -- * Useful Lenses and Traversals
     , getModule
     , getSourceId
+    , mainModule
     )
 where
 
@@ -452,6 +454,11 @@ traverseModItem _ e = pure e
 newtype Verilog = Verilog { _getVerilog :: [ModDecl] }
                    deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
 
+data SourceInfo = SourceInfo { runMainModule :: {-# UNPACK #-} !Text
+                             , runSource     :: !Verilog
+                             }
+                  deriving (Eq, Show)
+
 $(makeLenses ''Expr)
 $(makeLenses ''ConstExpr)
 $(makeLenses ''Task)
@@ -480,3 +487,15 @@ getModule = _Wrapped . traverse
 getSourceId :: Traversal' Verilog Text
 getSourceId = getModule . modId . _Wrapped
 {-# INLINE getSourceId #-}
+
+-- | May need to change this to Traversal to be safe. For now it will fail when
+-- the main has not been properly set with.
+mainModule :: Lens' SourceInfo ModDecl
+mainModule = lens get_ set_
+  where
+    set_ (SourceInfo top main) v =
+        SourceInfo top (main & getModule %~ update top v)
+    update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
+                                                    | otherwise = m
+    get_ (SourceInfo top main) = head . filter (f top) $ main ^.. getModule
+    f top (ModDecl (Identifier i) _ _ _ _) = i == top

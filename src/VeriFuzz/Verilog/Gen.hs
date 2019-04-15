@@ -436,10 +436,11 @@ moduleDef top = do
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
-procedural :: Config -> Gen Verilog
-procedural config = do
-    (mainMod, st) <- Hog.resize num
-        $ runReaderT (runStateT (moduleDef (Just "top")) context) config
+procedural :: T.Text -> Config -> Gen Verilog
+procedural top config = do
+    (mainMod, st) <- Hog.resize num $ runReaderT
+        (runStateT (moduleDef (Just $ Identifier top)) context)
+        config
     return . Verilog $ mainMod : st ^. modules
   where
     context =
@@ -447,5 +448,5 @@ procedural config = do
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
-proceduralIO :: Config -> IO Verilog
-proceduralIO = Hog.sample . procedural
+proceduralIO :: T.Text -> Config -> IO Verilog
+proceduralIO t = Hog.sample . procedural t

@@ -28,7 +28,6 @@ import qualified Data.Text               as T
 import qualified Data.Text.IO            as T
 import           Numeric                 (showHex)
 import           VeriFuzz.Internal
-import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 

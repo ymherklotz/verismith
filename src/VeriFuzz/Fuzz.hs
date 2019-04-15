@@ -36,6 +36,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
+import           Hedgehog                         (Gen)
 import           Prelude                          hiding (FilePath)
 import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
@@ -43,6 +44,7 @@ import           VeriFuzz.Sim.Quartus
 import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
+import           VeriFuzz.Verilog.AST
 
 data Result = Pass
             | EquivFail
@@ -112,8 +114,8 @@ synthesisers = lift $ asks getSynthesisers
 simulators :: (Monad m) => Fuzz m [SimTool]
 simulators = lift $ asks getSimulators
 
-fuzz :: (MonadIO m) => Fuzz m FuzzResult
-fuzz = do
+fuzz :: (MonadIO m) => Gen SourceInfo -> Fuzz m FuzzResult
+fuzz _ = do
     _ <- synthesisers
     _ <- simulators
     return mempty

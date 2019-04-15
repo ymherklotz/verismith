@@ -11,7 +11,8 @@ Verilog implementation with random generation and mutations.
 -}
 
 module VeriFuzz.Verilog
-    ( Verilog(..)
+    ( SourceInfo(..)
+    , Verilog(..)
     , parseVerilog
     , procedural
     , proceduralIO

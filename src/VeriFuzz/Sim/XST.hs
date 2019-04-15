@@ -23,6 +23,7 @@ import           Shelly
 import           Text.Shakespeare.Text    (st)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
+import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
 data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath

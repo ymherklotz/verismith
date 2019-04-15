@@ -19,7 +19,6 @@ module VeriFuzz.Sim.Reduce
 where
 
 import           Control.Lens
-import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate

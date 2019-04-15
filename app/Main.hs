@@ -206,7 +206,7 @@ handleOpts (Fuzz out configF force keep) = do
         S.mkdir_p $ S.fromText out
     vars <-
         sequence
-        $   (\x -> myForkIO $ V.runEquivalence (V.procedural config)
+        $   (\x -> myForkIO $ V.runEquivalence (V.procedural "top" config)
                                                ("test_" <> T.pack (show x))
                                                out
                                                keep
@@ -216,7 +216,7 @@ handleOpts (Fuzz out configF force keep) = do
     sequence_ $ takeMVar <$> vars
 handleOpts (Generate f c) = do
     config <- getConfig c
-    source <- V.proceduralIO config
+    source <- V.proceduralIO "top" config
     maybe (T.putStrLn $ V.genSource source)
           (flip T.writeFile (V.genSource source))
           f

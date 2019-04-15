@@ -20,6 +20,7 @@ import           Prelude                  hiding (FilePath)
 import           Shelly
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
+import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
 newtype Vivado = Vivado { vivadoPath :: FilePath }

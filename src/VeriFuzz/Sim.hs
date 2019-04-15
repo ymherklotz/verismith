@@ -11,11 +11,10 @@ Simulator implementations.
 -}
 
 module VeriFuzz.Sim
-    ( -- * Environment
-      SourceInfo(..)
+    (
     -- * Simulators
     -- ** Icarus
-    , Icarus(..)
+      Icarus(..)
     , defaultIcarus
     -- ** Yosys
     , Yosys(..)
