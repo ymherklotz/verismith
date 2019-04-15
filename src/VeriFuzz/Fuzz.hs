@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Env
+Module      : VeriFuzz.Fuzz
 Description : Environment to run the simulator and synthesisers in a matrix.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -22,12 +22,13 @@ Environment to run the simulator and synthesisers in a matrix.
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 
-module VeriFuzz.Sim.Env
+module VeriFuzz.Fuzz
     ( SynthTool(..)
     , SimTool(..)
     , FuzzResult(..)
     , Fuzz
     , fuzz
+    , runFuzz
     )
 where
 
@@ -52,16 +53,20 @@ data Result = Pass
 data SynthTool = XSTSynth {-# UNPACK #-} !XST
                | VivadoSynth {-# UNPACK #-} !Vivado
                | YosysSynth {-# UNPACK #-} !Yosys
-               | QuartusSynth {-# UNPACK #-} !Quartus
+               | QuartusSynth !Quartus
                deriving (Eq, Show)
 
 instance Tool SynthTool where
-    toText (XSTSynth xst)     = toText xst
-    toText (YosysSynth yosys) = toText yosys
+    toText (XSTSynth xst)         = toText xst
+    toText (VivadoSynth vivado)   = toText vivado
+    toText (YosysSynth yosys)     = toText yosys
+    toText (QuartusSynth quartus) = toText quartus
 
 instance Synthesiser SynthTool where
-    runSynth (XSTSynth xst)     = runSynth xst
-    runSynth (YosysSynth yosys) = runSynth yosys
+    runSynth (XSTSynth xst)         = runSynth xst
+    runSynth (VivadoSynth vivado)   = runSynth vivado
+    runSynth (YosysSynth yosys)     = runSynth yosys
+    runSynth (QuartusSynth quartus) = runSynth quartus
 
 newtype SimTool = IcarusSim Icarus
                 deriving (Eq, Show)
@@ -108,6 +113,6 @@ simulators = lift $ asks getSimulators
 
 fuzz :: (MonadIO m) => Fuzz m FuzzResult
 fuzz = do
-    synths <- synthesisers
-    sims <- simulators
+    _ <- synthesisers
+    _ <- simulators
     return mempty
