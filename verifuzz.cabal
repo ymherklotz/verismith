@@ -34,9 +34,9 @@ library
                  , VeriFuzz.Circuit.Internal
                  , VeriFuzz.Circuit.Random
                  , VeriFuzz.Config
+                 , VeriFuzz.Fuzz
                  , VeriFuzz.Internal
                  , VeriFuzz.Sim
-                 , VeriFuzz.Sim.Env
                  , VeriFuzz.Sim.Icarus
                  , VeriFuzz.Sim.Internal
                  , VeriFuzz.Sim.Quartus

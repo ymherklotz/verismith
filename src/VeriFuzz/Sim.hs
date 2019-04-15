@@ -12,7 +12,7 @@ Simulator implementations.
 
 module VeriFuzz.Sim
     ( -- * Environment
-    SourceInfo(..)
+      SourceInfo(..)
     -- * Simulators
     -- ** Icarus
     , Icarus(..)

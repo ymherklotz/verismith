@@ -104,12 +104,12 @@ rotateBitVec b@(BitVec s _) n | n >= 0    = iterate rotateL1 b !! n
     testBits a b' n' = if testBit n' a then bit b' else zeroBits
 
 width' :: Integer -> Int
-width' a | a == 0 = 1
+width' a | a == 0    = 1
          | otherwise = width'' a
-    where
-        width'' a' | a' == 0    = 0
-                   | a' == -1   = 1
-                   | otherwise = 1 + width'' (shiftR a' 1)
+  where
+    width'' a' | a' == 0   = 0
+               | a' == -1  = 1
+               | otherwise = 1 + width'' (shiftR a' 1)
 
 both :: (a -> b) -> (a, a) -> (b, b)
 both f (a, b) = (f a, f b)

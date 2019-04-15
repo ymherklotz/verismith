@@ -20,17 +20,17 @@ module VeriFuzz.Verilog.Gen
     )
 where
 
-import           Control.Lens                   hiding (Context)
-import           Control.Monad                  (replicateM)
-import           Control.Monad.Trans.Class      (lift)
-import           Control.Monad.Trans.Reader     hiding (local)
-import           Control.Monad.Trans.State.Lazy
-import           Data.Foldable                  (fold)
-import           Data.List.NonEmpty             (toList)
-import qualified Data.Text                      as T
-import           Hedgehog                       (Gen)
-import qualified Hedgehog.Gen                   as Hog
-import qualified Hedgehog.Range                 as Hog
+import           Control.Lens                     hiding (Context)
+import           Control.Monad                    (replicateM)
+import           Control.Monad.Trans.Class        (lift)
+import           Control.Monad.Trans.Reader       hiding (local)
+import           Control.Monad.Trans.State.Strict
+import           Data.Foldable                    (fold)
+import           Data.List.NonEmpty               (toList)
+import qualified Data.Text                        as T
+import           Hedgehog                         (Gen)
+import qualified Hedgehog.Gen                     as Hog
+import qualified Hedgehog.Range                   as Hog
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST

@@ -103,7 +103,8 @@ instance Monoid FuzzResult where
 type Fuzz m = StateT FuzzResult (ReaderT FuzzEnv m)
 
 runFuzz :: (Monad m) => [SynthTool] -> [SimTool] -> Fuzz m a -> m a
-runFuzz synth sim m =  runReaderT (evalStateT m (FuzzResult [] [])) (FuzzEnv synth sim)
+runFuzz synth sim m =
+    runReaderT (evalStateT m (FuzzResult [] [])) (FuzzEnv synth sim)
 
 synthesisers :: (Monad m) => Fuzz m [SynthTool]
 synthesisers = lift $ asks getSynthesisers
