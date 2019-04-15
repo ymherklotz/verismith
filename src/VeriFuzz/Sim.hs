@@ -12,11 +12,7 @@ Simulator implementations.
 
 module VeriFuzz.Sim
     ( -- * Environment
-      SynthTool(..)
-    , SimTool(..)
-    , SimEnv(..)
-    , SourceInfo(..)
-    , SynthEnv(..)
+    SourceInfo(..)
     -- * Simulators
     -- ** Icarus
     , Icarus(..)
@@ -42,7 +38,6 @@ module VeriFuzz.Sim
     )
 where
 
-import           VeriFuzz.Sim.Env
 import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Reduce
