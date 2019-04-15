@@ -1,13 +1,13 @@
 {-|
 Module      : VeriFuzz.Sim.Vivado
-Description : Vivado Synthesisor implementation.
+Description : Vivado Synthesiser implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
 Maintainer  : ymherklotz [at] gmail [dot] com
 Stability   : experimental
 Portability : POSIX
 
-Vivado Synthesisor implementation.
+Vivado Synthesiser implementation.
 -}
 
 module VeriFuzz.Sim.Vivado
@@ -28,7 +28,7 @@ newtype Vivado = Vivado { vivadoPath :: FilePath }
 instance Tool Vivado where
     toText _ = "vivado"
 
-instance Synthesisor Vivado where
+instance Synthesiser Vivado where
     runSynth = runSynthVivado
 
 defaultVivado :: Vivado

@@ -13,7 +13,7 @@ Class of the simulator and the synthesize tool.
 module VeriFuzz.Sim.Internal
     ( Tool(..)
     , Simulator(..)
-    , Synthesisor(..)
+    , Synthesiser(..)
     , SourceInfo(..)
     , mainModule
     , rootPath
@@ -56,9 +56,9 @@ class (Tool a) => Simulator a where
                  -> [ByteString]
                  -> Sh ByteString
 
--- | Synthesisor type class.
-class (Tool a) => Synthesisor a where
-  runSynth :: a        -- ^ Synthesisor tool instance
+-- | Synthesiser type class.
+class (Tool a) => Synthesiser a where
+  runSynth :: a        -- ^ Synthesiser tool instance
            -> SourceInfo  -- ^ Run information
            -> FilePath -- ^ Output verilog file for the module
            -> Sh ()    -- ^ does not return any values

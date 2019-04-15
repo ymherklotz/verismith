@@ -35,7 +35,7 @@ newtype Yosys = Yosys { yosysPath :: FilePath }
 instance Tool Yosys where
   toText _ = "yosys"
 
-instance Synthesisor Yosys where
+instance Synthesiser Yosys where
   runSynth = runSynthYosys
 
 defaultYosys :: Yosys
@@ -56,14 +56,14 @@ runSynthYosys sim (SourceInfo _ src) outf = do
     inp  = toTextIgnore inpf
     out  = toTextIgnore outf
 
-runMaybeSynth :: (Synthesisor a) => Maybe a -> SourceInfo -> Sh ()
+runMaybeSynth :: (Synthesiser a) => Maybe a -> SourceInfo -> Sh ()
 runMaybeSynth (Just sim) srcInfo =
     runSynth sim srcInfo $ fromText [st|syn_#{toText sim}.v|]
 runMaybeSynth Nothing (SourceInfo _ src) =
     writefile "syn_rtl.v" $ genSource src
 
 runEquivYosys
-    :: (Synthesisor a, Synthesisor b)
+    :: (Synthesiser a, Synthesiser b)
     => Yosys
     -> a
     -> Maybe b
@@ -82,7 +82,7 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
         fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
 
 runEquiv
-    :: (Synthesisor a, Synthesisor b)
+    :: (Synthesiser a, Synthesiser b)
     => Yosys
     -> a
     -> Maybe b

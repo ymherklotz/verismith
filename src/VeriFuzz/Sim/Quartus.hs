@@ -27,7 +27,7 @@ newtype Quartus = Quartus { quartusBin :: Maybe FilePath }
 instance Tool Quartus where
     toText _ = "quartus"
 
-instance Synthesisor Quartus where
+instance Synthesiser Quartus where
     runSynth = runSynthQuartus
 
 defaultQuartus :: Quartus

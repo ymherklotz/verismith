@@ -33,7 +33,7 @@ data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath
 instance Tool XST where
     toText _ = "xst"
 
-instance Synthesisor XST where
+instance Synthesiser XST where
     runSynth = runSynthXST
 
 defaultXST :: XST
