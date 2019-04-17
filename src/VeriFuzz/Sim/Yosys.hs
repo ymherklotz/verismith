@@ -23,6 +23,7 @@ where
 import           Control.Lens
 import           Prelude                  hiding (FilePath)
 import           Shelly
+import           Shelly.Lifted            (liftSh)
 import           Text.Shakespeare.Text    (st)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
@@ -42,8 +43,8 @@ instance Synthesiser Yosys where
 defaultYosys :: Yosys
 defaultYosys = Yosys "yosys"
 
-runSynthYosys :: Yosys -> SourceInfo -> FilePath -> Sh ()
-runSynthYosys sim (SourceInfo _ src) outf = do
+runSynthYosys :: Yosys -> SourceInfo -> FilePath -> ResultSh ()
+runSynthYosys sim (SourceInfo _ src) outf = (<?> SynthFail) . liftSh $ do
     dir <- pwd
     writefile inpf $ genSource src
     echoP "Yosys: synthesis"
@@ -57,11 +58,11 @@ runSynthYosys sim (SourceInfo _ src) outf = do
     inp  = toTextIgnore inpf
     out  = toTextIgnore outf
 
-runMaybeSynth :: (Synthesiser a) => Maybe a -> SourceInfo -> Sh ()
+runMaybeSynth :: (Synthesiser a) => Maybe a -> SourceInfo -> ResultSh ()
 runMaybeSynth (Just sim) srcInfo =
     runSynth sim srcInfo $ fromText [st|syn_#{toText sim}.v|]
 runMaybeSynth Nothing (SourceInfo _ src) =
-    writefile "syn_rtl.v" $ genSource src
+    liftSh . writefile "syn_rtl.v" $ genSource src
 
 runEquivYosys
     :: (Synthesiser a, Synthesiser b)
@@ -69,15 +70,22 @@ runEquivYosys
     -> a
     -> Maybe b
     -> SourceInfo
-    -> Sh ()
+    -> ResultSh ()
 runEquivYosys yosys sim1 sim2 srcInfo = do
-    writefile "top.v" . genSource . initMod . makeTop 2 $ srcInfo ^. mainModule
-    writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
+    liftSh $ do
+        writefile "top.v"
+            .  genSource
+            .  initMod
+            .  makeTop 2
+            $  srcInfo
+            ^. mainModule
+        writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
     runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
     runMaybeSynth sim2 srcInfo
-    echoP "Yosys: equivalence check"
-    run_ (yosysPath yosys) [toTextIgnore checkFile]
-    echoP "Yosys: equivalence done"
+    liftSh $ do
+        echoP "Yosys: equivalence check"
+        run_ (yosysPath yosys) [toTextIgnore checkFile]
+        echoP "Yosys: equivalence done"
   where
     checkFile =
         fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
@@ -88,20 +96,21 @@ runEquiv
     -> a
     -> Maybe b
     -> SourceInfo
-    -> Sh ()
+    -> ResultSh ()
 runEquiv _ sim1 sim2 srcInfo = do
-    root <- rootPath
-    dir  <- pwd
-    echoP "SymbiYosys: setup"
-    writefile "top.v"
-        .  genSource
-        .  initMod
-        .  makeTopAssert
-        $  srcInfo
-        ^. mainModule
-    writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
+    root <- liftSh rootPath
+    dir  <- liftSh pwd
+    liftSh $ do
+        echoP "SymbiYosys: setup"
+        writefile "top.v"
+            .  genSource
+            .  initMod
+            .  makeTopAssert
+            $  srcInfo
+            ^. mainModule
+        writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
     runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
     runMaybeSynth sim2 srcInfo
-    echoP "SymbiYosys: run"
-    logger_ dir "symbiyosys" $ run "sby" ["-f", "test.sby"]
-    echoP "SymbiYosys: done"
+    liftSh $ echoP "SymbiYosys: run"
+    execute_ EquivFail dir "symbiyosys" "sby" ["-f", "test.sby"]
+    liftSh $ echoP "SymbiYosys: done"

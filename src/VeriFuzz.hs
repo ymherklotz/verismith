@@ -36,9 +36,13 @@ import           Hedgehog                 (Gen)
 import qualified Hedgehog.Gen             as Hog
 import           Prelude                  hiding (FilePath)
 import           Shelly
+import           Shelly.Lifted            (liftSh)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
+import           VeriFuzz.Reduce
+import           VeriFuzz.Result
 import           VeriFuzz.Sim
+import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog
 
 -- | Generate a specific number of random bytestrings of size 256.
@@ -81,23 +85,27 @@ runSimulation = do
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
     rand  <- generateByteString 20
     rand2 <- Hog.sample (randomMod 10 100)
-    val   <- shelly $ runSim defaultIcarus (makeSrcInfo rand2) rand
-    T.putStrLn $ showBS val
+    val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
+    case val of
+        Pass a -> T.putStrLn $ showBS a
+        _      -> T.putStrLn "Test failed"
 
 
 -- | Code to be executed on a failure. Also checks if the failure was a timeout,
 -- as the timeout command will return the 124 error code if that was the
 -- case. In that case, the error will be moved to a different directory.
-onFailure :: Text -> RunFailed -> Sh ()
+onFailure :: Text -> RunFailed -> Sh (Result Failed ())
 onFailure t _ = do
     ex <- lastExitCode
     case ex of
         124 -> do
             echoP "Test TIMEOUT"
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
+            return $ Fail EmptyFail
         _ -> do
             echoP "Test FAIL"
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
+            return $ Fail EmptyFail
 
 checkEquivalence :: SourceInfo -> Text -> IO Bool
 checkEquivalence src dir = shellyFailDir $ do
@@ -106,7 +114,7 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText dir)
     catch_sh
-        (  runEquiv defaultYosys defaultYosys (Just defaultVivado) src
+        (  (runResultT $ runEquiv defaultYosys defaultYosys (Just defaultVivado) src)
         >> return True
         )
         ((\_ -> return False) :: RunFailed -> Sh Bool)
@@ -130,13 +138,13 @@ runEquivalence gm t d k i = do
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
         catch_sh
-                (runEquiv defaultYosys defaultYosys (Just defaultVivado) srcInfo
-                >> echoP "Test OK"
+                (runResultT $ runEquiv defaultYosys defaultYosys (Just defaultVivado) srcInfo
+                >> liftSh (echoP "Test OK")
                 )
             $ onFailure n
         catch_sh
-                (   runSim (Icarus "iverilog" "vvp") srcInfo rand
-                >>= (\b -> echoP ("RTL Sim: " <> showBS b))
+                (runResultT $ runSim (Icarus "iverilog" "vvp") srcInfo rand
+                >>= (\b -> liftSh $ echoP ("RTL Sim: " <> showBS b))
                 )
             $ onFailure n
         cd ".."

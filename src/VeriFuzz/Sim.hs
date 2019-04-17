@@ -25,8 +25,6 @@ module VeriFuzz.Sim
     -- ** XST
     , XST(..)
     , defaultXST
-    -- * Reducer
-    , reduce
     -- * Equivalence
     , runEquiv
     -- * Simulation
@@ -39,7 +37,6 @@ where
 
 import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Reduce
 import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
