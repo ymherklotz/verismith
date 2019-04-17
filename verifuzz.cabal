@@ -25,7 +25,7 @@ custom-setup
 library
   hs-source-dirs: src
   default-language: Haskell2010
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall 
   build-tools: alex >=3 && <4
   exposed-modules: VeriFuzz
                  , VeriFuzz.Circuit
@@ -36,11 +36,12 @@ library
                  , VeriFuzz.Config
                  , VeriFuzz.Fuzz
                  , VeriFuzz.Internal
+                 , VeriFuzz.Reduce
+                 , VeriFuzz.Result
                  , VeriFuzz.Sim
                  , VeriFuzz.Sim.Icarus
                  , VeriFuzz.Sim.Internal
                  , VeriFuzz.Sim.Quartus
-                 , VeriFuzz.Sim.Reduce
                  , VeriFuzz.Sim.Template
                  , VeriFuzz.Sim.Vivado
                  , VeriFuzz.Sim.XST
@@ -99,7 +100,7 @@ test-suite verifuzz-test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Test.hs
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall
   other-modules: Unit
                , Property
   build-depends: base >=4 && <5
@@ -109,6 +110,7 @@ test-suite verifuzz-test
                , tasty-hunit >=0.10 && <0.11
                , tasty-hedgehog >=0.2 && <0.3
                , hedgehog >=0.6 && <0.7
+               , hedgehog-fn >=0.6 && <0.7
                , lens >=4.17 && <4.18
                , text >=1.2 && <1.3
                , parsec >= 3.1 && < 3.2

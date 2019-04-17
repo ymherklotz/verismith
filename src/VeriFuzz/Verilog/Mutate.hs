@@ -108,7 +108,7 @@ allVars m =
 
 -- $setup
 -- >>> import VeriFuzz.Verilog.CodeGen
--- >>> let m = (ModDecl (Identifier "m") [Port Wire False 0 5 (Identifier "y")] [Port Wire False 0 5 "x"] [] [])
+-- >>> let m = (ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [] [])
 -- >>> let main = (ModDecl "main" [] [] [] [])
 
 -- | Add a Module Instantiation using 'ModInst' from the first module passed to
@@ -117,8 +117,8 @@ allVars m =
 --
 -- >>> render $ instantiateMod m main
 -- module main;
--- wire [4:0] y;
--- reg [4:0] x;
+-- wire [(3'h4):(1'h0)] y;
+-- reg [(3'h4):(1'h0)] x;
 -- m m1(y, x);
 -- endmodule
 -- <BLANKLINE>
@@ -179,8 +179,8 @@ filterChar t ids =
 --
 -- >>> GenVerilog $ initMod m
 -- module m(y, x);
--- output wire [4:0] y;
--- input wire [4:0] x;
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 initMod :: ModDecl -> ModDecl
