@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Reduce
+Module      : VeriFuzz.Reduce
 Description : Test case reducer implementation.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -13,7 +13,7 @@ Test case reducer implementation.
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module VeriFuzz.Sim.Reduce
+module VeriFuzz.Reduce
     ( reduce
     )
 where
