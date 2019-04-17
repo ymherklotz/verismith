@@ -69,33 +69,29 @@ type GenFunctor f a b c =
     )
 
 mapCompose
-  :: forall f a b c
-   . GenFunctor f a b c
-  => (forall x. Gen x -> Gen (f x))
-  -> Gen a
-  -> Gen b
-  -> Gen c
-  -> Property
-mapCompose genF genA genB genC =
-    Hog.property $ do
-        g <- Hog.forAllFn $ Hog.fn @a genB
-        f <- Hog.forAllFn $ Hog.fn @b genC
-        xs <- Hog.forAll $ genF genA
-        fmap (f . g) xs === fmap f (fmap g xs)
+    :: forall f a b c
+     . GenFunctor f a b c
+    => (forall x . Gen x -> Gen (f x))
+    -> Gen a
+    -> Gen b
+    -> Gen c
+    -> Property
+mapCompose genF genA genB genC = Hog.property $ do
+    g  <- Hog.forAllFn $ Hog.fn @a genB
+    f  <- Hog.forAllFn $ Hog.fn @b genC
+    xs <- Hog.forAll $ genF genA
+    fmap (f . g) xs === fmap f (fmap g xs)
 
 propertyResultInterrupted :: Property
 propertyResultInterrupted = do
-    mapCompose
-        genResult
-        (Hog.int (Hog.linear 0 100))
-        (Hog.int (Hog.linear 0 100))
-        (Hog.int (Hog.linear 0 100))
-    where
-        genResult :: Gen a -> Gen (Result Text a)
-        genResult a = Hog.choice
-                      [ Pass <$> a
-                      , Fail <$> Hog.text (Hog.linear 1 100) Hog.unicode
-                      ]
+    mapCompose genResult
+               (Hog.int (Hog.linear 0 100))
+               (Hog.int (Hog.linear 0 100))
+               (Hog.int (Hog.linear 0 100))
+  where
+    genResult :: Gen a -> Gen (Result Text a)
+    genResult a = Hog.choice
+        [Pass <$> a, Fail <$> Hog.text (Hog.linear 1 100) Hog.unicode]
 
 propertyTests :: TestTree
 propertyTests = testGroup
@@ -103,5 +99,5 @@ propertyTests = testGroup
     [ testProperty "simple graph generation check" simpleGraph
 --    , testProperty "parser input"                  parserInput
 --    , testProperty "parser idempotence"            parserIdempotent
-    , testProperty "fmap for Result" propertyResultInterrupted
+    , testProperty "fmap for Result"               propertyResultInterrupted
     ]
