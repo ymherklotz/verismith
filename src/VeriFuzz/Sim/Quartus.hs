@@ -24,7 +24,10 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
 newtype Quartus = Quartus { quartusBin :: Maybe FilePath }
-                deriving (Eq, Show)
+                deriving (Eq)
+
+instance Show Quartus where
+    show _ = "quartus"
 
 instance Tool Quartus where
     toText _ = "quartus"
@@ -42,8 +45,9 @@ runSynthQuartus sim (SourceInfo top src) outf = do
     liftSh $ do
         writefile inpf $ genSource src
         echoP "Running Quartus synthesis"
-    ex (exec "quartus_map") [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
-    ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F27C6"]
+    ex (exec "quartus_map")
+       [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
+    ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
     ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
     liftSh $ do
         cp (fromText "simulation/vcs" </> fromText top <.> "vo") outf

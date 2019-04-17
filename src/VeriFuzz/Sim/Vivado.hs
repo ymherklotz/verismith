@@ -25,7 +25,10 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
 newtype Vivado = Vivado { vivadoPath :: FilePath }
-               deriving (Eq, Show)
+               deriving (Eq)
+
+instance Show Vivado where
+    show _ = "vivado"
 
 instance Tool Vivado where
     toText _ = "vivado"

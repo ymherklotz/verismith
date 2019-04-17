@@ -45,7 +45,10 @@ import           VeriFuzz.Verilog.Mutate
 data Icarus = Icarus { icarusPath :: FilePath
                      , vvpPath    :: FilePath
                      }
-              deriving (Eq, Show)
+              deriving (Eq)
+
+instance Show Icarus where
+    show _ = "show"
 
 instance Tool Icarus where
   toText _ = "iverilog"
@@ -106,7 +109,8 @@ runSimIcarus sim rinfo bss = do
     annotate SimFail $ runSimWithFile sim "main.v" bss
     where m = rinfo ^. mainModule
 
-runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> ResultSh ByteString
+runSimIcarusWithFile
+    :: Icarus -> FilePath -> [ByteString] -> ResultSh ByteString
 runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
     dir <- pwd
     echoP "Icarus: Compile"

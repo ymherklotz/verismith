@@ -32,13 +32,16 @@ import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 
 newtype Yosys = Yosys { yosysPath :: FilePath }
-              deriving (Eq, Show)
+              deriving (Eq)
 
 instance Tool Yosys where
   toText _ = "yosys"
 
 instance Synthesiser Yosys where
   runSynth = runSynthYosys
+
+instance Show Yosys where
+    show _ = "yosys"
 
 defaultYosys :: Yosys
 defaultYosys = Yosys "yosys"

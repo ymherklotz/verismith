@@ -30,7 +30,10 @@ import           VeriFuzz.Verilog.CodeGen
 data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath
                , netgenPath :: {-# UNPACK #-} !FilePath
                }
-         deriving (Eq, Show)
+         deriving (Eq)
+
+instance Show XST where
+    show _ = "xst"
 
 instance Tool XST where
     toText _ = "xst"
