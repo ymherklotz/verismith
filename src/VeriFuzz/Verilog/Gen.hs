@@ -16,6 +16,8 @@ module VeriFuzz.Verilog.Gen
     ( -- * Generation methods
       procedural
     , proceduralIO
+    , proceduralSrc
+    , proceduralSrcIO
     , randomMod
     )
 where
@@ -104,7 +106,7 @@ largeNum :: Gen Int
 largeNum = Hog.int Hog.linearBounded
 
 wireSize :: Gen Int
-wireSize = Hog.int $ Hog.linear 2 200
+wireSize = Hog.int $ Hog.linear 2 100
 
 range :: Gen Range
 range = Range <$> fmap fromIntegral wireSize <*> pure 0
@@ -450,3 +452,9 @@ procedural top config = do
 
 proceduralIO :: T.Text -> Config -> IO Verilog
 proceduralIO t = Hog.sample . procedural t
+
+proceduralSrc :: T.Text -> Config -> Gen SourceInfo
+proceduralSrc t c = SourceInfo t <$> procedural t c
+
+proceduralSrcIO :: T.Text -> Config -> IO SourceInfo
+proceduralSrcIO t c = SourceInfo t <$> proceduralIO t c
