@@ -34,6 +34,7 @@ import qualified Data.Text                 as T
 import           Numeric                   (readInt)
 import           Prelude                   hiding (FilePath)
 import           Shelly
+import           Shelly.Lifted             (liftSh)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
@@ -88,7 +89,7 @@ mask = T.replace "x" "0"
 callback :: ByteString -> Text -> ByteString
 callback b t = b <> convert (mask t)
 
-runSimIcarus :: Icarus -> SourceInfo -> [ByteString] -> Sh ByteString
+runSimIcarus :: Icarus -> SourceInfo -> [ByteString] -> ResultSh ByteString
 runSimIcarus sim rinfo bss = do
     let tb = ModDecl
             "main"
@@ -101,12 +102,12 @@ runSimIcarus sim rinfo bss = do
             []
     let newtb     = instantiateMod m tb
     let modWithTb = Verilog [newtb, m]
-    writefile "main.v" $ genSource modWithTb
-    runSimWithFile sim "main.v" bss
+    liftSh . writefile "main.v" $ genSource modWithTb
+    annotate SimFail $ runSimWithFile sim "main.v" bss
     where m = rinfo ^. mainModule
 
-runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> Sh ByteString
-runSimIcarusWithFile sim f _ = do
+runSimIcarusWithFile :: Icarus -> FilePath -> [ByteString] -> ResultSh ByteString
+runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
     dir <- pwd
     echoP "Icarus: Compile"
     logger_ dir "icarus" $ run (icarusPath sim) ["-o", "main", toTextIgnore f]

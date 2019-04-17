@@ -18,6 +18,7 @@ where
 
 import           Prelude                  hiding (FilePath)
 import           Shelly
+import           Shelly.Lifted            (liftSh)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
@@ -35,16 +36,18 @@ instance Synthesiser Vivado where
 defaultVivado :: Vivado
 defaultVivado = Vivado "vivado"
 
-runSynthVivado :: Vivado -> SourceInfo -> FilePath -> Sh ()
+runSynthVivado :: Vivado -> SourceInfo -> FilePath -> ResultSh ()
 runSynthVivado sim (SourceInfo top src) outf = do
-    dir <- pwd
-    writefile vivadoTcl . vivadoSynthConfig top $ toTextIgnore outf
-    writefile "rtl.v" $ genSource src
-    run_ "sed" ["s/^module/(* use_dsp48=\"no\" *) module/;", "-i", "rtl.v"]
-    echoP "Vivado: run"
-    logger_ dir "vivado"
-        $ timeout
-              (vivadoPath sim)
-              ["-mode", "batch", "-source", toTextIgnore vivadoTcl]
-    echoP "Vivado: done"
+    dir <- liftSh pwd
+    liftSh $ do
+        writefile vivadoTcl . vivadoSynthConfig top $ toTextIgnore outf
+        writefile "rtl.v" $ genSource src
+        run_ "sed" ["s/^module/(* use_dsp48=\"no\" *) module/;", "-i", "rtl.v"]
+        echoP "Vivado: run"
+    execute_ SynthFail
+             dir
+             "vivado"
+             (vivadoPath sim)
+             ["-mode", "batch", "-source", toTextIgnore vivadoTcl]
+    liftSh $ echoP "Vivado: done"
     where vivadoTcl = fromText ("vivado_" <> top) <.> "tcl"

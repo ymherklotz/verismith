@@ -18,6 +18,7 @@ where
 
 import           Prelude                  hiding (FilePath)
 import           Shelly
+import           Shelly.Lifted            (liftSh)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
@@ -34,20 +35,19 @@ instance Synthesiser Quartus where
 defaultQuartus :: Quartus
 defaultQuartus = Quartus Nothing
 
-runSynthQuartus :: Quartus -> SourceInfo -> FilePath -> Sh ()
+runSynthQuartus :: Quartus -> SourceInfo -> FilePath -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) outf = do
-    dir <- pwd
-    writefile inpf $ genSource src
-    echoP "Running Quartus synthesis"
-    logger_ dir "quartus" $ timeout
-        (exec "quartus_map")
-        [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
-    logger_ dir "quartus"
-        $ timeout (exec "quartus_fit") [top, "--part=5CGXFC7D6F27C6"]
-    logger_ dir "quartus"
-        $ timeout (exec "quartus_eda") [top, "--simulation", "--tool=vcs"] -- --formal_verification --tool=conformal
-    cp (fromText "simulation/vcs" </> fromText top <.> "vo") outf
-    echoP "Quartus synthesis done"
+    dir <- liftSh pwd
+    let ex = execute_ SynthFail dir "quartus"
+    liftSh $ do
+        writefile inpf $ genSource src
+        echoP "Running Quartus synthesis"
+    ex (exec "quartus_map") [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
+    ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F27C6"]
+    ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
+    liftSh $ do
+        cp (fromText "simulation/vcs" </> fromText top <.> "vo") outf
+        echoP "Quartus synthesis done"
   where
     inpf = "rtl.v"
     exec s = maybe (fromText s) (</> fromText s) $ quartusBin sim

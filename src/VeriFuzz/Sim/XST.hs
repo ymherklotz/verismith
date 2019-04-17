@@ -20,6 +20,7 @@ where
 
 import           Prelude                  hiding (FilePath)
 import           Shelly
+import           Shelly.Lifted            (liftSh)
 import           Text.Shakespeare.Text    (st)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
@@ -40,16 +41,18 @@ instance Synthesiser XST where
 defaultXST :: XST
 defaultXST = XST "xst" "netgen"
 
-runSynthXST :: XST -> SourceInfo -> FilePath -> Sh ()
+runSynthXST :: XST -> SourceInfo -> FilePath -> ResultSh ()
 runSynthXST sim (SourceInfo top src) outf = do
-    dir <- pwd
-    writefile xstFile $ xstSynthConfig top
-    writefile prjFile [st|verilog work "rtl.v"|]
-    writefile "rtl.v" $ genSource src
-    echoP "XST: run"
-    logger_ dir "xst" $ timeout (xstPath sim) ["-ifn", toTextIgnore xstFile]
-    echoP "XST: netgen"
-    logger_ dir "netgen" $ run
+    dir <- liftSh pwd
+    let exec = execute_ SynthFail dir "xst"
+    liftSh $ do
+        writefile xstFile $ xstSynthConfig top
+        writefile prjFile [st|verilog work "rtl.v"|]
+        writefile "rtl.v" $ genSource src
+        echoP "XST: run"
+    exec (xstPath sim) ["-ifn", toTextIgnore xstFile]
+    liftSh $ echoP "XST: netgen"
+    exec
         (netgenPath sim)
         [ "-w"
         , "-ofmt"
@@ -57,14 +60,15 @@ runSynthXST sim (SourceInfo top src) outf = do
         , toTextIgnore $ modFile <.> "ngc"
         , toTextIgnore outf
         ]
-    echoP "XST: clean"
-    noPrint $ run_
-        "sed"
-        [ "-i"
-        , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
-        , toTextIgnore outf
-        ]
-    echoP "XST: done"
+    liftSh $ do
+        echoP "XST: clean"
+        noPrint $ run_
+            "sed"
+            [ "-i"
+            , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
+            , toTextIgnore outf
+            ]
+        echoP "XST: done"
   where
     modFile = fromText $ "xst_" <> top
     xstFile = modFile <.> "xst"
