@@ -18,6 +18,7 @@ module VeriFuzz
     , module VeriFuzz.Config
     , module VeriFuzz.Circuit
     , module VeriFuzz.Sim
+    , module VeriFuzz.Fuzz
     )
 where
 
@@ -39,6 +40,7 @@ import           Shelly
 import           Shelly.Lifted            (liftSh)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
+import           VeriFuzz.Fuzz
 import           VeriFuzz.Reduce
 import           VeriFuzz.Result
 import           VeriFuzz.Sim
@@ -114,7 +116,9 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText dir)
     catch_sh
-        (  (runResultT $ runEquiv defaultYosys defaultYosys (Just defaultVivado) src)
+        (  ( runResultT
+           $ runEquiv defaultYosys defaultYosys (Just defaultVivado) src
+           )
         >> return True
         )
         ((\_ -> return False) :: RunFailed -> Sh Bool)
@@ -137,16 +141,23 @@ runEquivalence gm t d k i = do
         curr <- toTextIgnore <$> pwd
         setenv "VERIFUZZ_ROOT" curr
         cd (fromText "output" </> fromText n)
-        catch_sh
-                (runResultT $ runEquiv defaultYosys defaultYosys (Just defaultVivado) srcInfo
-                >> liftSh (echoP "Test OK")
-                )
-            $ onFailure n
-        catch_sh
-                (runResultT $ runSim (Icarus "iverilog" "vvp") srcInfo rand
-                >>= (\b -> liftSh $ echoP ("RTL Sim: " <> showBS b))
-                )
-            $ onFailure n
+        _ <-
+            catch_sh
+                    (  runResultT
+                    $  runEquiv defaultYosys
+                                defaultYosys
+                                (Just defaultVivado)
+                                srcInfo
+                    >> liftSh (echoP "Test OK")
+                    )
+                $ onFailure n
+        _ <-
+            catch_sh
+                    (   runResultT
+                    $   runSim (Icarus "iverilog" "vvp") srcInfo rand
+                    >>= (\b -> liftSh $ echoP ("RTL Sim: " <> showBS b))
+                    )
+                $ onFailure n
         cd ".."
         unless k . rm_rf $ fromText n
     when (i < 5) (runEquivalence gm t d k $ i + 1)

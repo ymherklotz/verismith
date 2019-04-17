@@ -25,6 +25,9 @@ module VeriFuzz.Sim
     -- ** XST
     , XST(..)
     , defaultXST
+    -- ** Quartus
+    , Quartus(..)
+    , defaultQuartus
     -- * Equivalence
     , runEquiv
     -- * Simulation
@@ -37,6 +40,7 @@ where
 
 import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Sim.Quartus
 import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys

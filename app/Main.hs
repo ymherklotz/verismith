@@ -1,7 +1,6 @@
 module Main where
 
 import           Control.Concurrent
-import           Control.Monad       (when)
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import qualified Data.Text.IO        as T
@@ -198,22 +197,14 @@ getConfig :: Maybe FilePath -> IO V.Config
 getConfig = maybe (return V.defaultConfig) V.parseConfigFile
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz out configF force keep) = do
-    num    <- getNumCapabilities
+handleOpts (Fuzz _ configF _ _) = do
     config <- getConfig configF
-    S.shellyFailDir $ do
-        when force . S.rm_rf $ S.fromText out
-        S.mkdir_p $ S.fromText out
-    vars <-
-        sequence
-        $   (\x -> myForkIO $ V.runEquivalence (V.procedural "top" config)
-                                               ("test_" <> T.pack (show x))
-                                               out
-                                               keep
-                                               0
-            )
-        <$> [1 .. num]
-    sequence_ $ takeMVar <$> vars
+    _      <- V.runFuzz
+        [V.defaultYosysSynth, V.defaultVivadoSynth, V.defaultQuartusSynth]
+        []
+        V.defaultYosys
+        (V.fuzz (V.proceduralSrc "top" config))
+    return ()
 handleOpts (Generate f c) = do
     config <- getConfig c
     source <- V.proceduralIO "top" config
