@@ -10,18 +10,6 @@ Portability : POSIX
 Environment to run the simulator and synthesisers in a matrix.
 -}
 
-{-# LANGUAGE AllowAmbiguousTypes    #-}
-{-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE LambdaCase             #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TupleSections          #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
-
 module VeriFuzz.Fuzz
     ( SynthTool(..)
     , SimTool(..)
@@ -36,8 +24,10 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
+import           Data.List                        (nubBy)
 import           Hedgehog                         (Gen)
 import           Prelude                          hiding (FilePath)
+import           VeriFuzz.Result
 import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Quartus
@@ -45,12 +35,6 @@ import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
 import           VeriFuzz.Verilog.AST
-
-data Result = Pass
-            | EquivFail
-            | SimFail
-            | TimeoutFail
-            deriving (Eq, Show)
 
 data SynthTool = XSTSynth {-# UNPACK #-} !XST
                | VivadoSynth {-# UNPACK #-} !Vivado
@@ -85,37 +69,44 @@ data FuzzEnv = FuzzEnv { getSynthesisers :: ![SynthTool]
                        }
                deriving (Eq, Show)
 
-data SimResult = SimResult !SynthTool !SimTool !Result
-               deriving (Eq, Show)
-
-data SynthResult = SynthResult !SynthTool !SynthTool !Result
+data SimResult a = SimResult !SynthTool !SimTool !(Result Failed a)
                  deriving (Eq, Show)
 
-data FuzzResult = FuzzResult { getSynthResults :: ![SynthResult]
-                             , getSimResults   :: ![SimResult]
-                             }
-                deriving (Eq, Show)
+data SynthResult a = SynthResult !SynthTool !SynthTool !(Result Failed a)
+                   deriving (Eq, Show)
 
-instance Semigroup FuzzResult where
+data FuzzResult a = FuzzResult { getSynthResults :: ![SynthResult a]
+                               , getSimResults   :: ![SimResult a]
+                               }
+                  deriving (Eq, Show)
+
+instance Semigroup (FuzzResult a) where
     FuzzResult a1 b1 <> FuzzResult a2 b2 = FuzzResult (a1 <> a2) (b1 <> b2)
 
-instance Monoid FuzzResult where
+instance Monoid (FuzzResult a) where
     mempty = FuzzResult [] []
 
-type Fuzz m = StateT FuzzResult (ReaderT FuzzEnv m)
+type Fuzz a m = StateT (FuzzResult a) (ReaderT FuzzEnv m)
 
-runFuzz :: (Monad m) => [SynthTool] -> [SimTool] -> Fuzz m a -> m a
+runFuzz :: (Monad m) => [SynthTool] -> [SimTool] -> Fuzz a m b -> m b
 runFuzz synth sim m =
     runReaderT (evalStateT m (FuzzResult [] [])) (FuzzEnv synth sim)
 
-synthesisers :: (Monad m) => Fuzz m [SynthTool]
+synthesisers :: (Monad m) => Fuzz () m [SynthTool]
 synthesisers = lift $ asks getSynthesisers
 
-simulators :: (Monad m) => Fuzz m [SimTool]
+simulators :: (Monad m) => Fuzz () m [SimTool]
 simulators = lift $ asks getSimulators
 
-fuzz :: (MonadIO m) => Gen SourceInfo -> Fuzz m FuzzResult
+combinations :: [a] -> [b] -> [(a, b)]
+combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
+
+fuzz :: (MonadIO m) => Gen SourceInfo -> Fuzz () m (FuzzResult ())
 fuzz _ = do
-    _ <- synthesisers
-    _ <- simulators
+    synth <- synthesisers
+    sim   <- simulators
+    let synthComb =
+            nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
+    let simComb = combinations synth sim
     return mempty
+    where tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
