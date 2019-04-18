@@ -42,13 +42,13 @@ instance Tool XST where
 instance Synthesiser XST where
     runSynth = runSynthXST
     synthOutput = xstOutput
-    setSynthOutput (XST a b _) f = XST a b f
+    setSynthOutput (XST a b _) = XST a b
 
 defaultXST :: XST
-defaultXST = XST "xst" "netgen" "xst/syn_xst.v"
+defaultXST = XST "xst" "netgen" "syn_xst.v"
 
-runSynthXST :: XST -> SourceInfo -> FilePath -> ResultSh ()
-runSynthXST sim (SourceInfo top src) outf = do
+runSynthXST :: XST -> SourceInfo -> ResultSh ()
+runSynthXST sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let exec = execute_ SynthFail dir "xst"
     liftSh $ do
@@ -64,7 +64,7 @@ runSynthXST sim (SourceInfo top src) outf = do
         , "-ofmt"
         , "verilog"
         , toTextIgnore $ modFile <.> "ngc"
-        , toTextIgnore outf
+        , toTextIgnore $ synthOutput sim
         ]
     liftSh $ do
         echoP "XST: clean"
@@ -72,7 +72,7 @@ runSynthXST sim (SourceInfo top src) outf = do
             "sed"
             [ "-i"
             , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
-            , toTextIgnore outf
+            , toTextIgnore $ synthOutput sim
             ]
         echoP "XST: done"
   where

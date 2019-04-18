@@ -43,16 +43,18 @@ doubleName :: Text -> Text
 doubleName n = n <> " " <> n
 {-# INLINE doubleName #-}
 
+outputText :: Synthesiser a => a -> Text
+outputText = toTextIgnore . synthOutput
+
 -- brittany-disable-next-binding
-yosysSatConfig :: (Tool a, Tool b) => a -> Maybe b -> SourceInfo -> Text
-yosysSatConfig sim1 sim2 (SourceInfo top src) = [st|read_verilog syn_#{toText sim1}.v
+yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> Maybe b -> SourceInfo -> Text
+yosysSatConfig sim1 sim2 (SourceInfo top src) = [st|read_verilog #{outputText sim1}
 #{rename "_1" mis}
 read_verilog syn_#{idSim2}.v
 #{rename "_2" mis}
 read_verilog #{top}.v
 proc; opt_clean
 flatten #{top}
-! touch test.#{toText sim1}.#{idSim2}.input_ok
 sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{top}
 |]
   where
@@ -86,7 +88,7 @@ write_verilog -force #{outf}
 |]
 
 -- brittany-disable-next-binding
-sbyConfig :: (Tool a, Tool b) => FilePath -> a -> Maybe b -> SourceInfo -> Text
+sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> Maybe b -> SourceInfo -> Text
 sbyConfig bd sim1 sim2 (SourceInfo top src) = [st|[options]
 mode prove
 
@@ -95,17 +97,17 @@ smtbmc z3
 
 [script]
 #{readL}
-read -formal syn_#{toText sim1}.v
+read -formal #{outputText sim1}
 #{rename "_1" mis}
-read -formal syn_#{maybe "rtl" toText sim2}.v
+read -formal #{maybe "rtl.v" outputText sim2}
 #{rename "_2" mis}
 read -formal top.v
 prep -top #{top}
 
 [files]
 #{depList}
-syn_#{maybe "rtl" toText sim2}.v
-syn_#{toText sim1}.v
+#{maybe "rtl.v" outputText sim2}
+#{outputText sim1}
 top.v
 |]
   where

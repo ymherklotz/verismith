@@ -42,16 +42,16 @@ instance Tool Yosys where
 instance Synthesiser Yosys where
   runSynth = runSynthYosys
   synthOutput = yosysOutput
-  setSynthOutput (Yosys a _) f = Yosys a f
+  setSynthOutput (Yosys a _) = Yosys a
 
 instance Show Yosys where
     show _ = "yosys"
 
 defaultYosys :: Yosys
-defaultYosys = Yosys "yosys" "yosys/syn_yosys.v"
+defaultYosys = Yosys "yosys" "syn_yosys.v"
 
-runSynthYosys :: Yosys -> SourceInfo -> FilePath -> ResultSh ()
-runSynthYosys sim (SourceInfo _ src) outf = (<?> SynthFail) . liftSh $ do
+runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
+runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
     dir <- pwd
     writefile inpf $ genSource src
     echoP "Yosys: synthesis"
@@ -63,13 +63,13 @@ runSynthYosys sim (SourceInfo _ src) outf = (<?> SynthFail) . liftSh $ do
   where
     inpf = "rtl.v"
     inp  = toTextIgnore inpf
-    out  = toTextIgnore outf
+    out  = toTextIgnore $ synthOutput sim
 
 runMaybeSynth :: (Synthesiser a) => Maybe a -> SourceInfo -> ResultSh ()
 runMaybeSynth (Just sim) srcInfo =
-    runSynth sim srcInfo $ fromText [st|syn_#{toText sim}.v|]
+    runSynth sim srcInfo
 runMaybeSynth Nothing (SourceInfo _ src) =
-    liftSh . writefile "syn_rtl.v" $ genSource src
+    liftSh . writefile "rtl.v" $ genSource src
 
 runEquivYosys
     :: (Synthesiser a, Synthesiser b)
@@ -87,7 +87,7 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
             $  srcInfo
             ^. mainModule
         writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
-    runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
+    runSynth sim1 srcInfo
     runMaybeSynth sim2 srcInfo
     liftSh $ do
         echoP "Yosys: equivalence check"
@@ -108,7 +108,6 @@ runEquiv _ sim1 sim2 srcInfo = do
     root <- liftSh rootPath
     dir  <- liftSh pwd
     liftSh $ do
-        echoP "SymbiYosys: setup"
         writefile "top.v"
             .  genSource
             .  initMod
@@ -116,6 +115,6 @@ runEquiv _ sim1 sim2 srcInfo = do
             $  srcInfo
             ^. mainModule
         writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
-    liftSh $ echoP "SymbiYosys: run"
+    liftSh $ echoP "Running SymbiYosys"
     execute_ EquivFail dir "symbiyosys" "sby" ["-f", "test.sby"]
-    liftSh $ echoP "SymbiYosys: done"
+    liftSh $ echoP "SymbiYosys equivalence check passed"

@@ -50,6 +50,7 @@ import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.CodeGen
 
 -- | Common type alias for synthesis results
 type UResult = Result Failed ()
@@ -171,11 +172,16 @@ instance Monoid FuzzResult where
 -- read from and the current state of all the results.
 type Fuzz m = StateT FuzzResult (ReaderT FuzzEnv m)
 
-runFuzz :: (Monad m) => [SynthTool] -> [SimTool] -> Yosys -> Fuzz m b -> m b
-runFuzz synth sim yos m =
+runFuzz
+  :: MonadIO m =>
+     [SynthTool] -> [SimTool] -> Yosys -> Fuzz Sh a -> m a
+runFuzz synth sim yos m = shelly $ runFuzz' synth sim yos m
+
+runFuzz' :: Monad m => [SynthTool] -> [SimTool] -> Yosys -> Fuzz m b -> m b
+runFuzz' synth sim yos m =
     runReaderT (evalStateT m (FuzzResult [] [] [])) (FuzzEnv synth sim yos)
 
-synthesisers :: (Monad m) => Fuzz m [SynthTool]
+synthesisers :: Monad m => Fuzz m [SynthTool]
 synthesisers = lift $ asks getSynthesisers
 
 --simulators :: (Monad m) => Fuzz () m [SimTool]
@@ -184,71 +190,80 @@ synthesisers = lift $ asks getSynthesisers
 combinations :: [a] -> [b] -> [(a, b)]
 combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
 
-runInTmp :: (MonadSh m) => m a -> m a
-runInTmp a = liftSh (withTmpDir $ (\dir -> cd dir)) >> a
+logT :: MonadSh m => Text -> m ()
+logT = liftSh . echoP
 
-mkAndRun :: (MonadSh m) => FilePath -> Sh a -> m a
-mkAndRun a = liftSh . chdir_p a
-
-liftWith'
-    :: (MonadIO m)
-    => (Sh (Result a b) -> Sh (Result a b))
-    -> ResultT a Sh b
-    -> m (Result a b)
-liftWith' a = liftIO . shellyFailDir . a . runResultT
-
---lift' :: (MonadIO m) => ResultT a Sh b -> m (Result a b)
---lift' = liftWith' id
-
-logT :: (MonadIO m) => Text -> m ()
-logT = liftIO . shelly . echoP
-
-timeit :: (MonadIO m) => m a -> m (NominalDiffTime, a)
+timeit :: (MonadIO m, MonadSh m) => m a -> m (NominalDiffTime, a)
 timeit a = do
     start <- liftIO getCurrentTime
     result <- a
     end <- liftIO getCurrentTime
     return (diffUTCTime end start, result)
 
-synthesis :: (MonadIO m) => SourceInfo -> Fuzz m ()
+synthesis :: MonadSh m => SourceInfo -> Fuzz m ()
 synthesis src = do
     synth   <- synthesisers
-    results <- mapM
-        (\a -> liftWith' (mkAndRun . fromText $ showT a)
-            $ runSynth a src (fromText $ "syn_" <> showT a <> ".v")
-        )
-        synth
+    results <- liftSh $ mapM exec synth
     synthStatus .= zipWith SynthStatus synth results
-    liftIO $ print results
+    liftSh $ inspect results
+    where
+        exec a = runResultT $ do
+            liftSh . mkdir_p . fromText $ toText a
+            pop (fromText $ toText a) $ runSynth a src
 
-generateSample :: (MonadIO m) => Gen SourceInfo -> Fuzz m SourceInfo
+generateSample :: (MonadIO m, MonadSh m) => Gen SourceInfo -> Fuzz m SourceInfo
 generateSample gen = do
     logT "Sampling Verilog from generator"
     (t, src)   <- timeit $ Hog.sample gen
     logT $ "Generated Verilog (" <> showT t <> ")"
     return src
 
-passedSynthesis :: (MonadIO m) => Fuzz m [SynthTool]
+passedSynthesis :: MonadSh m => Fuzz m [SynthTool]
 passedSynthesis = fmap toSynth . filter passed . _synthStatus <$> get
     where
         passed (SynthStatus _ (Pass _)) = True
+        passed _                        = False
         toSynth (SynthStatus s _) = s
 
-fuzz :: (MonadIO m) => Gen SourceInfo -> Fuzz m FuzzResult
-fuzz gen = do
+make :: MonadSh m => FilePath -> m ()
+make f = liftSh $ do
+    mkdir_p f
+    cp_r "data" $ f </> fromText "data"
+
+pop :: MonadSh m => FilePath -> m a -> m a
+pop f a = do
+    dir <- liftSh pwd
+    liftSh $ cd f
+    ret <- a
+    liftSh $ cd dir
+    return ret
+
+equivalence :: MonadSh m => SourceInfo -> Fuzz m ()
+equivalence src = do
     yos   <- lift $ asks yosysInstance
-    src <- generateSample gen
-    synthesis src
     synth <- passedSynthesis
     let synthComb =
             nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
-    results <- mapM (uncurry $ equivalence yos src) synthComb
-    liftIO $ print results
+    results <- liftSh $ mapM (uncurry $ equiv yos) synthComb
+    liftSh $ inspect results
+    where
+        tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
+        equiv yos a b = runResultT $ do
+            make dir
+            pop dir $ do
+                liftSh $ do
+                    cp (fromText ".." </> fromText (toText a) </> synthOutput a) $ synthOutput a
+                    cp (fromText ".." </> fromText (toText b) </> synthOutput b) $ synthOutput b
+                    writefile "rtl.v" $ genSource src
+                runEquiv yos a (Just b) src
+            where
+                dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
+
+fuzz :: (MonadIO m, MonadSh m) => Gen SourceInfo -> Fuzz m FuzzResult
+fuzz gen = do
+    make "output"
+    pop "output" $ do
+        src <- generateSample gen
+        synthesis src
+        equivalence src
     return mempty
-  where
-    tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equivalence yos src a b =
-        liftIO . shellyFailDir . runInTmp . runResultT $ runEquiv yos
-                                                                  a
-                                                                  (Just b)
-                                                                  src

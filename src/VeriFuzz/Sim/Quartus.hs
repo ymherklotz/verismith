@@ -37,13 +37,13 @@ instance Tool Quartus where
 instance Synthesiser Quartus where
     runSynth = runSynthQuartus
     synthOutput = quartusOutput
-    setSynthOutput (Quartus a _) f = Quartus a f
+    setSynthOutput (Quartus a _) = Quartus a
 
 defaultQuartus :: Quartus
-defaultQuartus = Quartus Nothing "quartus/syn_quartus.v"
+defaultQuartus = Quartus Nothing "syn_quartus.v"
 
-runSynthQuartus :: Quartus -> SourceInfo -> FilePath -> ResultSh ()
-runSynthQuartus sim (SourceInfo top src) outf = do
+runSynthQuartus :: Quartus -> SourceInfo -> ResultSh ()
+runSynthQuartus sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let ex = execute_ SynthFail dir "quartus"
     liftSh $ do
@@ -54,7 +54,7 @@ runSynthQuartus sim (SourceInfo top src) outf = do
     ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
     ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
     liftSh $ do
-        cp (fromText "simulation/vcs" </> fromText top <.> "vo") outf
+        cp (fromText "simulation/vcs" </> fromText top <.> "vo") $ synthOutput sim
         echoP "Quartus synthesis done"
   where
     inpf = "rtl.v"

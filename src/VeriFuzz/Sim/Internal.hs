@@ -80,7 +80,6 @@ instance Monoid Failed where
 class Tool a => Synthesiser a where
     runSynth :: a        -- ^ Synthesiser tool instance
              -> SourceInfo  -- ^ Run information
-             -> FilePath -- ^ Output verilog file for the module
              -> ResultSh ()    -- ^ does not return any values
     synthOutput :: a -> FilePath
     setSynthOutput :: a -> FilePath -> a

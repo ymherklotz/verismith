@@ -38,16 +38,16 @@ instance Tool Vivado where
 instance Synthesiser Vivado where
     runSynth = runSynthVivado
     synthOutput = vivadoOutput
-    setSynthOutput (Vivado a _) f = Vivado a f
+    setSynthOutput (Vivado a _) = Vivado a
 
 defaultVivado :: Vivado
-defaultVivado = Vivado "vivado" "vivado/syn_vivado.v"
+defaultVivado = Vivado "vivado" "syn_vivado.v"
 
-runSynthVivado :: Vivado -> SourceInfo -> FilePath -> ResultSh ()
-runSynthVivado sim (SourceInfo top src) outf = do
+runSynthVivado :: Vivado -> SourceInfo -> ResultSh ()
+runSynthVivado sim (SourceInfo top src) = do
     dir <- liftSh pwd
     liftSh $ do
-        writefile vivadoTcl . vivadoSynthConfig top $ toTextIgnore outf
+        writefile vivadoTcl . vivadoSynthConfig top . toTextIgnore $ synthOutput sim
         writefile "rtl.v" $ genSource src
         run_ "sed" ["s/^module/(* use_dsp48=\"no\" *) module/;", "-i", "rtl.v"]
         echoP "Vivado: run"
