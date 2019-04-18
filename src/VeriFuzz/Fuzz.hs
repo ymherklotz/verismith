@@ -10,7 +10,8 @@ Portability : POSIX
 Environment to run the simulator and synthesisers in a matrix.
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 
 module VeriFuzz.Fuzz
     ( SynthTool(..)
@@ -27,9 +28,11 @@ module VeriFuzz.Fuzz
     )
 where
 
+import           Control.Exception.Lifted         (finally)
 import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
+import           Control.Monad.Trans.Control      (MonadBaseControl)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.ByteString                  (ByteString)
@@ -200,7 +203,7 @@ timeit a = do
     end <- liftIO getCurrentTime
     return (diffUTCTime end start, result)
 
-synthesis :: MonadSh m => SourceInfo -> Fuzz m ()
+synthesis :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 synthesis src = do
     synth   <- synthesisers
     results <- liftSh $ mapM exec synth
@@ -230,7 +233,7 @@ make f = liftSh $ do
     mkdir_p f
     cp_r "data" $ f </> fromText "data"
 
-pop :: MonadSh m => FilePath -> m a -> m a
+pop :: (MonadBaseControl IO m, MonadSh m) => FilePath -> m a -> m a
 pop f a = do
     dir <- liftSh pwd
     liftSh $ cd f
@@ -238,7 +241,7 @@ pop f a = do
     liftSh $ cd dir
     return ret
 
-equivalence :: MonadSh m => SourceInfo -> Fuzz m ()
+equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
     yos   <- lift $ asks yosysInstance
     synth <- passedSynthesis
@@ -259,7 +262,7 @@ equivalence src = do
             where
                 dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-fuzz :: (MonadIO m, MonadSh m) => Gen SourceInfo -> Fuzz m FuzzResult
+fuzz :: (MonadBaseControl IO m, MonadIO m, MonadSh m) => Gen SourceInfo -> Fuzz m FuzzResult
 fuzz gen = do
     make "output"
     pop "output" $ do

@@ -12,7 +12,12 @@ but to have more control this is reimplemented with the instances that are
 needed in "VeriFuzz".
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 module VeriFuzz.Result
     ( Result(..)
@@ -22,9 +27,13 @@ module VeriFuzz.Result
     )
 where
 
+import           Control.Monad               (liftM)
+import           Control.Monad.Base
 import           Control.Monad.IO.Class
-import           Shelly                 (RunFailed (..), Sh, catch_sh)
-import           Shelly.Lifted          (MonadSh, liftSh)
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Control
+import           Shelly                      (RunFailed (..), Sh, catch_sh)
+import           Shelly.Lifted               (MonadSh, liftSh)
 
 -- | Result type which is equivalent to 'Either' or 'Error'. This is
 -- reimplemented so that there is full control over the 'Monad' definition and
@@ -52,6 +61,9 @@ instance Applicative (Result a) where
 instance Monad (Result a) where
     Pass a >>= f = f a
     Fail b >>= _ = Fail b
+
+instance MonadBase (Result a) (Result a) where
+    liftBase = id
 
 -- | The transformer for the 'Result' type. This
 newtype ResultT a m b = ResultT { runResultT :: m (Result a b) }
@@ -85,8 +97,30 @@ instance (MonadSh m, Monoid a) => MonadSh (ResultT a m) where
         . catch_sh (Pass <$> s)
         $ (const (Fail <$> return mempty) :: RunFailed -> Sh (Result a b))
 
-instance (MonadIO m) => MonadIO (ResultT a m) where
+instance MonadIO m => MonadIO (ResultT a m) where
     liftIO s = ResultT $ Pass <$> liftIO s
+
+instance MonadBase b m => MonadBase b (ResultT a m) where
+    liftBase = liftBaseDefault
+
+instance MonadTrans (ResultT e) where
+    lift m = ResultT $ do
+        a <- m
+        return (Pass a)
+
+instance MonadTransControl (ResultT a) where
+    type StT (ResultT a) b = Result a b
+    liftWith f = ResultT $ liftM return $ f $ runResultT
+    restoreT = ResultT
+    {-# INLINABLE liftWith #-}
+    {-# INLINABLE restoreT #-}
+
+instance MonadBaseControl IO m => MonadBaseControl IO (ResultT a m) where
+    type StM (ResultT a m) b = ComposeSt (ResultT a) m b
+    liftBaseWith = defaultLiftBaseWith
+    restoreM     = defaultRestoreM
+    {-# INLINABLE liftBaseWith #-}
+    {-# INLINABLE restoreM #-}
 
 infix 0 <?>
 
