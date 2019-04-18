@@ -27,7 +27,6 @@ module VeriFuzz.Result
     )
 where
 
-import           Control.Monad               (liftM)
 import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
@@ -104,13 +103,11 @@ instance MonadBase b m => MonadBase b (ResultT a m) where
     liftBase = liftBaseDefault
 
 instance MonadTrans (ResultT e) where
-    lift m = ResultT $ do
-        a <- m
-        return (Pass a)
+    lift m = ResultT $ Pass <$> m
 
 instance MonadTransControl (ResultT a) where
     type StT (ResultT a) b = Result a b
-    liftWith f = ResultT $ liftM return $ f $ runResultT
+    liftWith f = ResultT $ return <$> f runResultT
     restoreT = ResultT
     {-# INLINABLE liftWith #-}
     {-# INLINABLE restoreT #-}
