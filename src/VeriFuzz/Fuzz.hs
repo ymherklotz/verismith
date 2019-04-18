@@ -237,8 +237,7 @@ pop :: (MonadBaseControl IO m, MonadSh m) => FilePath -> m a -> m a
 pop f a = do
     dir <- liftSh pwd
     liftSh $ cd f
-    ret <- a
-    liftSh $ cd dir
+    ret <- finally a . liftSh $ cd dir
     return ret
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
