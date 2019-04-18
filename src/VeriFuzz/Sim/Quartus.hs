@@ -23,7 +23,9 @@ import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
-newtype Quartus = Quartus { quartusBin :: Maybe FilePath }
+data Quartus = Quartus { quartusBin    :: !(Maybe FilePath)
+                       , quartusOutput :: {-# UNPACK #-} !FilePath
+                       }
                 deriving (Eq)
 
 instance Show Quartus where
@@ -34,9 +36,11 @@ instance Tool Quartus where
 
 instance Synthesiser Quartus where
     runSynth = runSynthQuartus
+    synthOutput = quartusOutput
+    setSynthOutput (Quartus a _) f = Quartus a f
 
 defaultQuartus :: Quartus
-defaultQuartus = Quartus Nothing
+defaultQuartus = Quartus Nothing "quartus/syn_quartus.v"
 
 runSynthQuartus :: Quartus -> SourceInfo -> FilePath -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) outf = do

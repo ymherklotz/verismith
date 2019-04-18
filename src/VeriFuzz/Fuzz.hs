@@ -10,6 +10,8 @@ Portability : POSIX
 Environment to run the simulator and synthesisers in a matrix.
 -}
 
+{-# LANGUAGE TemplateHaskell #-}
+
 module VeriFuzz.Fuzz
     ( SynthTool(..)
     , SimTool(..)
@@ -25,18 +27,19 @@ module VeriFuzz.Fuzz
     )
 where
 
+import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
+import           Data.ByteString                  (ByteString)
 import           Data.List                        (nubBy)
 import           Data.Text                        (Text)
-import qualified Data.Text                        as T
 import           Data.Time
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
 import           Prelude                          hiding (FilePath)
-import           Shelly
+import           Shelly                           hiding (get)
 import           Shelly.Lifted                    (MonadSh, liftSh)
 import           VeriFuzz.Internal
 import           VeriFuzz.Result
@@ -47,6 +50,12 @@ import           VeriFuzz.Sim.Vivado
 import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
 import           VeriFuzz.Verilog.AST
+
+-- | Common type alias for synthesis results
+type UResult = Result Failed ()
+
+-- | Commont type alias for simulation results
+type BResult = Result Failed ByteString
 
 data SynthTool = XSTSynth {-# UNPACK #-} !XST
                | VivadoSynth {-# UNPACK #-} !Vivado
@@ -71,6 +80,16 @@ instance Synthesiser SynthTool where
     runSynth (VivadoSynth vivado)   = runSynth vivado
     runSynth (YosysSynth yosys)     = runSynth yosys
     runSynth (QuartusSynth quartus) = runSynth quartus
+
+    synthOutput (XSTSynth xst)         = synthOutput xst
+    synthOutput (VivadoSynth vivado)   = synthOutput vivado
+    synthOutput (YosysSynth yosys)     = synthOutput yosys
+    synthOutput (QuartusSynth quartus) = synthOutput quartus
+
+    setSynthOutput (YosysSynth yosys)     = YosysSynth . setSynthOutput yosys
+    setSynthOutput (XSTSynth xst)         = XSTSynth . setSynthOutput xst
+    setSynthOutput (VivadoSynth vivado)   = VivadoSynth . setSynthOutput vivado
+    setSynthOutput (QuartusSynth quartus) = QuartusSynth . setSynthOutput quartus
 
 defaultYosysSynth :: SynthTool
 defaultYosysSynth = YosysSynth defaultYosys
@@ -106,30 +125,57 @@ data FuzzEnv = FuzzEnv { getSynthesisers :: ![SynthTool]
                        }
                deriving (Eq, Show)
 
-data SimResult a = SimResult !SynthTool !SimTool !(Result Failed a)
-                 deriving (Eq, Show)
+-- | The results from running a tool through a simulator. It can either fail or
+-- return a result, which is most likely a 'ByteString'.
+data SimResult = SimResult !SynthTool !SimTool !(BResult)
+                 deriving (Eq)
 
-data SynthResult a = SynthResult !SynthTool !SynthTool !(Result Failed a)
-                   deriving (Eq, Show)
+instance Show SimResult where
+    show (SimResult synth sim r) = show synth <> ", " <> show sim <> ": " <> show r
 
-data FuzzResult a = FuzzResult { getSynthResults :: ![SynthResult a]
-                               , getSimResults   :: ![SimResult a]
-                               }
+-- | The results of comparing the synthesised outputs of two files using a
+-- formal equivalence checker. This will either return a failure or an output
+-- which is most likely '()'.
+data SynthResult = SynthResult !SynthTool !SynthTool !(UResult)
+                   deriving (Eq)
+
+instance Show SynthResult where
+    show (SynthResult synth synth2 r) = show synth <> ", " <> show synth2 <> ": " <> show r
+
+-- | The status of the synthesis using a simulator. This will be checked before
+-- attempting to run the equivalence checks on the simulator, as that would be
+-- unnecessary otherwise.
+data SynthStatus = SynthStatus !SynthTool !(UResult)
+                 deriving (Eq)
+
+instance Show SynthStatus where
+    show (SynthStatus synth r) = "synthesis " <> show synth <> ": " <> show r
+
+-- | The complete state that will be used during fuzzing, which contains the
+-- results from all the operations.
+data FuzzResult = FuzzResult { _synthResults :: ![SynthResult]
+                             , _simResults   :: ![SimResult]
+                             , _synthStatus  :: ![SynthStatus]
+                             }
                   deriving (Eq, Show)
 
-instance Semigroup (FuzzResult a) where
-    FuzzResult a1 b1 <> FuzzResult a2 b2 = FuzzResult (a1 <> a2) (b1 <> b2)
+$(makeLenses ''FuzzResult)
 
-instance Monoid (FuzzResult a) where
-    mempty = FuzzResult [] []
+instance Semigroup FuzzResult where
+    FuzzResult a1 b1 c1 <> FuzzResult a2 b2 c2 = FuzzResult (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
-type Fuzz a m = StateT (FuzzResult a) (ReaderT FuzzEnv m)
+instance Monoid FuzzResult where
+    mempty = FuzzResult [] [] []
 
-runFuzz :: (Monad m) => [SynthTool] -> [SimTool] -> Yosys -> Fuzz a m b -> m b
+-- | The main type for the fuzzing, which contains an environment that can be
+-- read from and the current state of all the results.
+type Fuzz m = StateT FuzzResult (ReaderT FuzzEnv m)
+
+runFuzz :: (Monad m) => [SynthTool] -> [SimTool] -> Yosys -> Fuzz m b -> m b
 runFuzz synth sim yos m =
-    runReaderT (evalStateT m (FuzzResult [] [])) (FuzzEnv synth sim yos)
+    runReaderT (evalStateT m (FuzzResult [] [] [])) (FuzzEnv synth sim yos)
 
-synthesisers :: (Monad m) => Fuzz () m [SynthTool]
+synthesisers :: (Monad m) => Fuzz m [SynthTool]
 synthesisers = lift $ asks getSynthesisers
 
 --simulators :: (Monad m) => Fuzz () m [SimTool]
@@ -151,22 +197,11 @@ liftWith'
     -> m (Result a b)
 liftWith' a = liftIO . shellyFailDir . a . runResultT
 
-lift' :: (MonadIO m) => ResultT a Sh b -> m (Result a b)
-lift' = liftWith' id
+--lift' :: (MonadIO m) => ResultT a Sh b -> m (Result a b)
+--lift' = liftWith' id
 
 logT :: (MonadIO m) => Text -> m ()
 logT = liftIO . shelly . echoP
-
-synthesis :: (MonadIO m) => SourceInfo -> Fuzz () m (FuzzResult ())
-synthesis src = do
-    synth   <- synthesisers
-    results <- mapM
-        (\a -> liftWith' (mkAndRun . fromText $ showT a)
-            $ runSynth a src (fromText $ "syn_" <> showT a <> ".v")
-        )
-        synth
-    liftIO $ print results
-    return mempty
 
 timeit :: (MonadIO m) => m a -> m (NominalDiffTime, a)
 timeit a = do
@@ -175,19 +210,40 @@ timeit a = do
     end <- liftIO getCurrentTime
     return (diffUTCTime end start, result)
 
-fuzz :: (MonadIO m) => Gen SourceInfo -> Fuzz () m (FuzzResult ())
-fuzz gen = do
-    synth <- synthesisers
+synthesis :: (MonadIO m) => SourceInfo -> Fuzz m ()
+synthesis src = do
+    synth   <- synthesisers
+    results <- mapM
+        (\a -> liftWith' (mkAndRun . fromText $ showT a)
+            $ runSynth a src (fromText $ "syn_" <> showT a <> ".v")
+        )
+        synth
+    synthStatus .= zipWith SynthStatus synth results
+    liftIO $ print results
+
+generateSample :: (MonadIO m) => Gen SourceInfo -> Fuzz m SourceInfo
+generateSample gen = do
     logT "Sampling Verilog from generator"
     (t, src)   <- timeit $ Hog.sample gen
     logT $ "Generated Verilog (" <> showT t <> ")"
+    return src
+
+passedSynthesis :: (MonadIO m) => Fuzz m [SynthTool]
+passedSynthesis = fmap toSynth . filter passed . _synthStatus <$> get
+    where
+        passed (SynthStatus _ (Pass _)) = True
+        toSynth (SynthStatus s _) = s
+
+fuzz :: (MonadIO m) => Gen SourceInfo -> Fuzz m FuzzResult
+fuzz gen = do
     yos   <- lift $ asks yosysInstance
-    _     <- synthesis src
+    src <- generateSample gen
+    synthesis src
+    synth <- passedSynthesis
     let synthComb =
             nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
-    --let simComb = combinations synth sim
-    --results <- mapM (uncurry $ equivalence yos src) synthComb
-    --liftIO $ print results
+    results <- mapM (uncurry $ equivalence yos src) synthComb
+    liftIO $ print results
     return mempty
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')

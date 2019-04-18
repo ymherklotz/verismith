@@ -31,7 +31,9 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 
-newtype Yosys = Yosys { yosysPath :: FilePath }
+data Yosys = Yosys { yosysPath   :: {-# UNPACK #-} !FilePath
+                   , yosysOutput :: {-# UNPACK #-} !FilePath
+                   }
               deriving (Eq)
 
 instance Tool Yosys where
@@ -39,12 +41,14 @@ instance Tool Yosys where
 
 instance Synthesiser Yosys where
   runSynth = runSynthYosys
+  synthOutput = yosysOutput
+  setSynthOutput (Yosys a _) f = Yosys a f
 
 instance Show Yosys where
     show _ = "yosys"
 
 defaultYosys :: Yosys
-defaultYosys = Yosys "yosys"
+defaultYosys = Yosys "yosys" "yosys/syn_yosys.v"
 
 runSynthYosys :: Yosys -> SourceInfo -> FilePath -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) outf = (<?> SynthFail) . liftSh $ do
@@ -112,8 +116,6 @@ runEquiv _ sim1 sim2 srcInfo = do
             $  srcInfo
             ^. mainModule
         writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
-    runSynth sim1 srcInfo $ fromText [st|syn_#{toText sim1}.v|]
-    runMaybeSynth sim2 srcInfo
     liftSh $ echoP "SymbiYosys: run"
     execute_ EquivFail dir "symbiyosys" "sby" ["-f", "test.sby"]
     liftSh $ echoP "SymbiYosys: done"

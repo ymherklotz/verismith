@@ -29,6 +29,7 @@ import           VeriFuzz.Verilog.CodeGen
 
 data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath
                , netgenPath :: {-# UNPACK #-} !FilePath
+               , xstOutput  :: {-# UNPACK #-} !FilePath
                }
          deriving (Eq)
 
@@ -40,9 +41,11 @@ instance Tool XST where
 
 instance Synthesiser XST where
     runSynth = runSynthXST
+    synthOutput = xstOutput
+    setSynthOutput (XST a b _) f = XST a b f
 
 defaultXST :: XST
-defaultXST = XST "xst" "netgen"
+defaultXST = XST "xst" "netgen" "xst/syn_xst.v"
 
 runSynthXST :: XST -> SourceInfo -> FilePath -> ResultSh ()
 runSynthXST sim (SourceInfo top src) outf = do

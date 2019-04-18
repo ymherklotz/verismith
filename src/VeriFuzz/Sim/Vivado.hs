@@ -24,7 +24,9 @@ import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
-newtype Vivado = Vivado { vivadoPath :: FilePath }
+data Vivado = Vivado { vivadoPath   :: {-# UNPACK #-} !FilePath
+                     , vivadoOutput :: {-# UNPACK #-} !FilePath
+                     }
                deriving (Eq)
 
 instance Show Vivado where
@@ -35,9 +37,11 @@ instance Tool Vivado where
 
 instance Synthesiser Vivado where
     runSynth = runSynthVivado
+    synthOutput = vivadoOutput
+    setSynthOutput (Vivado a _) f = Vivado a f
 
 defaultVivado :: Vivado
-defaultVivado = Vivado "vivado"
+defaultVivado = Vivado "vivado" "vivado/syn_vivado.v"
 
 runSynthVivado :: Vivado -> SourceInfo -> FilePath -> ResultSh ()
 runSynthVivado sim (SourceInfo top src) outf = do

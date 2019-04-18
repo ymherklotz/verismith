@@ -78,10 +78,12 @@ instance Monoid Failed where
 
 -- | Synthesiser type class.
 class Tool a => Synthesiser a where
-  runSynth :: a        -- ^ Synthesiser tool instance
-           -> SourceInfo  -- ^ Run information
-           -> FilePath -- ^ Output verilog file for the module
-           -> ResultSh ()    -- ^ does not return any values
+    runSynth :: a        -- ^ Synthesiser tool instance
+             -> SourceInfo  -- ^ Run information
+             -> FilePath -- ^ Output verilog file for the module
+             -> ResultSh ()    -- ^ does not return any values
+    synthOutput :: a -> FilePath
+    setSynthOutput :: a -> FilePath -> a
 
 -- | Type synonym for a 'ResultT' that will be used throughout 'VeriFuzz'. This
 -- has instances for 'MonadSh' and 'MonadIO' if the 'Monad' it is parametrised
