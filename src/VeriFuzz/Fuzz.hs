@@ -10,6 +10,7 @@ Portability : POSIX
 Environment to run the simulator and synthesisers in a matrix.
 -}
 
+{-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
 
@@ -22,6 +23,8 @@ module VeriFuzz.Fuzz
     , synthStatus
     , Fuzz
     , fuzz
+    , fuzzInDir
+    , fuzzMultiple
     , runFuzz
     , defaultIcarusSim
     , defaultVivadoSynth
@@ -33,6 +36,7 @@ where
 
 import           Control.Exception.Lifted         (finally)
 import           Control.Lens
+import           Control.Monad                    (forM, void)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Control      (MonadBaseControl)
@@ -57,6 +61,8 @@ import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
+
+type MonadFuzz m = (MonadBaseControl IO m, MonadIO m, MonadSh m)
 
 -- | Common type alias for synthesis results
 type UResult = Result Failed ()
@@ -239,9 +245,7 @@ make f = liftSh $ do
 pop :: (MonadBaseControl IO m, MonadSh m) => FilePath -> m a -> m a
 pop f a = do
     dir <- liftSh pwd
-    liftSh $ cd f
-    ret <- finally a . liftSh $ cd dir
-    return ret
+    finally (liftSh (cd f) >> a) . liftSh $ cd dir
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
@@ -264,11 +268,22 @@ equivalence src = do
             where
                 dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-fuzz :: (MonadBaseControl IO m, MonadIO m, MonadSh m) => Gen SourceInfo -> Fuzz m FuzzResult
+fuzz :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzResult
 fuzz gen = do
-    make "output"
-    pop "output" $ do
-        src <- generateSample gen
-        synthesis src
-        equivalence src
+    src <- generateSample gen
+    synthesis src
+    equivalence src
     return mempty
+
+fuzzInDir :: MonadFuzz m => FilePath -> Gen SourceInfo -> Fuzz m FuzzResult
+fuzzInDir fp src = do
+    make fp
+    pop fp $ fuzz src
+
+fuzzMultiple :: MonadFuzz m => Int -> FilePath -> Gen SourceInfo -> Fuzz m FuzzResult
+fuzzMultiple n fp src = do
+    make fp
+    void . pop fp $ forM [1..n] fuzzDir
+    return mempty
+    where
+        fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src
