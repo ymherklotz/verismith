@@ -17,6 +17,9 @@ module VeriFuzz.Fuzz
     ( SynthTool(..)
     , SimTool(..)
     , FuzzResult(..)
+    , synthResults
+    , simResults
+    , synthStatus
     , Fuzz
     , fuzz
     , runFuzz

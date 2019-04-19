@@ -3,6 +3,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Property
     ( propertyTests
     )
@@ -11,8 +14,7 @@ where
 import           Data.Either             (either, isRight)
 import qualified Data.Graph.Inductive    as G
 import           Data.Text               (Text)
-import qualified Data.Text               as T
-import           Hedgehog                (Gen, MonadGen, Property, (===))
+import           Hedgehog                (Gen, Property, (===))
 import qualified Hedgehog                as Hog
 import           Hedgehog.Function       (Arg, Vary)
 import qualified Hedgehog.Function       as Hog
