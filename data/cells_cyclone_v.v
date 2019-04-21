@@ -235,4 +235,57 @@ assign o = i, obar = ~i;
 
 endmodule
 
-// ==========================================================================================
+module dffeas (d, clk, ena, clrn, prn, aload, asdata, sclr, sload, devclrn, devpor, q );
+// GLOBAL PARAMETER DECLARATION
+parameter power_up = "DONT_CARE";
+parameter is_wysiwyg = "false";
+parameter dont_touch = "false";
+
+
+parameter x_on_violation = "on";
+parameter lpm_type = "dffeas";
+
+input d;
+input clk;
+input ena;
+input clrn;
+input prn;
+input aload; 
+input asdata;  
+input sclr; 
+input sload; 
+input devclrn; 
+input devpor; 
+
+output q;
+
+always @(posedge clk) begin
+   q <= d;
+end
+
+endmodule
+
+module cyclonev_clkena    (
+    inclk,
+    ena,
+    enaout,
+    outclk);
+
+// leda G_521_3_B off
+    parameter    clock_type    =    "auto";
+    parameter    ena_register_mode    =    "always enabled";
+    parameter    lpm_type    =    "cyclonev_clkena";
+    parameter    ena_register_power_up    =    "high";
+    parameter    disable_mode    =    "low";
+    parameter    test_syn    =    "high";
+// leda G_521_3_B on
+
+    input    inclk;
+    input    ena;
+    output    enaout;
+    output    outclk;
+
+   assign outclk = ena ? inclk : 1'b0;
+   assign enaout = ena;
+
+endmodule //cyclonev_clkena
