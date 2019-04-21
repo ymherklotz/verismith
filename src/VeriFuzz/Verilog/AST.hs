@@ -158,6 +158,8 @@ data Event = EId {-# UNPACK #-} !Identifier
            | EAll
            | EPosEdge {-# UNPACK #-} !Identifier
            | ENegEdge {-# UNPACK #-} !Identifier
+           | EOr !Event !Event
+           | EComb !Event !Event
            deriving (Eq, Show, Ord, Data)
 
 -- | Binary operators that are currently supported in the verilog generation.
@@ -477,6 +479,7 @@ $(makeWrapped ''Verilog)
 $(makeWrapped ''Identifier)
 $(makeWrapped ''Delay)
 
+$(makeBaseFunctor ''Event)
 $(makeBaseFunctor ''Expr)
 $(makeBaseFunctor ''ConstExpr)
 

@@ -21,6 +21,7 @@ module VeriFuzz.Config
     , probModItem
     , probStmnt
     , probExpr
+    , probEventList
     , ProbExpr(..)
     , probExprNum
     , probExprId
@@ -31,6 +32,10 @@ module VeriFuzz.Config
     , probExprStr
     , probExprSigned
     , probExprUnsigned
+    , ProbEventList(..)
+    , probEventListAll
+    , probEventListVar
+    , probEventListClk
     , ProbModItem(..)
     , probModItemAssign
     , probModItemAlways
@@ -86,9 +91,16 @@ data ProbStatement = ProbStatement { _probStmntBlock    :: {-# UNPACK #-} !Int
                                    }
                    deriving (Eq, Show)
 
-data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
-                               , _probStmnt   :: {-# UNPACK #-} !ProbStatement
-                               , _probExpr    :: {-# UNPACK #-} !ProbExpr
+data ProbEventList = ProbEventList { _probEventListAll :: {-# UNPACK #-} !Int
+                                   , _probEventListClk :: {-# UNPACK #-} !Int
+                                   , _probEventListVar :: {-# UNPACK #-} !Int
+                                   }
+                   deriving (Eq, Show)
+
+data Probability = Probability { _probModItem   :: {-# UNPACK #-} !ProbModItem
+                               , _probStmnt     :: {-# UNPACK #-} !ProbStatement
+                               , _probExpr      :: {-# UNPACK #-} !ProbExpr
+                               , _probEventList :: {-# UNPACK #-} !ProbEventList
                                }
                  deriving (Eq, Show)
 
@@ -108,6 +120,7 @@ data Config = Config { _configProbability :: {-# UNPACK #-} !Probability
 makeLenses ''ProbExpr
 makeLenses ''ProbModItem
 makeLenses ''ProbStatement
+makeLenses ''ProbEventList
 makeLenses ''Probability
 makeLenses ''Property
 makeLenses ''Config
@@ -120,12 +133,13 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability defModItem defStmnt defExpr)
+defaultConfig = Config (Probability defModItem defStmnt defExpr defEvent)
                        (Property 20 Nothing 3 2 5)
   where
     defModItem = ProbModItem 5 1 1
     defStmnt   = ProbStatement 0 15 1 1
     defExpr    = ProbExpr 1 1 1 1 1 1 0 1 1
+    defEvent = ProbEventList 1 1 1
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
@@ -186,6 +200,19 @@ modItemCodec =
     defProb i = defaultConfig ^. configProbability . probModItem . i
     intM = int "moditem"
 
+eventListCodec :: TomlCodec ProbEventList
+eventListCodec =
+    ProbEventList
+    <$> defaultValue (defProb probEventListClk) (intE "clk")
+    .= _probEventListClk
+    <*> defaultValue (defProb probEventListClk) (intE "all")
+    .= _probEventListAll
+    <*> defaultValue (defProb probEventListClk) (intE "var")
+    .= _probEventListClk
+    where
+        defProb i = defaultConfig ^. configProbability . probEventList . i
+        intE = int "eventlist"
+
 probCodec :: TomlCodec Probability
 probCodec =
     Probability
@@ -195,6 +222,8 @@ probCodec =
         .=  _probStmnt
         <*> defaultValue (defProb probExpr) exprCodec
         .=  _probExpr
+        <*> defaultValue (defProb probEventList) eventListCodec
+        .= _probEventList
     where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec Property

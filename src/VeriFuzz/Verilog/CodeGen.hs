@@ -204,13 +204,18 @@ unaryOp UnXor     = "^"
 unaryOp UnNxor    = "~^"
 unaryOp UnNxorInv = "^~"
 
--- | Generate verilog code for an 'Event'.
 event :: Event -> Text
-event (EId   i)    = "@(" <> getIdentifier i <> ")"
-event (EExpr e)    = "@(" <> expr e <> ")"
-event EAll         = "@*"
-event (EPosEdge i) = "@(posedge " <> getIdentifier i <> ")"
-event (ENegEdge i) = "@(negedge " <> getIdentifier i <> ")"
+event a = "@(" <> eventRec a <> ")"
+
+-- | Generate verilog code for an 'Event'.
+eventRec :: Event -> Text
+eventRec (EId   i)    = getIdentifier i
+eventRec (EExpr e)    = expr e
+eventRec EAll         = "@*"
+eventRec (EPosEdge i) = "posedge " <> getIdentifier i
+eventRec (ENegEdge i) = "negedge " <> getIdentifier i
+eventRec (EOr a b)    = "(" <> eventRec a <> " or " <> eventRec b <> ")"
+eventRec (EComb a b)  = "(" <> eventRec a <> ", " <> eventRec b <> ")"
 
 -- | Generates verilog code for a 'Delay'.
 delay :: Delay -> Text

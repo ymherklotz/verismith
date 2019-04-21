@@ -28,7 +28,7 @@ import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.Foldable                    (fold)
-import           Data.List.NonEmpty               (toList)
+import           Data.List.NonEmpty               (NonEmpty (..), toList)
 import qualified Data.Text                        as T
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
@@ -318,6 +318,32 @@ statement = do
         , (onDepth cont (defProb probStmntFor) , forLoop)
         ]
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
+
+recEventList :: NonEmpty Identifier -> Hog.Size -> Gen Event
+recEventList ids size
+    | size <= 0 = idgen
+    | size > 0 = Hog.choice
+                 [ idgen
+                 , EOr <$> recCall <*> recCall
+                 ]
+    where
+        idgen = fmap EId . Hog.element $ toList ids
+        recCall = (recEventList ids (size `div` 2))
+
+eventList :: StateGen Event
+eventList = do
+    prob    <- askProbability
+    context <- get
+    let defProb i = prob ^. probEventList . i
+    gen $ Hog.frequency
+        [ (defProb probEventListAll, return EAll)
+        , (defProb probEventListVar, case context ^. variables of
+                  []   -> return EAll
+                  x:xs -> Hog.sized . recEventList $ fmap toId (x :| xs))
+        , (defProb probEventListClk, return $ EPosEdge "clk")
+        ]
+    where
+        toId (Port _ _ _ i) = i
 
 always :: StateGen ModItem
 always = do
