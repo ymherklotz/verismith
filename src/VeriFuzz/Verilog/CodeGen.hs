@@ -146,7 +146,7 @@ expr (Str t                ) = "\"" <> t <> "\""
 
 showNum :: BitVec -> Text
 showNum (BitVec s n) =
-    minus <> showT s <> "'h" <> T.pack (showHex (abs n) "")
+    "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
@@ -214,8 +214,8 @@ eventRec (EExpr e)    = expr e
 eventRec EAll         = "*"
 eventRec (EPosEdge i) = "posedge " <> getIdentifier i
 eventRec (ENegEdge i) = "negedge " <> getIdentifier i
-eventRec (EOr a b)    = "(" <> eventRec a <> " or " <> eventRec b <> ")"
-eventRec (EComb a b)  = "(" <> eventRec a <> ", " <> eventRec b <> ")"
+eventRec (EOr   a b ) = eventRec a <> " or " <> eventRec b
+eventRec (EComb a b ) = eventRec a <> ", " <> eventRec b
 
 -- | Generates verilog code for a 'Delay'.
 delay :: Delay -> Text
