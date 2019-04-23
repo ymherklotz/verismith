@@ -47,7 +47,8 @@ runSynthVivado :: Vivado -> SourceInfo -> ResultSh ()
 runSynthVivado sim (SourceInfo top src) = do
     dir <- liftSh pwd
     liftSh $ do
-        writefile vivadoTcl . vivadoSynthConfig top . toTextIgnore $ synthOutput sim
+        writefile vivadoTcl . vivadoSynthConfig top . toTextIgnore $ synthOutput
+            sim
         writefile "rtl.v" $ genSource src
         run_ "sed" ["s/^module/(* use_dsp48=\"no\" *) module/;", "-i", "rtl.v"]
         echoP "Vivado: run"

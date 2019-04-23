@@ -48,7 +48,7 @@ data Icarus = Icarus { icarusPath :: FilePath
               deriving (Eq)
 
 instance Show Icarus where
-    show _ = "show"
+    show _ = "iverilog"
 
 instance Tool Icarus where
   toText _ = "iverilog"

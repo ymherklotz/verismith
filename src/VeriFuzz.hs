@@ -19,6 +19,7 @@ module VeriFuzz
     , module VeriFuzz.Circuit
     , module VeriFuzz.Sim
     , module VeriFuzz.Fuzz
+    , module VeriFuzz.Report
     )
 where
 
@@ -42,6 +43,7 @@ import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
 import           VeriFuzz.Reduce
+import           VeriFuzz.Report
 import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal

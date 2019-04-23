@@ -66,8 +66,7 @@ runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
     out  = toTextIgnore $ synthOutput sim
 
 runMaybeSynth :: (Synthesiser a) => Maybe a -> SourceInfo -> ResultSh ()
-runMaybeSynth (Just sim) srcInfo =
-    runSynth sim srcInfo
+runMaybeSynth (Just sim) srcInfo = runSynth sim srcInfo
 runMaybeSynth Nothing (SourceInfo _ src) =
     liftSh . writefile "rtl.v" $ genSource src
 

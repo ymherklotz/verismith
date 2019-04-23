@@ -54,8 +54,14 @@ runSynthQuartus sim (SourceInfo top src) = do
     ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
     ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
     liftSh $ do
-        cp (fromText "simulation/vcs" </> fromText top <.> "vo") $ synthOutput sim
-        run_ "sed" ["-ri", "s,^// DATE.*,,; s,^tri1 (.*);,wire \\1 = 1;,; /^\\/\\/ +synopsys/ d;", toTextIgnore $ synthOutput sim]
+        cp (fromText "simulation/vcs" </> fromText top <.> "vo")
+            $ synthOutput sim
+        run_
+            "sed"
+            [ "-ri"
+            , "s,^// DATE.*,,; s,^tri1 (.*);,wire \\1 = 1;,; /^\\/\\/ +synopsys/ d;"
+            , toTextIgnore $ synthOutput sim
+            ]
         echoP "Quartus synthesis done"
   where
     inpf = "rtl.v"

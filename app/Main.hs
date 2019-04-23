@@ -200,8 +200,7 @@ handleOpts :: Opts -> IO ()
 handleOpts (Fuzz out configF _ _) = do
     config <- getConfig configF
     _      <- V.runFuzz
-        [V.defaultYosysSynth, V.defaultVivadoSynth, V.defaultQuartusSynth]
-        []
+        config
         V.defaultYosys
         (V.fuzzMultiple 5 (S.fromText out) (V.proceduralSrc "top" config))
     return ()
