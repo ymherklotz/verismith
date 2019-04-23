@@ -17,6 +17,8 @@ module VeriFuzz.Config
     , defaultConfig
     , configProbability
     , configProperty
+    , configSimulators
+    , configSynthesisers
     , Probability(..)
     , probModItem
     , probStmnt
@@ -50,6 +52,8 @@ module VeriFuzz.Config
     , propStmntDepth
     , propModDepth
     , propMaxModules
+    , SimDescription(..)
+    , SynthDescription(..)
     , parseConfigFile
     , parseConfig
     , configEncode
@@ -57,7 +61,7 @@ module VeriFuzz.Config
     )
 where
 
-import           Control.Applicative (Alternative)
+import           Control.Applicative (Alternative, (<|>))
 import           Control.Lens        hiding ((.=))
 import           Data.List.NonEmpty  (NonEmpty (..))
 import           Data.Maybe          (fromMaybe)
@@ -112,8 +116,16 @@ data Property = Property { _propSize       :: {-# UNPACK #-} !Int
                          }
               deriving (Eq, Show)
 
-data Config = Config { _configProbability :: {-# UNPACK #-} !Probability
-                     , _configProperty    :: {-# UNPACK #-} !Property
+data SimDescription = SimDescription { _simName :: {-# UNPACK #-} !Text }
+                    deriving (Eq, Show)
+
+data SynthDescription = SynthDescription { _synthName :: {-# UNPACK #-} !Text }
+                      deriving (Eq, Show)
+
+data Config = Config { _configProbability  :: {-# UNPACK #-} !Probability
+                     , _configProperty     :: {-# UNPACK #-} !Property
+                     , _configSimulators   :: ![SimDescription]
+                     , _configSynthesisers :: ![SynthDescription]
                      }
             deriving (Eq, Show)
 
@@ -133,13 +145,16 @@ defaultValue
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 defaultConfig :: Config
-defaultConfig = Config (Probability defModItem defStmnt defExpr defEvent)
-                       (Property 20 Nothing 3 2 5)
+defaultConfig = Config
+    (Probability defModItem defStmnt defExpr defEvent)
+    (Property 20 Nothing 3 2 5)
+    []
+    [SynthDescription "yosys", SynthDescription "vivado"]
   where
     defModItem = ProbModItem 5 1 1
     defStmnt   = ProbStatement 0 15 1 1
     defExpr    = ProbExpr 1 1 1 1 1 1 0 1 1
-    defEvent = ProbEventList 1 1 1
+    defEvent   = ProbEventList 1 1 1
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
@@ -203,15 +218,15 @@ modItemCodec =
 eventListCodec :: TomlCodec ProbEventList
 eventListCodec =
     ProbEventList
-    <$> defaultValue (defProb probEventListClk) (intE "clk")
-    .= _probEventListClk
-    <*> defaultValue (defProb probEventListClk) (intE "all")
-    .= _probEventListAll
-    <*> defaultValue (defProb probEventListClk) (intE "var")
-    .= _probEventListClk
-    where
-        defProb i = defaultConfig ^. configProbability . probEventList . i
-        intE = int "eventlist"
+        <$> defaultValue (defProb probEventListClk) (intE "clk")
+        .=  _probEventListClk
+        <*> defaultValue (defProb probEventListClk) (intE "all")
+        .=  _probEventListAll
+        <*> defaultValue (defProb probEventListClk) (intE "var")
+        .=  _probEventListClk
+  where
+    defProb i = defaultConfig ^. configProbability . probEventList . i
+    intE = int "eventlist"
 
 probCodec :: TomlCodec Probability
 probCodec =
@@ -223,7 +238,7 @@ probCodec =
         <*> defaultValue (defProb probExpr) exprCodec
         .=  _probExpr
         <*> defaultValue (defProb probEventList) eventListCodec
-        .= _probEventList
+        .=  _probEventList
     where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec Property
@@ -241,6 +256,23 @@ propCodec =
         .=  _propMaxModules
     where defProp i = defaultConfig ^. configProperty . i
 
+simulator :: TomlCodec SimDescription
+simulator = Toml.textBy pprint parseIcarus "name"
+  where
+    parseIcarus i@"icarus" = Right $ SimDescription i
+    parseIcarus s = Left $ "Could not match '" <> s <> "' with a simulator."
+    pprint (SimDescription a) = a
+
+synthesiser :: TomlCodec SynthDescription
+synthesiser = Toml.textBy pprint parseIcarus "name"
+  where
+    parseIcarus s@"yosys"   = Right $ SynthDescription s
+    parseIcarus s@"vivado"  = Right $ SynthDescription s
+    parseIcarus s@"quartus" = Right $ SynthDescription s
+    parseIcarus s@"xst"     = Right $ SynthDescription s
+    parseIcarus s = Left $ "Could not match '" <> s <> "' with a synthesiser."
+    pprint (SynthDescription a) = a
+
 configCodec :: TomlCodec Config
 configCodec =
     Config
@@ -250,6 +282,12 @@ configCodec =
         <*> defaultValue (defaultConfig ^. configProperty)
                          (Toml.table propCodec "property")
         .=  _configProperty
+        <*> defaultValue (defaultConfig ^. configSimulators)
+                         (Toml.list simulator "simulator")
+        .=  _configSimulators
+        <*> defaultValue (defaultConfig ^. configSynthesisers)
+                         (Toml.list synthesiser "synthesiser")
+        .=  _configSynthesisers
 
 parseConfigFile :: FilePath -> IO Config
 parseConfigFile = Toml.decodeFile configCodec
@@ -262,7 +300,7 @@ parseConfig t = case Toml.decode configCodec t of
     Left  (Toml.TableNotFound k) -> error $ "Table " ++ show k ++ " not found"
     Left (Toml.TypeMismatch k _ _) ->
         error $ "Type mismatch with key " ++ show k
-    Left (Toml.ParseError _) -> error "Config file parse error"
+    Left _ -> error "Config file parse error"
 
 configEncode :: Config -> Text
 configEncode = Toml.encode configCodec
