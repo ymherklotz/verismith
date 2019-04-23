@@ -90,6 +90,7 @@ write_verilog -force #{outf}
 -- brittany-disable-next-binding
 sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> Maybe b -> SourceInfo -> Text
 sbyConfig bd sim1 sim2 (SourceInfo top src) = [st|[options]
+multiclock on
 mode prove
 
 [engines]

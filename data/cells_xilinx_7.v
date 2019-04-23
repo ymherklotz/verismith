@@ -210,3 +210,55 @@ module FDSE (Q, C, CE, D, S);
 	 else if (CE)
 	   q_out <=  D_in;
 endmodule
+
+module LD (Q, D, G);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    wire Q;
+
+    input  D, G;
+
+    reg q_out;
+
+    initial q_out = INIT;
+
+    assign Q = q_out;
+
+    always @(D or G)
+      if (G)
+        q_out <= D;
+
+   specify
+        if (G)
+            (D +=> Q) = (100, 100);
+        (posedge G => (Q +: D)) = (100, 100);
+    endspecify
+
+endmodule
+
+module FD (Q, C, D);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+
+    input  C, D;
+
+    wire Q;
+    reg q_out;
+    tri0 GSR = glbl.GSR;
+
+    initial q_out = INIT;
+
+    always @(posedge C)
+      q_out <=  D;
+
+    assign Q = q_out;
+
+    specify
+        (posedge C => (Q +: D)) = (100, 100);
+    endspecify
+
+endmodule
