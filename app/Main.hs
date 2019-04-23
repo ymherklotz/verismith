@@ -226,8 +226,8 @@ handleOpts (Reduce f t) = do
             writeFile "reduced.v" . T.unpack $ V.genSource vreduced
     where file = T.unpack $ S.toTextIgnore f
 handleOpts (Config c) = maybe
-    (T.putStrLn . V.configEncode $ V.defaultConfig)
-    (`V.configToFile` V.defaultConfig)
+    (T.putStrLn . V.encodeConfig $ V.defaultConfig)
+    (`V.encodeConfigFile` V.defaultConfig)
     c
 
 main :: IO ()
