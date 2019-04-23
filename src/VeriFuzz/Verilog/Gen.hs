@@ -347,8 +347,9 @@ eventList = do
 
 always :: StateGen ModItem
 always = do
+    events <- eventList
     stat <- SeqBlock <$> some statement
-    return $ Always (EventCtrl (EPosEdge "clk") (Just stat))
+    return $ Always (EventCtrl events (Just stat))
 
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do

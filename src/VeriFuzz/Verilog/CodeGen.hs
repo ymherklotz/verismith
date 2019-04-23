@@ -146,7 +146,7 @@ expr (Str t                ) = "\"" <> t <> "\""
 
 showNum :: BitVec -> Text
 showNum (BitVec s n) =
-    "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
+    minus <> showT s <> "'h" <> T.pack (showHex (abs n) "")
   where
     minus | signum n >= 0 = ""
           | otherwise     = "-"
@@ -211,7 +211,7 @@ event a = "@(" <> eventRec a <> ")"
 eventRec :: Event -> Text
 eventRec (EId   i)    = getIdentifier i
 eventRec (EExpr e)    = expr e
-eventRec EAll         = "@*"
+eventRec EAll         = "*"
 eventRec (EPosEdge i) = "posedge " <> getIdentifier i
 eventRec (ENegEdge i) = "negedge " <> getIdentifier i
 eventRec (EOr a b)    = "(" <> eventRec a <> " or " <> eventRec b <> ")"
