@@ -218,12 +218,12 @@ exprWithContext prob l n
 
 some :: StateGen a -> StateGen [a]
 some f = do
-    amount <- gen $ Hog.int (Hog.linear 1 100)
+    amount <- gen $ Hog.int (Hog.linear 1 50)
     replicateM amount f
 
 many :: StateGen a -> StateGen [a]
 many f = do
-    amount <- gen $ Hog.int (Hog.linear 0 100)
+    amount <- gen $ Hog.int (Hog.linear 0 50)
     replicateM amount f
 
 makeIdentifier :: T.Text -> StateGen Identifier
@@ -322,13 +322,10 @@ statement = do
 recEventList :: NonEmpty Identifier -> Hog.Size -> Gen Event
 recEventList ids size
     | size <= 0 = idgen
-    | size > 0 = Hog.choice
-                 [ idgen
-                 , EOr <$> recCall <*> recCall
-                 ]
-    where
-        idgen = fmap EId . Hog.element $ toList ids
-        recCall = (recEventList ids (size `div` 2))
+    | size > 0  = Hog.choice [idgen, EOr <$> recCall <*> recCall]
+  where
+    idgen   = fmap EId . Hog.element $ toList ids
+    recCall = recEventList ids (size `div` 2)
 
 eventList :: StateGen Event
 eventList = do
@@ -337,18 +334,19 @@ eventList = do
     let defProb i = prob ^. probEventList . i
     gen $ Hog.frequency
         [ (defProb probEventListAll, return EAll)
-        , (defProb probEventListVar, case context ^. variables of
-                  []   -> return EAll
-                  x:xs -> Hog.sized . recEventList $ fmap toId (x :| xs))
+        , ( defProb probEventListVar
+          , case context ^. variables of
+              []     -> return EAll
+              x : xs -> Hog.sized . recEventList $ toIds <$> (x :| xs)
+          )
         , (defProb probEventListClk, return $ EPosEdge "clk")
         ]
-    where
-        toId (Port _ _ _ i) = i
+    where toIds (Port _ _ _ i) = i
 
 always :: StateGen ModItem
 always = do
     events <- eventList
-    stat <- SeqBlock <$> some statement
+    stat   <- SeqBlock <$> some statement
     return $ Always (EventCtrl events (Just stat))
 
 instantiate :: ModDecl -> StateGen ModItem
