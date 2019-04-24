@@ -34,6 +34,7 @@ import           Control.Monad.Trans.State.Strict
 import           Data.ByteString                  (ByteString)
 import           Data.List                        (nubBy)
 import           Data.Text                        (Text)
+import qualified Data.Text                        as T
 import           Data.Time
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
@@ -165,9 +166,22 @@ fuzzInDir fp src = do
     pop fp $ fuzz src
 
 fuzzMultiple
-    :: MonadFuzz m => Int -> FilePath -> Gen SourceInfo -> Fuzz m FuzzReport
+    :: MonadFuzz m
+    => Int
+    -> (Maybe FilePath)
+    -> Gen SourceInfo
+    -> Fuzz m FuzzReport
 fuzzMultiple n fp src = do
-    make fp
-    void . pop fp $ forM [1 .. n] fuzzDir
+    x <- case fp of
+        Nothing -> do
+            ct <- liftIO getZonedTime
+            return
+                .  fromText
+                .  T.pack
+                $  "output_"
+                <> formatTime defaultTimeLocale "%Y-%m-%d_%H-%M-%S" ct
+        Just f -> return f
+    make x
+    void . pop x $ forM [1 .. n] fuzzDir
     return mempty
     where fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src

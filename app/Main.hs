@@ -199,10 +199,9 @@ getConfig = maybe (return V.defaultConfig) V.parseConfigFile
 handleOpts :: Opts -> IO ()
 handleOpts (Fuzz out configF _ _) = do
     config <- getConfig configF
-    _      <- V.runFuzz
-        config
-        V.defaultYosys
-        (V.fuzzMultiple 5 (S.fromText out) (V.proceduralSrc "top" config))
+    _ <- V.runFuzz config
+                   V.defaultYosys
+                   (V.fuzzMultiple 5 Nothing (V.proceduralSrc "top" config))
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c
