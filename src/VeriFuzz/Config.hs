@@ -44,6 +44,7 @@ module VeriFuzz.Config
     , probEventList
     , probExprNum
     , probExprId
+    , probExprRangeSelect
     , probExprUnOp
     , probExprBinOp
     , probExprCond
@@ -160,30 +161,32 @@ import qualified Toml
 -- <BLANKLINE>
 
 -- | Probability of different expressions nodes.
-data ProbExpr = ProbExpr { _probExprNum      :: {-# UNPACK #-} !Int
+data ProbExpr = ProbExpr { _probExprNum         :: {-# UNPACK #-} !Int
                          -- ^ Probability of generation a number like
                          -- @4'ha@. This should never be set to 0, as it is used
                          -- as a fallback in case there are no viable
                          -- identifiers, such as none being in scope.
-                         , _probExprId       :: {-# UNPACK #-} !Int
+                         , _probExprId          :: {-# UNPACK #-} !Int
                          -- ^ Probability of generating an identifier that is in
                          -- scope and of the right type.
-                         , _probExprUnOp     :: {-# UNPACK #-} !Int
+                         , _probExprRangeSelect :: {-# UNPACK #-} !Int
+                         -- ^ Probability of generating a range selection from a port.
+                         , _probExprUnOp        :: {-# UNPACK #-} !Int
                          -- ^ Probability of generating a unary operator.
-                         , _probExprBinOp    :: {-# UNPACK #-} !Int
+                         , _probExprBinOp       :: {-# UNPACK #-} !Int
                          -- ^ Probability of generation a binary operator.
-                         , _probExprCond     :: {-# UNPACK #-} !Int
+                         , _probExprCond        :: {-# UNPACK #-} !Int
                          -- ^ probability of generating a conditional ternary
                          -- operator.
-                         , _probExprConcat   :: {-# UNPACK #-} !Int
+                         , _probExprConcat      :: {-# UNPACK #-} !Int
                          -- ^ Probability of generating a concatenation.
-                         , _probExprStr      :: {-# UNPACK #-} !Int
+                         , _probExprStr         :: {-# UNPACK #-} !Int
                          -- ^ Probability of generating a string. This is not
                          -- fully supported therefore currently cannot be set.
-                         , _probExprSigned   :: {-# UNPACK #-} !Int
+                         , _probExprSigned      :: {-# UNPACK #-} !Int
                          -- ^ Probability of generating a signed function
                          -- @$signed(...)@.
-                         , _probExprUnsigned :: {-# UNPACK #-} !Int
+                         , _probExprUnsigned    :: {-# UNPACK #-} !Int
                          -- ^ Probability of generating an unsigned function
                          -- @$unsigned(...)@.
                          }
@@ -265,7 +268,7 @@ defaultConfig = Config
   where
     defModItem = ProbModItem 5 1 1
     defStmnt   = ProbStatement 0 15 1 1
-    defExpr    = ProbExpr 1 1 1 1 1 1 0 1 1
+    defExpr    = ProbExpr 1 1 1 1 1 1 1 0 1 1
     defEvent   = ProbEventList 1 1 1
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
@@ -281,6 +284,8 @@ exprCodec =
         .=  _probExprNum
         <*> defaultValue (defProb probExprId) (intE "variable")
         .=  _probExprId
+        <*> defaultValue (defProb probExprRangeSelect) (intE "rangeselect")
+        .= _probExprRangeSelect
         <*> defaultValue (defProb probExprUnOp) (intE "unary")
         .=  _probExprUnOp
         <*> defaultValue (defProb probExprBinOp) (intE "binary")

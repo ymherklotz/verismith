@@ -28,6 +28,7 @@ import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.Foldable                    (fold)
+import           Data.Functor.Foldable            (cata)
 import           Data.List.NonEmpty               (NonEmpty (..), toList)
 import qualified Data.Text                        as T
 import           Hedgehog                         (Gen)
@@ -37,6 +38,7 @@ import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
+import           VeriFuzz.Verilog.Eval
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
 
@@ -63,22 +65,22 @@ toPort ident = do
 sumSize :: [Port] -> Range
 sumSize ps = sum $ ps ^.. traverse . portSize
 
-random :: [Identifier] -> (Expr -> ContAssign) -> Gen ModItem
+random :: [Port] -> (Expr -> ContAssign) -> Gen ModItem
 random ctx fun = do
-    expr <- Hog.sized (exprWithContext (ProbExpr 1 1 1 1 1 1 0 1 1) ctx)
+    expr <- Hog.sized (exprWithContext (ProbExpr 1 1 0 1 1 1 1 0 1 1) [] ctx)
     return . ModCA $ fun expr
 
 --randomAssigns :: [Identifier] -> [Gen ModItem]
 --randomAssigns ids = random ids . ContAssign <$> ids
 
-randomOrdAssigns :: [Identifier] -> [Identifier] -> [Gen ModItem]
+randomOrdAssigns :: [Port] -> [Port] -> [Gen ModItem]
 randomOrdAssigns inp ids = snd $ foldr generate (inp, []) ids
-    where generate cid (i, o) = (cid : i, random i (ContAssign cid) : o)
+    where generate cid (i, o) = (cid : i, random i (ContAssign (_portName cid)) : o)
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
-    x     <- sequence $ randomOrdAssigns start end
     ident <- sequence $ toPort <$> ids
+    x     <- sequence $ randomOrdAssigns (start ident) (end ident)
     let inputs_ = take inps ident
     let other   = drop inps ident
     let y = ModCA . ContAssign "y" . fold $ Id <$> drop inps ids
@@ -90,8 +92,8 @@ randomMod inps total = do
                                         []
   where
     ids   = toId <$> [1 .. total]
-    end   = drop inps ids
-    start = take inps ids
+    end   = drop inps
+    start = take inps
 
 gen :: Gen a -> StateGen a
 gen = lift . lift
@@ -184,7 +186,7 @@ constExprWithContext ps prob size
     where subexpr y = constExprWithContext ps prob $ size `div` y
 
 exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
-exprSafeList prob = [(prob ^. probExprNum, Number <$> genBitVec)]
+exprSafeList prob = [ (prob ^. probExprNum, Number <$> genBitVec)]
 
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
@@ -198,23 +200,32 @@ exprRecList prob subexpr =
     , (prob ^. probExprUnsigned, Appl <$> pure "$unsigned" <*> subexpr 2)
     ]
 
-exprWithContext :: ProbExpr -> [Identifier] -> Hog.Size -> Gen Expr
-exprWithContext prob [] n | n == 0    = Hog.frequency $ exprSafeList prob
-                          | n > 0     = Hog.frequency $ exprRecList prob subexpr
-                          | otherwise = exprWithContext prob [] 0
-    where subexpr y = exprWithContext prob [] $ n `div` y
-exprWithContext prob l n
+rangeSelect :: [Parameter] -> [Port] -> Gen Expr
+rangeSelect ps ports = do
+    p <- Hog.element ports
+    let s = calcRange ps (Just 32) $ _portSize p
+    msb <- Hog.int (Hog.constantFrom (s `div` 2) 0 (s - 1))
+    lsb <- Hog.int (Hog.constantFrom (msb `div` 2) 0 msb)
+    return . RangeSelect (_portName p) $ Range (fromIntegral msb) (fromIntegral lsb)
+
+exprWithContext :: ProbExpr -> [Parameter] -> [Port] -> Hog.Size -> Gen Expr
+exprWithContext prob ps [] n | n == 0    = Hog.frequency $ exprSafeList prob
+                             | n > 0     = Hog.frequency $ exprRecList prob subexpr
+                             | otherwise = exprWithContext prob ps [] 0
+    where subexpr y = exprWithContext prob ps [] $ n `div` y
+exprWithContext prob ps l n
     | n == 0
     = Hog.frequency
-        $ (prob ^. probExprId, Id <$> Hog.element l)
+        $ (prob ^. probExprId, Id . fromPort <$> Hog.element l)
         : exprSafeList prob
     | n > 0
     = Hog.frequency
-        $ (prob ^. probExprId, Id <$> Hog.element l)
+        $ (prob ^. probExprId, Id . fromPort <$> Hog.element l)
+        : (prob ^. probExprRangeSelect, rangeSelect ps l)
         : exprRecList prob subexpr
     | otherwise
-    = exprWithContext prob l 0
-    where subexpr y = exprWithContext prob l $ n `div` y
+    = exprWithContext prob ps l 0
+    where subexpr y = exprWithContext prob ps l $ n `div` y
 
 some :: StateGen a -> StateGen [a]
 some f = do
@@ -244,11 +255,7 @@ scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
     prob    <- askProbability
-    gen . Hog.sized . exprWithContext (prob ^. probExpr) $ vars context
-  where
-    vars cont =
-        (cont ^.. variables . traverse . portName)
-            <> (cont ^.. parameters . traverse . paramIdent)
+    gen . Hog.sized . exprWithContext (_probExpr prob) (_parameters context) $ _variables context
 
 contAssign :: StateGen ContAssign
 contAssign = do
@@ -337,11 +344,10 @@ eventList = do
         , ( defProb probEventListVar
           , case context ^. variables of
               []     -> return EAll
-              x : xs -> Hog.sized . recEventList $ toIds <$> (x :| xs)
+              x : xs -> Hog.sized . recEventList $ fromPort <$> (x :| xs)
           )
         , (defProb probEventListClk, return $ EPosEdge "clk")
         ]
-    where toIds (Port _ _ _ i) = i
 
 always :: StateGen ModItem
 always = do
@@ -442,6 +448,15 @@ parameter = do
     parameters %= (param :)
     return param
 
+-- | Evaluate a range to an integer, and cast it back to a range.
+evalRange :: [Parameter] -> Int -> Range -> Range
+evalRange ps n (Range l r) = Range (eval l) (eval r)
+    where eval = ConstNum . cata (evaluateConst ps) . resize n
+
+calcRange :: [Parameter] -> Maybe Int -> Range -> Int
+calcRange ps i (Range l r) = eval l - eval r + 1
+    where eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (flip resize a) i
+
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
 -- defined wires, so that it correctly reflects the internal state of the
@@ -451,15 +466,15 @@ moduleDef top = do
     name     <- moduleName top
     portList <- some $ newPort Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
+    ps <- many parameter
     context  <- get
-    let local = filter (`notElem` portList) $ context ^. variables
-    let size  = sum $ local ^.. traverse . portSize
+    let local = filter (`notElem` portList) $ _variables context
+    let size  = evalRange (_parameters context) 32 . sum $ local ^.. traverse . portSize
     let clock = Port Wire False 1 "clk"
     let yport = Port Wire False size "y"
     let comb  = combineAssigns_ yport local
-    declareMod local
-        .   ModDecl name [yport] (clock : portList) (mi <> [comb])
-        <$> many parameter
+    return . declareMod local
+        .   ModDecl name [yport] (clock : portList) (mi <> [comb]) $ ps
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.

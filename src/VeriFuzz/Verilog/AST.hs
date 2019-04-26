@@ -209,6 +209,8 @@ data UnaryOperator = UnPlus    -- ^ @+@
 data Expr = Number {-# UNPACK #-} !BitVec
           -- ^ Number implementation containing the size and the value itself
           | Id {-# UNPACK #-} !Identifier
+          | VecSelect {-# UNPACK #-} !Identifier !Expr
+          | RangeSelect {-# UNPACK #-} !Identifier !Range
           -- ^ Symbols
           | Concat ![Expr]
           -- ^ Bit-wise concatenation of expressions represented by braces.
