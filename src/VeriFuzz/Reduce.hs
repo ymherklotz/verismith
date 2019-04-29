@@ -102,6 +102,13 @@ cleanMod m newm = modify . change <$> newm
             $  l
             ^. modItems
 
+halveStatements :: Statement -> Replacement Statement
+halveStatements (SeqBlock l)             = SeqBlock <$> halve l
+halveStatements (CondStmnt _ (Just a) b) = maybe (Single a) (Dual a) b
+halveStatements (CondStmnt _ Nothing b)  = maybe None Single b
+halveStatements (ForLoop _ _ _ s)        = Single s
+halveStatements _                        = None
+
 -- | Split a module declaration in half by trying to remove assign statements.
 halveAssigns :: SourceInfo -> Replacement SourceInfo
 halveAssigns = combine mainModule halveModAssign
@@ -145,7 +152,7 @@ reduce_ repl eval src = do
         _            -> return src
   where
     replacement = repl src
-    runIf s = if s /= src then reduce eval s else return s
+    runIf s = if s /= src then reduce_ repl eval s else return s
     evalIfNotEmpty m = do
         print
             $   GenVerilog
@@ -161,4 +168,5 @@ reduce
     :: (SourceInfo -> IO Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.
     -> IO SourceInfo           -- ^ Reduced output.
-reduce eval src = reduce_ halveAssigns eval src >>= reduce_ halveExpr eval
+reduce eval src = red halveAssigns src >>= red halveExpr
+    where red a = reduce_ a eval
