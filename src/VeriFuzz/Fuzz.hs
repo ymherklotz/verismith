@@ -116,7 +116,11 @@ synthesis src = do
         liftSh . mkdir_p . fromText $ toText a
         pop (fromText $ toText a) $ runSynth a src
 
-generateSample :: (MonadIO m, MonadSh m) => Maybe Seed -> Gen SourceInfo -> Fuzz m (Seed, SourceInfo)
+generateSample
+    :: (MonadIO m, MonadSh m)
+    => Maybe Seed
+    -> Gen SourceInfo
+    -> Fuzz m (Seed, SourceInfo)
 generateSample seed gen = do
     logT "Sampling Verilog from generator"
     (t, v) <- timeit $ sampleSeed seed gen
@@ -165,13 +169,20 @@ equivalence src = do
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzz gen conf = do
     (seed', src) <- generateSample seed gen
-    liftSh . writefile "config.toml" . encodeConfig $ conf & configProperty . propSeed .~ Just seed'
+    liftSh
+        .  writefile "config.toml"
+        .  encodeConfig
+        $  conf
+        &  configProperty
+        .  propSeed
+        .~ Just seed'
     synthesis src
     equivalence src
     return mempty
     where seed = conf ^. configProperty . propSeed
 
-fuzzInDir :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
+fuzzInDir
+    :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzzInDir fp src conf = do
     make fp
     pop fp $ fuzz src conf
@@ -197,23 +208,32 @@ fuzzMultiple n fp src conf = do
     when (isNothing seed) . void . pop x . forM [1 .. n] $ fuzzDir
     unless (isNothing seed) . void . pop x $ fuzzDir (1 :: Int)
     return mempty
-    where fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
-          seed = conf ^. configProperty . propSeed
+  where
+    fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
+    seed = conf ^. configProperty . propSeed
 
 sampleSeed :: MonadIO m => Maybe Seed -> Gen a -> m (Seed, a)
 sampleSeed s gen =
-  liftIO $
-    let
-      loop n =
-        if n <= 0 then
-          error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
-        else do
-          seed <- maybe Hog.random return s
-          case runIdentity . runMaybeT . Hog.runTree $ Hog.runGenT 30 seed gen of
-            Nothing ->
-              loop (n - 1)
-            Just x -> do
-              liftIO . putStrLn $ "VeriFuzz: Chosen seed was '" <> show seed <> "'"
-              pure $ (seed, Hog.nodeValue x)
-    in
-      loop (100 :: Int)
+    liftIO
+        $ let
+              loop n = if n <= 0
+                  then
+                      error
+                          "Hedgehog.Gen.sample: too many discards, could not generate a sample"
+                  else do
+                      seed <- maybe Hog.random return s
+                      case
+                              runIdentity
+                              . runMaybeT
+                              . Hog.runTree
+                              $ Hog.runGenT 30 seed gen
+                          of
+                              Nothing -> loop (n - 1)
+                              Just x  -> do
+                                  liftIO
+                                      .  putStrLn
+                                      $  "VeriFuzz: Chosen seed was '"
+                                      <> show seed
+                                      <> "'"
+                                  pure $ (seed, Hog.nodeValue x)
+          in  loop (100 :: Int)

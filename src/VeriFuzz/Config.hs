@@ -287,7 +287,7 @@ exprCodec =
         <*> defaultValue (defProb probExprId) (intE "variable")
         .=  _probExprId
         <*> defaultValue (defProb probExprRangeSelect) (intE "rangeselect")
-        .= _probExprRangeSelect
+        .=  _probExprRangeSelect
         <*> defaultValue (defProb probExprUnOp) (intE "unary")
         .=  _probExprUnOp
         <*> defaultValue (defProb probExprBinOp) (intE "binary")

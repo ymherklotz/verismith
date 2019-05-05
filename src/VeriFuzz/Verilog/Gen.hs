@@ -75,7 +75,8 @@ random ctx fun = do
 
 randomOrdAssigns :: [Port] -> [Port] -> [Gen ModItem]
 randomOrdAssigns inp ids = snd $ foldr generate (inp, []) ids
-    where generate cid (i, o) = (cid : i, random i (ContAssign (_portName cid)) : o)
+  where
+    generate cid (i, o) = (cid : i, random i (ContAssign (_portName cid)) : o)
 
 randomMod :: Int -> Int -> Gen ModDecl
 randomMod inps total = do
@@ -186,7 +187,7 @@ constExprWithContext ps prob size
     where subexpr y = constExprWithContext ps prob $ size `div` y
 
 exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
-exprSafeList prob = [ (prob ^. probExprNum, Number <$> genBitVec)]
+exprSafeList prob = [(prob ^. probExprNum, Number <$> genBitVec)]
 
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
@@ -206,11 +207,12 @@ rangeSelect ps ports = do
     let s = calcRange ps (Just 32) $ _portSize p
     msb <- Hog.int (Hog.constantFrom (s `div` 2) 0 (s - 1))
     lsb <- Hog.int (Hog.constantFrom (msb `div` 2) 0 msb)
-    return . RangeSelect (_portName p) $ Range (fromIntegral msb) (fromIntegral lsb)
+    return . RangeSelect (_portName p) $ Range (fromIntegral msb)
+                                               (fromIntegral lsb)
 
 exprWithContext :: ProbExpr -> [Parameter] -> [Port] -> Hog.Size -> Gen Expr
-exprWithContext prob ps [] n | n == 0    = Hog.frequency $ exprSafeList prob
-                             | n > 0     = Hog.frequency $ exprRecList prob subexpr
+exprWithContext prob ps [] n | n == 0 = Hog.frequency $ exprSafeList prob
+                             | n > 0 = Hog.frequency $ exprRecList prob subexpr
                              | otherwise = exprWithContext prob ps [] 0
     where subexpr y = exprWithContext prob ps [] $ n `div` y
 exprWithContext prob ps l n
@@ -220,7 +222,7 @@ exprWithContext prob ps l n
         : exprSafeList prob
     | n > 0
     = Hog.frequency
-        $ (prob ^. probExprId, Id . fromPort <$> Hog.element l)
+        $ (prob ^. probExprId         , Id . fromPort <$> Hog.element l)
         : (prob ^. probExprRangeSelect, rangeSelect ps l)
         : exprRecList prob subexpr
     | otherwise
@@ -255,7 +257,10 @@ scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
     prob    <- askProbability
-    gen . Hog.sized . exprWithContext (_probExpr prob) (_parameters context) $ _variables context
+    gen
+        . Hog.sized
+        . exprWithContext (_probExpr prob) (_parameters context)
+        $ _variables context
 
 contAssign :: StateGen ContAssign
 contAssign = do
@@ -455,7 +460,8 @@ evalRange ps n (Range l r) = Range (eval l) (eval r)
 
 calcRange :: [Parameter] -> Maybe Int -> Range -> Int
 calcRange ps i (Range l r) = eval l - eval r + 1
-    where eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (flip resize a) i
+  where
+    eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (flip resize a) i
 
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
@@ -466,15 +472,23 @@ moduleDef top = do
     name     <- moduleName top
     portList <- some $ newPort Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
-    ps <- many parameter
+    ps       <- many parameter
     context  <- get
     let local = filter (`notElem` portList) $ _variables context
-    let size  = evalRange (_parameters context) 32 . sum $ local ^.. traverse . portSize
+    let
+        size =
+            evalRange (_parameters context) 32
+                .   sum
+                $   local
+                ^.. traverse
+                .   portSize
     let clock = Port Wire False 1 "clk"
     let yport = Port Wire False size "y"
     let comb  = combineAssigns_ yport local
-    return . declareMod local
-        .   ModDecl name [yport] (clock : portList) (mi <> [comb]) $ ps
+    return
+        . declareMod local
+        . ModDecl name [yport] (clock : portList) (mi <> [comb])
+        $ ps
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.

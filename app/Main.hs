@@ -80,13 +80,13 @@ fuzzOpts =
         <*> (switch $ long "keep" <> short 'k' <> help
                 "Keep all the directories."
             )
-        <*> (option auto $
-             long "num"
-             <> short 'n'
-             <> help "The number of fuzz runs that should be performed."
-             <> showDefault
-             <> value 1
-             <> metavar "INT"
+        <*> (  option auto
+            $  long "num"
+            <> short 'n'
+            <> help "The number of fuzz runs that should be performed."
+            <> showDefault
+            <> value 1
+            <> metavar "INT"
             )
 
 genOpts :: Parser Opts
@@ -209,8 +209,8 @@ handleOpts :: Opts -> IO ()
 handleOpts (Fuzz out configF _ _ n) = do
     config <- getConfig configF
     _ <- V.runFuzz config
-         V.defaultYosys
-         (V.fuzzMultiple n Nothing (V.proceduralSrc "top" config))
+                   V.defaultYosys
+                   (V.fuzzMultiple n Nothing (V.proceduralSrc "top" config))
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c
