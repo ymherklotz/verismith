@@ -138,7 +138,7 @@ expr (BinOp eRhs bin eLhs) =
     "(" <> expr eRhs <> binaryOp bin <> expr eLhs <> ")"
 expr (Number b             ) = showNum b
 expr (Id     i             ) = getIdentifier i
-expr (VecSelect i e) = getIdentifier i <> "[" <> genExpr e <> "]"
+expr (VecSelect i e) = getIdentifier i <> "[" <> expr e <> "]"
 expr (RangeSelect i r) = getIdentifier i <> range r
 expr (Concat c             ) = "{" <> comma (expr <$> c) <> "}"
 expr (UnOp u e             ) = "(" <> unaryOp u <> expr e <> ")"

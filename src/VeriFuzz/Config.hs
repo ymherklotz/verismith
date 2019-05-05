@@ -74,13 +74,15 @@ module VeriFuzz.Config
     )
 where
 
-import           Control.Applicative (Alternative, (<|>))
-import           Control.Lens        hiding ((.=))
-import           Data.List.NonEmpty  (NonEmpty (..))
-import           Data.Maybe          (fromMaybe)
-import           Data.Text           (Text)
-import qualified Data.Text.IO        as T
-import           Toml                (TomlCodec, (.=))
+import           Control.Applicative    (Alternative, (<|>))
+import           Control.Lens           hiding ((.=))
+import           Data.List.NonEmpty     (NonEmpty (..))
+import           Data.Maybe             (fromMaybe)
+import           Data.Text              (Text)
+import qualified Data.Text.IO           as T
+import           Hedgehog.Internal.Seed (Seed)
+import qualified Hedgehog.Internal.Seed as Seed
+import           Toml                   (TomlCodec, (.=))
 import qualified Toml
 
 -- $conf
@@ -224,7 +226,7 @@ data Probability = Probability { _probModItem   :: {-# UNPACK #-} !ProbModItem
                  deriving (Eq, Show)
 
 data Property = Property { _propSize       :: {-# UNPACK #-} !Int
-                         , _propSeed       :: !(Maybe Int)
+                         , _propSeed       :: !(Maybe Seed)
                          , _propStmntDepth :: {-# UNPACK #-} !Int
                          , _propModDepth   :: {-# UNPACK #-} !Int
                          , _propMaxModules :: {-# UNPACK #-} !Int
@@ -363,7 +365,7 @@ propCodec =
     Property
         <$> defaultValue (defProp propSize) (Toml.int "size")
         .=  _propSize
-        <*> Toml.dioptional (Toml.int "seed")
+        <*> Toml.dioptional (Toml.read "seed")
         .=  _propSeed
         <*> defaultValue (defProp propStmntDepth) (int "statement" "depth")
         .=  _propStmntDepth

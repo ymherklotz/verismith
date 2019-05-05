@@ -24,21 +24,28 @@ module VeriFuzz
 where
 
 import           Control.Lens
-import qualified Crypto.Random.DRBG       as C
-import           Data.ByteString          (ByteString)
-import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
-import qualified Data.ByteString.Lazy     as L
-import qualified Data.Graph.Inductive     as G
-import qualified Data.Graph.Inductive.Dot as G
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           Data.Text.Encoding       (decodeUtf8)
-import qualified Data.Text.IO             as T
-import           Hedgehog                 (Gen)
-import qualified Hedgehog.Gen             as Hog
-import           Prelude                  hiding (FilePath)
+import           Control.Monad.IO.Class    (MonadIO)
+import           Control.Monad.Trans.Maybe (runMaybeT)
+import qualified Crypto.Random.DRBG        as C
+import           Data.ByteString           (ByteString)
+import           Data.ByteString.Builder   (byteStringHex, toLazyByteString)
+import qualified Data.ByteString.Lazy      as L
+import qualified Data.Graph.Inductive      as G
+import qualified Data.Graph.Inductive.Dot  as G
+import           Data.Maybe                (isNothing)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import           Data.Text.Encoding        (decodeUtf8)
+import qualified Data.Text.IO              as T
+import           Hedgehog                  (Gen)
+import qualified Hedgehog.Gen              as Hog
+import qualified Hedgehog.Internal.Gen     as Hog
+import           Hedgehog.Internal.Seed    (Seed)
+import qualified Hedgehog.Internal.Seed    as Hog
+import qualified Hedgehog.Internal.Tree    as Hog
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted            (liftSh)
+import           Shelly.Lifted             (liftSh)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
@@ -128,14 +135,15 @@ checkEquivalence src dir = shellyFailDir $ do
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
 -- generated Verilog files are equivalent.
 runEquivalence
-    :: Gen Verilog -- ^ Generator for the Verilog file.
+    :: Maybe Seed
+    -> Gen Verilog -- ^ Generator for the Verilog file.
     -> Text        -- ^ Name of the folder on each thread.
     -> Text        -- ^ Name of the general folder being used.
     -> Bool        -- ^ Keep flag.
     -> Int         -- ^ Used to track the recursion.
     -> IO ()
-runEquivalence gm t d k i = do
-    m <- Hog.sample gm
+runEquivalence seed gm t d k i = do
+    m <- sampleSeed seed gm
     let srcInfo = SourceInfo "top" m
     rand <- generateByteString 20
     shellyFailDir $ do
@@ -162,7 +170,7 @@ runEquivalence gm t d k i = do
                 $ onFailure n
         cd ".."
         unless k . rm_rf $ fromText n
-    when (i < 5) (runEquivalence gm t d k $ i + 1)
+    when (i < 5 && isNothing seed) (runEquivalence seed gm t d k $ i + 1)
     where n = t <> "_" <> T.pack (show i)
 
 runReduce :: SourceInfo -> IO SourceInfo

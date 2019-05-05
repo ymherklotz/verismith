@@ -209,8 +209,8 @@ handleOpts :: Opts -> IO ()
 handleOpts (Fuzz out configF _ _ n) = do
     config <- getConfig configF
     _ <- V.runFuzz config
-                   V.defaultYosys
-                   (V.fuzzMultiple n Nothing (V.proceduralSrc "top" config))
+         V.defaultYosys
+         (V.fuzzMultiple n Nothing (V.proceduralSrc "top" config))
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c

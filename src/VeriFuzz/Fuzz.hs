@@ -20,6 +20,7 @@ module VeriFuzz.Fuzz
     , fuzzInDir
     , fuzzMultiple
     , runFuzz
+    , sampleSeed
     )
 where
 
@@ -29,15 +30,23 @@ import           Control.Monad                    (forM, void)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Control      (MonadBaseControl)
+import           Control.Monad.Trans.Maybe        (runMaybeT)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.ByteString                  (ByteString)
 import           Data.List                        (nubBy)
+import           Data.Maybe                       (isNothing)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as T
 import           Data.Time
 import           Hedgehog                         (Gen)
+import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
+import qualified Hedgehog.Gen                     as Hog
+import qualified Hedgehog.Internal.Gen            as Hog
+import           Hedgehog.Internal.Seed           (Seed)
+import qualified Hedgehog.Internal.Seed           as Hog
+import qualified Hedgehog.Internal.Tree           as Hog
 import           Prelude                          hiding (FilePath)
 import           Shelly                           hiding (get)
 import           Shelly.Lifted                    (MonadSh, liftSh)
@@ -66,12 +75,12 @@ type Fuzz m = StateT FuzzReport (ReaderT FuzzEnv m)
 
 type MonadFuzz m = (MonadBaseControl IO m, MonadIO m, MonadSh m)
 
-runFuzz :: MonadIO m => Config -> Yosys -> Fuzz Sh a -> m a
+runFuzz :: MonadIO m => Config -> Yosys -> (Maybe Seed -> Fuzz Sh a) -> m a
 runFuzz conf yos m = shelly $ runFuzz' conf yos m
 
-runFuzz' :: Monad m => Config -> Yosys -> Fuzz m b -> m b
+runFuzz' :: Monad m => Config -> Yosys -> (Maybe Seed -> Fuzz m b) -> m b
 runFuzz' conf yos m = runReaderT
-    (evalStateT m (FuzzReport [] [] []))
+    (evalStateT (m (conf ^. configProperty . propSeed)) (FuzzReport [] [] []))
     (FuzzEnv (descriptionToSynth <$> conf ^. configSynthesisers)
              (descriptionToSim <$> conf ^. configSimulators)
              yos
@@ -107,10 +116,10 @@ synthesis src = do
         liftSh . mkdir_p . fromText $ toText a
         pop (fromText $ toText a) $ runSynth a src
 
-generateSample :: (MonadIO m, MonadSh m) => Gen SourceInfo -> Fuzz m SourceInfo
-generateSample gen = do
+generateSample :: (MonadIO m, MonadSh m) => Maybe Seed -> Gen SourceInfo -> Fuzz m SourceInfo
+generateSample seed gen = do
     logT "Sampling Verilog from generator"
-    (t, src) <- timeit $ Hog.sample gen
+    (t, src) <- timeit $ sampleSeed seed gen
     logT $ "Generated Verilog (" <> showT t <> ")"
     return src
 
@@ -153,25 +162,26 @@ equivalence src = do
             runEquiv yos a (Just b) src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-fuzz :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzReport
-fuzz gen = do
-    src <- generateSample gen
+fuzz :: MonadFuzz m => Gen SourceInfo -> Maybe Seed -> Fuzz m FuzzReport
+fuzz gen seed = do
+    src <- generateSample seed gen
     synthesis src
     equivalence src
     return mempty
 
-fuzzInDir :: MonadFuzz m => FilePath -> Gen SourceInfo -> Fuzz m FuzzReport
-fuzzInDir fp src = do
+fuzzInDir :: MonadFuzz m => FilePath -> Gen SourceInfo -> Maybe Seed -> Fuzz m FuzzReport
+fuzzInDir fp src seed = do
     make fp
-    pop fp $ fuzz src
+    pop fp $ fuzz src seed
 
 fuzzMultiple
     :: MonadFuzz m
     => Int
-    -> (Maybe FilePath)
+    -> Maybe FilePath
     -> Gen SourceInfo
+    -> Maybe Seed
     -> Fuzz m FuzzReport
-fuzzMultiple n fp src = do
+fuzzMultiple n fp src seed = do
     x <- case fp of
         Nothing -> do
             ct <- liftIO getZonedTime
@@ -182,6 +192,25 @@ fuzzMultiple n fp src = do
                 <> formatTime defaultTimeLocale "%Y-%m-%d_%H-%M-%S" ct
         Just f -> return f
     make x
-    void . pop x $ forM [1 .. n] fuzzDir
+    when (isNothing seed) . void . pop x . forM [1 .. n] $ fuzzDir
+    unless (isNothing seed) . void . pop x $ fuzzDir (1 :: Int)
     return mempty
-    where fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src
+    where fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src seed
+
+sampleSeed :: MonadIO m => Maybe Seed -> Gen a -> m a
+sampleSeed s gen =
+  liftIO $
+    let
+      loop n =
+        if n <= 0 then
+          error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
+        else do
+          seed <- maybe Hog.random return s
+          case runIdentity . runMaybeT . Hog.runTree $ Hog.runGenT 30 seed gen of
+            Nothing ->
+              loop (n - 1)
+            Just x -> do
+              liftIO . putStrLn $ "VeriFuzz: Chosen seed was '" <> show seed <> "'"
+              pure $ Hog.nodeValue x
+    in
+      loop (100 :: Int)
