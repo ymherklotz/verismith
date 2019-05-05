@@ -229,10 +229,13 @@ exprWithContext prob ps l n
     = exprWithContext prob ps l 0
     where subexpr y = exprWithContext prob ps l $ n `div` y
 
-some :: StateGen a -> StateGen [a]
-some f = do
-    amount <- gen $ Hog.int (Hog.linear 1 50)
+someI :: Int -> StateGen a -> StateGen [a]
+someI m f = do
+    amount <- gen $ Hog.int (Hog.linear 1 m)
     replicateM amount f
+
+some :: StateGen a -> StateGen [a]
+some = someI 50
 
 many :: StateGen a -> StateGen [a]
 many f = do
@@ -246,9 +249,22 @@ makeIdentifier prefix = do
     nameCounter += 1
     return ident
 
-newPort :: PortType -> StateGen Port
-newPort pt = do
+getPort' :: PortType -> Identifier -> [Port] -> StateGen Port
+getPort' pt i c =
+    case filter portId c of
+        x:_ -> return x
+        []  -> newPort i pt
+    where
+        portId (Port pt' _ _ i') = i == i' && pt == pt'
+
+nextPort :: PortType -> StateGen Port
+nextPort pt = do
+    context <- get
     ident <- makeIdentifier . T.toLower $ showT pt
+    getPort' pt ident (_variables context)
+
+newPort :: Identifier -> PortType -> StateGen Port
+newPort ident pt = do
     p     <- gen $ Port pt <$> Hog.bool <*> range <*> pure ident
     variables %= (p :)
     return p
@@ -265,7 +281,7 @@ scopedExpr = do
 contAssign :: StateGen ContAssign
 contAssign = do
     expr <- scopedExpr
-    p    <- newPort Wire
+    p    <- nextPort Wire
     return $ ContAssign (p ^. portName) expr
 
 lvalFromPort :: Port -> LVal
@@ -280,21 +296,25 @@ askProbability = lift $ asks probability
 assignment :: StateGen Assign
 assignment = do
     expr <- scopedExpr
-    lval <- lvalFromPort <$> newPort Reg
+    lval <- lvalFromPort <$> nextPort Reg
     return $ Assign lval Nothing expr
 
 seqBlock :: StateGen Statement
 seqBlock = do
     stmntDepth -= 1
-    tstat <- SeqBlock <$> some statement
+    tstat <- SeqBlock <$> someI 20 statement
     stmntDepth += 1
     return tstat
 
 conditional :: StateGen Statement
 conditional = do
     expr  <- scopedExpr
+    nc <- _nameCounter <$> get
     tstat <- seqBlock
+    nameCounter .= nc
     fstat <- Hog.maybe seqBlock
+    nc' <- _nameCounter <$> get
+    nameCounter .= max nc nc'
     return $ CondStmnt expr (Just tstat) fstat
 
 --constToExpr :: ConstExpr -> Expr
@@ -310,12 +330,11 @@ conditional = do
 forLoop :: StateGen Statement
 forLoop = do
     num   <- Hog.int (Hog.linear 0 20)
-    var   <- lvalFromPort <$> newPort Reg
-    stats <- seqBlock
-    return $ ForLoop (Assign var Nothing 0)
+    var   <- lvalFromPort <$> nextPort Reg
+    ForLoop (Assign var Nothing 0)
                      (BinOp (varId var) BinLT $ fromIntegral num)
                      (Assign var Nothing $ BinOp (varId var) BinPlus 1)
-                     stats
+                     <$> seqBlock
     where varId v = Id (v ^. regId)
 
 statement :: StateGen Statement
@@ -357,14 +376,14 @@ eventList = do
 always :: StateGen ModItem
 always = do
     events <- eventList
-    stat   <- SeqBlock <$> some statement
+    stat   <- seqBlock
     return $ Always (EventCtrl events (Just stat))
 
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
     outs    <-
-        fmap (Id . view portName) <$> (replicateM (length outP) $ newPort Wire)
+        fmap (Id . view portName) <$> (replicateM (length outP) $ nextPort Wire)
     ins <-
         (Id "clk" :)
         .   fmap (Id . view portName)
@@ -461,7 +480,7 @@ evalRange ps n (Range l r) = Range (eval l) (eval r)
 calcRange :: [Parameter] -> Maybe Int -> Range -> Int
 calcRange ps i (Range l r) = eval l - eval r + 1
   where
-    eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (flip resize a) i
+    eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (`resize` a) i
 
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
@@ -470,7 +489,7 @@ calcRange ps i (Range l r) = eval l - eval r + 1
 moduleDef :: Maybe Identifier -> StateGen ModDecl
 moduleDef top = do
     name     <- moduleName top
-    portList <- some $ newPort Wire
+    portList <- some $ nextPort Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
     ps       <- many parameter
     context  <- get
