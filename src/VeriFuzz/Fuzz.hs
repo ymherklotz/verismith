@@ -75,12 +75,12 @@ type Fuzz m = StateT FuzzReport (ReaderT FuzzEnv m)
 
 type MonadFuzz m = (MonadBaseControl IO m, MonadIO m, MonadSh m)
 
-runFuzz :: MonadIO m => Config -> Yosys -> (Maybe Seed -> Fuzz Sh a) -> m a
+runFuzz :: MonadIO m => Config -> Yosys -> (Config -> Fuzz Sh a) -> m a
 runFuzz conf yos m = shelly $ runFuzz' conf yos m
 
-runFuzz' :: Monad m => Config -> Yosys -> (Maybe Seed -> Fuzz m b) -> m b
+runFuzz' :: Monad m => Config -> Yosys -> (Config -> Fuzz m b) -> m b
 runFuzz' conf yos m = runReaderT
-    (evalStateT (m (conf ^. configProperty . propSeed)) (FuzzReport [] [] []))
+    (evalStateT (m conf) (FuzzReport [] [] []))
     (FuzzEnv (descriptionToSynth <$> conf ^. configSynthesisers)
              (descriptionToSim <$> conf ^. configSimulators)
              yos
@@ -116,12 +116,12 @@ synthesis src = do
         liftSh . mkdir_p . fromText $ toText a
         pop (fromText $ toText a) $ runSynth a src
 
-generateSample :: (MonadIO m, MonadSh m) => Maybe Seed -> Gen SourceInfo -> Fuzz m SourceInfo
+generateSample :: (MonadIO m, MonadSh m) => Maybe Seed -> Gen SourceInfo -> Fuzz m (Seed, SourceInfo)
 generateSample seed gen = do
     logT "Sampling Verilog from generator"
-    (t, src) <- timeit $ sampleSeed seed gen
+    (t, v) <- timeit $ sampleSeed seed gen
     logT $ "Generated Verilog (" <> showT t <> ")"
-    return src
+    return v
 
 passedSynthesis :: MonadSh m => Fuzz m [SynthTool]
 passedSynthesis = fmap toSynth . filter passed . _synthStatus <$> get
@@ -162,26 +162,28 @@ equivalence src = do
             runEquiv yos a (Just b) src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-fuzz :: MonadFuzz m => Gen SourceInfo -> Maybe Seed -> Fuzz m FuzzReport
-fuzz gen seed = do
-    src <- generateSample seed gen
+fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
+fuzz gen conf = do
+    (seed', src) <- generateSample seed gen
+    liftSh . writefile "config.toml" . encodeConfig $ conf & configProperty . propSeed .~ Just seed'
     synthesis src
     equivalence src
     return mempty
+    where seed = conf ^. configProperty . propSeed
 
-fuzzInDir :: MonadFuzz m => FilePath -> Gen SourceInfo -> Maybe Seed -> Fuzz m FuzzReport
-fuzzInDir fp src seed = do
+fuzzInDir :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
+fuzzInDir fp src conf = do
     make fp
-    pop fp $ fuzz src seed
+    pop fp $ fuzz src conf
 
 fuzzMultiple
     :: MonadFuzz m
     => Int
     -> Maybe FilePath
     -> Gen SourceInfo
-    -> Maybe Seed
+    -> Config
     -> Fuzz m FuzzReport
-fuzzMultiple n fp src seed = do
+fuzzMultiple n fp src conf = do
     x <- case fp of
         Nothing -> do
             ct <- liftIO getZonedTime
@@ -195,9 +197,10 @@ fuzzMultiple n fp src seed = do
     when (isNothing seed) . void . pop x . forM [1 .. n] $ fuzzDir
     unless (isNothing seed) . void . pop x $ fuzzDir (1 :: Int)
     return mempty
-    where fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src seed
+    where fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
+          seed = conf ^. configProperty . propSeed
 
-sampleSeed :: MonadIO m => Maybe Seed -> Gen a -> m a
+sampleSeed :: MonadIO m => Maybe Seed -> Gen a -> m (Seed, a)
 sampleSeed s gen =
   liftIO $
     let
@@ -211,6 +214,6 @@ sampleSeed s gen =
               loop (n - 1)
             Just x -> do
               liftIO . putStrLn $ "VeriFuzz: Chosen seed was '" <> show seed <> "'"
-              pure $ Hog.nodeValue x
+              pure $ (seed, Hog.nodeValue x)
     in
       loop (100 :: Int)
