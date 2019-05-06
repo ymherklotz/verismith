@@ -23,7 +23,7 @@ import qualified Hedgehog.Range          as Hog
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Text.Parsec
-import           VeriFuzz
+import           VeriFuzz                hiding (Property)
 import           VeriFuzz.Result
 import           VeriFuzz.Verilog.Lex
 import           VeriFuzz.Verilog.Parser

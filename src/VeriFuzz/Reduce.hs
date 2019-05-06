@@ -102,12 +102,12 @@ cleanMod m newm = modify . change <$> newm
             $  l
             ^. modItems
 
-halveStatements :: Statement -> Replacement Statement
-halveStatements (SeqBlock l            ) = SeqBlock <$> halve l
-halveStatements (CondStmnt _ (Just a) b) = maybe (Single a) (Dual a) b
-halveStatements (CondStmnt _ Nothing  b) = maybe None Single b
-halveStatements (ForLoop _ _ _ s       ) = Single s
-halveStatements _                        = None
+-- halveStatements :: Statement -> Replacement Statement
+-- halveStatements (SeqBlock l            ) = SeqBlock <$> halve l
+-- halveStatements (CondStmnt _ (Just a) b) = maybe (Single a) (Dual a) b
+-- halveStatements (CondStmnt _ Nothing  b) = maybe None Single b
+-- halveStatements (ForLoop _ _ _ s       ) = Single s
+-- halveStatements _                        = None
 
 -- | Split a module declaration in half by trying to remove assign statements.
 halveAssigns :: SourceInfo -> Replacement SourceInfo

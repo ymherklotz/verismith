@@ -8,11 +8,14 @@ Stability   : experimental
 Portability : POSIX
 -}
 
+{-# LANGUAGE TemplateHaskell #-}
+
 module VeriFuzz
     ( runEquivalence
     , runSimulation
     , runReduce
     , draw
+    , versionInfo
     , SourceInfo(..)
     , module VeriFuzz.Verilog
     , module VeriFuzz.Config
@@ -24,28 +27,26 @@ module VeriFuzz
 where
 
 import           Control.Lens
-import           Control.Monad.IO.Class    (MonadIO)
-import           Control.Monad.Trans.Maybe (runMaybeT)
-import qualified Crypto.Random.DRBG        as C
-import           Data.ByteString           (ByteString)
-import           Data.ByteString.Builder   (byteStringHex, toLazyByteString)
-import qualified Data.ByteString.Lazy      as L
-import qualified Data.Graph.Inductive      as G
-import qualified Data.Graph.Inductive.Dot  as G
-import           Data.Maybe                (isNothing)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
-import           Data.Text.Encoding        (decodeUtf8)
-import qualified Data.Text.IO              as T
-import           Hedgehog                  (Gen)
-import qualified Hedgehog.Gen              as Hog
-import qualified Hedgehog.Internal.Gen     as Hog
-import           Hedgehog.Internal.Seed    (Seed)
-import qualified Hedgehog.Internal.Seed    as Hog
-import qualified Hedgehog.Internal.Tree    as Hog
-import           Prelude                   hiding (FilePath)
+import qualified Crypto.Random.DRBG       as C
+import           Data.ByteString          (ByteString)
+import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
+import qualified Data.ByteString.Lazy     as L
+import qualified Data.Graph.Inductive     as G
+import qualified Data.Graph.Inductive.Dot as G
+import           Data.Maybe               (isNothing)
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           Data.Text.Encoding       (decodeUtf8)
+import qualified Data.Text.IO             as T
+import           Data.Version             (showVersion)
+import           Development.GitRev
+import           Hedgehog                 (Gen)
+import qualified Hedgehog.Gen             as Hog
+import           Hedgehog.Internal.Seed   (Seed)
+import           Paths_verifuzz           (version)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted             (liftSh)
+import           Shelly.Lifted            (liftSh)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
@@ -55,6 +56,16 @@ import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog
+
+versionInfo :: String
+versionInfo =
+    "VeriFuzz "
+        <> showVersion version
+        <> " ("
+        <> $(gitCommitDate)
+        <> " "
+        <> $(gitHash)
+        <> ")"
 
 -- | Generate a specific number of random bytestrings of size 256.
 randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]

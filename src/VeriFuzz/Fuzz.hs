@@ -33,16 +33,12 @@ import           Control.Monad.Trans.Control      (MonadBaseControl)
 import           Control.Monad.Trans.Maybe        (runMaybeT)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
-import           Data.ByteString                  (ByteString)
 import           Data.List                        (nubBy)
 import           Data.Maybe                       (isNothing)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as T
 import           Data.Time
 import           Hedgehog                         (Gen)
-import           Hedgehog                         (Gen)
-import qualified Hedgehog.Gen                     as Hog
-import qualified Hedgehog.Gen                     as Hog
 import qualified Hedgehog.Internal.Gen            as Hog
 import           Hedgehog.Internal.Seed           (Seed)
 import qualified Hedgehog.Internal.Seed           as Hog
@@ -54,11 +50,7 @@ import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Report
 import           VeriFuzz.Result
-import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Quartus
-import           VeriFuzz.Sim.Vivado
-import           VeriFuzz.Sim.XST
 import           VeriFuzz.Sim.Yosys
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen

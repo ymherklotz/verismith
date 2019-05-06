@@ -1,7 +1,10 @@
 # Files
 TAGS
+*.jou
+*.log
 
 # Folders
 .stack-work
 .shelly
 failed
+output*

@@ -250,22 +250,20 @@ makeIdentifier prefix = do
     return ident
 
 getPort' :: PortType -> Identifier -> [Port] -> StateGen Port
-getPort' pt i c =
-    case filter portId c of
-        x:_ -> return x
-        []  -> newPort i pt
-    where
-        portId (Port pt' _ _ i') = i == i' && pt == pt'
+getPort' pt i c = case filter portId c of
+    x : _ -> return x
+    []    -> newPort i pt
+    where portId (Port pt' _ _ i') = i == i' && pt == pt'
 
 nextPort :: PortType -> StateGen Port
 nextPort pt = do
     context <- get
-    ident <- makeIdentifier . T.toLower $ showT pt
+    ident   <- makeIdentifier . T.toLower $ showT pt
     getPort' pt ident (_variables context)
 
 newPort :: Identifier -> PortType -> StateGen Port
 newPort ident pt = do
-    p     <- gen $ Port pt <$> Hog.bool <*> range <*> pure ident
+    p <- gen $ Port pt <$> Hog.bool <*> range <*> pure ident
     variables %= (p :)
     return p
 
@@ -309,13 +307,14 @@ seqBlock = do
 conditional :: StateGen Statement
 conditional = do
     expr  <- scopedExpr
-    nc <- _nameCounter <$> get
+    nc    <- _nameCounter <$> get
     tstat <- seqBlock
+    nc'   <- _nameCounter <$> get
     nameCounter .= nc
-    fstat <- Hog.maybe seqBlock
-    nc' <- _nameCounter <$> get
-    nameCounter .= max nc nc'
-    return $ CondStmnt expr (Just tstat) fstat
+    fstat <- seqBlock
+    nc''  <- _nameCounter <$> get
+    nameCounter .= max nc' nc''
+    return $ CondStmnt expr (Just tstat) (Just fstat)
 
 --constToExpr :: ConstExpr -> Expr
 --constToExpr (ConstNum s n    ) = Number s n
@@ -329,12 +328,12 @@ conditional = do
 
 forLoop :: StateGen Statement
 forLoop = do
-    num   <- Hog.int (Hog.linear 0 20)
-    var   <- lvalFromPort <$> nextPort Reg
+    num <- Hog.int (Hog.linear 0 20)
+    var <- lvalFromPort <$> nextPort Reg
     ForLoop (Assign var Nothing 0)
-                     (BinOp (varId var) BinLT $ fromIntegral num)
-                     (Assign var Nothing $ BinOp (varId var) BinPlus 1)
-                     <$> seqBlock
+            (BinOp (varId var) BinLT $ fromIntegral num)
+            (Assign var Nothing $ BinOp (varId var) BinPlus 1)
+        <$> seqBlock
     where varId v = Id (v ^. regId)
 
 statement :: StateGen Statement
@@ -353,7 +352,7 @@ statement = do
 recEventList :: NonEmpty Identifier -> Hog.Size -> Gen Event
 recEventList ids size
     | size <= 0 = idgen
-    | size > 0  = Hog.choice [idgen, EOr <$> recCall <*> recCall]
+    | otherwise = Hog.choice [idgen, EOr <$> recCall <*> recCall]
   where
     idgen   = fmap EId . Hog.element $ toList ids
     recCall = recEventList ids (size `div` 2)

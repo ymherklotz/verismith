@@ -74,14 +74,13 @@ module VeriFuzz.Config
     )
 where
 
-import           Control.Applicative    (Alternative, (<|>))
+import           Control.Applicative    (Alternative)
 import           Control.Lens           hiding ((.=))
 import           Data.List.NonEmpty     (NonEmpty (..))
 import           Data.Maybe             (fromMaybe)
 import           Data.Text              (Text)
 import qualified Data.Text.IO           as T
 import           Hedgehog.Internal.Seed (Seed)
-import qualified Hedgehog.Internal.Seed as Seed
 import           Toml                   (TomlCodec, (.=))
 import qualified Toml
 
@@ -129,25 +128,26 @@ import qualified Toml
 -- >>> T.putStrLn $ encodeConfig defaultConfig
 -- <BLANKLINE>
 -- [probability]
---   eventlist.all = 1
+--   eventlist.all = 0
 --   eventlist.clk = 1
 --   eventlist.var = 1
---   expr.binary = 1
---   expr.concatenation = 1
+--   expr.binary = 5
+--   expr.concatenation = 3
 --   expr.number = 1
---   expr.signed = 1
+--   expr.rangeselect = 5
+--   expr.signed = 5
 --   expr.string = 0
---   expr.ternary = 1
---   expr.unary = 1
---   expr.unsigned = 1
---   expr.variable = 1
+--   expr.ternary = 5
+--   expr.unary = 5
+--   expr.unsigned = 5
+--   expr.variable = 5
 --   moditem.always = 1
 --   moditem.assign = 5
 --   moditem.instantiation = 1
 --   statement.blocking = 0
 --   statement.conditional = 1
 --   statement.forloop = 1
---   statement.nonblocking = 15
+--   statement.nonblocking = 3
 -- <BLANKLINE>
 -- [property]
 --   module.depth = 2
@@ -268,10 +268,30 @@ defaultConfig = Config
     []
     [SynthDescription "yosys", SynthDescription "vivado"]
   where
-    defModItem = ProbModItem 5 1 1
-    defStmnt   = ProbStatement 0 15 1 1
-    defExpr    = ProbExpr 1 1 1 1 1 1 1 0 1 1
-    defEvent   = ProbEventList 1 1 1
+    defModItem =
+        ProbModItem 5 -- Assign
+                    1 -- Always
+                    1 -- Instantiation
+    defStmnt =
+        ProbStatement 0 -- Blocking assignment
+                      3 -- Non-blocking assignment
+                      1 -- Conditional
+                      1 -- For loop
+    defExpr =
+        ProbExpr 1 -- Number
+                 5 -- Identifier
+                 5 -- Range selection
+                 5 -- Unary operator
+                 5 -- Binary operator
+                 5 -- Ternary conditional
+                 3 -- Concatenation
+                 0 -- String
+                 5 -- Signed function
+                 5 -- Unsigned funtion
+    defEvent =
+        ProbEventList 0 -- All
+                      1 -- Clk
+                      0 -- Var
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])

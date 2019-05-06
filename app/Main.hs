@@ -193,9 +193,13 @@ argparse =
                 <> metavar "config"
                 )
 
+version :: Parser (a -> a)
+version = infoOption V.versionInfo $ mconcat
+    [long "version", short 'v', help "Show version information.", hidden]
+
 opts :: ParserInfo Opts
 opts = info
-    (argparse <**> helper)
+    (argparse <**> helper <**> version)
     (  fullDesc
     <> progDesc "Fuzz different simulators and synthesisers."
     <> header
@@ -206,7 +210,7 @@ getConfig :: Maybe FilePath -> IO V.Config
 getConfig = maybe (return V.defaultConfig) V.parseConfigFile
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz out configF _ _ n) = do
+handleOpts (Fuzz _ configF _ _ n) = do
     config <- getConfig configF
     _ <- V.runFuzz config
                    V.defaultYosys
@@ -216,7 +220,7 @@ handleOpts (Generate f c) = do
     config <- getConfig c
     source <- V.proceduralIO "top" config
     maybe (T.putStrLn $ V.genSource source)
-          (flip T.writeFile (V.genSource source))
+          (flip T.writeFile $ V.genSource source)
           f
 handleOpts (Parse f) = do
     verilogSrc <- readFile file

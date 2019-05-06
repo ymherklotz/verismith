@@ -31,11 +31,8 @@ module VeriFuzz.Report
 where
 
 import           Control.Lens
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.ByteString             (ByteString)
-import           Prelude                     hiding (FilePath)
-import           Shelly.Lifted               (MonadSh)
+import           Data.ByteString       (ByteString)
+import           Prelude               hiding (FilePath)
 import           VeriFuzz.Config
 import           VeriFuzz.Result
 import           VeriFuzz.Sim.Icarus

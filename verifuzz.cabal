@@ -1,5 +1,5 @@
 name: verifuzz
-version: 0.1.1.0
+version: 0.2.0.0
 synopsis: Random verilog generation and simulator testing.
 description:
   VeriFuzz provides random verilog generation modules
@@ -26,6 +26,7 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   build-tools: alex >=3 && <4
+  other-modules: Paths_verifuzz
   exposed-modules: VeriFuzz
                  , VeriFuzz.Circuit
                  , VeriFuzz.Circuit.Base
@@ -83,6 +84,7 @@ library
                , time >= 1.8.0.2 && <1.9
                , lifted-base >=0.2.3 && <0.3
                , monad-control >=1.0.2 && <1.1
+               , gitrev >= 1.3.1 && <1.4
   default-extensions: OverloadedStrings
 
 executable verifuzz
@@ -92,7 +94,7 @@ executable verifuzz
   ghc-options: -threaded
   build-depends: base >= 4.7 && < 5
                , shelly >=1.8.0 && <1.9
-               , verifuzz >= 0.1 && <0.2
+               , verifuzz
                , text >=1.2 && <1.3
                , bytestring >=0.10 && <0.11
                , optparse-applicative >=0.14 && <0.15
@@ -106,7 +108,7 @@ test-suite verifuzz-test
   other-modules: Unit
                , Property
   build-depends: base >=4 && <5
-               , verifuzz >=0.1 && <0.2
+               , verifuzz
                , fgl >=5.7 && <5.8
                , tasty >=1.2 && <1.3
                , tasty-hunit >=0.10 && <0.11
