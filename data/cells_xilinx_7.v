@@ -154,7 +154,6 @@ module BUFG (O, I);
 endmodule
 
 module FDRE (Q, C, CE, D, R);
-
    parameter [0:0] INIT = 1'b0;
    parameter [0:0] IS_C_INVERTED = 1'b0;
    parameter [0:0] IS_D_INVERTED = 1'b0;
@@ -175,11 +174,9 @@ module FDRE (Q, C, CE, D, R);
        Q <= 0;
      else if (CE)
        Q <= D_in;
-
 endmodule
 
 module FDSE (Q, C, CE, D, S);
-
    parameter INIT = 1'b1;
    parameter [0:0] IS_C_INVERTED = 1'b0;
    parameter [0:0] IS_S_INVERTED = 1'b0;
@@ -212,36 +209,54 @@ module FDSE (Q, C, CE, D, S);
 endmodule
 
 module LD (Q, D, G);
+   parameter INIT = 1'b0;
+   output Q;
+   wire   Q;
+   input  D, G;
+   reg    q_out;
 
-    parameter INIT = 1'b0;
-    output Q;
-    wire Q;
-    input  D, G;
-    reg q_out;
+   initial q_out = INIT;
 
-    initial q_out = INIT;
+   assign Q = q_out;
 
-    assign Q = q_out;
-
-    always @(D or G)
-      if (G)
-        q_out <= D;
-
+   always @(D or G)
+     if (G)
+       q_out <= D;
 endmodule
 
 module FD (Q, C, D);
-    parameter INIT = 1'b0;
-    output Q;
-    input  C, D;
+   parameter INIT = 1'b0;
+   output Q;
+   input  C, D;
 
-    wire Q;
-    reg q_out;
+   wire   Q;
+   reg    q_out;
 
-    initial q_out = INIT;
+   initial q_out = INIT;
 
-    always @(posedge C)
-      q_out <=  D;
+   always @(posedge C)
+     q_out <=  D;
 
-    assign Q = q_out;
+   assign Q = q_out;
+endmodule
 
+module LDPE (Q, D, G, GE, PRE);
+   parameter [0:0] INIT = 1'b1;
+   parameter [0:0] IS_G_INVERTED = 1'b0;
+   parameter [0:0] IS_PRE_INVERTED = 1'b0;
+
+   output Q;
+   reg    Q = INIT;
+
+   input  D, G, GE, PRE;
+   wire   G_in, PRE_in;
+
+   assign G_in = IS_G_INVERTED ^ G;
+   assign PRE_in = IS_PRE_INVERTED ^ PRE;
+
+   always @( PRE_in or D or G_in or GE)
+     if (PRE_in)
+       Q <= 1;
+     else if (G_in && GE)
+       Q <= D;
 endmodule
