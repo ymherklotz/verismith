@@ -130,7 +130,7 @@ import qualified Toml
 -- [probability]
 --   eventlist.all = 0
 --   eventlist.clk = 1
---   eventlist.var = 1
+--   eventlist.var = 0
 --   expr.binary = 5
 --   expr.concatenation = 3
 --   expr.number = 1
@@ -146,7 +146,7 @@ import qualified Toml
 --   moditem.instantiation = 1
 --   statement.blocking = 0
 --   statement.conditional = 1
---   statement.forloop = 1
+--   statement.forloop = 0
 --   statement.nonblocking = 3
 -- <BLANKLINE>
 -- [property]
@@ -276,7 +276,7 @@ defaultConfig = Config
         ProbStatement 0 -- Blocking assignment
                       3 -- Non-blocking assignment
                       1 -- Conditional
-                      1 -- For loop
+                      0 -- For loop
     defExpr =
         ProbExpr 1 -- Number
                  5 -- Identifier
@@ -359,10 +359,10 @@ eventListCodec =
     ProbEventList
         <$> defaultValue (defProb probEventListClk) (intE "clk")
         .=  _probEventListClk
-        <*> defaultValue (defProb probEventListClk) (intE "all")
+        <*> defaultValue (defProb probEventListAll) (intE "all")
         .=  _probEventListAll
-        <*> defaultValue (defProb probEventListClk) (intE "var")
-        .=  _probEventListClk
+        <*> defaultValue (defProb probEventListVar) (intE "var")
+        .=  _probEventListVar
   where
     defProb i = defaultConfig ^. configProbability . probEventList . i
     intE = int "eventlist"
