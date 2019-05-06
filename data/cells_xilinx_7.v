@@ -241,22 +241,16 @@ module FD (Q, C, D);
 endmodule
 
 module LDPE (Q, D, G, GE, PRE);
-   parameter [0:0] INIT = 1'b1;
-   parameter [0:0] IS_G_INVERTED = 1'b0;
-   parameter [0:0] IS_PRE_INVERTED = 1'b0;
+   parameter INIT = 1'b1;
 
    output Q;
-   reg    Q = INIT;
+   reg    Q;
 
    input  D, G, GE, PRE;
-   wire   G_in, PRE_in;
 
-   assign G_in = IS_G_INVERTED ^ G;
-   assign PRE_in = IS_PRE_INVERTED ^ PRE;
-
-   always @( PRE_in or D or G_in or GE)
-     if (PRE_in)
-       Q <= 1;
-     else if (G_in && GE)
-       Q <= D;
+   always @( PRE or D or G or GE)
+	 if (PRE)
+	   Q <= 1;
+	 else if (G && GE)
+	   Q <= D;
 endmodule
