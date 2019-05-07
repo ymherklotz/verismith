@@ -27,9 +27,9 @@ module VeriFuzz.Sim.Internal
     , timeout_
     , bsToI
     , noPrint
-    , echoP
     , logger
-    , logger_
+    , logCommand
+    , logCommand_
     , execute
     , execute_
     , (<?>)
@@ -105,13 +105,16 @@ checkPresent fp t = do
 -- may have been inlined. This could be improved if the parser worked properly.
 checkPresentModules :: FilePath -> SourceInfo -> Sh [Text]
 checkPresentModules fp (SourceInfo _ src) = do
-    vals <- forM (src ^.. _Wrapped . traverse . modId . _Wrapped) $ checkPresent fp
+    vals <- forM (src ^.. _Wrapped . traverse . modId . _Wrapped)
+        $ checkPresent fp
     return $ catMaybes vals
 
 -- | Uses sed to replace a string in a text file.
 replace :: FilePath -> Text -> Text -> Sh ()
 replace fp t1 t2 = do
-    errExit False . noPrint $ run_ "sed" ["-i", "s/" <> t1 <> "/" <> t2 <> "/g", toTextIgnore fp]
+    errExit False . noPrint $ run_
+        "sed"
+        ["-i", "s/" <> t1 <> "/" <> t2 <> "/g", toTextIgnore fp]
 
 -- | This is used because rename only renames the definitions of modules of
 -- course, so instead this just searches and replaces all the module names. This
@@ -119,7 +122,9 @@ replace fp t1 t2 = do
 -- much simpler if the parser works.
 replaceMods :: FilePath -> Text -> SourceInfo -> Sh ()
 replaceMods fp t (SourceInfo _ src) =
-    void . forM (src ^.. _Wrapped . traverse . modId . _Wrapped) $ (\a -> replace fp a (a <> t))
+    void
+        . forM (src ^.. _Wrapped . traverse . modId . _Wrapped)
+        $ (\a -> replace fp a (a <> t))
 
 rootPath :: Sh FilePath
 rootPath = do
@@ -143,21 +148,22 @@ noPrint :: Sh a -> Sh a
 noPrint = print_stdout False . print_stderr False
 {-# INLINE noPrint #-}
 
-echoP :: Text -> Sh ()
-echoP t = do
+logger :: Text -> Sh ()
+logger t = do
     fn          <- pwd
     currentTime <- liftIO getZonedTime
     echo $ bname fn <> " [" <> showT currentTime <> "] - " <> t
     where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
-logger :: FilePath -> Text -> Sh a -> Sh a
-logger fp name = log_stderr_with (l "_stderr.log") . log_stdout_with (l ".log")
+logCommand :: FilePath -> Text -> Sh a -> Sh a
+logCommand fp name = log_stderr_with (l "_stderr.log")
+    . log_stdout_with (l ".log")
   where
     l s t = appendFile (file s) (T.unpack t) >> appendFile (file s) "\n"
     file s = T.unpack (toTextIgnore $ fp </> fromText name) <> s
 
-logger_ :: FilePath -> Text -> Sh a -> Sh ()
-logger_ fp name = void . logger fp name
+logCommand_ :: FilePath -> Text -> Sh a -> Sh ()
+logCommand_ fp name = void . logCommand fp name
 
 execute
     :: (MonadSh m, Monad m, Monoid a)
@@ -167,7 +173,7 @@ execute
     -> FilePath
     -> [Text]
     -> ResultT a m Text
-execute f dir name e = annotate f . liftSh . logger dir name . timeout e
+execute f dir name e = annotate f . liftSh . logCommand dir name . timeout e
 
 execute_
     :: (MonadSh m, Monad m, Monoid a)

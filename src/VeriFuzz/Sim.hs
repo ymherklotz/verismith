@@ -34,7 +34,7 @@ module VeriFuzz.Sim
     , runSim
     -- * Synthesis
     , runSynth
-    , echoP
+    , logger
     )
 where
 

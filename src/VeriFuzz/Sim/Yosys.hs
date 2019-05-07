@@ -54,12 +54,12 @@ runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
     dir <- pwd
     writefile inpf $ genSource src
-    echoP "Yosys: synthesis"
-    logger_ dir "yosys"
+    logger "Yosys: synthesis"
+    logCommand_ dir "yosys"
         $ timeout
               (yosysPath sim)
               ["-b", "verilog -noattr", "-o", out, "-S", inp]
-    echoP "Yosys: synthesis done"
+    logger "Yosys: synthesis done"
   where
     inpf = "rtl.v"
     inp  = toTextIgnore inpf
@@ -89,9 +89,9 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
     runSynth sim1 srcInfo
     runMaybeSynth sim2 srcInfo
     liftSh $ do
-        echoP "Yosys: equivalence check"
+        logger "Yosys: equivalence check"
         run_ (yosysPath yosys) [toTextIgnore checkFile]
-        echoP "Yosys: equivalence done"
+        logger "Yosys: equivalence done"
   where
     checkFile =
         fromText [st|test.#{toText sim1}.#{maybe "rtl" toText sim2}.ys|]
@@ -104,7 +104,7 @@ runEquiv
     -> SourceInfo
     -> ResultSh ()
 runEquiv _ sim1 sim2 srcInfo = do
-    dir  <- liftSh pwd
+    dir <- liftSh pwd
     liftSh $ do
         writefile "top.v"
             .  genSource
@@ -112,9 +112,9 @@ runEquiv _ sim1 sim2 srcInfo = do
             .  makeTopAssert
             $  srcInfo
             ^. mainModule
-        replaceMods (synthOutput sim1) "_1" srcInfo
+        replaceMods (synthOutput sim1)               "_1" srcInfo
         replaceMods (maybe "rtl.v" synthOutput sim2) "_2" srcInfo
         writefile "test.sby" $ sbyConfig sim1 sim2 srcInfo
-    liftSh $ echoP "Running SymbiYosys"
+    liftSh $ logger "Running SymbiYosys"
     execute_ EquivFail dir "symbiyosys" "sby" ["-f", "test.sby"]
-    liftSh $ echoP "SymbiYosys equivalence check passed"
+    liftSh $ logger "SymbiYosys equivalence check passed"

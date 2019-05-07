@@ -113,10 +113,11 @@ runSimIcarusWithFile
     :: Icarus -> FilePath -> [ByteString] -> ResultSh ByteString
 runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
     dir <- pwd
-    echoP "Icarus: Compile"
-    logger_ dir "icarus" $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
-    echoP "Icarus: Run"
-    B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$> logger
+    logger "Icarus: Compile"
+    logCommand_ dir "icarus"
+        $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
+    logger "Icarus: Run"
+    B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$> logCommand
         dir
         "vvp"
         (runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"])

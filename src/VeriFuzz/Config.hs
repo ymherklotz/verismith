@@ -270,28 +270,28 @@ defaultConfig = Config
   where
     defModItem =
         ProbModItem 5 -- Assign
-                    1 -- Always
-                    1 -- Instantiation
+                      1 -- Always
+                        1 -- Instantiation
     defStmnt =
         ProbStatement 0 -- Blocking assignment
-                      3 -- Non-blocking assignment
-                      1 -- Conditional
-                      0 -- For loop
+                        3 -- Non-blocking assignment
+                          1 -- Conditional
+                            0 -- For loop
     defExpr =
         ProbExpr 1 -- Number
-                 5 -- Identifier
-                 5 -- Range selection
-                 5 -- Unary operator
-                 5 -- Binary operator
-                 5 -- Ternary conditional
-                 3 -- Concatenation
-                 0 -- String
-                 5 -- Signed function
-                 5 -- Unsigned funtion
+                   5 -- Identifier
+                     5 -- Range selection
+                       5 -- Unary operator
+                         5 -- Binary operator
+                           5 -- Ternary conditional
+                             3 -- Concatenation
+                               0 -- String
+                                 5 -- Signed function
+                                   5 -- Unsigned funtion
     defEvent =
         ProbEventList 0 -- All
-                      1 -- Clk
-                      0 -- Var
+                        1 -- Clk
+                          0 -- Var
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])

@@ -121,11 +121,11 @@ onFailure t _ = do
     ex <- lastExitCode
     case ex of
         124 -> do
-            echoP "Test TIMEOUT"
+            logger "Test TIMEOUT"
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
             return $ Fail EmptyFail
         _ -> do
-            echoP "Test FAIL"
+            logger "Test FAIL"
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
             return $ Fail EmptyFail
 
@@ -169,14 +169,14 @@ runEquivalence seed gm t d k i = do
                                 defaultYosys
                                 (Just defaultVivado)
                                 srcInfo
-                    >> liftSh (echoP "Test OK")
+                    >> liftSh (logger "Test OK")
                     )
                 $ onFailure n
         _ <-
             catch_sh
                     (   runResultT
                     $   runSim (Icarus "iverilog" "vvp") srcInfo rand
-                    >>= (\b -> liftSh $ echoP ("RTL Sim: " <> showBS b))
+                    >>= (\b -> liftSh $ logger ("RTL Sim: " <> showBS b))
                     )
                 $ onFailure n
         cd ".."

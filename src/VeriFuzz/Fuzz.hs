@@ -88,7 +88,7 @@ combinations :: [a] -> [b] -> [(a, b)]
 combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
 
 logT :: MonadSh m => Text -> m ()
-logT = liftSh . echoP
+logT = liftSh . logger
 
 timeit :: (MonadIO m, MonadSh m) => m a -> m (NominalDiffTime, a)
 timeit a = do
