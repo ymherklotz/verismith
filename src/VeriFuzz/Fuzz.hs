@@ -223,8 +223,6 @@ sampleSeed s gen =
                               Just x  -> do
                                   liftSh
                                       .  logT
-                                      $  "Chosen seed was '"
-                                      <> showT seed
-                                      <> "'"
+                                      $ showT seed
                                   return (seed, Hog.nodeValue x)
           in  loop (100 :: Int)
