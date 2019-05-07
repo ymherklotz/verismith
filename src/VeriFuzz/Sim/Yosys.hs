@@ -104,7 +104,6 @@ runEquiv
     -> SourceInfo
     -> ResultSh ()
 runEquiv _ sim1 sim2 srcInfo = do
-    root <- liftSh rootPath
     dir  <- liftSh pwd
     liftSh $ do
         writefile "top.v"
@@ -113,7 +112,9 @@ runEquiv _ sim1 sim2 srcInfo = do
             .  makeTopAssert
             $  srcInfo
             ^. mainModule
-        writefile "test.sby" $ sbyConfig root sim1 sim2 srcInfo
+        replaceMods (synthOutput sim1) "_1" srcInfo
+        replaceMods (maybe "rtl.v" synthOutput sim2) "_2" srcInfo
+        writefile "test.sby" $ sbyConfig sim1 sim2 srcInfo
     liftSh $ echoP "Running SymbiYosys"
     execute_ EquivFail dir "symbiyosys" "sby" ["-f", "test.sby"]
     liftSh $ echoP "SymbiYosys equivalence check passed"

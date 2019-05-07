@@ -50,7 +50,7 @@ runSynthVivado sim (SourceInfo top src) = do
         writefile vivadoTcl . vivadoSynthConfig top . toTextIgnore $ synthOutput
             sim
         writefile "rtl.v" $ genSource src
-        run_ "sed" ["s/^module/(* use_dsp48=\"no\" *) module/;", "-i", "rtl.v"]
+        run_ "sed" ["s/^module/(* use_dsp=\"no\" *) module/;", "-i", "rtl.v"]
         echoP "Vivado: run"
     execute_ SynthFail
              dir

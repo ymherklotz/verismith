@@ -88,8 +88,8 @@ write_verilog -force #{outf}
 |]
 
 -- brittany-disable-next-binding
-sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> Maybe b -> SourceInfo -> Text
-sbyConfig bd sim1 sim2 (SourceInfo top src) = [st|[options]
+sbyConfig :: (Synthesiser a, Synthesiser b) => a -> Maybe b -> SourceInfo -> Text
+sbyConfig sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
 mode prove
 
@@ -99,9 +99,7 @@ smtbmc z3
 [script]
 #{readL}
 read -formal #{outputText sim1}
-#{rename "_1" mis}
 read -formal #{maybe "rtl.v" outputText sim2}
-#{rename "_2" mis}
 read -formal top.v
 prep -top #{top}
 
@@ -112,12 +110,11 @@ prep -top #{top}
 top.v
 |]
   where
-    mis = src ^.. getSourceId
     deps = ["cells_cmos.v", "cells_cyclone_v.v", "cells_verific.v", "cells_xilinx_7.v", "cells_yosys.v"]
     depList =
       T.intercalate "\n"
         $   toTextIgnore
-        .   ((bd </> fromText "data") </>)
+        .   (fromText "data" </>)
         .   fromText
         <$> deps
     readL = T.intercalate "\n" $ mappend "read -formal " <$> deps

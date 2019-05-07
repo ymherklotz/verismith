@@ -18,6 +18,10 @@ module VeriFuzz.Sim.Internal
     , Simulator(..)
     , Synthesiser(..)
     , Failed(..)
+    , checkPresent
+    , checkPresentModules
+    , replace
+    , replaceMods
     , rootPath
     , timeout
     , timeout_
@@ -33,10 +37,12 @@ module VeriFuzz.Sim.Internal
     )
 where
 
-import           Control.Monad         (void)
+import           Control.Lens
+import           Control.Monad         (forM, void)
 import           Data.Bits             (shiftL)
 import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as B
+import           Data.Maybe            (catMaybes)
 import           Data.Text             (Text)
 import qualified Data.Text             as T
 import           Data.Time.LocalTime   (getZonedTime)
@@ -89,6 +95,32 @@ class Tool a => Synthesiser a where
 -- with also has those instances.
 type ResultSh = ResultT Failed Sh
 
+checkPresent :: FilePath -> Text -> Sh (Maybe Text)
+checkPresent fp t = do
+    errExit False $ run_ "grep" [t, toTextIgnore fp]
+    i <- lastExitCode
+    if i == 0 then return $ Just t else return Nothing
+
+-- | Checks what modules are present in the synthesised output, as some modules
+-- may have been inlined. This could be improved if the parser worked properly.
+checkPresentModules :: FilePath -> SourceInfo -> Sh [Text]
+checkPresentModules fp (SourceInfo _ src) = do
+    vals <- forM (src ^.. _Wrapped . traverse . modId . _Wrapped) $ checkPresent fp
+    return $ catMaybes vals
+
+-- | Uses sed to replace a string in a text file.
+replace :: FilePath -> Text -> Text -> Sh ()
+replace fp t1 t2 = do
+    errExit False . noPrint $ run_ "sed" ["-i", "s/" <> t1 <> "/" <> t2 <> "/g", toTextIgnore fp]
+
+-- | This is used because rename only renames the definitions of modules of
+-- course, so instead this just searches and replaces all the module names. This
+-- should find all the instantiations and definitions. This could again be made
+-- much simpler if the parser works.
+replaceMods :: FilePath -> Text -> SourceInfo -> Sh ()
+replaceMods fp t (SourceInfo _ src) =
+    void . forM (src ^.. _Wrapped . traverse . modId . _Wrapped) $ (\a -> replace fp a (a <> t))
+
 rootPath :: Sh FilePath
 rootPath = do
     current <- pwd
@@ -108,7 +140,7 @@ bsToI = B.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
 {-# INLINE bsToI #-}
 
 noPrint :: Sh a -> Sh a
-noPrint = liftSh . print_stdout False . print_stderr False
+noPrint = print_stdout False . print_stderr False
 {-# INLINE noPrint #-}
 
 echoP :: Text -> Sh ()
