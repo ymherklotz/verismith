@@ -58,7 +58,7 @@ runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
     logCommand_ dir "yosys"
         $ timeout
               (yosysPath sim)
-              ["-b", "verilog -noattr", "-o", out, "-S", inp]
+              ["-p", "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out]
     logger "Yosys: synthesis done"
   where
     inpf = "rtl.v"
@@ -114,7 +114,7 @@ runEquiv _ sim1 sim2 srcInfo = do
             ^. mainModule
         replaceMods (synthOutput sim1)               "_1" srcInfo
         replaceMods (maybe "rtl.v" synthOutput sim2) "_2" srcInfo
-        writefile "test.sby" $ sbyConfig sim1 sim2 srcInfo
+        writefile "proof.sby" $ sbyConfig sim1 sim2 srcInfo
     liftSh $ logger "Running SymbiYosys"
-    execute_ EquivFail dir "symbiyosys" "sby" ["-f", "test.sby"]
+    execute_ EquivFail dir "symbiyosys" "sby" ["proof.sby"]
     liftSh $ logger "SymbiYosys equivalence check passed"

@@ -94,7 +94,7 @@ multiclock on
 mode prove
 
 [engines]
-smtbmc z3
+abc pdr
 
 [script]
 #{readL}

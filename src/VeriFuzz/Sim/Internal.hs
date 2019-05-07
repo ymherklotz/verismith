@@ -51,7 +51,6 @@ import           Prelude               hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted         (MonadSh, liftSh)
 import           System.FilePath.Posix (takeBaseName)
-import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Verilog.AST
 
@@ -154,9 +153,8 @@ logger t = do
     fn          <- pwd
     currentTime <- liftIO getZonedTime
     echo
-        $  "VeriFuzz ["
-        <> T.pack (formatTime defaultTimeLocale "%Y-%m-%d %H:%M:%S" currentTime)
-        <> "] "
+        $  "VeriFuzz "
+        <> T.pack (formatTime defaultTimeLocale "%H:%M:%S " currentTime)
         <> bname fn
         <> " - "
         <> t
