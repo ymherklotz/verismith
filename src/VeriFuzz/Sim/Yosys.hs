@@ -21,7 +21,7 @@ module VeriFuzz.Sim.Yosys
 where
 
 import           Control.Lens
-import           Data.Text
+import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted            (liftSh)
@@ -32,35 +32,39 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 
-data Yosys = Yosys { yosysPath        :: {-# UNPACK #-} !FilePath
-                   , yosysDescription :: {-# UNPACK #-} !Text
-                   , yosysOutput      :: {-# UNPACK #-} !FilePath
+data Yosys = Yosys { yosysBin    :: {-# UNPACK #-} !(Maybe FilePath)
+                   , yosysDesc   :: {-# UNPACK #-} !Text
+                   , yosysOutput :: {-# UNPACK #-} !FilePath
                    }
               deriving (Eq)
 
 instance Tool Yosys where
-  toText (Yosys _ t _) = t
+    toText (Yosys _ t _) = t
+
+instance Show Yosys where
+    show t = unpack $ toText t
 
 instance Synthesiser Yosys where
   runSynth = runSynthYosys
   synthOutput = yosysOutput
   setSynthOutput (Yosys a b _) = Yosys a b
 
-instance Show Yosys where
-    show _ = "yosys"
-
 defaultYosys :: Yosys
-defaultYosys = Yosys "yosys" "syn_yosys.v" "yosys"
+defaultYosys = Yosys Nothing "yosys" "syn_yosys.v"
+
+yosysPath :: Yosys -> FilePath
+yosysPath sim = maybe (fromText "yosys") (</> fromText "yosys") $ yosysBin sim
 
 runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
     dir <- pwd
     writefile inpf $ genSource src
     logger "Yosys: synthesis"
-    logCommand_ dir "yosys"
-        $ timeout
-              (yosysPath sim)
-              ["-p", "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out]
+    logCommand_ dir "yosys" $ timeout
+        (yosysPath sim)
+        [ "-p"
+        , "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out
+        ]
     logger "Yosys: synthesis done"
   where
     inpf = "rtl.v"

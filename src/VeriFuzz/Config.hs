@@ -34,6 +34,10 @@ module VeriFuzz.Config
     -- ** Synthesiser Description
     , SynthDescription(..)
     -- * Useful Lenses
+    , fromXST
+    , fromYosys
+    , fromVivado
+    , fromQuartus
     , configProbability
     , configProperty
     , configSimulators
@@ -81,8 +85,13 @@ import           Data.Maybe             (fromMaybe)
 import           Data.Text              (Text)
 import qualified Data.Text.IO           as T
 import           Hedgehog.Internal.Seed (Seed)
+import           Shelly                 (toTextIgnore)
 import           Toml                   (TomlCodec, (.=))
 import qualified Toml
+import           VeriFuzz.Sim.Quartus
+import           VeriFuzz.Sim.Vivado
+import           VeriFuzz.Sim.XST
+import           VeriFuzz.Sim.Yosys
 
 -- $conf
 --
@@ -157,9 +166,13 @@ import qualified Toml
 -- <BLANKLINE>
 -- [[synthesiser]]
 --   name = "yosys"
+--   yosys.description = "yosys"
+--   yosys.output = "syn_yosys.v"
 -- <BLANKLINE>
 -- [[synthesiser]]
 --   name = "vivado"
+--   vivado.description = "vivado"
+--   vivado.output = "syn_vivado.v"
 -- <BLANKLINE>
 
 -- | Probability of different expressions nodes.
@@ -233,10 +246,23 @@ data Property = Property { _propSize       :: {-# UNPACK #-} !Int
                          }
               deriving (Eq, Show)
 
-data SimDescription = SimDescription { _simName :: {-# UNPACK #-} !Text }
+data SimDescription = SimDescription { simName :: {-# UNPACK #-} !Text }
                     deriving (Eq, Show)
 
-data SynthDescription = SynthDescription { _synthName :: {-# UNPACK #-} !Text }
+data SynthDescription = SynthDescription { synthName          :: {-# UNPACK #-} !Text
+                                         , synthYosysBin      :: !(Maybe Text)
+                                         , synthYosysDesc     :: !(Maybe Text)
+                                         , synthYosysOutput   :: !(Maybe Text)
+                                         , synthXstBin        :: !(Maybe Text)
+                                         , synthXstDesc       :: !(Maybe Text)
+                                         , synthXstOutput     :: !(Maybe Text)
+                                         , synthVivadoBin     :: !(Maybe Text)
+                                         , synthVivadoDesc    :: !(Maybe Text)
+                                         , synthVivadoOutput  :: !(Maybe Text)
+                                         , synthQuartusBin    :: !(Maybe Text)
+                                         , synthQuartusDesc   :: !(Maybe Text)
+                                         , synthQuartusOutput :: !(Maybe Text)
+                                         }
                       deriving (Eq, Show)
 
 data Config = Config { _configProbability  :: {-# UNPACK #-} !Probability
@@ -261,12 +287,79 @@ defaultValue
     -> Toml.Codec r w a b
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
+fromXST :: XST -> SynthDescription
+fromXST (XST a b c) =
+    SynthDescription
+    "xst"
+    Nothing
+    Nothing
+    Nothing
+    (toTextIgnore <$> a)
+    (Just b)
+    (Just $ toTextIgnore c)
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+
+fromYosys :: Yosys -> SynthDescription
+fromYosys (Yosys a b c) =
+    SynthDescription
+    "yosys"
+    (toTextIgnore <$> a)
+    (Just b)
+    (Just $ toTextIgnore c)
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+
+fromVivado :: Vivado -> SynthDescription
+fromVivado (Vivado a b c) =
+    SynthDescription
+    "vivado"
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    (toTextIgnore <$> a)
+    (Just b)
+    (Just $ toTextIgnore c)
+    Nothing
+    Nothing
+    Nothing
+
+fromQuartus :: Quartus -> SynthDescription
+fromQuartus (Quartus a b c) =
+    SynthDescription
+    "quartus"
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    (toTextIgnore <$> a)
+    (Just b)
+    (Just $ toTextIgnore c)
+
 defaultConfig :: Config
-defaultConfig = Config
-    (Probability defModItem defStmnt defExpr defEvent)
-    (Property 20 Nothing 3 2 5)
-    []
-    [SynthDescription "yosys", SynthDescription "vivado"]
+defaultConfig = Config (Probability defModItem defStmnt defExpr defEvent)
+                       (Property 20 Nothing 3 2 5)
+                       []
+                       [fromYosys defaultYosys, fromVivado defaultVivado]
   where
     defModItem =
         ProbModItem 5 -- Assign
@@ -403,14 +496,40 @@ simulator = Toml.textBy pprint parseIcarus "name"
     pprint (SimDescription a) = a
 
 synthesiser :: TomlCodec SynthDescription
-synthesiser = Toml.textBy pprint parseIcarus "name"
+synthesiser =
+    SynthDescription
+        <$> Toml.textBy id parseSynth "name"
+        .=  synthName
+        <*> Toml.dioptional (Toml.text $ twoKey "yosys" "bin")
+        .=  synthYosysBin
+        <*> Toml.dioptional (Toml.text $ twoKey "yosys" "description")
+        .=  synthYosysDesc
+        <*> Toml.dioptional (Toml.text $ twoKey "yosys" "output")
+        .=  synthYosysOutput
+        <*> Toml.dioptional (Toml.text $ twoKey "xst" "bin")
+        .=  synthXstBin
+        <*> Toml.dioptional (Toml.text $ twoKey "xst" "description")
+        .=  synthXstDesc
+        <*> Toml.dioptional (Toml.text $ twoKey "xst" "output")
+        .=  synthXstOutput
+        <*> Toml.dioptional (Toml.text $ twoKey "vivado" "bin")
+        .=  synthVivadoBin
+        <*> Toml.dioptional (Toml.text $ twoKey "vivado" "description")
+        .=  synthVivadoDesc
+        <*> Toml.dioptional (Toml.text $ twoKey "vivado" "output")
+        .=  synthVivadoOutput
+        <*> Toml.dioptional (Toml.text $ twoKey "quartus" "bin")
+        .=  synthQuartusBin
+        <*> Toml.dioptional (Toml.text $ twoKey "quartus" "description")
+        .=  synthQuartusDesc
+        <*> Toml.dioptional (Toml.text $ twoKey "quartus" "output")
+        .=  synthQuartusOutput
   where
-    parseIcarus s@"yosys"   = Right $ SynthDescription s
-    parseIcarus s@"vivado"  = Right $ SynthDescription s
-    parseIcarus s@"quartus" = Right $ SynthDescription s
-    parseIcarus s@"xst"     = Right $ SynthDescription s
-    parseIcarus s = Left $ "Could not match '" <> s <> "' with a synthesiser."
-    pprint (SynthDescription a) = a
+    parseSynth s@"yosys"   = Right s
+    parseSynth s@"vivado"  = Right s
+    parseSynth s@"quartus" = Right s
+    parseSynth s@"xst"     = Right s
+    parseSynth s = Left $ "Could not match '" <> s <> "' with a synthesiser."
 
 configCodec :: TomlCodec Config
 configCodec =

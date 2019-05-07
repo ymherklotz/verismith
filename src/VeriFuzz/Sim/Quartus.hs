@@ -16,6 +16,7 @@ module VeriFuzz.Sim.Quartus
     )
 where
 
+import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted            (liftSh)
@@ -24,23 +25,24 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
 data Quartus = Quartus { quartusBin    :: !(Maybe FilePath)
+                       , quartusDesc   :: {-# UNPACK #-} !Text
                        , quartusOutput :: {-# UNPACK #-} !FilePath
                        }
                 deriving (Eq)
 
-instance Show Quartus where
-    show _ = "quartus"
-
 instance Tool Quartus where
-    toText _ = "quartus"
+    toText (Quartus _ t _) = t
+
+instance Show Quartus where
+    show t = unpack $ toText t
 
 instance Synthesiser Quartus where
     runSynth = runSynthQuartus
     synthOutput = quartusOutput
-    setSynthOutput (Quartus a _) = Quartus a
+    setSynthOutput (Quartus a b _) = Quartus a b
 
 defaultQuartus :: Quartus
-defaultQuartus = Quartus Nothing "syn_quartus.v"
+defaultQuartus = Quartus Nothing "quartus" "syn_quartus.v"
 
 runSynthQuartus :: Quartus -> SourceInfo -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) = do

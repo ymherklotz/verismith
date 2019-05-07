@@ -18,6 +18,7 @@ module VeriFuzz.Sim.XST
     )
 where
 
+import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted            (liftSh)
@@ -27,17 +28,17 @@ import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 
-data XST = XST { xstPath    :: {-# UNPACK #-} !FilePath
-               , netgenPath :: {-# UNPACK #-} !FilePath
-               , xstOutput  :: {-# UNPACK #-} !FilePath
+data XST = XST { xstBin    :: !(Maybe FilePath)
+               , xstDesc   :: {-# UNPACK #-} !Text
+               , xstOutput :: {-# UNPACK #-} !FilePath
                }
          deriving (Eq)
 
-instance Show XST where
-    show _ = "xst"
-
 instance Tool XST where
-    toText _ = "xst"
+    toText (XST _ t _) = t
+
+instance Show XST where
+    show t = unpack $ toText t
 
 instance Synthesiser XST where
     runSynth = runSynthXST
@@ -45,21 +46,25 @@ instance Synthesiser XST where
     setSynthOutput (XST a b _) = XST a b
 
 defaultXST :: XST
-defaultXST = XST "xst" "netgen" "syn_xst.v"
+defaultXST = XST Nothing "xst" "syn_xst.v"
 
 runSynthXST :: XST -> SourceInfo -> ResultSh ()
 runSynthXST sim (SourceInfo top src) = do
     dir <- liftSh pwd
-    let exec = execute_ SynthFail dir "xst"
+    let exec n = execute_
+            SynthFail
+            dir
+            "xst"
+            (maybe (fromText n) (</> fromText n) $ xstBin sim)
     liftSh $ do
         writefile xstFile $ xstSynthConfig top
         writefile prjFile [st|verilog work "rtl.v"|]
         writefile "rtl.v" $ genSource src
         logger "XST: run"
-    exec (xstPath sim) ["-ifn", toTextIgnore xstFile]
+    exec "xst" ["-ifn", toTextIgnore xstFile]
     liftSh $ logger "XST: netgen"
     exec
-        (netgenPath sim)
+        "netgen"
         [ "-w"
         , "-ofmt"
         , "verilog"

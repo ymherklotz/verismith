@@ -32,7 +32,9 @@ where
 
 import           Control.Lens
 import           Data.ByteString       (ByteString)
+import           Data.Maybe            (fromMaybe)
 import           Prelude               hiding (FilePath)
+import           Shelly                (fromText)
 import           VeriFuzz.Config
 import           VeriFuzz.Result
 import           VeriFuzz.Sim.Icarus
@@ -158,9 +160,25 @@ descriptionToSim s =
     error $ "Could not find implementation for simulator '" <> show s <> "'"
 
 descriptionToSynth :: SynthDescription -> SynthTool
-descriptionToSynth (SynthDescription "yosys"  ) = defaultYosysSynth
-descriptionToSynth (SynthDescription "vivado" ) = defaultVivadoSynth
-descriptionToSynth (SynthDescription "xst"    ) = defaultXSTSynth
-descriptionToSynth (SynthDescription "quartus") = defaultQuartusSynth
+descriptionToSynth s@(SynthDescription "yosys" _ _ _ _ _ _ _ _ _ _ _ _) =
+    YosysSynth
+        . Yosys (fromText <$> synthYosysBin s) (fromMaybe (yosysDesc defaultYosys) $ synthYosysDesc s)
+        . maybe (yosysOutput defaultYosys) fromText
+        $ synthYosysOutput s
+descriptionToSynth s@(SynthDescription "vivado" _ _ _ _ _ _ _ _ _ _ _ _) =
+    VivadoSynth
+        . Vivado (fromText <$> synthVivadoBin s) (fromMaybe (vivadoDesc defaultVivado) $ synthVivadoDesc s)
+        . maybe (vivadoOutput defaultVivado) fromText
+        $ synthVivadoOutput s
+descriptionToSynth s@(SynthDescription "xst" _ _ _ _ _ _ _ _ _ _ _ _) =
+    XSTSynth
+        . XST (fromText <$> synthXstBin s) (fromMaybe (xstDesc defaultXST) $ synthXstDesc s)
+        . maybe (xstOutput defaultXST) fromText
+        $ synthXstOutput s
+descriptionToSynth s@(SynthDescription "quartus" _ _ _ _ _ _ _ _ _ _ _ _) =
+    QuartusSynth
+        . Quartus (fromText <$> synthQuartusBin s) (fromMaybe (quartusDesc defaultQuartus) $ synthQuartusDesc s)
+        . maybe (quartusOutput defaultQuartus) fromText
+        $ synthQuartusOutput s
 descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
