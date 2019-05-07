@@ -21,6 +21,7 @@ module VeriFuzz.Sim.Yosys
 where
 
 import           Control.Lens
+import           Data.Text
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted            (liftSh)
@@ -31,24 +32,25 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 
-data Yosys = Yosys { yosysPath   :: {-# UNPACK #-} !FilePath
-                   , yosysOutput :: {-# UNPACK #-} !FilePath
+data Yosys = Yosys { yosysPath        :: {-# UNPACK #-} !FilePath
+                   , yosysDescription :: {-# UNPACK #-} !Text
+                   , yosysOutput      :: {-# UNPACK #-} !FilePath
                    }
               deriving (Eq)
 
 instance Tool Yosys where
-  toText _ = "yosys"
+  toText (Yosys _ t _) = t
 
 instance Synthesiser Yosys where
   runSynth = runSynthYosys
   synthOutput = yosysOutput
-  setSynthOutput (Yosys a _) = Yosys a
+  setSynthOutput (Yosys a b _) = Yosys a b
 
 instance Show Yosys where
     show _ = "yosys"
 
 defaultYosys :: Yosys
-defaultYosys = Yosys "yosys" "syn_yosys.v"
+defaultYosys = Yosys "yosys" "syn_yosys.v" "yosys"
 
 runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
@@ -98,12 +100,11 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
 
 runEquiv
     :: (Synthesiser a, Synthesiser b)
-    => Yosys
-    -> a
+    => a
     -> Maybe b
     -> SourceInfo
     -> ResultSh ()
-runEquiv _ sim1 sim2 srcInfo = do
+runEquiv sim1 sim2 srcInfo = do
     dir <- liftSh pwd
     liftSh $ do
         writefile "top.v"

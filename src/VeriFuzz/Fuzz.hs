@@ -138,15 +138,14 @@ pop f a = do
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
-    yos   <- lift $ asks yosysInstance
     synth <- passedSynthesis
     let synthComb =
             nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
-    results <- liftSh $ mapM (uncurry $ equiv yos) synthComb
+    results <- liftSh $ mapM (uncurry equiv) synthComb
     liftSh $ inspect results
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equiv yos a b = runResultT $ do
+    equiv a b = runResultT $ do
         make dir
         pop dir $ do
             liftSh $ do
@@ -155,7 +154,7 @@ equivalence src = do
                 cp (fromText ".." </> fromText (toText b) </> synthOutput b)
                     $ synthOutput b
                 writefile "rtl.v" $ genSource src
-            runEquiv yos a (Just b) src
+            runEquiv a (Just b) src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport

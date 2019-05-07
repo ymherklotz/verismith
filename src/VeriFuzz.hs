@@ -137,7 +137,7 @@ checkEquivalence src dir = shellyFailDir $ do
     cd (fromText dir)
     catch_sh
         (  ( runResultT
-           $ runEquiv defaultYosys defaultYosys (Just defaultVivado) src
+           $ runEquiv defaultYosys (Just defaultVivado) src
            )
         >> return True
         )
@@ -166,7 +166,6 @@ runEquivalence seed gm t d k i = do
             catch_sh
                     (  runResultT
                     $  runEquiv defaultYosys
-                                defaultYosys
                                 (Just defaultVivado)
                                 srcInfo
                     >> liftSh (logger "Test OK")
