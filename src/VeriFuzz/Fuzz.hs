@@ -204,9 +204,9 @@ fuzzMultiple n fp src conf = do
     fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
     seed = conf ^. configProperty . propSeed
 
-sampleSeed :: MonadIO m => Maybe Seed -> Gen a -> m (Seed, a)
+sampleSeed :: MonadSh m => Maybe Seed -> Gen a -> m (Seed, a)
 sampleSeed s gen =
-    liftIO
+    liftSh
         $ let
               loop n = if n <= 0
                   then
@@ -222,10 +222,10 @@ sampleSeed s gen =
                           of
                               Nothing -> loop (n - 1)
                               Just x  -> do
-                                  liftIO
-                                      .  putStrLn
-                                      $  "VeriFuzz: Chosen seed was '"
-                                      <> show seed
+                                  liftSh
+                                      .  logT
+                                      $  "Chosen seed was '"
+                                      <> showT seed
                                       <> "'"
-                                  pure $ (seed, Hog.nodeValue x)
+                                  return (seed, Hog.nodeValue x)
           in  loop (100 :: Int)

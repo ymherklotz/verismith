@@ -154,7 +154,7 @@ runEquivalence
     -> Int         -- ^ Used to track the recursion.
     -> IO ()
 runEquivalence seed gm t d k i = do
-    (_, m) <- sampleSeed seed gm
+    (_, m) <- shelly $ sampleSeed seed gm
     let srcInfo = SourceInfo "top" m
     rand <- generateByteString 20
     shellyFailDir $ do

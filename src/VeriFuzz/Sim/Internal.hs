@@ -45,6 +45,7 @@ import qualified Data.ByteString       as B
 import           Data.Maybe            (catMaybes)
 import           Data.Text             (Text)
 import qualified Data.Text             as T
+import           Data.Time.Format      (defaultTimeLocale, formatTime)
 import           Data.Time.LocalTime   (getZonedTime)
 import           Prelude               hiding (FilePath)
 import           Shelly
@@ -152,7 +153,13 @@ logger :: Text -> Sh ()
 logger t = do
     fn          <- pwd
     currentTime <- liftIO getZonedTime
-    echo $ bname fn <> " [" <> showT currentTime <> "] - " <> t
+    echo
+        $  "VeriFuzz ["
+        <> T.pack (formatTime defaultTimeLocale "%Y-%m-%d %H:%M:%S" currentTime)
+        <> "] "
+        <> bname fn
+        <> " - "
+        <> t
     where bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 logCommand :: FilePath -> Text -> Sh a -> Sh a
