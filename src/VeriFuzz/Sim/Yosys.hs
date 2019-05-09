@@ -32,7 +32,7 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 
-data Yosys = Yosys { yosysBin    :: {-# UNPACK #-} !(Maybe FilePath)
+data Yosys = Yosys { yosysBin    :: !(Maybe FilePath)
                    , yosysDesc   :: {-# UNPACK #-} !Text
                    , yosysOutput :: {-# UNPACK #-} !FilePath
                    }
