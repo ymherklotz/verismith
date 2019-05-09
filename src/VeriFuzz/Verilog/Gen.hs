@@ -29,7 +29,6 @@ import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.Foldable                    (fold)
 import           Data.Functor.Foldable            (cata)
-import           Data.List.NonEmpty               (NonEmpty (..), toList)
 import qualified Data.Text                        as T
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
@@ -100,7 +99,7 @@ gen :: Gen a -> StateGen a
 gen = lift . lift
 
 listOf1 :: Gen a -> Gen [a]
-listOf1 a = toList <$> Hog.nonEmpty (Hog.linear 0 100) a
+listOf1 a = Hog.list (Hog.linear 1 100) a
 
 --listOf :: Gen a -> Gen [a]
 --listOf = Hog.list (Hog.linear 0 100)
@@ -349,34 +348,10 @@ statement = do
         ]
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
-recEventList :: NonEmpty Identifier -> Hog.Size -> Gen Event
-recEventList ids size
-    | size <= 0 = idgen
-    | otherwise = Hog.choice [idgen, EOr <$> recCall <*> recCall]
-  where
-    idgen   = fmap EId . Hog.element $ toList ids
-    recCall = recEventList ids (size `div` 2)
-
-eventList :: StateGen Event
-eventList = do
-    prob    <- askProbability
-    context <- get
-    let defProb i = prob ^. probEventList . i
-    gen $ Hog.frequency
-        [ (defProb probEventListAll, return EAll)
-        , ( defProb probEventListVar
-          , case context ^. variables of
-              []     -> return EAll
-              x : xs -> Hog.sized . recEventList $ fromPort <$> (x :| xs)
-          )
-        , (defProb probEventListClk, return $ EPosEdge "clk")
-        ]
-
-always :: StateGen ModItem
-always = do
-    events <- eventList
+alwaysSeq :: StateGen ModItem
+alwaysSeq = do
     stat   <- seqBlock
-    return $ Always (EventCtrl events (Just stat))
+    return $ Always (EventCtrl (EPosEdge "clk") (Just stat))
 
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
@@ -446,7 +421,7 @@ modItem = do
     let defProb i = prob ^. probModItem . i
     Hog.frequency
         [ (defProb probModItemAssign, ModCA <$> contAssign)
-        , (defProb probModItemAlways, always)
+        , (defProb probModItemSeqAlways, alwaysSeq)
         , ( if context ^. modDepth > 0 then defProb probModItemInst else 0
           , modInst
           )

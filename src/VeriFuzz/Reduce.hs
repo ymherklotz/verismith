@@ -23,6 +23,8 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 
+-- | Replacement type that supports returning different kinds of reduced
+-- replacements that could be tried.
 data Replacement a = Dual a a
                    | Single a
                    | None
@@ -58,21 +60,30 @@ halve []  = None
 halve [a] = Single [a]
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
+-- | When given a Lens and a function that works on a lower replacement, it will
+-- go down, apply the replacement, and return a replacement of the original
+-- module.
 combine :: Lens' a b -> (b -> Replacement b) -> a -> Replacement a
 combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 
+-- | Deletes Id 'Expr' if they are not part of the current scope, and replaces
+-- these by 0.
 filterExpr :: [Identifier] -> Expr -> Expr
 filterExpr ids (Id i) = if i `notElem` ids then Number 0 else Id i
 filterExpr _   e      = e
 
+-- | Checks if a declaration is part of the current scope. If not, it returns
+-- 'False', otherwise 'True', as it should be kept.
 filterDecl :: [Identifier] -> ModItem -> Bool
 filterDecl ids (Decl Nothing (Port _ _ _ i) _) = i `elem` ids
 filterDecl _   _                               = True
 
+-- | Checks if a continuous assignment is in the current scope, if not, it
+-- returns 'False'.
 filterAssigns :: [Port] -> ModItem -> Bool
 filterAssigns out (ModCA (ContAssign i _)) =
-    notElem i $ out ^.. traverse . portName
-filterAssigns _ _ = False
+    elem i $ out ^.. traverse . portName
+filterAssigns _ _ = True
 
 cleanUndefined :: [Identifier] -> [ModItem] -> [ModItem]
 cleanUndefined ids mis =
@@ -163,7 +174,8 @@ reduce_ repl eval src = do
             .   modContAssign
         eval m
 
--- | Reduce an input to a minimal representation.
+-- | Reduce an input to a minimal representation. It first reduces the always
+-- blocks, then reduces
 reduce
     :: (SourceInfo -> IO Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.

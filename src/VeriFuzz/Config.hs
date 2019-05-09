@@ -21,8 +21,6 @@ module VeriFuzz.Config
     , Probability(..)
     -- *** Expression
     , ProbExpr(..)
-    -- *** Event List
-    , ProbEventList(..)
     -- *** Module Item
     , ProbModItem(..)
     -- *** Statement
@@ -45,7 +43,6 @@ module VeriFuzz.Config
     , probModItem
     , probStmnt
     , probExpr
-    , probEventList
     , probExprNum
     , probExprId
     , probExprRangeSelect
@@ -56,11 +53,9 @@ module VeriFuzz.Config
     , probExprStr
     , probExprSigned
     , probExprUnsigned
-    , probEventListAll
-    , probEventListVar
-    , probEventListClk
     , probModItemAssign
-    , probModItemAlways
+    , probModItemSeqAlways
+    , probModItemCombAlways
     , probModItemInst
     , probStmntBlock
     , probStmntNonBlock
@@ -137,9 +132,6 @@ import           VeriFuzz.Sim.Yosys
 -- >>> T.putStrLn $ encodeConfig defaultConfig
 -- <BLANKLINE>
 -- [probability]
---   eventlist.all = 0
---   eventlist.clk = 1
---   eventlist.var = 0
 --   expr.binary = 5
 --   expr.concatenation = 3
 --   expr.number = 1
@@ -150,9 +142,10 @@ import           VeriFuzz.Sim.Yosys
 --   expr.unary = 5
 --   expr.unsigned = 5
 --   expr.variable = 5
---   moditem.always = 1
 --   moditem.assign = 5
+--   moditem.combinational = 1
 --   moditem.instantiation = 1
+--   moditem.sequential = 1
 --   statement.blocking = 0
 --   statement.conditional = 1
 --   statement.forloop = 0
@@ -208,11 +201,13 @@ data ProbExpr = ProbExpr { _probExprNum         :: {-# UNPACK #-} !Int
               deriving (Eq, Show)
 
 -- | Probability of generating different nodes inside a module declaration.
-data ProbModItem = ProbModItem { _probModItemAssign :: {-# UNPACK #-} !Int
+data ProbModItem = ProbModItem { _probModItemAssign     :: {-# UNPACK #-} !Int
                                -- ^ Probability of generating an @assign@.
-                               , _probModItemAlways :: {-# UNPACK #-} !Int
-                               -- ^ Probability of generating an @always@ block.
-                               , _probModItemInst   :: {-# UNPACK #-} !Int
+                               , _probModItemSeqAlways  :: {-# UNPACK #-} !Int
+                               -- ^ Probability of generating a sequential @always@ block.
+                               , _probModItemCombAlways :: {-# UNPACK #-} !Int
+                               -- ^ Probability of generating an combinational @always@ block.
+                               , _probModItemInst       :: {-# UNPACK #-} !Int
                                -- ^ Probability of generating a module
                                -- instantiation.
                                }
@@ -225,16 +220,9 @@ data ProbStatement = ProbStatement { _probStmntBlock    :: {-# UNPACK #-} !Int
                                    }
                    deriving (Eq, Show)
 
-data ProbEventList = ProbEventList { _probEventListAll :: {-# UNPACK #-} !Int
-                                   , _probEventListClk :: {-# UNPACK #-} !Int
-                                   , _probEventListVar :: {-# UNPACK #-} !Int
-                                   }
-                   deriving (Eq, Show)
-
-data Probability = Probability { _probModItem   :: {-# UNPACK #-} !ProbModItem
-                               , _probStmnt     :: {-# UNPACK #-} !ProbStatement
-                               , _probExpr      :: {-# UNPACK #-} !ProbExpr
-                               , _probEventList :: {-# UNPACK #-} !ProbEventList
+data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
+                               , _probStmnt   :: {-# UNPACK #-} !ProbStatement
+                               , _probExpr    :: {-# UNPACK #-} !ProbExpr
                                }
                  deriving (Eq, Show)
 
@@ -250,32 +238,31 @@ data SimDescription = SimDescription { simName :: {-# UNPACK #-} !Text }
                     deriving (Eq, Show)
 
 data SynthDescription = SynthDescription { synthName          :: {-# UNPACK #-} !Text
-                                         , synthYosysBin      :: !(Maybe Text)
-                                         , synthYosysDesc     :: !(Maybe Text)
-                                         , synthYosysOutput   :: !(Maybe Text)
-                                         , synthXstBin        :: !(Maybe Text)
-                                         , synthXstDesc       :: !(Maybe Text)
-                                         , synthXstOutput     :: !(Maybe Text)
-                                         , synthVivadoBin     :: !(Maybe Text)
-                                         , synthVivadoDesc    :: !(Maybe Text)
-                                         , synthVivadoOutput  :: !(Maybe Text)
-                                         , synthQuartusBin    :: !(Maybe Text)
-                                         , synthQuartusDesc   :: !(Maybe Text)
-                                         , synthQuartusOutput :: !(Maybe Text)
+                                         , synthYosysBin      :: Maybe Text
+                                         , synthYosysDesc     :: Maybe Text
+                                         , synthYosysOutput   :: Maybe Text
+                                         , synthXstBin        :: Maybe Text
+                                         , synthXstDesc       :: Maybe Text
+                                         , synthXstOutput     :: Maybe Text
+                                         , synthVivadoBin     :: Maybe Text
+                                         , synthVivadoDesc    :: Maybe Text
+                                         , synthVivadoOutput  :: Maybe Text
+                                         , synthQuartusBin    :: Maybe Text
+                                         , synthQuartusDesc   :: Maybe Text
+                                         , synthQuartusOutput :: Maybe Text
                                          }
                       deriving (Eq, Show)
 
 data Config = Config { _configProbability  :: {-# UNPACK #-} !Probability
                      , _configProperty     :: {-# UNPACK #-} !Property
-                     , _configSimulators   :: ![SimDescription]
-                     , _configSynthesisers :: ![SynthDescription]
+                     , _configSimulators   :: [SimDescription]
+                     , _configSynthesisers :: [SynthDescription]
                      }
             deriving (Eq, Show)
 
 makeLenses ''ProbExpr
 makeLenses ''ProbModItem
 makeLenses ''ProbStatement
-makeLenses ''ProbEventList
 makeLenses ''Probability
 makeLenses ''Property
 makeLenses ''Config
@@ -356,15 +343,16 @@ fromQuartus (Quartus a b c) =
     (Just $ toTextIgnore c)
 
 defaultConfig :: Config
-defaultConfig = Config (Probability defModItem defStmnt defExpr defEvent)
+defaultConfig = Config (Probability defModItem defStmnt defExpr)
                        (Property 20 Nothing 3 2 5)
                        []
                        [fromYosys defaultYosys, fromVivado defaultVivado]
   where
     defModItem =
         ProbModItem 5 -- Assign
-                      1 -- Always
-                        1 -- Instantiation
+        1 -- Sequential Always
+        1 -- Combinational Always
+        1 -- Instantiation
     defStmnt =
         ProbStatement 0 -- Blocking assignment
                         3 -- Non-blocking assignment
@@ -381,10 +369,6 @@ defaultConfig = Config (Probability defModItem defStmnt defExpr defEvent)
                                0 -- String
                                  5 -- Signed function
                                    5 -- Unsigned funtion
-    defEvent =
-        ProbEventList 0 -- All
-                        1 -- Clk
-                          0 -- Var
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
@@ -439,26 +423,15 @@ modItemCodec =
     ProbModItem
         <$> defaultValue (defProb probModItemAssign) (intM "assign")
         .=  _probModItemAssign
-        <*> defaultValue (defProb probModItemAlways) (intM "always")
-        .=  _probModItemAlways
+        <*> defaultValue (defProb probModItemSeqAlways) (intM "sequential")
+        .=  _probModItemSeqAlways
+        <*> defaultValue (defProb probModItemCombAlways) (intM "combinational")
+        .=  _probModItemCombAlways
         <*> defaultValue (defProb probModItemInst) (intM "instantiation")
         .=  _probModItemInst
   where
     defProb i = defaultConfig ^. configProbability . probModItem . i
     intM = int "moditem"
-
-eventListCodec :: TomlCodec ProbEventList
-eventListCodec =
-    ProbEventList
-        <$> defaultValue (defProb probEventListClk) (intE "clk")
-        .=  _probEventListClk
-        <*> defaultValue (defProb probEventListAll) (intE "all")
-        .=  _probEventListAll
-        <*> defaultValue (defProb probEventListVar) (intE "var")
-        .=  _probEventListVar
-  where
-    defProb i = defaultConfig ^. configProbability . probEventList . i
-    intE = int "eventlist"
 
 probCodec :: TomlCodec Probability
 probCodec =
@@ -469,8 +442,6 @@ probCodec =
         .=  _probStmnt
         <*> defaultValue (defProb probExpr) exprCodec
         .=  _probExpr
-        <*> defaultValue (defProb probEventList) eventListCodec
-        .=  _probEventList
     where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec Property
