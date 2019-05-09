@@ -16,6 +16,7 @@ module VeriFuzz.Sim.Quartus
     )
 where
 
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
@@ -40,6 +41,9 @@ instance Synthesiser Quartus where
     runSynth = runSynthQuartus
     synthOutput = quartusOutput
     setSynthOutput (Quartus a b _) = Quartus a b
+
+instance NFData Quartus where
+    rnf = rwhnf
 
 defaultQuartus :: Quartus
 defaultQuartus = Quartus Nothing "quartus" "syn_quartus.v"

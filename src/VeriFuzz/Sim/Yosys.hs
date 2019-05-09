@@ -20,6 +20,7 @@ module VeriFuzz.Sim.Yosys
     )
 where
 
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Control.Lens
 import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
@@ -48,6 +49,9 @@ instance Synthesiser Yosys where
   runSynth = runSynthYosys
   synthOutput = yosysOutput
   setSynthOutput (Yosys a b _) = Yosys a b
+
+instance NFData Yosys where
+    rnf = rwhnf
 
 defaultYosys :: Yosys
 defaultYosys = Yosys Nothing "yosys" "syn_yosys.v"

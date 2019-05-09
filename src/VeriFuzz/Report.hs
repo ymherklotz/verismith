@@ -30,6 +30,7 @@ module VeriFuzz.Report
     )
 where
 
+import           Control.DeepSeq       (NFData, rnf)
 import           Control.Lens
 import           Data.ByteString       (ByteString)
 import           Data.Maybe            (fromMaybe)
@@ -53,8 +54,14 @@ type BResult = Result Failed ByteString
 data SynthTool = XSTSynth {-# UNPACK #-} !XST
                | VivadoSynth {-# UNPACK #-} !Vivado
                | YosysSynth {-# UNPACK #-} !Yosys
-               | QuartusSynth !Quartus
+               | QuartusSynth {-# UNPACK #-} !Quartus
                deriving (Eq)
+
+instance NFData SynthTool where
+    rnf (XSTSynth a)     = rnf a
+    rnf (VivadoSynth a)  = rnf a
+    rnf (YosysSynth a)   = rnf a
+    rnf (QuartusSynth a) = rnf a
 
 instance Show SynthTool where
     show (XSTSynth xst)         = show xst
@@ -98,6 +105,9 @@ defaultXSTSynth = XSTSynth defaultXST
 
 newtype SimTool = IcarusSim Icarus
                 deriving (Eq)
+
+instance NFData SimTool where
+    rnf (IcarusSim a) = rnf a
 
 instance Tool SimTool where
     toText (IcarusSim icarus) = toText icarus
@@ -160,25 +170,21 @@ descriptionToSim s =
     error $ "Could not find implementation for simulator '" <> show s <> "'"
 
 descriptionToSynth :: SynthDescription -> SynthTool
-descriptionToSynth s@(SynthDescription "yosys" _ _ _ _ _ _ _ _ _ _ _ _) =
+descriptionToSynth (SynthDescription "yosys" bin desc out) =
     YosysSynth
-        . Yosys (fromText <$> synthYosysBin s) (fromMaybe (yosysDesc defaultYosys) $ synthYosysDesc s)
-        . maybe (yosysOutput defaultYosys) fromText
-        $ synthYosysOutput s
-descriptionToSynth s@(SynthDescription "vivado" _ _ _ _ _ _ _ _ _ _ _ _) =
+        . Yosys (fromText <$> bin) (fromMaybe (yosysDesc defaultYosys) desc)
+        $ maybe (yosysOutput defaultYosys) fromText out
+descriptionToSynth (SynthDescription "vivado" bin desc out) =
     VivadoSynth
-        . Vivado (fromText <$> synthVivadoBin s) (fromMaybe (vivadoDesc defaultVivado) $ synthVivadoDesc s)
-        . maybe (vivadoOutput defaultVivado) fromText
-        $ synthVivadoOutput s
-descriptionToSynth s@(SynthDescription "xst" _ _ _ _ _ _ _ _ _ _ _ _) =
+        . Vivado (fromText <$> bin) (fromMaybe (vivadoDesc defaultVivado) desc)
+        $ maybe (vivadoOutput defaultVivado) fromText out
+descriptionToSynth (SynthDescription "xst" bin desc out) =
     XSTSynth
-        . XST (fromText <$> synthXstBin s) (fromMaybe (xstDesc defaultXST) $ synthXstDesc s)
-        . maybe (xstOutput defaultXST) fromText
-        $ synthXstOutput s
-descriptionToSynth s@(SynthDescription "quartus" _ _ _ _ _ _ _ _ _ _ _ _) =
+        . XST (fromText <$> bin) (fromMaybe (xstDesc defaultXST) desc)
+        $ maybe (xstOutput defaultXST) fromText out
+descriptionToSynth (SynthDescription "quartus" bin desc out) =
     QuartusSynth
-        . Quartus (fromText <$> synthQuartusBin s) (fromMaybe (quartusDesc defaultQuartus) $ synthQuartusDesc s)
-        . maybe (quartusOutput defaultQuartus) fromText
-        $ synthQuartusOutput s
+        . Quartus (fromText <$> bin) (fromMaybe (quartusDesc defaultQuartus) $ desc)
+        $ maybe (quartusOutput defaultQuartus) fromText out
 descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"

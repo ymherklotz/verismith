@@ -18,6 +18,7 @@ module VeriFuzz.Sim.XST
     )
 where
 
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
@@ -44,6 +45,9 @@ instance Synthesiser XST where
     runSynth = runSynthXST
     synthOutput = xstOutput
     setSynthOutput (XST a b _) = XST a b
+
+instance NFData XST where
+    rnf = rwhnf
 
 defaultXST :: XST
 defaultXST = XST Nothing "xst" "syn_xst.v"

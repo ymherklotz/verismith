@@ -24,6 +24,7 @@ module VeriFuzz.Fuzz
     )
 where
 
+import           Control.DeepSeq                  (force)
 import           Control.Exception.Lifted         (finally)
 import           Control.Lens
 import           Control.Monad                    (forM, void)
@@ -73,8 +74,8 @@ runFuzz conf yos m = shelly $ runFuzz' conf yos m
 runFuzz' :: Monad m => Config -> Yosys -> (Config -> Fuzz m b) -> m b
 runFuzz' conf yos m = runReaderT
     (evalStateT (m conf) (FuzzReport [] [] []))
-    (FuzzEnv (descriptionToSynth <$> conf ^. configSynthesisers)
-             (descriptionToSim <$> conf ^. configSimulators)
+    (FuzzEnv (force $ descriptionToSynth <$> conf ^. configSynthesisers)
+             (force $ descriptionToSim <$> conf ^. configSimulators)
              yos
     )
 

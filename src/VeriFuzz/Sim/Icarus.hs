@@ -16,6 +16,7 @@ module VeriFuzz.Sim.Icarus
     )
 where
 
+import           Control.DeepSeq           (NFData, rnf, rwhnf)
 import           Control.Lens
 import           Crypto.Hash               (Digest, hash)
 import           Crypto.Hash.Algorithms    (SHA256)
@@ -56,6 +57,9 @@ instance Tool Icarus where
 instance Simulator Icarus where
   runSim = runSimIcarus
   runSimWithFile = runSimIcarusWithFile
+
+instance NFData Icarus where
+    rnf = rwhnf
 
 defaultIcarus :: Icarus
 defaultIcarus = Icarus "iverilog" "vvp"

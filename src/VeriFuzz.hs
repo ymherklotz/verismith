@@ -15,7 +15,6 @@ module VeriFuzz
     , runSimulation
     , runReduce
     , draw
-    , versionInfo
     , SourceInfo(..)
     , module VeriFuzz.Verilog
     , module VeriFuzz.Config
@@ -38,12 +37,9 @@ import           Data.Text                (Text)
 import qualified Data.Text                as T
 import           Data.Text.Encoding       (decodeUtf8)
 import qualified Data.Text.IO             as T
-import           Data.Version             (showVersion)
-import           Development.GitRev
 import           Hedgehog                 (Gen)
 import qualified Hedgehog.Gen             as Hog
 import           Hedgehog.Internal.Seed   (Seed)
-import           Paths_verifuzz           (version)
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted            (liftSh)
@@ -56,16 +52,6 @@ import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog
-
-versionInfo :: String
-versionInfo =
-    "VeriFuzz "
-        <> showVersion version
-        <> " ("
-        <> $(gitCommitDate)
-        <> " "
-        <> $(gitHash)
-        <> ")"
 
 -- | Generate a specific number of random bytestrings of size 256.
 randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]

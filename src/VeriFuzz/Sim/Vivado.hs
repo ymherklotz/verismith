@@ -16,6 +16,7 @@ module VeriFuzz.Sim.Vivado
     )
 where
 
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
@@ -41,6 +42,9 @@ instance Synthesiser Vivado where
     runSynth = runSynthVivado
     synthOutput = vivadoOutput
     setSynthOutput (Vivado a b _) = Vivado a b
+
+instance NFData Vivado where
+    rnf = rwhnf
 
 defaultVivado :: Vivado
 defaultVivado = Vivado Nothing "vivado" "syn_vivado.v"
