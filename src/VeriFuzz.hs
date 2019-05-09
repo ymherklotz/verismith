@@ -166,4 +166,4 @@ runEquivalence seed gm t d k i = do
     where n = t <> "_" <> T.pack (show i)
 
 runReduce :: SourceInfo -> IO SourceInfo
-runReduce s = reduce (\s -> not <$> checkEquivalence s "reduce") s
+runReduce s = reduce (\s' -> not <$> checkEquivalence s' "reduce") s

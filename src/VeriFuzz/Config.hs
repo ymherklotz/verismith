@@ -25,8 +25,8 @@ module VeriFuzz.Config
     , ProbModItem(..)
     -- *** Statement
     , ProbStatement(..)
-    -- ** Property
-    , Property(..)
+    -- ** ConfProperty
+    , ConfProperty(..)
     -- ** Simulator Description
     , SimDescription(..)
     -- ** Synthesiser Description
@@ -189,11 +189,11 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                }
                  deriving (Eq, Show)
 
-data Property = Property { _propSize       :: {-# UNPACK #-} !Int
-                         , _propSeed       :: !(Maybe Seed)
-                         , _propStmntDepth :: {-# UNPACK #-} !Int
-                         , _propModDepth   :: {-# UNPACK #-} !Int
-                         , _propMaxModules :: {-# UNPACK #-} !Int
+data ConfProperty = ConfProperty { _propSize :: {-# UNPACK #-} !Int
+                         , _propSeed         :: !(Maybe Seed)
+                         , _propStmntDepth   :: {-# UNPACK #-} !Int
+                         , _propModDepth     :: {-# UNPACK #-} !Int
+                         , _propMaxModules   :: {-# UNPACK #-} !Int
                          }
               deriving (Eq, Show)
 
@@ -214,7 +214,7 @@ data SynthDescription = SynthDescription { synthName :: {-# UNPACK #-} !Text
 
 data Config = Config { _configInfo         :: Info
                      , _configProbability  :: {-# UNPACK #-} !Probability
-                     , _configProperty     :: {-# UNPACK #-} !Property
+                     , _configProperty     :: {-# UNPACK #-} !ConfProperty
                      , _configSimulators   :: [SimDescription]
                      , _configSynthesisers :: [SynthDescription]
                      }
@@ -224,7 +224,7 @@ $(makeLenses ''ProbExpr)
 $(makeLenses ''ProbModItem)
 $(makeLenses ''ProbStatement)
 $(makeLenses ''Probability)
-$(makeLenses ''Property)
+$(makeLenses ''ConfProperty)
 $(makeLenses ''Info)
 $(makeLenses ''Config)
 
@@ -270,7 +270,7 @@ fromQuartus (Quartus a b c) =
 defaultConfig :: Config
 defaultConfig = Config (Info (pack $(gitHash)) (pack $ showVersion version))
                 (Probability defModItem defStmnt defExpr)
-                (Property 20 Nothing 3 2 5)
+                (ConfProperty 20 Nothing 3 2 5)
                 []
                 [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -370,9 +370,9 @@ probCodec =
         .=  _probExpr
     where defProb i = defaultConfig ^. configProbability . i
 
-propCodec :: TomlCodec Property
+propCodec :: TomlCodec ConfProperty
 propCodec =
-    Property
+    ConfProperty
         <$> defaultValue (defProp propSize) (Toml.int "size")
         .=  _propSize
         <*> Toml.dioptional (Toml.read "seed")

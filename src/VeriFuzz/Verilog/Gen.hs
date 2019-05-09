@@ -98,12 +98,6 @@ randomMod inps total = do
 gen :: Gen a -> StateGen a
 gen = lift . lift
 
-listOf1 :: Gen a -> Gen [a]
-listOf1 a = Hog.list (Hog.linear 1 100) a
-
---listOf :: Gen a -> Gen [a]
---listOf = Hog.list (Hog.linear 0 100)
-
 largeNum :: Gen Int
 largeNum = Hog.int Hog.linearBounded
 
@@ -178,9 +172,9 @@ constExprWithContext ps prob size
           , ConstBinOp <$> subexpr 2 <*> binOp <*> subexpr 2
           )
         , ( prob ^. probExprCond
-          , ConstCond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3
+          , ConstCond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2
           )
-        , (prob ^. probExprConcat, ConstConcat <$> listOf1 (subexpr 8))
+        , (prob ^. probExprConcat, ConstConcat <$> Hog.list (Hog.linear 1 10) (subexpr 2))
         ]
     | otherwise = constExprWithContext ps prob 0
     where subexpr y = constExprWithContext ps prob $ size `div` y
@@ -191,11 +185,11 @@ exprSafeList prob = [(prob ^. probExprNum, Number <$> genBitVec)]
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
     [ (prob ^. probExprNum     , Number <$> genBitVec)
-    , (prob ^. probExprConcat  , Concat <$> listOf1 (subexpr 8))
+    , (prob ^. probExprConcat  , Concat <$> Hog.list (Hog.linear 1 10) (subexpr 2))
     , (prob ^. probExprUnOp    , UnOp <$> unOp <*> subexpr 2)
     , (prob ^. probExprStr, Str <$> Hog.text (Hog.linear 0 100) Hog.alphaNum)
     , (prob ^. probExprBinOp   , BinOp <$> subexpr 2 <*> binOp <*> subexpr 2)
-    , (prob ^. probExprCond    , Cond <$> subexpr 3 <*> subexpr 3 <*> subexpr 3)
+    , (prob ^. probExprCond    , Cond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2)
     , (prob ^. probExprSigned  , Appl <$> pure "$signed" <*> subexpr 2)
     , (prob ^. probExprUnsigned, Appl <$> pure "$unsigned" <*> subexpr 2)
     ]

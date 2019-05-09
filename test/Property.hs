@@ -20,16 +20,14 @@ import           Hedgehog.Function       (Arg, Vary)
 import qualified Hedgehog.Function       as Hog
 import qualified Hedgehog.Gen            as Hog
 import qualified Hedgehog.Range          as Hog
+import           Parser                  (parserTests)
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Text.Parsec
-import           VeriFuzz                hiding (Property)
+import           VeriFuzz
 import           VeriFuzz.Result
 import           VeriFuzz.Verilog.Lex
 import           VeriFuzz.Verilog.Parser
-
-randomMod' :: Gen ModDecl
-randomMod' = Hog.resize 20 (randomMod 3 10)
 
 randomDAG' :: Gen Circuit
 randomDAG' = Hog.resize 30 randomDAG
@@ -39,26 +37,6 @@ simpleGraph = Hog.property $ do
     xs <- Hog.forAllWith (const "") randomDAG'
     Hog.assert $ simp xs
     where simp = G.isSimple . getCircuit
-
-parserInput :: Property
-parserInput = Hog.property $ do
-    v <- Hog.forAll randomMod'
-    Hog.assert . isRight $ parse parseModDecl
-                                 "input_test.v"
-                                 (alexScanTokens $ str v)
-    where str = show . GenVerilog
-
-parserIdempotent :: Property
-parserIdempotent = Hog.property $ do
-    v <- Hog.forAll randomMod'
-    let sv = vshow v
-    p sv === (p . p) sv
-  where
-    vshow = show . GenVerilog
-    p sv =
-        either (\x -> show x <> "\n" <> sv) vshow
-            . parse parseModDecl "idempotent_test.v"
-            $ alexScanTokens sv
 
 type GenFunctor f a b c =
     ( Functor f
@@ -99,7 +77,6 @@ propertyTests :: TestTree
 propertyTests = testGroup
     "Property Tests"
     [ testProperty "simple graph generation check" simpleGraph
---    , testProperty "parser input"                  parserInput
---    , testProperty "parser idempotence"            parserIdempotent
     , testProperty "fmap for Result"               propertyResultInterrupted
+    , parserTests
     ]

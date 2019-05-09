@@ -21,13 +21,12 @@ module VeriFuzz.Verilog.CodeGen
     )
 where
 
-import           Data.Foldable           (fold)
-import           Data.List.NonEmpty      (NonEmpty (..), toList)
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import qualified Data.Text.IO            as T
-import           Numeric                 (showHex)
-import           VeriFuzz.Internal
+import           Data.List.NonEmpty        (NonEmpty (..), toList)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import           Data.Text.Prettyprint.Doc
+import           Numeric                   (showHex)
+import           VeriFuzz.Internal         hiding (comma)
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 
@@ -39,161 +38,159 @@ class Source a where
 
 -- | Map a 'Maybe Statement' to 'Text'. If it is 'Just statement', the generated
 -- statements are returned. If it is 'Nothing', then @;\n@ is returned.
-defMap :: Maybe Statement -> Text
-defMap = maybe ";\n" statement
+defMap :: Maybe Statement -> Doc a
+defMap = maybe semi statement
 
 -- | Convert the 'Verilog' type to 'Text' so that it can be rendered.
-verilogSrc :: Verilog -> Text
-verilogSrc (Verilog modules) = fold $ moduleDecl <$> modules
+verilogSrc :: Verilog -> Doc a
+verilogSrc (Verilog modules) = vsep . punctuate line $ moduleDecl <$> modules
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
-moduleDecl :: ModDecl -> Text
+moduleDecl :: ModDecl -> Doc a
 moduleDecl (ModDecl i outP inP items ps) =
-    "module "
-        <> identifier i
-        <> params ps
-        <> ports
-        <> ";\n"
-        <> modI
-        <> "endmodule\n\n"
+    vsep
+    [ sep ["module" <+> identifier i, params ps, ports <> semi]
+    , indent 2 modI
+    , "endmodule"
+    ]
   where
     ports | null outP && null inP = ""
-          | otherwise             = "(" <> comma (modPort <$> outIn) <> ")"
-    modI  = fold $ moduleItem <$> items
+          | otherwise             = parens . align . sep . punctuate comma $ modPort <$> outIn
+    modI  = vsep $ moduleItem <$> items
     outIn = outP ++ inP
     params []        = ""
-    params (p : pps) = "\n#(\n" <> paramList (p :| pps) <> "\n)\n"
+    params (p : pps) = hcat ["#", paramList (p :| pps)]
 
 -- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
-paramList :: NonEmpty Parameter -> Text
-paramList ps = "parameter " <> (commaNL . toList $ parameter <$> ps)
+paramList :: NonEmpty Parameter -> Doc a
+paramList ps = tupled . toList $ parameter <$> ps
 
 -- | Generates a localparam list. Can only be called with a 'NonEmpty' list.
-localParamList :: NonEmpty LocalParam -> Text
-localParamList ps = "localparam " <> (commaNL . toList $ localParam <$> ps)
+localParamList :: NonEmpty LocalParam -> Doc a
+localParamList ps = tupled . toList $ localParam <$> ps
 
 -- | Generates the assignment for a 'Parameter'.
-parameter :: Parameter -> Text
-parameter (Parameter name val) = identifier name <> " = " <> constExpr val
+parameter :: Parameter -> Doc a
+parameter (Parameter name val) = hsep ["parameter", identifier name,  "=", constExpr val]
 
 -- | Generates the assignment for a 'LocalParam'.
-localParam :: LocalParam -> Text
-localParam (LocalParam name val) = identifier name <> " = " <> constExpr val
+localParam :: LocalParam -> Doc a
+localParam (LocalParam name val) = hsep ["localparameter", identifier name,  "=", constExpr val]
 
-identifier :: Identifier -> Text
-identifier (Identifier i) = i
+identifier :: Identifier -> Doc a
+identifier (Identifier i) = pretty i
 
 -- | Conversts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
-modPort :: Port -> Text
-modPort (Port _ _ _ (Identifier i)) = i
+modPort :: Port -> Doc a
+modPort (Port _ _ _ i) = identifier i
 
 -- | Generate the 'Port' description.
-port :: Port -> Text
-port (Port tp sgn r (Identifier name)) = t <> sign <> range r <> name
+port :: Port -> Doc a
+port (Port tp sgn r name) = hsep [t, sign, range r, identifier name]
   where
-    t    = flip mappend " " $ pType tp
+    t    = pType tp
     sign = signed sgn
 
-range :: Range -> Text
-range (Range msb lsb) = "[" <> constExpr msb <> ":" <> constExpr lsb <> "] "
+range :: Range -> Doc a
+range (Range msb lsb) = brackets $ hcat [constExpr msb, colon, constExpr lsb]
 
-signed :: Bool -> Text
-signed True = "signed "
-signed _    = ""
+signed :: Bool -> Doc a
+signed True = "signed"
+signed _    = mempty
 
 -- | Convert the 'PortDir' type to 'Text'.
-portDir :: PortDir -> Text
+portDir :: PortDir -> Doc a
 portDir PortIn    = "input"
 portDir PortOut   = "output"
 portDir PortInOut = "inout"
 
 -- | Generate a 'ModItem'.
-moduleItem :: ModItem -> Text
+moduleItem :: ModItem -> Doc a
 moduleItem (ModCA ca) = contAssign ca
-moduleItem (ModInst (Identifier i) (Identifier name) conn) =
-    i <> " " <> name <> "(" <> comma (mConn <$> conn) <> ")" <> ";\n"
-moduleItem (Initial stat) = "initial " <> statement stat
-moduleItem (Always  stat) = "always " <> statement stat
+moduleItem (ModInst i name conn) =
+    hsep [identifier i, identifier name, parens . hsep $ punctuate comma (mConn <$> conn), semi]
+moduleItem (Initial stat) = nest 2 $ vsep ["initial", statement stat]
+moduleItem (Always  stat) = nest 2 $ vsep ["always", statement stat]
 moduleItem (Decl dir p ini) =
-    maybe "" makePort dir <> port p <> maybe "" makeIni ini <> ";\n"
+    hsep [maybe mempty makePort dir, port p, maybe mempty makeIni ini, semi]
   where
-    makePort = (<> " ") . portDir
-    makeIni  = (" = " <>) . constExpr
-moduleItem (ParamDecl      p) = paramList p <> ";\n"
-moduleItem (LocalParamDecl p) = localParamList p <> ";\n"
+    makePort = portDir
+    makeIni  = ("=" <+>) . constExpr
+moduleItem (ParamDecl      p) = hcat [paramList p, semi]
+moduleItem (LocalParamDecl p) = hcat [localParamList p, semi]
 
-mConn :: ModConn -> Text
+mConn :: ModConn -> Doc a
 mConn (ModConn c       ) = expr c
-mConn (ModConnNamed n c) = "." <> getIdentifier n <> "(" <> expr c <> ")"
+mConn (ModConnNamed n c) = hcat [dot, identifier n, parens $ expr c]
 
 -- | Generate continuous assignment
-contAssign :: ContAssign -> Text
+contAssign :: ContAssign -> Doc a
 contAssign (ContAssign val e) =
-    "assign " <> getIdentifier val <> " = " <> expr e <> ";\n"
+    hsep ["assign", identifier val, "=", align $ expr e, semi]
 
 -- | Generate 'Expr' to 'Text'.
-expr :: Expr -> Text
+expr :: Expr -> Doc a
 expr (BinOp eRhs bin eLhs) =
-    "(" <> expr eRhs <> binaryOp bin <> expr eLhs <> ")"
+    parens $ hsep [expr eRhs, binaryOp bin, expr eLhs]
 expr (Number b             ) = showNum b
-expr (Id     i             ) = getIdentifier i
-expr (VecSelect   i e      ) = getIdentifier i <> "[" <> expr e <> "]"
-expr (RangeSelect i r      ) = getIdentifier i <> range r
-expr (Concat c             ) = "{" <> comma (expr <$> c) <> "}"
-expr (UnOp u e             ) = "(" <> unaryOp u <> expr e <> ")"
-expr (Cond l t f) = "(" <> expr l <> " ? " <> expr t <> " : " <> expr f <> ")"
-expr (Appl (Identifier f) e) = f <> "(" <> expr e <> ")"
-expr (Str t                ) = "\"" <> t <> "\""
+expr (Id     i             ) = identifier i
+expr (VecSelect   i e      ) = hcat [identifier i, brackets $ expr e]
+expr (RangeSelect i r      ) = hcat [identifier i, range r]
+expr (Concat c             ) = braces . nest 4 . sep $ punctuate comma (expr <$> c)
+expr (UnOp u e             ) = parens $ hcat [unaryOp u, expr e]
+expr (Cond l t f) = parens . nest 4 $ sep [expr l <+> "?", hsep [expr t, colon, expr f]]
+expr (Appl f e) = hcat [identifier f, parens $ expr e]
+expr (Str t                ) = dquotes $ pretty t
 
-showNum :: BitVec -> Text
+showNum :: BitVec -> Doc a
 showNum (BitVec s n) =
-    "(" <> minus <> showT s <> "'h" <> T.pack (showHex (abs n) "") <> ")"
+    parens $ hcat [minus, pretty $ showT s, "'h", pretty $ T.pack (showHex (abs n) "")]
   where
-    minus | signum n >= 0 = ""
+    minus | signum n >= 0 = mempty
           | otherwise     = "-"
 
-constExpr :: ConstExpr -> Text
+constExpr :: ConstExpr -> Doc a
 constExpr (ConstNum    b) = showNum b
 constExpr (ParamId     i) = identifier i
-constExpr (ConstConcat c) = "{" <> comma (constExpr <$> c) <> "}"
-constExpr (ConstUnOp u e) = "(" <> unaryOp u <> constExpr e <> ")"
+constExpr (ConstConcat c) = braces . hsep $ punctuate comma (constExpr <$> c)
+constExpr (ConstUnOp u e) = parens $ hcat [unaryOp u, constExpr e]
 constExpr (ConstBinOp eRhs bin eLhs) =
-    "(" <> constExpr eRhs <> binaryOp bin <> constExpr eLhs <> ")"
+    parens $ hsep [constExpr eRhs, binaryOp bin, constExpr eLhs]
 constExpr (ConstCond l t f) =
-    "(" <> constExpr l <> " ? " <> constExpr t <> " : " <> constExpr f <> ")"
-constExpr (ConstStr t) = "\"" <> t <> "\""
+    parens $ hsep [constExpr l, "?", constExpr t, colon, constExpr f]
+constExpr (ConstStr t) = dquotes $ pretty t
 
 -- | Convert 'BinaryOperator' to 'Text'.
-binaryOp :: BinaryOperator -> Text
-binaryOp BinPlus    = " + "
-binaryOp BinMinus   = " - "
-binaryOp BinTimes   = " * "
-binaryOp BinDiv     = " / "
-binaryOp BinMod     = " % "
-binaryOp BinEq      = " == "
-binaryOp BinNEq     = " != "
-binaryOp BinCEq     = " === "
-binaryOp BinCNEq    = " !== "
-binaryOp BinLAnd    = " && "
-binaryOp BinLOr     = " || "
-binaryOp BinLT      = " < "
-binaryOp BinLEq     = " <= "
-binaryOp BinGT      = " > "
-binaryOp BinGEq     = " >= "
-binaryOp BinAnd     = " & "
-binaryOp BinOr      = " | "
-binaryOp BinXor     = " ^ "
-binaryOp BinXNor    = " ^~ "
-binaryOp BinXNorInv = " ~^ "
-binaryOp BinPower   = " ** "
-binaryOp BinLSL     = " << "
-binaryOp BinLSR     = " >> "
-binaryOp BinASL     = " <<< "
-binaryOp BinASR     = " >>> "
+binaryOp :: BinaryOperator -> Doc a
+binaryOp BinPlus    = "+"
+binaryOp BinMinus   = "-"
+binaryOp BinTimes   = "*"
+binaryOp BinDiv     = "/"
+binaryOp BinMod     = "%"
+binaryOp BinEq      = "=="
+binaryOp BinNEq     = "!="
+binaryOp BinCEq     = "==="
+binaryOp BinCNEq    = "!=="
+binaryOp BinLAnd    = "&&"
+binaryOp BinLOr     = "||"
+binaryOp BinLT      = "<"
+binaryOp BinLEq     = "<="
+binaryOp BinGT      = ">"
+binaryOp BinGEq     = ">="
+binaryOp BinAnd     = "&"
+binaryOp BinOr      = "|"
+binaryOp BinXor     = "^"
+binaryOp BinXNor    = "^~"
+binaryOp BinXNorInv = "~^"
+binaryOp BinPower   = "**"
+binaryOp BinLSL     = "<<"
+binaryOp BinLSR     = ">>"
+binaryOp BinASL     = "<<<"
+binaryOp BinASR     = ">>>"
 
 -- | Convert 'UnaryOperator' to 'Text'.
-unaryOp :: UnaryOperator -> Text
+unaryOp :: UnaryOperator -> Doc a
 unaryOp UnPlus    = "+"
 unaryOp UnMinus   = "-"
 unaryOp UnLNot    = "!"
@@ -206,115 +203,116 @@ unaryOp UnXor     = "^"
 unaryOp UnNxor    = "~^"
 unaryOp UnNxorInv = "^~"
 
-event :: Event -> Text
-event a = "@(" <> eventRec a <> ")"
+event :: Event -> Doc a
+event a = hcat ["@", parens $ eventRec a]
 
 -- | Generate verilog code for an 'Event'.
-eventRec :: Event -> Text
-eventRec (EId   i)    = getIdentifier i
+eventRec :: Event -> Doc a
+eventRec (EId   i)    = identifier i
 eventRec (EExpr e)    = expr e
 eventRec EAll         = "*"
-eventRec (EPosEdge i) = "posedge " <> getIdentifier i
-eventRec (ENegEdge i) = "negedge " <> getIdentifier i
-eventRec (EOr   a b ) = eventRec a <> " or " <> eventRec b
-eventRec (EComb a b ) = eventRec a <> ", " <> eventRec b
+eventRec (EPosEdge i) = hsep ["posedge", identifier i]
+eventRec (ENegEdge i) = hsep ["negedge", identifier i]
+eventRec (EOr   a b ) = hsep [eventRec a, "or", eventRec b]
+eventRec (EComb a b ) = hsep $ punctuate comma [eventRec a, eventRec b]
 
 -- | Generates verilog code for a 'Delay'.
-delay :: Delay -> Text
-delay (Delay i) = "#" <> showT i
+delay :: Delay -> Doc a
+delay (Delay i) = "#" <> pretty i
 
 -- | Generate the verilog code for an 'LVal'.
-lVal :: LVal -> Text
-lVal (RegId i    ) = getIdentifier i
-lVal (RegExpr i e) = getIdentifier i <> " [" <> expr e <> "]"
-lVal (RegSize i r) = getIdentifier i <> " " <> range r
-lVal (RegConcat e) = "{" <> comma (expr <$> e) <> "}"
+lVal :: LVal -> Doc a
+lVal (RegId i    ) = identifier i
+lVal (RegExpr i e) = hsep [identifier i, expr e]
+lVal (RegSize i r) = hsep [identifier i, range r]
+lVal (RegConcat e) = braces . hsep $ punctuate comma (expr <$> e)
 
-pType :: PortType -> Text
+pType :: PortType -> Doc a
 pType Wire = "wire"
 pType Reg  = "reg"
 
-genAssign :: Text -> Assign -> Text
-genAssign op (Assign r d e) = lVal r <> op <> maybe "" delay d <> expr e
+genAssign :: Text -> Assign -> Doc a
+genAssign op (Assign r d e) = hsep [lVal r, pretty op, maybe mempty delay d, expr e]
 
-statement :: Statement -> Text
-statement (TimeCtrl  d stat     ) = delay d <> " " <> defMap stat
-statement (EventCtrl e stat     ) = event e <> " " <> defMap stat
-statement (SeqBlock s) = "begin\n" <> fold (statement <$> s) <> "end\n"
-statement (BlockAssign    a     ) = genAssign " = " a <> ";\n"
-statement (NonBlockAssign a     ) = genAssign " <= " a <> ";\n"
-statement (TaskEnable     t     ) = task t <> ";\n"
-statement (SysTaskEnable  t     ) = "$" <> task t <> ";\n"
-statement (CondStmnt e t Nothing) = "if(" <> expr e <> ")\n" <> defMap t
+statement :: Statement -> Doc a
+statement (TimeCtrl  d stat     ) = hsep [delay d, defMap stat]
+statement (EventCtrl e stat     ) = hsep [event e, defMap stat]
+statement (SeqBlock s) = vsep ["begin", indent 2 . vsep $ statement <$> s, "end"]
+statement (BlockAssign    a     ) = hcat [genAssign "=" a, semi]
+statement (NonBlockAssign a     ) = hcat [genAssign "<=" a, semi]
+statement (TaskEnable     t     ) = hcat [task t, semi]
+statement (SysTaskEnable  t     ) = hcat ["$", task t, semi]
+statement (CondStmnt e t Nothing) = vsep [hsep ["if", parens $ expr e], indent 2 $ defMap t]
 statement (CondStmnt e t f) =
-    "if(" <> expr e <> ")\n" <> defMap t <> "else\n" <> defMap f
+    vsep [hsep ["if", parens $ expr e], indent 2 $ defMap t, "else", indent 2 $ defMap f]
 statement (ForLoop a e incr stmnt) =
-    "for("
-        <> genAssign " = " a
-        <> "; "
-        <> expr e
-        <> "; "
-        <> genAssign " = " incr
-        <> ")\n"
-        <> statement stmnt
+    vsep [ hsep
+           [ "for"
+           , parens . hsep $ punctuate semi
+               [ genAssign "=" a
+               , expr e
+               , genAssign "=" incr
+               ]
+           ]
+         , indent 2 $ statement stmnt]
 
-task :: Task -> Text
-task (Task (Identifier i) e) | null e    = i
-                             | otherwise = i <> "(" <> comma (expr <$> e) <> ")"
+task :: Task -> Doc a
+task (Task i e) | null e    = identifier i
+                | otherwise = hsep [identifier i, parens . hsep $ punctuate comma (expr <$> e)]
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: (Source a) => a -> IO ()
-render = T.putStrLn . genSource
+render = print . genSource
 
 -- Instances
 
 instance Source Identifier where
-    genSource = getIdentifier
+    genSource = showT . identifier
 
 instance Source Task where
-    genSource = task
+    genSource = showT . task
 
 instance Source Statement where
-    genSource = statement
+    genSource = showT . statement
 
 instance Source PortType where
-    genSource = pType
+    genSource = showT . pType
 
 instance Source ConstExpr where
-    genSource = constExpr
+    genSource = showT . constExpr
 
 instance Source LVal where
-    genSource = lVal
+    genSource = showT . lVal
 
 instance Source Delay where
-    genSource = delay
+    genSource = showT . delay
 
 instance Source Event where
-    genSource = event
+    genSource = showT . event
 
 instance Source UnaryOperator where
-    genSource = unaryOp
+    genSource = showT . unaryOp
 
 instance Source Expr where
-    genSource = expr
+    genSource = showT . expr
 
 instance Source ContAssign where
-    genSource = contAssign
+    genSource = showT . contAssign
 
 instance Source ModItem where
-    genSource = moduleItem
+    genSource = showT . moduleItem
 
 instance Source PortDir where
-    genSource = portDir
+    genSource = showT . portDir
 
 instance Source Port where
-    genSource = port
+    genSource = showT . port
 
 instance Source ModDecl where
-    genSource = moduleDecl
+    genSource = showT . moduleDecl
 
 instance Source Verilog where
-    genSource = verilogSrc
+    genSource = showT . verilogSrc
 
 instance Source SourceInfo where
     genSource (SourceInfo _ src) = genSource src
