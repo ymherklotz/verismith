@@ -14,21 +14,52 @@ Test case reducer implementation.
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module VeriFuzz.Reduce
-    ( reduce
+    ( -- $strategy
+      Replacement(..)
+    , reduce
+    , reduce_
+    , halveModules
     )
 where
 
 import           Control.Lens
+import           Data.Text                (Text)
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
+
+-- $strategy
+-- The reduction strategy has multiple different steps. 'reduce' will run these
+-- strategies one after another, starting at the most coarse grained one. The
+-- supported reduction strategies are the following:
+--
+--   [Modules] First of all, the reducer will try and remove all the modules
+--   except the top module.
+--
+--   [Module Items] Then, the module items will be reduced by using standard
+--   delta debugging. Half of the module items will be removed, and both
+--   versions will be tested. If both succeed, they will be divided further and
+--   tested further. Finally, the shortest version will be returned.
+--
+--   [Statements] Once the module items have been reduced, the statements will
+--   be reduced as well. This is done using delta debugging, just like the
+--   module items.
+--
+--   [Expressions] Finally, the expressions themselves will be reduced. This is
+--   done by splitting the top most binary expressions in half and testing each
+--   half.
 
 -- | Replacement type that supports returning different kinds of reduced
 -- replacements that could be tried.
 data Replacement a = Dual a a
                    | Single a
                    | None
-                   deriving (Eq, Show)
+                   deriving (Eq)
+
+instance Show a => Show (Replacement a) where
+    show None       = "None"
+    show (Single a) = "--- Only try:\n" <> show a
+    show (Dual a b) = "--- Try:\n" <> show a <> "\n--- Then:\n" <> show b
 
 instance Functor Replacement where
     fmap f (Dual a b) = Dual (f a) $ f b
@@ -57,7 +88,7 @@ instance Traversable Replacement where
 -- | Split a list in two halves.
 halve :: [a] -> Replacement [a]
 halve []  = None
-halve [a] = Single [a]
+halve [_] = Single []
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
 -- | When given a Lens and a function that works on a lower replacement, it will
@@ -142,6 +173,121 @@ halveExpr = combine contexpr $ traverse halveModExpr
     contexpr :: Lens' SourceInfo [ModItem]
     contexpr = mainModule . modItems
 
+-- $setup
+-- >>> import VeriFuzz.Verilog.CodeGen
+-- >>> let m = initMod $ ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [] []
+-- >>> let m2 = m & modId .~ "m2"
+-- >>> let inst = ModInst "m" "m" [ModConn (Id "y"), ModConn (Id "x")]
+-- >>> let inst2 = ModInst "m2" "m2" [ModConn (Id "y"), ModConn (Id "x")]
+-- >>> let srcInfo = SourceInfo "top" (Verilog [(m & (modId .~ "top") . (modItems %~ (++[inst]))), m])
+-- >>> let srcInfo2 = SourceInfo "top" (Verilog [(m & (modId .~ "top") . (modItems %~ (++[inst, inst2]))), m, m2])
+
+-- | Removes half the modules randomly, until it reaches a minimal amount of
+-- modules. This is done by doing a binary search on the list of modules and
+-- removing the instantiations from the main module body.
+--
+-- >>> GenVerilog srcInfo
+-- module top(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- m m(y, x);
+-- endmodule
+-- <BLANKLINE>
+-- module m(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- endmodule
+-- <BLANKLINE>
+-- <BLANKLINE>
+--
+-- >>> GenVerilog <$> halveModules srcInfo
+-- --- Only try:
+-- module top(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- endmodule
+-- <BLANKLINE>
+-- <BLANKLINE>
+--
+-- >>> GenVerilog srcInfo2
+-- module top(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- m m(y, x);
+-- m2 m2(y, x);
+-- endmodule
+-- <BLANKLINE>
+-- module m(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- endmodule
+-- <BLANKLINE>
+-- module m2(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- endmodule
+-- <BLANKLINE>
+-- <BLANKLINE>
+--
+-- >>> GenVerilog <$> halveModules srcInfo2
+-- --- Try:
+-- module top(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- m m(y, x);
+-- endmodule
+-- <BLANKLINE>
+-- module m(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- endmodule
+-- <BLANKLINE>
+-- <BLANKLINE>
+-- --- Then:
+-- module top(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- m2 m2(y, x);
+-- endmodule
+-- <BLANKLINE>
+-- module m2(y, x);
+-- output wire [(3'h4):(1'h0)] y;
+-- input wire [(3'h4):(1'h0)] x;
+-- endmodule
+-- <BLANKLINE>
+-- <BLANKLINE>
+halveModules :: SourceInfo -> Replacement SourceInfo
+halveModules srcInfo@(SourceInfo top _) =
+    cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
+    where
+        repl = halve . filter (not . matchesModName top)
+        main = srcInfo ^. mainModule
+
+-- | Remove all the undefined mod instances.
+cleanModInst :: SourceInfo -> SourceInfo
+cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
+    where
+        validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
+        cleaned = cleanModInst' validInst <$> srcInfo ^. infoSrc . _Wrapped
+
+cleanModInst' :: [Identifier] -> ModDecl -> ModDecl
+cleanModInst' ids m = m & modItems .~ newModItem
+    where
+        newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
+
+validModInst :: [Identifier] -> ModItem -> Bool
+validModInst ids (ModInst i _ _) = i `elem` ids
+validModInst _ _                 = True
+
+-- | Adds a 'ModDecl' to a 'SourceInfo'.
+addMod :: ModDecl -> SourceInfo -> SourceInfo
+addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
+
+-- | Returns true if the text matches the name of a module.
+matchesModName :: Text -> ModDecl -> Bool
+matchesModName top (ModDecl i _ _ _ _) = top == getIdentifier i
+
+-- | Reduction using custom reduction strategies.
 reduce_
     :: (SourceInfo -> Replacement SourceInfo)
     -> (SourceInfo -> IO Bool)
@@ -150,16 +296,15 @@ reduce_
 reduce_ repl eval src = do
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single False    ) -> runIf s
-        (Dual _ l, Dual True False ) -> runIf l
-        (Dual r _, Dual False True ) -> runIf r
-        (Dual r l, Dual False False) -> do
+        (Single s, Single True    ) -> runIf s
+        (Dual _ l, Dual False True ) -> runIf l
+        (Dual r _, Dual True False ) -> runIf r
+        (Dual r l, Dual True True) -> do
             lreduced <- runIf l
             rreduced <- runIf r
-            if runSource lreduced < runSource rreduced
+            if _infoSrc lreduced < _infoSrc rreduced
                 then return lreduced
                 else return rreduced
-        (None, None) -> return src
         _            -> return src
   where
     replacement = repl src
@@ -174,8 +319,8 @@ reduce_ repl eval src = do
             .   modContAssign
         eval m
 
--- | Reduce an input to a minimal representation. It first reduces the always
--- blocks, then reduces
+-- | Reduce an input to a minimal representation. It follows the reduction
+-- strategy mentioned above.
 reduce
     :: (SourceInfo -> IO Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.

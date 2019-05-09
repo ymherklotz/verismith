@@ -55,7 +55,7 @@ moduleDecl (ModDecl i outP inP items ps) =
         <> ports
         <> ";\n"
         <> modI
-        <> "endmodule\n"
+        <> "endmodule\n\n"
   where
     ports | null outP && null inP = ""
           | otherwise             = "(" <> comma (modPort <$> outIn) <> ")"

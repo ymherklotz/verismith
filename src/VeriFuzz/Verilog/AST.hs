@@ -23,6 +23,8 @@ Defines the types to build a Verilog AST.
 module VeriFuzz.Verilog.AST
     ( -- * Top level types
       SourceInfo(..)
+    , infoTop
+    , infoSrc
     , Verilog(..)
     -- * Primitives
     -- ** Identifier
@@ -455,11 +457,11 @@ traverseModItem f (ModInst a b e) =
 traverseModItem _ e = pure e
 
 -- | The complete sourcetext for the Verilog module.
-newtype Verilog = Verilog { _getVerilog :: [ModDecl] }
+newtype Verilog = Verilog { getVerilog :: [ModDecl] }
                    deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
 
-data SourceInfo = SourceInfo { runMainModule :: {-# UNPACK #-} !Text
-                             , runSource     :: !Verilog
+data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
+                             , _infoSrc :: !Verilog
                              }
                   deriving (Eq, Show)
 
@@ -477,6 +479,7 @@ $(makeLenses ''ModItem)
 $(makeLenses ''Parameter)
 $(makeLenses ''LocalParam)
 $(makeLenses ''ModDecl)
+$(makeLenses ''SourceInfo)
 $(makeWrapped ''Verilog)
 $(makeWrapped ''Identifier)
 $(makeWrapped ''Delay)

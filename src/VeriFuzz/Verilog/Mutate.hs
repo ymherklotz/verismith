@@ -123,6 +123,7 @@ allVars m =
 -- m m1(y, x);
 -- endmodule
 -- <BLANKLINE>
+-- <BLANKLINE>
 instantiateMod :: ModDecl -> ModDecl -> ModDecl
 instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
   where
@@ -183,6 +184,7 @@ filterChar t ids =
 -- output wire [(3'h4):(1'h0)] y;
 -- input wire [(3'h4):(1'h0)] x;
 -- endmodule
+-- <BLANKLINE>
 -- <BLANKLINE>
 initMod :: ModDecl -> ModDecl
 initMod m = m & modItems %~ ((out ++ inp) ++)
