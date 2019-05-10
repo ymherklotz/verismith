@@ -118,9 +118,9 @@ allVars m =
 --
 -- >>> render $ instantiateMod m main
 -- module main;
--- wire [(3'h4):(1'h0)] y;
--- reg [(3'h4):(1'h0)] x;
--- m m1(y, x);
+--   wire [(3'h4):(1'h0)] y;
+--   reg [(3'h4):(1'h0)] x;
+--   m m1(y, x);
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
@@ -181,8 +181,8 @@ filterChar t ids =
 --
 -- >>> GenVerilog $ initMod m
 -- module m(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
