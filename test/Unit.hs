@@ -4,6 +4,7 @@ module Unit
 where
 
 import           Control.Lens
+import           Parser           (parseUnitTests)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz
@@ -15,6 +16,7 @@ unitTests = testGroup
           "Successful transformation"
           transformExpectedResult
           (transform trans transformTestData)
+    , parseUnitTests
     ]
 
 transformTestData :: Expr

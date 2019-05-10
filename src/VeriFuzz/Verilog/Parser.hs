@@ -15,6 +15,9 @@ module VeriFuzz.Verilog.Parser
     ( -- * Parser
       parseVerilog
     , parseModDecl
+    -- ** Internal parsers
+    , parseEvent
+    , Parser
     )
 where
 
@@ -24,6 +27,7 @@ import           Data.Bifunctor              (bimap)
 import           Data.Bits
 import           Data.Functor                (($>))
 import           Data.Functor.Identity       (Identity)
+import           Data.List                   (null)
 import           Data.List                   (isInfixOf, isPrefixOf)
 import qualified Data.Text                   as T
 import           Text.Parsec                 hiding (satisfy)
@@ -132,6 +136,9 @@ parseExpr = do
     e <- parseExpr'
     option e . try $ parseCond e
 
+parseConstExpr :: Parser ConstExpr
+parseConstExpr = fmap exprToConst parseExpr
+
 -- | Table of binary and unary operators that encode the right precedence for
 -- each.
 parseTable :: [[ParseOperator Expr]]
@@ -223,17 +230,20 @@ number = number' <$> numLit
                 (drop 2 a')
             | otherwise = error $ "Invalid number format: " ++ a'
 
-toInteger' :: Decimal -> Integer
-toInteger' (Decimal _ n) = n
+-- toInteger' :: Decimal -> Integer
+-- toInteger' (Decimal _ n) = n
+
+toInt' :: Decimal -> Int
+toInt' (Decimal _ n) = fromInteger n
 
 -- | Parse a range and return the total size. As it is inclusive, 1 has to be
 -- added to the difference.
-parseRange :: Parser Int
+parseRange :: Parser Range
 parseRange = do
-    rangeH <- tok SymBrackL *> number
-    rangeL <- tok SymColon *> number
+    rangeH <- tok SymBrackL *> parseConstExpr
+    rangeL <- tok SymColon *> parseConstExpr
     tok' SymBrackR
-    return . fromInteger . toInteger' $ rangeH - rangeL + 1
+    return $ Range rangeH rangeL
 
 strId :: Parser String
 strId = satisfy' matchId
@@ -252,7 +262,7 @@ parseNetDecl pd = do
     range <- option 1 parseRange
     name  <- identifier
     tok' SymSemi
-    return $ Decl pd (Port t sign (fromIntegral range) name) Nothing
+    return $ Decl pd (Port t sign range name) Nothing
     where type_ = tok KWWire $> Wire <|> tok KWReg $> Reg
 
 parsePortDir :: Parser PortDir
@@ -267,8 +277,109 @@ parsePortDir =
 parseDecl :: Parser ModItem
 parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
 
+parseConditional :: Parser Statement
+parseConditional = do
+    expr <- tok' KWIf *> tok' SymParenL *> parseExpr
+    true <- maybeEmptyStatement
+    false <- option Nothing maybeEmptyStatement
+    return $ CondStmnt expr true false
+
+parseLVal :: Parser LVal
+parseLVal =
+    fmap RegConcat (braces $ commaSep parseExpr)
+    <|> ident
+    where
+        ident = do
+            i <- identifier
+            (try (ex i) <|> try (sz i) <|> return (RegId i))
+        ex i = do
+            e <- tok' SymBrackL *> parseExpr
+            tok' SymBrackR
+            return $ RegExpr i e
+        sz i = RegSize i <$> parseRange
+
+parseDelay :: Parser Delay
+parseDelay = Delay . toInt' <$> (tok' SymPound *> number)
+
+parseAssign :: TokenName -> Parser Assign
+parseAssign t = do
+    lval <- parseLVal
+    tok' t
+    delay <- option Nothing (fmap Just parseDelay)
+    expr <- parseExpr
+    return $ Assign lval delay expr
+
+parseLoop :: Parser Statement
+parseLoop = do
+    a <- tok' KWFor *> tok' SymParenL *> parseAssign SymEq
+    expr <- tok' SymSemi *> parseExpr
+    incr <- tok' SymSemi *> parseAssign SymEq
+    tok' SymParenR
+    statement <- parseStatement
+    return $ ForLoop a expr incr statement
+
+eventList :: TokenName -> Parser [Event]
+eventList t = do
+    l <- sepBy parseEvent' (tok t)
+    if null l then fail "Could not parse list" else return l
+
+parseEvent :: Parser Event
+parseEvent = tok' SymAtAster *> return EAll
+    <|> try (tok' SymAt *> tok' SymParenLAsterParenR *> return EAll)
+    <|> try (tok' SymAt *> tok' SymParenL *> tok' SymAster *> tok' SymParenR *> return EAll)
+    <|> try (tok' SymAt *> parens parseEvent')
+    <|> try (tok' SymAt *> parens (foldr1 EOr <$> eventList KWOr))
+    <|> try (tok' SymAt *> parens (foldr1 EComb <$> eventList SymComma))
+
+parseEvent' :: Parser Event
+parseEvent' =
+    try (tok' KWPosedge *> fmap EPosEdge identifier)
+    <|> try (tok' KWNegedge *> fmap ENegEdge identifier)
+    <|> try (fmap EId identifier)
+    <|> try (fmap EExpr parseExpr)
+
+parseEventCtrl :: Parser Statement
+parseEventCtrl = do
+    event <- parseEvent
+    statement <- option Nothing maybeEmptyStatement
+    return $ EventCtrl event statement
+
+parseDelayCtrl :: Parser Statement
+parseDelayCtrl = do
+    delay <- parseDelay
+    statement <- option Nothing maybeEmptyStatement
+    return $ TimeCtrl delay statement
+
+parseBlocking :: Parser Statement
+parseBlocking = BlockAssign <$> parseAssign SymEq
+
+parseNonBlocking :: Parser Statement
+parseNonBlocking = NonBlockAssign <$> parseAssign SymLtEq
+
+parseStatement :: Parser Statement
+parseStatement =
+    parseConditional
+    <|> parseLoop
+    <|> parseEventCtrl
+    <|> parseDelayCtrl
+    <|> try parseBlocking
+    <|> parseNonBlocking
+
+maybeEmptyStatement :: Parser (Maybe Statement)
+maybeEmptyStatement =
+    (tok' SymSemi >> return Nothing)
+    <|> (Just <$> parseStatement)
+
+parseAlways :: Parser ModItem
+parseAlways = tok' KWAlways *> (Always <$> parseStatement)
+
+parseInitial :: Parser ModItem
+parseInitial = tok' KWInitial *> (Initial <$> parseStatement)
+
 parseModItem :: Parser ModItem
 parseModItem = (ModCA <$> parseContAssign) <|> parseDecl
+    <|> parseAlways
+    <|> parseInitial
 
 parseModList :: Parser [Identifier]
 parseModList = list <|> return [] where list = parens $ commaSep identifier
