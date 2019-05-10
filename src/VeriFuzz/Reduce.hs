@@ -188,14 +188,14 @@ halveExpr = combine contexpr $ traverse halveModExpr
 --
 -- >>> GenVerilog srcInfo
 -- module top(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
--- m m(y, x);
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
+--   m m(y, x);
 -- endmodule
 -- <BLANKLINE>
 -- module m(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
@@ -203,28 +203,28 @@ halveExpr = combine contexpr $ traverse halveModExpr
 -- >>> GenVerilog <$> halveModules srcInfo
 -- --- Only try:
 -- module top(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
 --
 -- >>> GenVerilog srcInfo2
 -- module top(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
--- m m(y, x);
--- m2 m2(y, x);
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
+--   m m(y, x);
+--   m2 m2(y, x);
 -- endmodule
 -- <BLANKLINE>
 -- module m(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- module m2(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
@@ -232,27 +232,27 @@ halveExpr = combine contexpr $ traverse halveModExpr
 -- >>> GenVerilog <$> halveModules srcInfo2
 -- --- Try:
 -- module top(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
--- m m(y, x);
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
+--   m m(y, x);
 -- endmodule
 -- <BLANKLINE>
 -- module m(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
 -- --- Then:
 -- module top(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
--- m2 m2(y, x);
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
+--   m2 m2(y, x);
 -- endmodule
 -- <BLANKLINE>
 -- module m2(y, x);
--- output wire [(3'h4):(1'h0)] y;
--- input wire [(3'h4):(1'h0)] x;
+--   output wire [(3'h4):(1'h0)] y;
+--   input wire [(3'h4):(1'h0)] x;
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
