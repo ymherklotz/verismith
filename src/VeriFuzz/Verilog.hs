@@ -53,6 +53,8 @@ module VeriFuzz.Verilog
     -- * Expression
     , Expr(..)
     , ConstExpr(..)
+    , constToExpr
+    , exprToConst
     , constNum
     -- * Assignment
     , Assign(..)
