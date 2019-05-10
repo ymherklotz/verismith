@@ -17,6 +17,8 @@ module VeriFuzz.Verilog.Parser
     , parseModDecl
     -- ** Internal parsers
     , parseEvent
+    , parseStatement
+    , parseModItem
     , Parser
     )
 where
@@ -27,8 +29,7 @@ import           Data.Bifunctor              (bimap)
 import           Data.Bits
 import           Data.Functor                (($>))
 import           Data.Functor.Identity       (Identity)
-import           Data.List                   (null)
-import           Data.List                   (isInfixOf, isPrefixOf)
+import           Data.List                   (isInfixOf, isPrefixOf, null)
 import qualified Data.Text                   as T
 import           Text.Parsec                 hiding (satisfy)
 import           Text.Parsec.Expr
@@ -81,6 +82,9 @@ tok' p = void $ tok p
 parens :: Parser a -> Parser a
 parens = between (tok SymParenL) (tok SymParenR)
 
+brackets :: Parser a -> Parser a
+brackets = between (tok SymBrackL) (tok SymBrackR)
+
 braces :: Parser a -> Parser a
 braces = between (tok SymBraceL) (tok SymBraceR)
 
@@ -101,6 +105,18 @@ parseNum = decToExpr <$> number
 parseVar :: Parser Expr
 parseVar = Id <$> identifier
 
+parseVecSelect :: Parser Expr
+parseVecSelect = do
+    i <- identifier
+    expr <- brackets parseExpr
+    return $ VecSelect i expr
+
+parseRangeSelect :: Parser Expr
+parseRangeSelect = do
+    i <- identifier
+    range <- parseRange
+    return $ RangeSelect i range
+
 systemFunc :: Parser String
 systemFunc = satisfy' matchId
   where
@@ -119,6 +135,8 @@ parseTerm =
         <|> (Concat <$> braces (commaSep parseExpr))
         <|> parseFun
         <|> parseNum
+        <|> try parseVecSelect
+        <|> try parseRangeSelect
         <|> parseVar
         <?> "simple expr"
 
@@ -261,8 +279,9 @@ parseNetDecl pd = do
     sign  <- option False (tok KWSigned $> True)
     range <- option 1 parseRange
     name  <- identifier
+    i <- option Nothing (fmap Just (tok' SymEq *> parseConstExpr))
     tok' SymSemi
-    return $ Decl pd (Port t sign range name) Nothing
+    return $ Decl pd (Port t sign range name) i
     where type_ = tok KWWire $> Wire <|> tok KWReg $> Reg
 
 parsePortDir :: Parser PortDir
@@ -279,9 +298,9 @@ parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
 
 parseConditional :: Parser Statement
 parseConditional = do
-    expr <- tok' KWIf *> tok' SymParenL *> parseExpr
+    expr <- tok' KWIf *> parens parseExpr
     true <- maybeEmptyStatement
-    false <- option Nothing maybeEmptyStatement
+    false <- option Nothing (tok' KWElse *> maybeEmptyStatement)
     return $ CondStmnt expr true false
 
 parseLVal :: Parser LVal
@@ -324,9 +343,9 @@ eventList t = do
     if null l then fail "Could not parse list" else return l
 
 parseEvent :: Parser Event
-parseEvent = tok' SymAtAster *> return EAll
-    <|> try (tok' SymAt *> tok' SymParenLAsterParenR *> return EAll)
-    <|> try (tok' SymAt *> tok' SymParenL *> tok' SymAster *> tok' SymParenR *> return EAll)
+parseEvent = tok' SymAtAster $> EAll
+    <|> try (tok' SymAt *> tok' SymParenLAsterParenR $> EAll)
+    <|> try (tok' SymAt *> tok' SymParenL *> tok' SymAster *> tok' SymParenR $> EAll)
     <|> try (tok' SymAt *> parens parseEvent')
     <|> try (tok' SymAt *> parens (foldr1 EOr <$> eventList KWOr))
     <|> try (tok' SymAt *> parens (foldr1 EComb <$> eventList SymComma))
@@ -351,14 +370,27 @@ parseDelayCtrl = do
     return $ TimeCtrl delay statement
 
 parseBlocking :: Parser Statement
-parseBlocking = BlockAssign <$> parseAssign SymEq
+parseBlocking = do
+    a <- parseAssign SymEq
+    tok' SymSemi
+    return $ BlockAssign a
 
 parseNonBlocking :: Parser Statement
-parseNonBlocking = NonBlockAssign <$> parseAssign SymLtEq
+parseNonBlocking = do
+    a <- parseAssign SymLtEq
+    tok' SymSemi
+    return $ NonBlockAssign a
+
+parseSeq :: Parser Statement
+parseSeq = do
+    seq' <- tok' KWBegin *> many parseStatement
+    tok' KWEnd
+    return $ SeqBlock seq'
 
 parseStatement :: Parser Statement
 parseStatement =
-    parseConditional
+    parseSeq
+    <|> parseConditional
     <|> parseLoop
     <|> parseEventCtrl
     <|> parseDelayCtrl
@@ -376,10 +408,32 @@ parseAlways = tok' KWAlways *> (Always <$> parseStatement)
 parseInitial :: Parser ModItem
 parseInitial = tok' KWInitial *> (Initial <$> parseStatement)
 
+namedModConn :: Parser ModConn
+namedModConn = do
+    target <- tok' SymDot *> identifier
+    expr <- parens parseExpr
+    return $ ModConnNamed target expr
+
+parseModConn :: Parser ModConn
+parseModConn =
+    try (fmap ModConn parseExpr)
+    <|> namedModConn
+
+parseModInst :: Parser ModItem
+parseModInst = do
+    m <- identifier
+    name <- identifier
+    modconns <- parens (commaSep parseModConn)
+    tok' SymSemi
+    return $ ModInst m name modconns
+
 parseModItem :: Parser ModItem
-parseModItem = (ModCA <$> parseContAssign) <|> parseDecl
+parseModItem =
+    try (ModCA <$> parseContAssign)
+    <|> try parseDecl
     <|> parseAlways
     <|> parseInitial
+    <|> parseModInst
 
 parseModList :: Parser [Identifier]
 parseModList = list <|> return [] where list = parens $ commaSep identifier
@@ -391,9 +445,19 @@ filterDecl _ _                    = False
 modPorts :: PortDir -> [ModItem] -> [Port]
 modPorts p mis = filter (filterDecl p) mis ^.. traverse . declPort
 
+parseParam :: Parser Parameter
+parseParam = do
+    i <- tok' KWParameter *> identifier
+    expr <- tok' SymEq *> parseConstExpr
+    return $ Parameter i expr
+
+parseParams :: Parser [Parameter]
+parseParams = tok' SymPound *> parens (commaSep parseParam)
+
 parseModDecl :: Parser ModDecl
 parseModDecl = do
     name <- tok KWModule *> identifier
+    paramList <- option [] $ try parseParams
     _    <- fmap defaultPort <$> parseModList
     tok' SymSemi
     modItem <- option [] . try $ many1 parseModItem
@@ -402,7 +466,7 @@ parseModDecl = do
                      (modPorts PortOut modItem)
                      (modPorts PortIn modItem)
                      modItem
-                     []
+                     paramList
 
 -- | Parses a 'String' into 'Verilog' by skipping any beginning whitespace
 -- and then parsing multiple Verilog source.

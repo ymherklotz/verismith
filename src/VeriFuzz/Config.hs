@@ -189,13 +189,13 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                }
                  deriving (Eq, Show)
 
-data ConfProperty = ConfProperty { _propSize :: {-# UNPACK #-} !Int
-                         , _propSeed         :: !(Maybe Seed)
-                         , _propStmntDepth   :: {-# UNPACK #-} !Int
-                         , _propModDepth     :: {-# UNPACK #-} !Int
-                         , _propMaxModules   :: {-# UNPACK #-} !Int
-                         }
-              deriving (Eq, Show)
+data ConfProperty = ConfProperty { _propSize       :: {-# UNPACK #-} !Int
+                                 , _propSeed       :: !(Maybe Seed)
+                                 , _propStmntDepth :: {-# UNPACK #-} !Int
+                                 , _propModDepth   :: {-# UNPACK #-} !Int
+                                 , _propMaxModules :: {-# UNPACK #-} !Int
+                                 }
+                  deriving (Eq, Show)
 
 data Info = Info { _infoCommit  :: !Text
                  , _infoVersion :: !Text
