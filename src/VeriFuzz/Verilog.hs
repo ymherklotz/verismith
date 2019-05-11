@@ -99,6 +99,8 @@ module VeriFuzz.Verilog
     -- * Useful Lenses and Traversals
     , getModule
     , getSourceId
+    -- * Quote
+    , verilog
     )
 where
 
@@ -106,3 +108,4 @@ import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Gen
 import           VeriFuzz.Verilog.Parser
+import           VeriFuzz.Verilog.Quote
