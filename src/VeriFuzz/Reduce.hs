@@ -27,7 +27,7 @@ where
 
 import           Control.Lens
 import           Data.List                (nub)
-import           Data.Maybe               (catMaybes)
+import           Data.Maybe               (mapMaybe)
 import           Data.Text                (Text)
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
@@ -208,7 +208,7 @@ halveAssigns = combine mainModule halveModAssign
 -- | Checks if a module item is needed in the module declaration.
 relevantModItem :: ModDecl -> ModItem -> Bool
 relevantModItem (ModDecl _ out _ _ _) (ModCA (ContAssign i _)) = i `elem` fmap _portName out
-relevantModItem _ (Decl _ _ _)                          = True
+relevantModItem _ Decl{}                          = True
 relevantModItem _ _                                            = False
 
 isAssign :: Statement -> Bool
@@ -220,7 +220,7 @@ lValName :: LVal -> [Identifier]
 lValName (RegId i) = [i]
 lValName (RegExpr i _) = [i]
 lValName (RegSize i _) = [i]
-lValName (RegConcat e) = catMaybes . fmap getId . concat $ universe <$> e
+lValName (RegConcat e) = mapMaybe getId . concat $ universe <$> e
     where
         getId (Id i) = Just i
         getId _      = Nothing
@@ -235,15 +235,20 @@ findActiveWires :: ModDecl -> [Identifier]
 findActiveWires m@(ModDecl _ i o _ p) = nub $ assignWires <> assignStat <> fmap portToId i <> fmap portToId o <> fmap paramToId p
     where
         assignWires = m ^.. modItems . traverse . modContAssign . contAssignNetLVal
-        assignStat = concat . fmap lValName $ (allStat ^.. traverse . stmntBA . assignReg)
+        assignStat = concatMap lValName $ (allStat ^.. traverse . stmntBA . assignReg)
                      <> (allStat ^.. traverse . stmntNBA . assignReg)
         allStat = filter isAssign . concat $ fmap universe stat
         stat = (m ^.. modItems . traverse . _Initial) <> (m ^.. modItems . traverse . _Always)
 
+cleanSourceInfo :: SourceInfo -> SourceInfo
+cleanSourceInfo src = clean active src
+    where
+        active = findActiveWires (src ^. mainModule)
+
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
 halveModItems :: Replace SourceInfo
-halveModItems srcInfo = fmap addRelevant src
+halveModItems srcInfo = cleanSourceInfo . addRelevant <$> src
     where
         repl = halve . filter (not . relevantModItem main)
         relevant = filter (relevantModItem main) $ main ^. modItems

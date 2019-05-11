@@ -57,7 +57,7 @@ endmodule
 
 modItemReduceTest :: TestTree
 modItemReduceTest = testCase "Module items" $ do
-    halveModItems srcInfo1 @?= golden1
+    GenVerilog <$> halveModItems srcInfo1 @?= golden1
     where
         srcInfo1 = SourceInfo "top" [verilog|
 module top(y, x);
@@ -70,25 +70,25 @@ module top(y, x);
   assign y = w;
 endmodule
 |]
-        golden1 = Dual (SourceInfo "top" [verilog|
+        golden1 = GenVerilog <$> Dual (SourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
   wire z;
   wire w;
+  assign y = 1'b0;
   assign z = x;
-  assign y = w;
 endmodule
-|]) $ SourceInfo "top" [verilog|
+|]) (SourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
   wire z;
   wire w;
-  assign w = 1'b0;
   assign y = w;
+  assign w = 1'b0;
 endmodule
-|]
+|])
 
 moduleReducerTest :: TestTree
 moduleReducerTest = testCase "Module reducer" $ do

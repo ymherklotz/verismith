@@ -11,7 +11,8 @@ This module generates the code from the Verilog AST defined in
 "VeriFuzz.Verilog.AST".
 -}
 
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances  #-}
 
 module VeriFuzz.Verilog.CodeGen
     ( -- * Code Generation
@@ -21,6 +22,7 @@ module VeriFuzz.Verilog.CodeGen
     )
 where
 
+import           Data.Data                 (Data)
 import           Data.List.NonEmpty        (NonEmpty (..), toList)
 import           Data.Text                 (Text)
 import qualified Data.Text                 as T
@@ -318,6 +320,7 @@ instance Source SourceInfo where
     genSource (SourceInfo _ src) = genSource src
 
 newtype GenVerilog a = GenVerilog { unGenVerilog :: a }
+                     deriving (Eq, Ord, Data)
 
 instance (Source a) => Show (GenVerilog a) where
     show = T.unpack . genSource . unGenVerilog

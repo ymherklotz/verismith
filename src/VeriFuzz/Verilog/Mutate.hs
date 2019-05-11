@@ -49,6 +49,7 @@ import           VeriFuzz.Circuit.Internal
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
+import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Internal
 
 class Mutate a where
@@ -145,6 +146,9 @@ instance Mutate a => Mutate [a] where
 
 instance Mutate a => Mutate (Maybe a) where
     mutExpr f a = mutExpr f <$> a
+
+instance Mutate a => Mutate (GenVerilog a) where
+    mutExpr f (GenVerilog a) = GenVerilog $ mutExpr f a
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
