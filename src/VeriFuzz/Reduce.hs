@@ -107,9 +107,9 @@ filterExpr _   e      = e
 
 -- | Checks if a declaration is part of the current scope. If not, it returns
 -- 'False', otherwise 'True', as it should be kept.
-filterDecl :: [Identifier] -> ModItem -> Bool
-filterDecl ids (Decl Nothing (Port _ _ _ i) _) = i `elem` ids
-filterDecl _   _                               = True
+--filterDecl :: [Identifier] -> ModItem -> Bool
+--filterDecl ids (Decl Nothing (Port _ _ _ i) _) = i `elem` ids
+--filterDecl _   _                               = True
 
 -- | Checks if a continuous assignment is in the current scope, if not, it
 -- returns 'False'.

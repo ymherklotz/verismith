@@ -16,12 +16,11 @@ module Reduce
     (reduceUnitTests)
 where
 
-import           Data.List              ((\\))
+import           Data.List        ((\\))
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz
 import           VeriFuzz.Reduce
-import           VeriFuzz.Verilog.Quote
 
 reduceUnitTests :: TestTree
 reduceUnitTests = testGroup "Reducer tests"
