@@ -20,7 +20,9 @@ module VeriFuzz.Reduce
     , reduce_
     , halveModules
     , halveModItems
+    , halveStatements
     , halveExpr
+    , halveAssigns
     , findActiveWires
     )
 where
@@ -144,13 +146,6 @@ cleanMod m newm = modify . change <$> newm
             $  l
             ^. modItems
 
--- halveStatements :: Statement -> Replacement Statement
--- halveStatements (SeqBlock l            ) = SeqBlock <$> halve l
--- halveStatements (CondStmnt _ (Just a) b) = maybe (Single a) (Dual a) b
--- halveStatements (CondStmnt _ Nothing  b) = maybe None Single b
--- halveStatements (ForLoop _ _ _ s       ) = Single s
--- halveStatements _                        = None
-
 halveIndExpr :: Replace Expr
 halveIndExpr (Concat l      ) = Concat <$> halve l
 halveIndExpr (BinOp e1 _  e2) = Dual e1 e2
@@ -186,20 +181,6 @@ validModInst _ _                 = True
 addMod :: ModDecl -> SourceInfo -> SourceInfo
 addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
 
--- | Returns true if the text matches the name of a module.
-matchesModName :: Text -> ModDecl -> Bool
-matchesModName top (ModDecl i _ _ _ _) = top == getIdentifier i
-
--- | Removes half the modules randomly, until it reaches a minimal amount of
--- modules. This is done by doing a binary search on the list of modules and
--- removing the instantiations from the main module body.
-halveModules :: Replace SourceInfo
-halveModules srcInfo@(SourceInfo top _) =
-    cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
-    where
-        repl = halve . filter (not . matchesModName top)
-        main = srcInfo ^. mainModule
-
 -- | Split a module declaration in half by trying to remove assign
 -- statements. This is only done in the main module of the source.
 halveAssigns :: Replace SourceInfo
@@ -207,9 +188,10 @@ halveAssigns = combine mainModule halveModAssign
 
 -- | Checks if a module item is needed in the module declaration.
 relevantModItem :: ModDecl -> ModItem -> Bool
-relevantModItem (ModDecl _ out _ _ _) (ModCA (ContAssign i _)) = i `elem` fmap _portName out
-relevantModItem _ Decl{}                          = True
-relevantModItem _ _                                            = False
+relevantModItem (ModDecl _ out _ _ _) (ModCA (ContAssign i _)) =
+    i `elem` fmap _portName out
+relevantModItem _ Decl{} = True
+relevantModItem _ _ = False
 
 isAssign :: Statement -> Bool
 isAssign (BlockAssign _)    = True
@@ -232,18 +214,56 @@ paramToId :: Parameter -> Identifier
 paramToId (Parameter i _) = i
 
 findActiveWires :: ModDecl -> [Identifier]
-findActiveWires m@(ModDecl _ i o _ p) = nub $ assignWires <> assignStat <> fmap portToId i <> fmap portToId o <> fmap paramToId p
+findActiveWires m@(ModDecl _ i o _ p) =
+    nub $ assignWires
+    <> assignStat
+    <> fmap portToId i
+    <> fmap portToId o
+    <> fmap paramToId p
     where
-        assignWires = m ^.. modItems . traverse . modContAssign . contAssignNetLVal
-        assignStat = concatMap lValName $ (allStat ^.. traverse . stmntBA . assignReg)
-                     <> (allStat ^.. traverse . stmntNBA . assignReg)
+        assignWires =
+            m ^.. modItems . traverse
+            . modContAssign . contAssignNetLVal
+        assignStat =
+            concatMap lValName
+            $ (allStat ^.. traverse . stmntBA . assignReg)
+            <> (allStat ^.. traverse . stmntNBA . assignReg)
         allStat = filter isAssign . concat $ fmap universe stat
-        stat = (m ^.. modItems . traverse . _Initial) <> (m ^.. modItems . traverse . _Always)
+        stat =
+            (m ^.. modItems . traverse . _Initial)
+            <> (m ^.. modItems . traverse . _Always)
 
 cleanSourceInfo :: SourceInfo -> SourceInfo
 cleanSourceInfo src = clean active src
     where
         active = findActiveWires (src ^. mainModule)
+
+-- | Returns true if the text matches the name of a module.
+matchesModName :: Text -> ModDecl -> Bool
+matchesModName top (ModDecl i _ _ _ _) = top == getIdentifier i
+
+halveStatement :: Replace Statement
+halveStatement (SeqBlock s)                      = SeqBlock <$> halve s
+halveStatement (CondStmnt _ (Just s1) (Just s2)) = Dual s1 s2
+halveStatement (CondStmnt _ (Just s1) Nothing)   = Single s1
+halveStatement (CondStmnt _ Nothing (Just s1))   = Single s1
+halveStatement (EventCtrl e (Just s)) = EventCtrl e . Just <$> halveStatement s
+halveStatement (TimeCtrl e (Just s)) = TimeCtrl e . Just <$> halveStatement s
+halveStatement a = Single a
+
+halveAlways :: Replace ModItem
+halveAlways (Always s) = Always <$> halveStatement s
+halveAlways a          = Single a
+
+-- | Removes half the modules randomly, until it reaches a minimal amount of
+-- modules. This is done by doing a binary search on the list of modules and
+-- removing the instantiations from the main module body.
+halveModules :: Replace SourceInfo
+halveModules srcInfo@(SourceInfo top _) =
+    cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
+    where
+        repl = halve . filter (not . matchesModName top)
+        main = srcInfo ^. mainModule
 
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
@@ -255,6 +275,12 @@ halveModItems srcInfo = cleanSourceInfo . addRelevant <$> src
         main = srcInfo ^. mainModule
         src = combine (mainModule . modItems) repl srcInfo
         addRelevant = mainModule . modItems %~ (relevant ++)
+
+halveStatements :: Replace SourceInfo
+halveStatements m =
+    cleanSourceInfo <$> combine (mainModule . modItems) halves m
+    where
+        halves = traverse halveAlways
 
 -- | Reduce expressions by splitting them in half and keeping the half that
 -- succeeds.
@@ -302,5 +328,9 @@ reduce
     :: (SourceInfo -> IO Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.
     -> IO SourceInfo           -- ^ Reduced output.
-reduce eval src = red halveAssigns src >>= red halveExpr
+reduce eval src =
+    red halveModules src
+    >>= red halveModItems
+    >>= red halveStatements
+    >>= red halveExpr
     where red a = reduce_ a eval
