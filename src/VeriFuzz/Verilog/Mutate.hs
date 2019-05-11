@@ -11,8 +11,11 @@ Functions to mutate the Verilog AST from "VeriFuzz.Verilog.AST" to generate more
 random patterns, such as nesting wires instead of creating new ones.
 -}
 
+{-# LANGUAGE FlexibleInstances #-}
+
 module VeriFuzz.Verilog.Mutate
-    ( inPort
+    ( Mutate(..)
+    , inPort
     , findAssign
     , idTrans
     , replace
@@ -47,6 +50,101 @@ import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Internal
+
+class Mutate a where
+    mutExpr :: (Expr -> Expr) -> a -> a
+
+instance Mutate Identifier where
+    mutExpr _ = id
+
+instance Mutate Delay where
+    mutExpr _ = id
+
+instance Mutate Event where
+    mutExpr f (EExpr e) = EExpr $ f e
+    mutExpr _ a         = a
+
+instance Mutate BinaryOperator where
+    mutExpr _ = id
+
+instance Mutate UnaryOperator where
+    mutExpr _ = id
+
+instance Mutate Expr where
+    mutExpr f = f
+
+instance Mutate ConstExpr where
+    mutExpr _ = id
+
+instance Mutate Task where
+    mutExpr f (Task i e) = Task i $ fmap f e
+
+instance Mutate LVal where
+    mutExpr f (RegExpr a e) = RegExpr a $ f e
+    mutExpr _ a             = a
+
+instance Mutate PortDir where
+    mutExpr _ = id
+
+instance Mutate PortType where
+    mutExpr _ = id
+
+instance Mutate Range where
+    mutExpr _ = id
+
+instance Mutate Port where
+    mutExpr _ = id
+
+instance Mutate ModConn where
+    mutExpr f (ModConn e)        = ModConn $ f e
+    mutExpr f (ModConnNamed a e) = ModConnNamed a $ f e
+
+instance Mutate Assign where
+    mutExpr f (Assign a b c) = Assign a b $ f c
+
+instance Mutate ContAssign where
+    mutExpr f (ContAssign a e) = ContAssign a $ f e
+
+instance Mutate Statement where
+    mutExpr f (TimeCtrl d s)     = TimeCtrl d $ mutExpr f <$> s
+    mutExpr f (EventCtrl e s)    = EventCtrl e $ mutExpr f <$> s
+    mutExpr f (SeqBlock s)       = SeqBlock $ mutExpr f <$> s
+    mutExpr f (BlockAssign a)    = BlockAssign $ mutExpr f a
+    mutExpr f (NonBlockAssign a) = NonBlockAssign $ mutExpr f a
+    mutExpr f (TaskEnable a)     = TaskEnable $ mutExpr f a
+    mutExpr f (SysTaskEnable a)  = SysTaskEnable $ mutExpr f a
+    mutExpr f (CondStmnt a b c) = CondStmnt (f a) (mutExpr f <$> b) $ mutExpr f <$> c
+    mutExpr f (ForLoop a1 e a2 s) = ForLoop (mutExpr f a1) (f e) (mutExpr f a2) $ mutExpr f s
+
+instance Mutate Parameter where
+    mutExpr _ = id
+
+instance Mutate LocalParam where
+    mutExpr _ = id
+
+instance Mutate ModItem where
+    mutExpr f (ModCA (ContAssign a e)) = ModCA . ContAssign a $ f e
+    mutExpr f (ModInst a b conns)      = ModInst a b $ mutExpr f conns
+    mutExpr f (Initial s)              = Initial $ mutExpr f s
+    mutExpr f (Always s)               = Always $ mutExpr f s
+    mutExpr _ d@Decl{}                 = d
+    mutExpr _ p@ParamDecl{}            = p
+    mutExpr _ l@LocalParamDecl{}       = l
+
+instance Mutate ModDecl where
+    mutExpr f (ModDecl a b c d e) = ModDecl (mutExpr f a) (mutExpr f b) (mutExpr f c) (mutExpr f d) (mutExpr f e)
+
+instance Mutate Verilog where
+    mutExpr f (Verilog a) = Verilog $ mutExpr f a
+
+instance Mutate SourceInfo where
+    mutExpr f (SourceInfo a b) = SourceInfo a $ mutExpr f b
+
+instance Mutate a => Mutate [a] where
+    mutExpr f a = mutExpr f <$> a
+
+instance Mutate a => Mutate (Maybe a) where
+    mutExpr f a = mutExpr f <$> a
 
 -- | Return if the 'Identifier' is in a 'ModDecl'.
 inPort :: Identifier -> ModDecl -> Bool
