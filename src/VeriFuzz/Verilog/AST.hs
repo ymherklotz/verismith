@@ -119,6 +119,8 @@ module VeriFuzz.Verilog.AST
     , modInstId
     , modInstName
     , modInstConns
+    , _Initial
+    , _Always
     , paramDecl
     , localParamDecl
     , traverseModItem
@@ -420,6 +422,9 @@ data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
                      } -- ^ Loop bounds shall be statically computable for a for loop.
            deriving (Eq, Show, Ord, Data)
 
+instance Plated Statement where
+    plate = uniplate
+
 instance Semigroup Statement where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
   (SeqBlock a) <> b = SeqBlock $ a <> [b]
@@ -504,6 +509,7 @@ $(makeLenses ''SourceInfo)
 $(makeWrapped ''Verilog)
 $(makeWrapped ''Identifier)
 $(makeWrapped ''Delay)
+$(makePrisms ''ModItem)
 
 $(makeBaseFunctor ''Event)
 $(makeBaseFunctor ''Expr)
