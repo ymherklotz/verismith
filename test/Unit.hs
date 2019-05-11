@@ -5,6 +5,7 @@ where
 
 import           Control.Lens
 import           Parser           (parseUnitTests)
+import           Reduce           (reduceUnitTests)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz
@@ -17,6 +18,7 @@ unitTests = testGroup
           transformExpectedResult
           (transform trans transformTestData)
     , parseUnitTests
+    , reduceUnitTests
     ]
 
 transformTestData :: Expr
