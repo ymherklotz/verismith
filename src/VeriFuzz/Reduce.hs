@@ -19,10 +19,15 @@ module VeriFuzz.Reduce
     , reduce
     , reduce_
     , halveModules
+    , halveModItems
+    , halveExpr
+    , findActiveWires
     )
 where
 
 import           Control.Lens
+import           Data.List                (nub)
+import           Data.Maybe               (catMaybes)
 import           Data.Text                (Text)
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
@@ -54,12 +59,9 @@ import           VeriFuzz.Verilog.Mutate
 data Replacement a = Dual a a
                    | Single a
                    | None
-                   deriving (Eq)
+                   deriving (Show, Eq)
 
-instance Show a => Show (Replacement a) where
-    show None       = "None"
-    show (Single a) = "--- Only try:\n" <> show a
-    show (Dual a b) = "--- Try:\n" <> show a <> "\n--- Then:\n" <> show b
+type Replace a = a -> Replacement a
 
 instance Functor Replacement where
     fmap f (Dual a b) = Dual (f a) $ f b
@@ -86,7 +88,7 @@ instance Traversable Replacement where
     traverse f (Dual a b) = Dual <$> f a <*> f b
 
 -- | Split a list in two halves.
-halve :: [a] -> Replacement [a]
+halve :: Replace [a]
 halve []  = None
 halve [_] = Single []
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
@@ -94,13 +96,13 @@ halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 -- | When given a Lens and a function that works on a lower replacement, it will
 -- go down, apply the replacement, and return a replacement of the original
 -- module.
-combine :: Lens' a b -> (b -> Replacement b) -> a -> Replacement a
+combine :: Lens' a b -> Replace b -> Replace a
 combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 
 -- | Deletes Id 'Expr' if they are not part of the current scope, and replaces
 -- these by 0.
 filterExpr :: [Identifier] -> Expr -> Expr
-filterExpr ids (Id i) = if i `notElem` ids then Number 0 else Id i
+filterExpr ids (Id i) = if i `elem` ids then Id i else Number 0
 filterExpr _   e      = e
 
 -- | Checks if a declaration is part of the current scope. If not, it returns
@@ -116,17 +118,15 @@ filterAssigns out (ModCA (ContAssign i _)) =
     elem i $ out ^.. traverse . portName
 filterAssigns _ _ = True
 
+clean :: (Mutate a) => [Identifier] -> a -> a
+clean ids a = mutExpr (transform $ filterExpr ids) a
+
 cleanUndefined :: [Identifier] -> [ModItem] -> [ModItem]
-cleanUndefined ids mis =
-    filter (filterDecl usedWires) mis
-        &  traverse
-        .  modContAssign
-        .  contAssignExpr
-        %~ transform (filterExpr usedWires)
+cleanUndefined ids mis = clean usedWires mis
   where
     usedWires = mis ^.. traverse . modContAssign . contAssignNetLVal <> ids
 
-halveModAssign :: ModDecl -> Replacement ModDecl
+halveModAssign :: Replace ModDecl
 halveModAssign m = cleanMod m $ modify <$> assigns (m ^. modItems)
   where
     assigns = halve . filter (filterAssigns $ m ^. modOutPorts)
@@ -151,11 +151,7 @@ cleanMod m newm = modify . change <$> newm
 -- halveStatements (ForLoop _ _ _ s       ) = Single s
 -- halveStatements _                        = None
 
--- | Split a module declaration in half by trying to remove assign statements.
-halveAssigns :: SourceInfo -> Replacement SourceInfo
-halveAssigns = combine mainModule halveModAssign
-
-halveIndExpr :: Expr -> Replacement Expr
+halveIndExpr :: Replace Expr
 halveIndExpr (Concat l      ) = Concat <$> halve l
 halveIndExpr (BinOp e1 _  e2) = Dual e1 e2
 halveIndExpr (Cond  _  e1 e2) = Dual e1 e2
@@ -163,105 +159,9 @@ halveIndExpr (UnOp _ e      ) = Single e
 halveIndExpr (Appl _ e      ) = Single e
 halveIndExpr e                = Single e
 
-halveModExpr :: ModItem -> Replacement ModItem
+halveModExpr :: Replace ModItem
 halveModExpr (ModCA ca) = ModCA <$> combine contAssignExpr halveIndExpr ca
 halveModExpr a          = Single a
-
-halveExpr :: SourceInfo -> Replacement SourceInfo
-halveExpr = combine contexpr $ traverse halveModExpr
-  where
-    contexpr :: Lens' SourceInfo [ModItem]
-    contexpr = mainModule . modItems
-
--- $setup
--- >>> import VeriFuzz.Verilog.CodeGen
--- >>> let m = initMod $ ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [] []
--- >>> let m2 = m & modId .~ "m2"
--- >>> let inst = ModInst "m" "m" [ModConn (Id "y"), ModConn (Id "x")]
--- >>> let inst2 = ModInst "m2" "m2" [ModConn (Id "y"), ModConn (Id "x")]
--- >>> let srcInfo = SourceInfo "top" (Verilog [(m & (modId .~ "top") . (modItems %~ (++[inst]))), m])
--- >>> let srcInfo2 = SourceInfo "top" (Verilog [(m & (modId .~ "top") . (modItems %~ (++[inst, inst2]))), m, m2])
-
--- | Removes half the modules randomly, until it reaches a minimal amount of
--- modules. This is done by doing a binary search on the list of modules and
--- removing the instantiations from the main module body.
---
--- >>> GenVerilog srcInfo
--- module top(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
---   m m(y, x);
--- endmodule
--- <BLANKLINE>
--- module m(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
--- endmodule
--- <BLANKLINE>
--- <BLANKLINE>
---
--- >>> GenVerilog <$> halveModules srcInfo
--- --- Only try:
--- module top(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
--- endmodule
--- <BLANKLINE>
--- <BLANKLINE>
---
--- >>> GenVerilog srcInfo2
--- module top(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
---   m m(y, x);
---   m2 m2(y, x);
--- endmodule
--- <BLANKLINE>
--- module m(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
--- endmodule
--- <BLANKLINE>
--- module m2(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
--- endmodule
--- <BLANKLINE>
--- <BLANKLINE>
---
--- >>> GenVerilog <$> halveModules srcInfo2
--- --- Try:
--- module top(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
---   m m(y, x);
--- endmodule
--- <BLANKLINE>
--- module m(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
--- endmodule
--- <BLANKLINE>
--- <BLANKLINE>
--- --- Then:
--- module top(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
---   m2 m2(y, x);
--- endmodule
--- <BLANKLINE>
--- module m2(y, x);
---   output wire [(3'h4):(1'h0)] y;
---   input wire [(3'h4):(1'h0)] x;
--- endmodule
--- <BLANKLINE>
--- <BLANKLINE>
-halveModules :: SourceInfo -> Replacement SourceInfo
-halveModules srcInfo@(SourceInfo top _) =
-    cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
-    where
-        repl = halve . filter (not . matchesModName top)
-        main = srcInfo ^. mainModule
 
 -- | Remove all the undefined mod instances.
 cleanModInst :: SourceInfo -> SourceInfo
@@ -270,11 +170,14 @@ cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
         validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
         cleaned = cleanModInst' validInst <$> srcInfo ^. infoSrc . _Wrapped
 
+-- | Clean all the undefined module instances in a specific module using a
+-- context.
 cleanModInst' :: [Identifier] -> ModDecl -> ModDecl
 cleanModInst' ids m = m & modItems .~ newModItem
     where
         newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
 
+-- | Check if a mod instance is in the current context.
 validModInst :: [Identifier] -> ModItem -> Bool
 validModInst ids (ModInst i _ _) = i `elem` ids
 validModInst _ _                 = True
@@ -287,9 +190,78 @@ addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
 matchesModName :: Text -> ModDecl -> Bool
 matchesModName top (ModDecl i _ _ _ _) = top == getIdentifier i
 
+-- | Removes half the modules randomly, until it reaches a minimal amount of
+-- modules. This is done by doing a binary search on the list of modules and
+-- removing the instantiations from the main module body.
+halveModules :: Replace SourceInfo
+halveModules srcInfo@(SourceInfo top _) =
+    cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
+    where
+        repl = halve . filter (not . matchesModName top)
+        main = srcInfo ^. mainModule
+
+-- | Split a module declaration in half by trying to remove assign
+-- statements. This is only done in the main module of the source.
+halveAssigns :: Replace SourceInfo
+halveAssigns = combine mainModule halveModAssign
+
+-- | Checks if a module item is needed in the module declaration.
+relevantModItem :: ModDecl -> ModItem -> Bool
+relevantModItem (ModDecl _ out _ _ _) (ModCA (ContAssign i _)) = i `elem` fmap _portName out
+relevantModItem _ (Decl _ _ _)                          = True
+relevantModItem _ _                                            = False
+
+isAssign :: Statement -> Bool
+isAssign (BlockAssign _)    = True
+isAssign (NonBlockAssign _) = True
+isAssign _                  = False
+
+lValName :: LVal -> [Identifier]
+lValName (RegId i) = [i]
+lValName (RegExpr i _) = [i]
+lValName (RegSize i _) = [i]
+lValName (RegConcat e) = catMaybes . fmap getId . concat $ universe <$> e
+    where
+        getId (Id i) = Just i
+        getId _      = Nothing
+
+portToId :: Port -> Identifier
+portToId (Port _ _ _ i) = i
+
+paramToId :: Parameter -> Identifier
+paramToId (Parameter i _) = i
+
+findActiveWires :: ModDecl -> [Identifier]
+findActiveWires m@(ModDecl _ i o _ p) = nub $ assignWires <> assignStat <> fmap portToId i <> fmap portToId o <> fmap paramToId p
+    where
+        assignWires = m ^.. modItems . traverse . modContAssign . contAssignNetLVal
+        assignStat = concat . fmap lValName $ (allStat ^.. traverse . stmntBA . assignReg)
+                     <> (allStat ^.. traverse . stmntNBA . assignReg)
+        allStat = filter isAssign . concat $ fmap universe stat
+        stat = (m ^.. modItems . traverse . _Initial) <> (m ^.. modItems . traverse . _Always)
+
+-- | Reducer for module items. It does a binary search on all the module items,
+-- except assignments to outputs and input-output declarations.
+halveModItems :: Replace SourceInfo
+halveModItems srcInfo = fmap addRelevant src
+    where
+        repl = halve . filter (not . relevantModItem main)
+        relevant = filter (relevantModItem main) $ main ^. modItems
+        main = srcInfo ^. mainModule
+        src = combine (mainModule . modItems) repl srcInfo
+        addRelevant = mainModule . modItems %~ (relevant ++)
+
+-- | Reduce expressions by splitting them in half and keeping the half that
+-- succeeds.
+halveExpr :: Replace SourceInfo
+halveExpr = combine contexpr $ traverse halveModExpr
+  where
+    contexpr :: Lens' SourceInfo [ModItem]
+    contexpr = mainModule . modItems
+
 -- | Reduction using custom reduction strategies.
 reduce_
-    :: (SourceInfo -> Replacement SourceInfo)
+    :: Replace SourceInfo
     -> (SourceInfo -> IO Bool)
     -> SourceInfo
     -> IO SourceInfo
@@ -297,9 +269,9 @@ reduce_ repl eval src = do
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
         (Single s, Single True    ) -> runIf s
-        (Dual _ l, Dual False True ) -> runIf l
-        (Dual r _, Dual True False ) -> runIf r
-        (Dual r l, Dual True True) -> do
+        (Dual _ r, Dual False True ) -> runIf r
+        (Dual l _, Dual True False ) -> runIf l
+        (Dual l r, Dual True True) -> do
             lreduced <- runIf l
             rreduced <- runIf r
             if _infoSrc lreduced < _infoSrc rreduced
