@@ -126,142 +126,756 @@ module CARRY4(CO, O, CI, CYINIT, DI, S);
    assign ci_or_cyinit = CI | CYINIT;
 endmodule
 
-module LDCE (Q, CLR, D, G, GE);
-   parameter [0:0] INIT = 1'b0;
-   parameter [0:0] IS_CLR_INVERTED = 1'b0;
-   parameter [0:0] IS_G_INVERTED = 1'b0;
+module FD_1 (Q, C, D);
 
-   output Q;
-   reg    Q = INIT;
+    parameter INIT = 1'b0;
 
-   input  CLR, D, G, GE;
-   wire   CLR_in, G_in;
+    output Q;
+    reg    Q;
 
-   assign CLR_in = IS_CLR_INVERTED ^ CLR;
-   assign G_in = IS_G_INVERTED ^ G;
+    input  C, D;
 
-   always @( CLR_in or D or G_in or GE)
-     if (CLR_in)
-       Q <= 0;
-     else if (G_in && GE)
-       Q <= D;
-endmodule
+	always @(negedge C)
+	        Q <= D;
 
-module BUFG (O, I);
-   output O;
-   input  I;
-   buf B1 (O, I);
-endmodule
+endmodule // FD_1
 
-module FDRE (Q, C, CE, D, R);
-   parameter [0:0] INIT = 1'b0;
-   parameter [0:0] IS_C_INVERTED = 1'b0;
-   parameter [0:0] IS_D_INVERTED = 1'b0;
-   parameter [0:0] IS_R_INVERTED = 1'b0;
+module FDC_1 (Q, C, CLR, D);
 
-   output Q;
-   reg    Q = INIT;
+    parameter INIT = 1'b0;
 
-   input  C, CE, D, R;
-   wire   C_in, D_in, R_in;
+    output Q;
+    reg    Q;
 
-   assign C_in = C ^ IS_C_INVERTED;
-   assign D_in = D ^ IS_D_INVERTED;
-   assign R_in = R ^ IS_R_INVERTED;
+    input  C, CLR, D;
 
-   always @(posedge C_in)
-     if (R_in)
-       Q <= 0;
-     else if (CE)
-       Q <= D_in;
-endmodule
+	always @(posedge CLR or negedge C)
+	    if (CLR)
+		Q <= 0;
+	    else
+    	        Q <= D;
 
-module FDSE (Q, C, CE, D, S);
-   parameter INIT = 1'b1;
-   parameter [0:0] IS_C_INVERTED = 1'b0;
-   parameter [0:0] IS_S_INVERTED = 1'b0;
-   parameter [0:0] IS_D_INVERTED = 1'b0;
+endmodule // FDC_1
 
-   output Q;
+module FDCE_1 (Q, C, CE, CLR, D);
 
-   input  C, CE, D, S;
+    parameter INIT = 1'b0;
 
-   wire   Q;
-   wire   C_in;
-   wire   S_in;
-   wire   D_in;
-   wire   rst_int = 0;
-   wire   set_int = S;
-   reg    q_out;
+    output Q;
+    reg    Q;
 
-   initial q_out = INIT;
+    input  C, CE, CLR, D;
 
-   assign Q = q_out;
-   assign C_in = IS_C_INVERTED ^ C;
-   assign S_in = IS_S_INVERTED ^ S;
-   assign D_in = IS_D_INVERTED ^ D;
+	always @(posedge CLR or negedge C)
+	    if (CLR)
+		 Q <= 0;
+	    else if (CE)
+		Q <= D;
 
-   always @(posedge C_in)
-	 if (S_in)
-	   q_out <=  1;
-	 else if (CE)
-	   q_out <=  D_in;
-endmodule
+endmodule // FDCE_1
 
-module LD (Q, D, G);
-   parameter INIT = 1'b0;
-   output Q;
-   wire   Q;
-   input  D, G;
-   reg    q_out;
+module FDCE (Q, C, CE, CLR, D);
 
-   initial q_out = INIT;
+    parameter INIT = 1'b0;
 
-   assign Q = q_out;
+    output Q;
+    reg    Q;
 
-   always @(D or G)
-     if (G)
-       q_out <= D;
-endmodule
+    input  C, CE, CLR, D;
 
-module FD (Q, C, D);
-   parameter INIT = 1'b0;
-   output Q;
-   input  C, D;
+	always @(posedge CLR or posedge C)
+	    if (CLR)
+		Q <= 0;
+	    else if (CE)
+		Q <= D;
 
-   wire   Q;
-   reg    q_out;
+endmodule // FDCE
 
-   initial q_out = INIT;
+module FDCP_1 (Q, C, CLR, D, PRE);
 
-   always @(posedge C)
-     q_out <=  D;
+    parameter INIT = 1'b0;
 
-   assign Q = q_out;
-endmodule
+    output Q;
+    reg    Q;
 
-module LDPE (Q, D, G, GE, PRE);
-   parameter INIT = 1'b1;
+    input  C, CLR, D, PRE;
 
-   output Q;
-   reg    Q;
+	always @(posedge CLR or posedge PRE or negedge C)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else
+	        Q <= D;
 
-   input  D, G, GE, PRE;
+endmodule // FDCP_1
 
-   always @( PRE or D or G or GE)
-	 if (PRE)
-	   Q <= 1;
-	 else if (G && GE)
-	   Q <= D;
-endmodule
+module FDCPE_1 (Q, C, CE, CLR, D, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, CLR, D, PRE;
+
+	always @(posedge CLR or posedge PRE or negedge C)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDCPE_1
+
+module FDCPE (Q, C, CE, CLR, D, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, CLR, D, PRE;
+
+	always @(posedge CLR or posedge PRE or posedge C)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDCPE
+
+module FDCP (Q, C, CLR, D, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CLR, D, PRE;
+
+	always @(posedge CLR or posedge PRE or posedge C)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else
+	    	Q <= D;
+
+endmodule // FDCP
+
+module FDC (Q, C, CLR, D);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CLR, D;
+
+	always @(posedge CLR or posedge C)
+	    if (CLR)
+		Q <= 0;
+	    else
+	        Q <= D;
+
+endmodule // FDC
+
+module FDE_1 (Q, C, CE, D);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D;
+
+	always @(negedge C)
+	    if (CE)
+		Q <= D;
+
+endmodule // FDE_1
 
 module FDE (Q, C, CE, D);
-   parameter INIT = 1'b0;
-   output Q;
-   reg    Q;
-   input  C, CE, D;
 
-   always @(posedge C)
-	 if (CE)
-	   Q <= D;
-endmodule
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D;
+
+	always @(posedge C)
+	    if (CE)
+		Q <= D;
+
+endmodule // FDE
+
+module FDP_1 (Q, C, D, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, PRE;
+
+	always @(posedge PRE or negedge C)
+	    if (PRE)
+		Q <= 1;
+	    else
+	        Q <= D;
+
+endmodule // FDP_1
+
+module FDPE_1 (Q, C, CE, D, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, PRE;
+
+	always @(posedge PRE or negedge C)
+	    if (PRE)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDPE_1
+
+module FDPE (Q, C, CE, D, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, PRE;
+
+	always @(posedge PRE or posedge C)
+	    if (PRE)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDPE
+
+module FDP (Q, C, D, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, PRE;
+
+	always @(posedge PRE or posedge C)
+	    if (PRE)
+		Q <= 1;
+	    else
+		Q <= D;
+
+endmodule // FDP
+
+module FDR_1 (Q, C, D, R);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, R;
+
+	always @(negedge C)
+	    if (R)
+		Q <= 0;
+	    else
+		Q <= D;
+
+endmodule // FDR_1
+
+module FDRE_1 (Q, C, CE, D, R);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, R;
+
+	always @(negedge C)
+	    if (R)
+		Q <= 0;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDRE_1
+
+module FDRE (Q, C, CE, D, R);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, R;
+
+	always @(posedge C)
+	    if (R)
+		Q <= 0;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDRE
+
+module FDRS_1 (Q, C, D, R, S);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, R, S;
+
+	always @(negedge C)
+	    if (R)
+		Q <= 0;
+	    else if (S)
+		Q <= 1;
+	    else
+		Q <= D;
+
+endmodule // FDRS_1
+
+module FDRSE_1 (Q, C, CE, D, R, S);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, R, S;
+
+	always @(negedge C)
+	    if (R)
+		Q <= 0;
+	    else if (S)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDRSE_1
+
+module FDRSE (Q, C, CE, D, R, S);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, R, S;
+
+	always @(posedge C)
+	    if (R)
+		Q <= 0;
+	    else if (S)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDRSE
+
+module FDRS (Q, C, D, R, S);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, R, S;
+
+	always @(posedge C)
+	    if (R)
+		Q <= 0;
+	    else if (S)
+		Q <= 1;
+	    else
+		Q <= D;
+
+endmodule // FDRS
+
+module FDR (Q, C, D, R);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, R;
+
+	always @(posedge C)
+	    if (R)
+		Q <= 0;
+	    else
+		Q <= D;
+
+endmodule // FDR
+
+module FDS_1 (Q, C, D, S);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, S;
+
+	always @(negedge C)
+	    if (S)
+		Q <= 1;
+	    else
+		Q <= D;
+
+endmodule // FDS_1
+
+module FDSE_1 (Q, C, CE, D, S);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, S;
+
+	always @(negedge C)
+	    if (S)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDSE_1
+
+module FDSE (Q, C, CE, D, S);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, CE, D, S;
+
+	always @(posedge C)
+	    if (S)
+		Q <= 1;
+	    else if (CE)
+		Q <= D;
+
+endmodule // FDSE
+
+module FDS (Q, C, D, S);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  C, D, S;
+
+	always @(posedge C)
+	    if (S)
+		Q <= 1;
+	    else
+		Q <= D;
+
+endmodule // FDS
+
+module FD (Q, C, D);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  C, D;
+
+	always @(posedge C)
+		Q <= D;
+
+endmodule // FD
+
+module LD_1 (Q, D, G);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  D, G;
+
+	always @( D or G)
+	    if (!G)
+		Q <= D;
+
+endmodule // LD_1
+
+module LDC_1 (Q, CLR, D, G);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G;
+
+	always @( CLR or D or G)
+	    if (CLR)
+		Q <= 0;
+	    else if (!G)
+		Q <= D;
+
+endmodule // LDC_1
+
+module LDCE_1 (Q, CLR, D, G, GE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G, GE;
+
+	always @( CLR or D or G or GE)
+	    if (CLR)
+		Q <= 0;
+	    else if (!G && GE)
+		Q <= D;
+
+endmodule // LDCE_1
+
+module LDCE (Q, CLR, D, G, GE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G, GE;
+
+	always @( CLR or D or G or GE)
+	    if (CLR)
+		Q <= 0;
+	    else if (G && GE)
+		Q <= D;
+
+endmodule // LDCE
+
+module LDCP_1 (Q, CLR, D, G, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G, PRE;
+
+	always @( CLR or PRE or D or G)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else if (!G)
+		Q <= D;
+
+endmodule // LDCP_1
+
+module LDCPE_1 (Q, CLR, D, G, GE, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G, GE, PRE;
+
+	always @( CLR or PRE or D or G or GE)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else if (!G && GE)
+		Q <= D;
+
+endmodule // LDCPE_1
+
+module LDCPE (Q, CLR, D, G, GE, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G, GE, PRE;
+
+	always @( CLR or PRE or D or G or GE)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else if (G && GE)
+		Q <= D;
+
+endmodule // LDCPE
+
+module LDCP (Q, CLR, D, G, PRE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G, PRE;
+
+	always @( CLR or PRE or D or G)
+	    if (CLR)
+		Q <= 0;
+	    else if (PRE)
+		Q <= 1;
+	    else if (G)
+		Q <= D;
+
+endmodule // LDCP
+
+module LDC (Q, CLR, D, G);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  CLR, D, G;
+
+	always @( CLR or D or G)
+	    if (CLR)
+		Q <= 0;
+	    else if (G)
+		Q <= D;
+
+endmodule // LDC
+
+module LDE_1 (Q, D, G, GE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  D, G, GE;
+
+	always @( D or G or GE)
+	    if (!G && GE)
+		Q <= D;
+
+endmodule // LDE_1
+
+module LDE (Q, D, G, GE);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  D, G, GE;
+
+	always @( D or G or GE)
+	    if (G && GE)
+		Q <= D;
+
+endmodule // LDE
+
+module LDP_1 (Q, D, G, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  D, G, PRE;
+
+	always @( PRE or D or G)
+	    if (PRE)
+		Q <= 1;
+	    else if (!G)
+		Q <= D;
+
+endmodule // LDP_1
+
+module LDPE_1 (Q, D, G, GE, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  D, G, GE, PRE;
+
+	always @( PRE or D or G or GE)
+	    if (PRE)
+		Q <= 1;
+	    else if (!G && GE)
+		Q <= D;
+
+endmodule // LDPE_1
+
+module LDPE (Q, D, G, GE, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  D, G, GE, PRE;
+
+	always @( PRE or D or G or GE)
+	    if (PRE)
+		Q <= 1;
+	    else if (G && GE)
+		Q <= D;
+
+endmodule // LDPE
+
+module LDP (Q, D, G, PRE);
+
+    parameter INIT = 1'b1;
+
+    output Q;
+    reg    Q;
+
+    input  D, G, PRE;
+
+	always @( PRE or D or G)
+	    if (PRE)
+		Q <= 1;
+	    else if (G)
+		Q <= D;
+
+endmodule // LDP
+
+module LD (Q, D, G);
+
+    parameter INIT = 1'b0;
+
+    output Q;
+    reg    Q;
+
+    input  D, G;
+
+	always @( D or G)
+	    if (G)
+		Q <= D;
+
+endmodule // LD
