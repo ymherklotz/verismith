@@ -32,8 +32,8 @@ reduceUnitTests = testGroup "Reducer tests"
 
 activeWireTest :: TestTree
 activeWireTest = testCase "Active wires" $ do
-    findActiveWires verilog1 \\ ["x", "y", "z", "w"] @?= []
-    findActiveWires verilog2 \\ ["x", "y", "z"] @?= []
+    findActiveWires verilog1 \\ ["x", "y", "z", "w"]          @?= []
+    findActiveWires verilog2 \\ ["x", "y", "z"]               @?= []
     findActiveWires verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
     where
         verilog1 = head $ getVerilog [verilog|
