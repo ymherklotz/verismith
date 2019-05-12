@@ -254,3 +254,14 @@ module LDPE (Q, D, G, GE, PRE);
 	 else if (G && GE)
 	   Q <= D;
 endmodule
+
+module FDE (Q, C, CE, D);
+   parameter INIT = 1'b0;
+   output Q;
+   reg    Q;
+   input  C, CE, D;
+
+   always @(posedge C)
+	 if (CE)
+	   Q <= D;
+endmodule
