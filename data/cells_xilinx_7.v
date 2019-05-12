@@ -1832,13 +1832,3 @@ module BUF (O, I);
 	buf B1 (O, I);
 
 endmodule // BUF
-
-module INV (O, I);
-
-    output O;
-
-    input  I;
-
-	not N1 (O, I);
-
-endmodule // INV
