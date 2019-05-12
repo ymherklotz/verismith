@@ -8,13 +8,14 @@ Stability   : experimental
 Portability : POSIX
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module VeriFuzz
-    ( runEquivalence
+    ( defaultMain
+    , Opts(..)
+    , runEquivalence
     , runSimulation
     , runReduce
-    , defaultMain
     , draw
     , SourceInfo(..)
     , module VeriFuzz.Verilog
@@ -80,121 +81,6 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
                    , top      :: {-# UNPACK #-} !Text
                    }
           | ConfigOpt { writeDefaultConfig :: !(Maybe FilePath) }
-
--- | Generate a specific number of random bytestrings of size 256.
-randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes
-    | n == 0    = ranBytes : bytes
-    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
-    where Right (ranBytes, newGen) = C.genBytes 32 gen
-
--- | generates the specific number of bytestring with a random seed.
-generateByteString :: Int -> IO [ByteString]
-generateByteString n = do
-    gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ randomByteString gen n []
-
-makeSrcInfo :: ModDecl -> SourceInfo
-makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])
-
--- | Draw a randomly generated DAG to a dot file and compile it to a png so it
--- can be seen.
-draw :: IO ()
-draw = do
-    gr <- Hog.sample $ rDups . getCircuit <$> Hog.resize 10 randomDAG
-    let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
-    writeFile "file.dot" dot
-    shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
-
--- | Function to show a bytestring in a hex format.
-showBS :: ByteString -> Text
-showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
-
--- | Run a simulation on a random DAG or a random module.
-runSimulation :: IO ()
-runSimulation = do
-  -- gr <- Hog.generate $ rDups <$> Hog.resize 100 (randomDAG :: Gen (G.Gr Gate ()))
-  -- let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
-  -- writeFile "file.dot" dot
-  -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
-  -- let circ =
-  --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
-    rand  <- generateByteString 20
-    rand2 <- Hog.sample (randomMod 10 100)
-    val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
-    case val of
-        Pass a -> T.putStrLn $ showBS a
-        _      -> T.putStrLn "Test failed"
-
-
--- | Code to be executed on a failure. Also checks if the failure was a timeout,
--- as the timeout command will return the 124 error code if that was the
--- case. In that case, the error will be moved to a different directory.
-onFailure :: Text -> RunFailed -> Sh (Result Failed ())
-onFailure t _ = do
-    ex <- lastExitCode
-    case ex of
-        124 -> do
-            logger "Test TIMEOUT"
-            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
-            return $ Fail EmptyFail
-        _ -> do
-            logger "Test FAIL"
-            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
-            return $ Fail EmptyFail
-
-checkEquivalence :: SourceInfo -> Text -> IO Bool
-checkEquivalence src dir = shellyFailDir $ do
-    mkdir_p (fromText dir)
-    curr <- toTextIgnore <$> pwd
-    setenv "VERIFUZZ_ROOT" curr
-    cd (fromText dir)
-    catch_sh
-        (  (runResultT $ runEquiv defaultYosys (Just defaultVivado) src)
-        >> return True
-        )
-        ((\_ -> return False) :: RunFailed -> Sh Bool)
-
--- | Run a fuzz run and check if all of the simulators passed by checking if the
--- generated Verilog files are equivalent.
-runEquivalence
-    :: Maybe Seed
-    -> Gen Verilog -- ^ Generator for the Verilog file.
-    -> Text        -- ^ Name of the folder on each thread.
-    -> Text        -- ^ Name of the general folder being used.
-    -> Bool        -- ^ Keep flag.
-    -> Int         -- ^ Used to track the recursion.
-    -> IO ()
-runEquivalence seed gm t d k i = do
-    (_, m) <- shelly $ sampleSeed seed gm
-    let srcInfo = SourceInfo "top" m
-    rand <- generateByteString 20
-    shellyFailDir $ do
-        mkdir_p (fromText d </> fromText n)
-        curr <- toTextIgnore <$> pwd
-        setenv "VERIFUZZ_ROOT" curr
-        cd (fromText "output" </> fromText n)
-        _ <-
-            catch_sh
-                    (  runResultT
-                    $  runEquiv defaultYosys (Just defaultVivado) srcInfo
-                    >> liftSh (logger "Test OK")
-                    )
-                $ onFailure n
-        _ <-
-            catch_sh
-                    (   runResultT
-                    $   runSim (Icarus "iverilog" "vvp") srcInfo rand
-                    >>= (\b -> liftSh $ logger ("RTL Sim: " <> showBS b))
-                    )
-                $ onFailure n
-        cd ".."
-        unless k . rm_rf $ fromText n
-    when (i < 5 && isNothing seed) (runEquivalence seed gm t d k $ i + 1)
-    where n = t <> "_" <> T.pack (show i)
-
-runReduce :: SourceInfo -> IO SourceInfo
-runReduce s = reduce (\s' -> not <$> checkEquivalence s' "reduce") s
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -409,3 +295,118 @@ defaultMain :: IO ()
 defaultMain = do
     optsparsed <- execParser opts
     handleOpts optsparsed
+
+-- | Generate a specific number of random bytestrings of size 256.
+randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
+randomByteString gen n bytes
+    | n == 0    = ranBytes : bytes
+    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
+    where Right (ranBytes, newGen) = C.genBytes 32 gen
+
+-- | generates the specific number of bytestring with a random seed.
+generateByteString :: Int -> IO [ByteString]
+generateByteString n = do
+    gen <- C.newGenIO :: IO C.CtrDRBG
+    return $ randomByteString gen n []
+
+makeSrcInfo :: ModDecl -> SourceInfo
+makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])
+
+-- | Draw a randomly generated DAG to a dot file and compile it to a png so it
+-- can be seen.
+draw :: IO ()
+draw = do
+    gr <- Hog.sample $ rDups . getCircuit <$> Hog.resize 10 randomDAG
+    let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
+    writeFile "file.dot" dot
+    shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
+
+-- | Function to show a bytestring in a hex format.
+showBS :: ByteString -> Text
+showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
+
+-- | Run a simulation on a random DAG or a random module.
+runSimulation :: IO ()
+runSimulation = do
+  -- gr <- Hog.generate $ rDups <$> Hog.resize 100 (randomDAG :: Gen (G.Gr Gate ()))
+  -- let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
+  -- writeFile "file.dot" dot
+  -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
+  -- let circ =
+  --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
+    rand  <- generateByteString 20
+    rand2 <- Hog.sample (randomMod 10 100)
+    val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
+    case val of
+        Pass a -> T.putStrLn $ showBS a
+        _      -> T.putStrLn "Test failed"
+
+
+-- | Code to be executed on a failure. Also checks if the failure was a timeout,
+-- as the timeout command will return the 124 error code if that was the
+-- case. In that case, the error will be moved to a different directory.
+onFailure :: Text -> RunFailed -> Sh (Result Failed ())
+onFailure t _ = do
+    ex <- lastExitCode
+    case ex of
+        124 -> do
+            logger "Test TIMEOUT"
+            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
+            return $ Fail EmptyFail
+        _ -> do
+            logger "Test FAIL"
+            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
+            return $ Fail EmptyFail
+
+checkEquivalence :: SourceInfo -> Text -> IO Bool
+checkEquivalence src dir = shellyFailDir $ do
+    mkdir_p (fromText dir)
+    curr <- toTextIgnore <$> pwd
+    setenv "VERIFUZZ_ROOT" curr
+    cd (fromText dir)
+    catch_sh
+        (  (runResultT $ runEquiv defaultYosys (Just defaultVivado) src)
+        >> return True
+        )
+        ((\_ -> return False) :: RunFailed -> Sh Bool)
+
+-- | Run a fuzz run and check if all of the simulators passed by checking if the
+-- generated Verilog files are equivalent.
+runEquivalence
+    :: Maybe Seed
+    -> Gen Verilog -- ^ Generator for the Verilog file.
+    -> Text        -- ^ Name of the folder on each thread.
+    -> Text        -- ^ Name of the general folder being used.
+    -> Bool        -- ^ Keep flag.
+    -> Int         -- ^ Used to track the recursion.
+    -> IO ()
+runEquivalence seed gm t d k i = do
+    (_, m) <- shelly $ sampleSeed seed gm
+    let srcInfo = SourceInfo "top" m
+    rand <- generateByteString 20
+    shellyFailDir $ do
+        mkdir_p (fromText d </> fromText n)
+        curr <- toTextIgnore <$> pwd
+        setenv "VERIFUZZ_ROOT" curr
+        cd (fromText "output" </> fromText n)
+        _ <-
+            catch_sh
+                    (  runResultT
+                    $  runEquiv defaultYosys (Just defaultVivado) srcInfo
+                    >> liftSh (logger "Test OK")
+                    )
+                $ onFailure n
+        _ <-
+            catch_sh
+                    (   runResultT
+                    $   runSim (Icarus "iverilog" "vvp") srcInfo rand
+                    >>= (\b -> liftSh $ logger ("RTL Sim: " <> showBS b))
+                    )
+                $ onFailure n
+        cd ".."
+        unless k . rm_rf $ fromText n
+    when (i < 5 && isNothing seed) (runEquivalence seed gm t d k $ i + 1)
+    where n = t <> "_" <> T.pack (show i)
+
+runReduce :: SourceInfo -> IO SourceInfo
+runReduce s = reduce (\s' -> not <$> checkEquivalence s' "reduce") s
