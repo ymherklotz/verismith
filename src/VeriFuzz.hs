@@ -47,6 +47,7 @@ import           Options.Applicative
 import           Prelude                  hiding (FilePath)
 import           Shelly                   hiding (command)
 import           Shelly.Lifted            (liftSh)
+import           System.Random            (randomIO)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
@@ -80,7 +81,10 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
           | Reduce { fileName :: {-# UNPACK #-} !FilePath
                    , top      :: {-# UNPACK #-} !Text
                    }
-          | ConfigOpt { writeDefaultConfig :: !(Maybe FilePath) }
+          | ConfigOpt { writeConfig :: !(Maybe FilePath)
+                      , configFile  :: !(Maybe FilePath)
+                      , doRandomise :: !Bool
+                      }
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -185,6 +189,16 @@ configOpts =
             <> metavar "FILE"
             <> help "Output to a TOML Config file."
             )
+        <*> (  optional
+            .  strOption
+            $  long "config"
+            <> short 'c'
+            <> metavar "FILE"
+            <> help "Config file for the current fuzz run."
+            )
+        <*> (switch $ long "randomise" <> short 'r' <> help
+                "Randomise the given default config, or the default config by randomly switchin on and off options."
+            )
 
 argparse :: Parser Opts
 argparse =
@@ -258,6 +272,41 @@ opts = info
 getConfig :: Maybe FilePath -> IO Config
 getConfig s = maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
 
+-- | Randomly remove an option by setting it to 0.
+randDelete :: Int -> IO Int
+randDelete i = do
+    r <- randomIO
+    return $ if r then i else 0
+
+randomise :: Config -> IO Config
+randomise config@(Config a _ c d e) = do
+    mia <- randDelete $ cm ^. probModItemAssign
+    misa <- return $ cm ^. probModItemSeqAlways
+    mica <- randDelete $ cm ^. probModItemCombAlways
+    mii <- randDelete $ cm ^. probModItemInst
+    ssb <- randDelete $ cs ^. probStmntBlock
+    ssnb <- randDelete $ cs ^. probStmntNonBlock
+    ssc <- randDelete $ cs ^. probStmntCond
+    ssf <- randDelete $ cs ^. probStmntFor
+    en <- return $ ce ^. probExprNum
+    ei <- randDelete $ ce ^. probExprId
+    ers <- randDelete $ ce ^. probExprRangeSelect
+    euo <- randDelete $ ce ^. probExprUnOp
+    ebo <- randDelete $ ce ^. probExprBinOp
+    ec <- randDelete $ ce ^. probExprCond
+    eco <- randDelete $ ce ^. probExprConcat
+    estr <- randDelete $ ce ^. probExprStr
+    esgn <- randDelete $ ce ^. probExprSigned
+    eus <- randDelete $ ce ^. probExprUnsigned
+    return $ Config a (Probability
+                       (ProbModItem mia misa mica mii)
+                       (ProbStatement ssb ssnb ssc ssf)
+                       (ProbExpr en ei ers euo ebo ec eco estr esgn eus)) c d e
+    where
+        cm = config ^. configProbability . probModItem
+        cs = config ^. configProbability . probStmnt
+        ce = config ^. configProbability . probExpr
+
 handleOpts :: Opts -> IO ()
 handleOpts (Fuzz _ configF _ _ n) = do
     config <- getConfig configF
@@ -286,10 +335,11 @@ handleOpts (Reduce f t) = do
             vreduced <- runReduce (SourceInfo t v)
             writeFile "reduced.v" . T.unpack $ genSource vreduced
     where file = T.unpack $ toTextIgnore f
-handleOpts (ConfigOpt c) = maybe
-    (T.putStrLn . encodeConfig $ defaultConfig)
-    (`encodeConfigFile` defaultConfig)
-    $ T.unpack . toTextIgnore <$> c
+handleOpts (ConfigOpt c conf r) = do
+    config <- if r then getConfig conf >>= randomise else getConfig conf
+    maybe (T.putStrLn . encodeConfig $ config)
+        (`encodeConfigFile` config)
+        $ T.unpack . toTextIgnore <$> c
 
 defaultMain :: IO ()
 defaultMain = do

@@ -1,8 +1,10 @@
 #!/bin/sh
 
 sudo yum -y update
+
+# In addition, need to install bison-3.3
 sudo yum -y install git gcc72 gcc72-c++ tcl-devel python36 \
-     graphviz xdot gperf gmp-devel make bison flex autoconf \
+     graphviz xdot gperf gmp-devel make flex autoconf \
      readline-devel clang6.0 tmux boost libffi-devel
 
 sudo mkdir -p /mnt/tools
