@@ -286,6 +286,11 @@ halveModules srcInfo@(SourceInfo top _) =
         repl = halve . filter (not . matchesModName top)
         main = srcInfo ^. mainModule
 
+moduleBot :: SourceInfo -> Bool
+moduleBot (SourceInfo _ (Verilog []))  = True
+moduleBot (SourceInfo _ (Verilog [_])) = True
+moduleBot (SourceInfo _ (Verilog _))   = False
+
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
 halveModItems :: Replace SourceInfo
@@ -296,6 +301,15 @@ halveModItems srcInfo = cleanSourceInfo . addRelevant <$> src
         main = srcInfo ^. mainModule
         src = combine (mainModule . modItems) repl srcInfo
         addRelevant = mainModule . modItems %~ (relevant ++)
+
+modItemBot :: SourceInfo -> Bool
+modItemBot srcInfo
+    | length modItemsNoDecl > 2 = False
+    | otherwise = True
+    where
+        modItemsNoDecl = filter noDecl $ srcInfo ^.. mainModule . modItems . traverse
+        noDecl Decl{} = False
+        noDecl _      = True
 
 halveStatements :: Replace SourceInfo
 halveStatements m =
@@ -311,14 +325,18 @@ halveExpr = combine contexpr $ traverse halveModExpr
     contexpr :: Lens' SourceInfo [ModItem]
     contexpr = mainModule . modItems
 
+defaultBot :: SourceInfo -> Bool
+defaultBot = const False
+
 -- | Reduction using custom reduction strategies.
 reduce_ :: MonadSh m
         => Text
         -> Replace SourceInfo
+        -> (SourceInfo -> Bool)
         -> (SourceInfo -> m Bool)
         -> SourceInfo
         -> m SourceInfo
-reduce_ title repl eval src = do
+reduce_ title repl bot eval src = do
     liftSh . Shelly.echo $ "Reducing "
         <> title
         <> " (Modules: "
@@ -330,20 +348,24 @@ reduce_ title repl eval src = do
         <> ")"
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single True    ) -> runIf s
+        (Single s, Single True    )  -> runIf s
         (Dual _ r, Dual False True ) -> runIf r
         (Dual l _, Dual True False ) -> runIf l
-        (Dual l r, Dual True True) -> do
-            lreduced <- runIf l
-            rreduced <- runIf r
-            if _infoSrc lreduced < _infoSrc rreduced
-                then return lreduced
-                else return rreduced
-        _            -> return src
+        (Dual l r, Dual True True)   -> check l r
+        _                            -> return src
   where
     replacement = repl src
-    runIf s = if s /= src then reduce_ title repl eval s else return s
+    runIf s = if s /= src && not (bot s) then reduce_ title repl bot eval s else return s
     evalIfNotEmpty = eval
+    check l r
+        | bot l = return l
+        | bot r = return r
+        | otherwise = do
+              lreduced <- runIf l
+              rreduced <- runIf r
+              if _infoSrc lreduced < _infoSrc rreduced
+                  then return lreduced
+                  else return rreduced
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.
@@ -352,11 +374,11 @@ reduce :: MonadSh m
        -> SourceInfo              -- ^ Input verilog source to be reduced.
        -> m SourceInfo           -- ^ Reduced output.
 reduce eval src =
-    red "Modules" halveModules src
-    >>= red "Module Items" halveModItems
-    >>= red "Statements" halveStatements
-    >>= red "Expressions" halveExpr
-    where red s a = reduce_ s a eval
+    red "Modules" moduleBot halveModules src
+    >>= red "Module Items" modItemBot halveModItems
+    >>= red "Statements" defaultBot halveStatements
+    >>= red "Expressions" defaultBot halveExpr
+    where red s bot a = reduce_ s a bot eval
 
 runScript :: MonadSh m
           => Shelly.FilePath
@@ -395,5 +417,6 @@ reduceSynth a b = reduce synth
                 runSynth b src'
                 runEquiv a b src'
             return $ case r of
-                Fail _ -> False
-                Pass _ -> True
+                Fail EquivFail -> True
+                Fail _         -> False
+                Pass _         -> False
