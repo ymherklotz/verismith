@@ -15,9 +15,10 @@ Test case reducer implementation.
 
 module VeriFuzz.Reduce
     ( -- $strategy
-      Replacement(..)
+      reduceWithScript
     , reduce
     , reduce_
+    , Replacement(..)
     , halveModules
     , halveModItems
     , halveStatements
@@ -27,13 +28,26 @@ module VeriFuzz.Reduce
     )
 where
 
-import           Control.Lens
+import           Control.Lens             hiding ((<.>))
+import           Control.Monad            (void)
+import           Control.Monad.IO.Class   (MonadIO, liftIO)
 import           Data.List                (nub)
+import           Data.List.NonEmpty       (NonEmpty (..))
+import qualified Data.List.NonEmpty       as NonEmpty
 import           Data.Maybe               (mapMaybe)
 import           Data.Text                (Text)
+import qualified Data.Text                as T
+import qualified Data.Text.IO             as T
+import           Shelly                   ((<.>))
+import qualified Shelly
+import           Shelly.Lifted            (MonadSh, liftSh)
+import           VeriFuzz.Internal
+import           VeriFuzz.Sim
+import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
+import           VeriFuzz.Verilog.Parser
 
 -- $strategy
 -- The reduction strategy has multiple different steps. 'reduce' will run these
@@ -95,6 +109,13 @@ halve []  = None
 halve [_] = Single []
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
+halveNonEmpty :: Replace (NonEmpty a)
+halveNonEmpty l = case NonEmpty.splitAt (length l `div` 2) l of
+    ([], [])   -> None
+    ([], a:b)  -> Single $ a :| b
+    (a:b, [])  -> Single $ a :| b
+    (a:b, c:d) -> Dual (a :| b) $ c :| d
+
 -- | When given a Lens and a function that works on a lower replacement, it will
 -- go down, apply the replacement, and return a replacement of the original
 -- module.
@@ -121,7 +142,7 @@ filterAssigns out (ModCA (ContAssign i _)) =
 filterAssigns _ _ = True
 
 clean :: (Mutate a) => [Identifier] -> a -> a
-clean ids a = mutExpr (transform $ filterExpr ids) a
+clean ids = mutExpr (transform $ filterExpr ids)
 
 cleanUndefined :: [Identifier] -> [ModItem] -> [ModItem]
 cleanUndefined ids mis = clean usedWires mis
@@ -147,7 +168,7 @@ cleanMod m newm = modify . change <$> newm
             ^. modItems
 
 halveIndExpr :: Replace Expr
-halveIndExpr (Concat l      ) = Concat <$> halve l
+halveIndExpr (Concat l      ) = Concat <$> halveNonEmpty l
 halveIndExpr (BinOp e1 _  e2) = Dual e1 e2
 halveIndExpr (Cond  _  e1 e2) = Dual e1 e2
 halveIndExpr (UnOp _ e      ) = Single e
@@ -291,12 +312,22 @@ halveExpr = combine contexpr $ traverse halveModExpr
     contexpr = mainModule . modItems
 
 -- | Reduction using custom reduction strategies.
-reduce_
-    :: Replace SourceInfo
-    -> (SourceInfo -> IO Bool)
-    -> SourceInfo
-    -> IO SourceInfo
-reduce_ repl eval src = do
+reduce_ :: MonadSh m
+        => Text
+        -> Replace SourceInfo
+        -> (SourceInfo -> m Bool)
+        -> SourceInfo
+        -> m SourceInfo
+reduce_ title repl eval src = do
+    liftSh . Shelly.echo $ "Reducing "
+        <> title
+        <> " (Modules: "
+        <> showT (length . getVerilog $ _infoSrc src)
+        <> ", Module Items in "
+        <> _infoTop src
+        <> ": "
+        <> showT (length (src ^. mainModule . modItems))
+        <> ")"
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
         (Single s, Single True    ) -> runIf s
@@ -311,26 +342,50 @@ reduce_ repl eval src = do
         _            -> return src
   where
     replacement = repl src
-    runIf s = if s /= src then reduce_ repl eval s else return s
-    evalIfNotEmpty m = do
-        print
-            $   GenVerilog
-            <$> m
-            ^.. mainModule
-            .   modItems
-            .   traverse
-            .   modContAssign
-        eval m
+    runIf s = if s /= src then reduce_ title repl eval s else return s
+    evalIfNotEmpty = eval
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.
-reduce
-    :: (SourceInfo -> IO Bool) -- ^ Failed or not.
-    -> SourceInfo              -- ^ Input verilog source to be reduced.
-    -> IO SourceInfo           -- ^ Reduced output.
+reduce :: MonadSh m
+       => (SourceInfo -> m Bool) -- ^ Failed or not.
+       -> SourceInfo              -- ^ Input verilog source to be reduced.
+       -> m SourceInfo           -- ^ Reduced output.
 reduce eval src =
-    red halveModules src
-    >>= red halveModItems
-    >>= red halveStatements
-    >>= red halveExpr
-    where red a = reduce_ a eval
+    red "Modules" halveModules src
+    >>= red "Module Items" halveModItems
+    >>= red "Statements" halveStatements
+    >>= red "Expressions" halveExpr
+    where red s a = reduce_ s a eval
+
+runScript :: MonadSh m
+          => Shelly.FilePath
+          -> Shelly.FilePath
+          -> SourceInfo
+          -> m Bool
+runScript fp file src = do
+    e <- liftSh $ do
+        Shelly.writefile file $ genSource src
+        noPrint . Shelly.errExit False $ Shelly.run_ fp []
+        Shelly.lastExitCode
+    return $ e == 0
+
+-- | Reduce using a script that is passed to it
+reduceWithScript :: (MonadSh m, MonadIO m)
+                 => Text
+                 -> Shelly.FilePath
+                 -> Shelly.FilePath
+                 -> m ()
+reduceWithScript top script file = do
+    liftSh . Shelly.cp file $ file <.> "original"
+    srcInfo <- liftIO . parseSourceInfoFile top $ Shelly.toTextIgnore file
+    void $ reduce (runScript script file) srcInfo
+
+-- | Reduce a 'SourceInfo' using two Synthesisers that are passed to it.
+reduceSynth :: (Synthesiser a, Synthesiser b, MonadSh m)
+            => Yosys
+            -> a
+            -> Maybe b
+            -> SourceInfo
+            -> m SourceInfo
+reduceSynth = undefined

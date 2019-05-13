@@ -78,8 +78,9 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
                      }
           | Parse { fileName :: {-# UNPACK #-} !FilePath
                   }
-          | Reduce { fileName :: {-# UNPACK #-} !FilePath
-                   , top      :: {-# UNPACK #-} !Text
+          | Reduce { fileName     :: {-# UNPACK #-} !FilePath
+                   , top          :: {-# UNPACK #-} !Text
+                   , reduceScript :: {-# UNPACK #-} !FilePath
                    }
           | ConfigOpt { writeConfig :: !(Maybe FilePath)
                       , configFile  :: !(Maybe FilePath)
@@ -176,8 +177,14 @@ reduceOpts =
                 <> metavar "TOP"
                 <> help "Name of top level module."
                 <> showDefault
-                <> value "main"
+                <> value "top"
                 )
+        <*> (strOption
+            $  long "script"
+            <> short 's'
+            <> metavar "SCRIPT"
+            <> help "Script that determines if the current file is interesting, which is determined by the script returning 0."
+            )
 
 configOpts :: Parser Opts
 configOpts =
@@ -321,20 +328,12 @@ handleOpts (Generate f c) = do
           (flip T.writeFile $ genSource source)
           $ T.unpack . toTextIgnore <$> f
 handleOpts (Parse f) = do
-    verilogSrc <- readFile file
-    case parseVerilog file verilogSrc of
+    verilogSrc <- T.readFile file
+    case parseVerilog (T.pack file) verilogSrc of
         Left  l -> print l
         Right v -> print $ GenVerilog v
     where file = T.unpack . toTextIgnore $ f
-handleOpts (Reduce f t) = do
-    verilogSrc <- readFile file
-    case parseVerilog file verilogSrc of
-        Left  l -> print l
-        Right v -> do
-            writeFile "main.v" . T.unpack $ genSource (SourceInfo t v)
-            vreduced <- runReduce (SourceInfo t v)
-            writeFile "reduced.v" . T.unpack $ genSource vreduced
-    where file = T.unpack $ toTextIgnore f
+handleOpts (Reduce f t s) = reduceWithScript t s f
 handleOpts (ConfigOpt c conf r) = do
     config <- if r then getConfig conf >>= randomise else getConfig conf
     maybe (T.putStrLn . encodeConfig $ config)
