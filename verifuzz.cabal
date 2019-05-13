@@ -41,6 +41,7 @@ library
                  , VeriFuzz.Result
                  , VeriFuzz.Sim
                  , VeriFuzz.Sim.Icarus
+                 , VeriFuzz.Sim.Identity
                  , VeriFuzz.Sim.Internal
                  , VeriFuzz.Sim.Quartus
                  , VeriFuzz.Sim.Template
