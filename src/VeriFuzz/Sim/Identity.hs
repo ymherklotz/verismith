@@ -10,7 +10,11 @@ Portability : POSIX
 The identity simulator and synthesiser.
 -}
 
-module VeriFuzz.Sim.Identity where
+module VeriFuzz.Sim.Identity
+    ( Identity(..)
+    , defaultIdentity
+    )
+where
 
 import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Data.Text                (Text, unpack)
@@ -24,6 +28,7 @@ import           VeriFuzz.Verilog.CodeGen
 data Identity = Identity { identityDesc   :: {-# UNPACK #-} !Text
                          , identityOutput :: {-# UNPACK #-} !FilePath
                          }
+              deriving (Eq)
 
 instance Tool Identity where
     toText (Identity d _) = d
@@ -42,3 +47,6 @@ instance NFData Identity where
 runSynthIdentity :: Identity -> SourceInfo -> ResultSh ()
 runSynthIdentity (Identity _ out) src =
     writefile out $ genSource src
+
+defaultIdentity :: Identity
+defaultIdentity = Identity "identity" "syn_identity.v"

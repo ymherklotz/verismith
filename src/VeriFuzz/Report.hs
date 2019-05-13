@@ -25,13 +25,14 @@ module VeriFuzz.Report
     , defaultYosysSynth
     , defaultXSTSynth
     , defaultQuartusSynth
+    , defaultIdentitySynth
     , descriptionToSim
     , descriptionToSynth
     )
 where
 
 import           Control.DeepSeq       (NFData, rnf)
-import           Control.Lens
+import           Control.Lens          hiding (Identity)
 import           Data.ByteString       (ByteString)
 import           Data.Maybe            (fromMaybe)
 import           Prelude               hiding (FilePath)
@@ -39,6 +40,7 @@ import           Shelly                (fromText)
 import           VeriFuzz.Config
 import           VeriFuzz.Result
 import           VeriFuzz.Sim.Icarus
+import           VeriFuzz.Sim.Identity
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Quartus
 import           VeriFuzz.Sim.Vivado
@@ -55,41 +57,48 @@ data SynthTool = XSTSynth {-# UNPACK #-} !XST
                | VivadoSynth {-# UNPACK #-} !Vivado
                | YosysSynth {-# UNPACK #-} !Yosys
                | QuartusSynth {-# UNPACK #-} !Quartus
+               | IdentitySynth {-# UNPACK #-} !Identity
                deriving (Eq)
 
 instance NFData SynthTool where
-    rnf (XSTSynth a)     = rnf a
-    rnf (VivadoSynth a)  = rnf a
-    rnf (YosysSynth a)   = rnf a
-    rnf (QuartusSynth a) = rnf a
+    rnf (XSTSynth a)      = rnf a
+    rnf (VivadoSynth a)   = rnf a
+    rnf (YosysSynth a)    = rnf a
+    rnf (QuartusSynth a)  = rnf a
+    rnf (IdentitySynth a) = rnf a
 
 instance Show SynthTool where
-    show (XSTSynth xst)         = show xst
-    show (VivadoSynth vivado)   = show vivado
-    show (YosysSynth yosys)     = show yosys
-    show (QuartusSynth quartus) = show quartus
+    show (XSTSynth xst)           = show xst
+    show (VivadoSynth vivado)     = show vivado
+    show (YosysSynth yosys)       = show yosys
+    show (QuartusSynth quartus)   = show quartus
+    show (IdentitySynth identity) = show identity
 
 instance Tool SynthTool where
-    toText (XSTSynth xst)         = toText xst
-    toText (VivadoSynth vivado)   = toText vivado
-    toText (YosysSynth yosys)     = toText yosys
-    toText (QuartusSynth quartus) = toText quartus
+    toText (XSTSynth xst)           = toText xst
+    toText (VivadoSynth vivado)     = toText vivado
+    toText (YosysSynth yosys)       = toText yosys
+    toText (QuartusSynth quartus)   = toText quartus
+    toText (IdentitySynth identity) = toText identity
 
 instance Synthesiser SynthTool where
-    runSynth (XSTSynth xst)         = runSynth xst
-    runSynth (VivadoSynth vivado)   = runSynth vivado
-    runSynth (YosysSynth yosys)     = runSynth yosys
-    runSynth (QuartusSynth quartus) = runSynth quartus
+    runSynth (XSTSynth xst)           = runSynth xst
+    runSynth (VivadoSynth vivado)     = runSynth vivado
+    runSynth (YosysSynth yosys)       = runSynth yosys
+    runSynth (QuartusSynth quartus)   = runSynth quartus
+    runSynth (IdentitySynth identity) = runSynth identity
 
-    synthOutput (XSTSynth xst)         = synthOutput xst
-    synthOutput (VivadoSynth vivado)   = synthOutput vivado
-    synthOutput (YosysSynth yosys)     = synthOutput yosys
-    synthOutput (QuartusSynth quartus) = synthOutput quartus
+    synthOutput (XSTSynth xst)           = synthOutput xst
+    synthOutput (VivadoSynth vivado)     = synthOutput vivado
+    synthOutput (YosysSynth yosys)       = synthOutput yosys
+    synthOutput (QuartusSynth quartus)   = synthOutput quartus
+    synthOutput (IdentitySynth identity) = synthOutput identity
 
     setSynthOutput (YosysSynth yosys)     = YosysSynth . setSynthOutput yosys
     setSynthOutput (XSTSynth xst)         = XSTSynth . setSynthOutput xst
     setSynthOutput (VivadoSynth vivado)   = VivadoSynth . setSynthOutput vivado
     setSynthOutput (QuartusSynth quartus) = QuartusSynth . setSynthOutput quartus
+    setSynthOutput (IdentitySynth identity) = IdentitySynth . setSynthOutput identity
 
 defaultYosysSynth :: SynthTool
 defaultYosysSynth = YosysSynth defaultYosys
@@ -102,6 +111,9 @@ defaultVivadoSynth = VivadoSynth defaultVivado
 
 defaultXSTSynth :: SynthTool
 defaultXSTSynth = XSTSynth defaultXST
+
+defaultIdentitySynth :: SynthTool
+defaultIdentitySynth = IdentitySynth defaultIdentity
 
 newtype SimTool = IcarusSim Icarus
                 deriving (Eq)
@@ -169,6 +181,7 @@ descriptionToSim (SimDescription "icarus") = defaultIcarusSim
 descriptionToSim s =
     error $ "Could not find implementation for simulator '" <> show s <> "'"
 
+-- | Convert a description to a synthesiser.
 descriptionToSynth :: SynthDescription -> SynthTool
 descriptionToSynth (SynthDescription "yosys" bin desc out) =
     YosysSynth
@@ -186,5 +199,9 @@ descriptionToSynth (SynthDescription "quartus" bin desc out) =
     QuartusSynth
         . Quartus (fromText <$> bin) (fromMaybe (quartusDesc defaultQuartus) $ desc)
         $ maybe (quartusOutput defaultQuartus) fromText out
+descriptionToSynth (SynthDescription "identity" _ desc out) =
+    IdentitySynth
+        . Identity (fromMaybe (identityDesc defaultIdentity) $ desc)
+        $ maybe (identityOutput defaultIdentity) fromText out
 descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
