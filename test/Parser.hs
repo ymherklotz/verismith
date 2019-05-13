@@ -71,59 +71,60 @@ parserIdempotent = Hog.property $ do
     p sv === (p . p) sv
   where
     vshow = showT . GenVerilog
-    p sv =
-        either (\x -> showT x <> "\n" <> sv) vshow $ parseVerilog "idempotent_test" sv
+    p sv = either (\x -> showT x <> "\n" <> sv) vshow
+        $ parseVerilog "idempotent_test" sv
 
 parserTests :: TestTree
-parserTests = testGroup "Parser properties"
-    [ testProperty "Input Mod" parserInputMod
-    , testProperty "Input" parserInput
+parserTests = testGroup
+    "Parser properties"
+    [ testProperty "Input Mod"       parserInputMod
+    , testProperty "Input"           parserInput
     , testProperty "Idempotence Mod" parserIdempotentMod
-    , testProperty "Idempotence" parserIdempotent
+    , testProperty "Idempotence"     parserIdempotent
     ]
 
 testParse :: (Eq a, Show a) => Parser a -> String -> String -> a -> TestTree
-testParse p name input golden = testCase name $
-    case parse p "testcase" (alexScanTokens input) of
-        Left e       -> assertFailure $ show e
+testParse p name input golden =
+    testCase name $ case parse p "testcase" (alexScanTokens input) of
+        Left  e      -> assertFailure $ show e
         Right result -> golden @=? result
 
 testParseFail :: (Eq a, Show a) => Parser a -> String -> String -> TestTree
-testParseFail p name input = testCase name $
-    case parse p "testcase" (alexScanTokens input) of
-        Left _  -> return ()
+testParseFail p name input =
+    testCase name $ case parse p "testcase" (alexScanTokens input) of
+        Left  _ -> return ()
         Right _ -> assertFailure "Parse incorrectly succeeded"
 
 parseEventUnit :: TestTree
-parseEventUnit =
-    testGroup "Event"
+parseEventUnit = testGroup
+    "Event"
     [ testFailure "No empty event" "@()"
-    , test "@*" EAll
+    , test "@*"   EAll
     , test "@(*)" EAll
     , test "@(posedge clk)" $ EPosEdge "clk"
     , test "@(negedge clk)" $ ENegEdge "clk"
     , test "@(wire1)" $ EId "wire1"
-    , test "@(a or b or c or d)" $ EOr (EId "a") (EOr (EId "b") (EOr (EId "c") (EId "d")))
-    , test "@(a, b, c, d)" $ EComb (EId "a") (EComb (EId "b") (EComb (EId "c") (EId "d")))
-    , test "@(posedge a or negedge b or c or d)" $ EOr (EPosEdge "a") (EOr (ENegEdge "b") (EOr (EId "c") (EId "d")))
+    , test "@(a or b or c or d)"
+        $ EOr (EId "a") (EOr (EId "b") (EOr (EId "c") (EId "d")))
+    , test "@(a, b, c, d)"
+        $ EComb (EId "a") (EComb (EId "b") (EComb (EId "c") (EId "d")))
+    , test "@(posedge a or negedge b or c or d)"
+        $ EOr (EPosEdge "a") (EOr (ENegEdge "b") (EOr (EId "c") (EId "d")))
     ]
-    where
-        test a = testParse parseEvent ("Test " <> a) a
-        testFailure = testParseFail parseEvent
+  where
+    test a = testParse parseEvent ("Test " <> a) a
+    testFailure = testParseFail parseEvent
 
 parseAlwaysUnit :: TestTree
-parseAlwaysUnit =
-    testGroup "Always"
+parseAlwaysUnit = testGroup
+    "Always"
     [ test "Empty" "always begin end" $ Always (SeqBlock [])
-    , test "Empty with event @*" "always @* begin end" $ Always (EventCtrl EAll (Just (SeqBlock [])))
-    , test "Empty with event @(posedge clk)" "always @(posedge clk) begin end" $ Always (EventCtrl (EPosEdge "clk") (Just (SeqBlock [])))
+    , test "Empty with event @*"             "always @* begin end"
+        $ Always (EventCtrl EAll (Just (SeqBlock [])))
+    , test "Empty with event @(posedge clk)" "always @(posedge clk) begin end"
+        $ Always (EventCtrl (EPosEdge "clk") (Just (SeqBlock [])))
     ]
-    where
-        test = testParse parseModItem
+    where test = testParse parseModItem
 
 parseUnitTests :: TestTree
-parseUnitTests =
-    testGroup "Parser unit"
-    [ parseEventUnit
-    , parseAlwaysUnit
-    ]
+parseUnitTests = testGroup "Parser unit" [parseEventUnit, parseAlwaysUnit]

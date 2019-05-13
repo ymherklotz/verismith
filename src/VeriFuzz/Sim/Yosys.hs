@@ -99,15 +99,10 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
         logger "Yosys: equivalence check"
         run_ (yosysPath yosys) [toTextIgnore checkFile]
         logger "Yosys: equivalence done"
-  where
-    checkFile =
-        fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
+    where checkFile = fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
 
-runEquiv :: (Synthesiser a, Synthesiser b)
-         => a
-         -> b
-         -> SourceInfo
-         -> ResultSh ()
+runEquiv
+    :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> ResultSh ()
 runEquiv sim1 sim2 srcInfo = do
     dir <- liftSh pwd
     liftSh $ do
@@ -129,5 +124,5 @@ runEquiv sim1 sim2 srcInfo = do
         2   -> ResultT . return $ Fail EquivFail
         124 -> ResultT . return $ Fail TimeoutError
         _   -> ResultT . return $ Fail EquivError
-    where
-        exe dir name e = void . errExit False . logCommand dir name . timeout e
+  where
+    exe dir name e = void . errExit False . logCommand dir name . timeout e

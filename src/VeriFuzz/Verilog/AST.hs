@@ -270,23 +270,25 @@ data ConstExpr = ConstNum { _constNum :: {-# UNPACK #-} !BitVec }
                deriving (Eq, Show, Ord, Data)
 
 constToExpr :: ConstExpr -> Expr
-constToExpr (ConstNum a)    = Number a
-constToExpr (ParamId a)     = Id a
-constToExpr (ConstConcat a) = Concat $ fmap constToExpr a
-constToExpr (ConstUnOp a b) = UnOp a $ constToExpr b
+constToExpr (ConstNum    a   ) = Number a
+constToExpr (ParamId     a   ) = Id a
+constToExpr (ConstConcat a   ) = Concat $ fmap constToExpr a
+constToExpr (ConstUnOp a b   ) = UnOp a $ constToExpr b
 constToExpr (ConstBinOp a b c) = BinOp (constToExpr a) b $ constToExpr c
-constToExpr (ConstCond a b c) = Cond (constToExpr a) (constToExpr b) $ constToExpr c
+constToExpr (ConstCond a b c) =
+    Cond (constToExpr a) (constToExpr b) $ constToExpr c
 constToExpr (ConstStr a) = Str a
 
 exprToConst :: Expr -> ConstExpr
-exprToConst (Number a)    = ConstNum a
-exprToConst (Id a)     = ParamId a
-exprToConst (Concat a) = ConstConcat $ fmap exprToConst a
-exprToConst (UnOp a b) = ConstUnOp a $ exprToConst b
+exprToConst (Number a   ) = ConstNum a
+exprToConst (Id     a   ) = ParamId a
+exprToConst (Concat a   ) = ConstConcat $ fmap exprToConst a
+exprToConst (UnOp a b   ) = ConstUnOp a $ exprToConst b
 exprToConst (BinOp a b c) = ConstBinOp (exprToConst a) b $ exprToConst c
-exprToConst (Cond a b c) = ConstCond (exprToConst a) (exprToConst b) $ exprToConst c
+exprToConst (Cond a b c) =
+    ConstCond (exprToConst a) (exprToConst b) $ exprToConst c
 exprToConst (Str a) = ConstStr a
-exprToConst _ = error "Not a constant expression"
+exprToConst _       = error "Not a constant expression"
 
 instance Num ConstExpr where
   a + b = ConstBinOp a BinPlus b

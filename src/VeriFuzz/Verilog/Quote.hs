@@ -33,11 +33,12 @@ liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
 -- | Quasiquoter for verilog, so that verilog can be written inline and be
 -- parsed to an AST at compile time.
 verilog :: QuasiQuoter
-verilog = QuasiQuoter { quoteExp = quoteVerilog
-                      , quotePat = undefined
-                      , quoteType = undefined
-                      , quoteDec = undefined
-                      }
+verilog = QuasiQuoter
+    { quoteExp  = quoteVerilog
+    , quotePat  = undefined
+    , quoteType = undefined
+    , quoteDec  = undefined
+    }
 
 quoteVerilog :: String -> TH.Q TH.Exp
 quoteVerilog s = do
@@ -45,5 +46,5 @@ quoteVerilog s = do
     let pos = T.pack $ TH.loc_filename loc
     v <- case parseVerilog pos (T.pack s) of
         Right e -> return e
-        Left e  -> fail $ show e
+        Left  e -> fail $ show e
     liftDataWithText v

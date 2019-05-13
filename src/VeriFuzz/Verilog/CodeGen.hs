@@ -49,15 +49,15 @@ verilogSrc (Verilog modules) = vsep . punctuate line $ moduleDecl <$> modules
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 moduleDecl :: ModDecl -> Doc a
-moduleDecl (ModDecl i outP inP items ps) =
-    vsep
+moduleDecl (ModDecl i outP inP items ps) = vsep
     [ sep ["module" <+> identifier i, params ps, ports <> semi]
     , indent 2 modI
     , "endmodule"
     ]
   where
-    ports | null outP && null inP = ""
-          | otherwise             = parens . align . sep . punctuate comma $ modPort <$> outIn
+    ports
+        | null outP && null inP = ""
+        | otherwise = parens . align . sep . punctuate comma $ modPort <$> outIn
     modI  = vsep $ moduleItem <$> items
     outIn = outP ++ inP
     params []        = ""
@@ -73,11 +73,13 @@ localParamList ps = tupled . toList $ localParam <$> ps
 
 -- | Generates the assignment for a 'Parameter'.
 parameter :: Parameter -> Doc a
-parameter (Parameter name val) = hsep ["parameter", identifier name,  "=", constExpr val]
+parameter (Parameter name val) =
+    hsep ["parameter", identifier name, "=", constExpr val]
 
 -- | Generates the assignment for a 'LocalParam'.
 localParam :: LocalParam -> Doc a
-localParam (LocalParam name val) = hsep ["localparameter", identifier name,  "=", constExpr val]
+localParam (LocalParam name val) =
+    hsep ["localparameter", identifier name, "=", constExpr val]
 
 identifier :: Identifier -> Doc a
 identifier (Identifier i) = pretty i
@@ -109,13 +111,17 @@ portDir PortInOut = "inout"
 
 -- | Generate a 'ModItem'.
 moduleItem :: ModItem -> Doc a
-moduleItem (ModCA ca) = contAssign ca
-moduleItem (ModInst i name conn) =
-    hsep [identifier i, identifier name, parens . hsep $ punctuate comma (mConn <$> conn), semi]
-moduleItem (Initial stat) = nest 2 $ vsep ["initial", statement stat]
-moduleItem (Always  stat) = nest 2 $ vsep ["always", statement stat]
-moduleItem (Decl dir p ini) =
-    hsep [maybe mempty makePort dir, port p, maybe mempty makeIni ini, semi]
+moduleItem (ModCA ca           ) = contAssign ca
+moduleItem (ModInst i name conn) = hsep
+    [ identifier i
+    , identifier name
+    , parens . hsep $ punctuate comma (mConn <$> conn)
+    , semi
+    ]
+moduleItem (Initial stat  ) = nest 2 $ vsep ["initial", statement stat]
+moduleItem (Always  stat  ) = nest 2 $ vsep ["always", statement stat]
+moduleItem (Decl dir p ini) = hsep
+    [maybe mempty makePort dir, port p, maybe mempty makeIni ini, semi]
   where
     makePort = portDir
     makeIni  = ("=" <+>) . constExpr
@@ -133,29 +139,30 @@ contAssign (ContAssign val e) =
 
 -- | Generate 'Expr' to 'Text'.
 expr :: Expr -> Doc a
-expr (BinOp eRhs bin eLhs) =
-    parens $ hsep [expr eRhs, binaryOp bin, expr eLhs]
-expr (Number b             ) = showNum b
-expr (Id     i             ) = identifier i
-expr (VecSelect   i e      ) = hcat [identifier i, brackets $ expr e]
-expr (RangeSelect i r      ) = hcat [identifier i, range r]
-expr (Concat c             ) = braces . nest 4 . sep . punctuate comma $ toList (expr <$> c)
-expr (UnOp u e             ) = parens $ hcat [unaryOp u, expr e]
-expr (Cond l t f) = parens . nest 4 $ sep [expr l <+> "?", hsep [expr t, colon, expr f]]
+expr (BinOp eRhs bin eLhs) = parens $ hsep [expr eRhs, binaryOp bin, expr eLhs]
+expr (Number b           ) = showNum b
+expr (Id     i           ) = identifier i
+expr (VecSelect   i e    ) = hcat [identifier i, brackets $ expr e]
+expr (RangeSelect i r    ) = hcat [identifier i, range r]
+expr (Concat c) = braces . nest 4 . sep . punctuate comma $ toList (expr <$> c)
+expr (UnOp u e           ) = parens $ hcat [unaryOp u, expr e]
+expr (Cond l t f) =
+    parens . nest 4 $ sep [expr l <+> "?", hsep [expr t, colon, expr f]]
 expr (Appl f e) = hcat [identifier f, parens $ expr e]
-expr (Str t                ) = dquotes $ pretty t
+expr (Str t   ) = dquotes $ pretty t
 
 showNum :: BitVec -> Doc a
-showNum (BitVec s n) =
-    parens $ hcat [minus, pretty $ showT s, "'h", pretty $ T.pack (showHex (abs n) "")]
+showNum (BitVec s n) = parens
+    $ hcat [minus, pretty $ showT s, "'h", pretty $ T.pack (showHex (abs n) "")]
   where
     minus | signum n >= 0 = mempty
           | otherwise     = "-"
 
 constExpr :: ConstExpr -> Doc a
-constExpr (ConstNum    b) = showNum b
-constExpr (ParamId     i) = identifier i
-constExpr (ConstConcat c) = braces . hsep . punctuate comma $ toList (constExpr <$> c)
+constExpr (ConstNum b) = showNum b
+constExpr (ParamId  i) = identifier i
+constExpr (ConstConcat c) =
+    braces . hsep . punctuate comma $ toList (constExpr <$> c)
 constExpr (ConstUnOp u e) = parens $ hcat [unaryOp u, constExpr e]
 constExpr (ConstBinOp eRhs bin eLhs) =
     parens $ hsep [constExpr eRhs, binaryOp bin, constExpr eLhs]
@@ -234,33 +241,41 @@ pType Wire = "wire"
 pType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Doc a
-genAssign op (Assign r d e) = hsep [lVal r, pretty op, maybe mempty delay d, expr e]
+genAssign op (Assign r d e) =
+    hsep [lVal r, pretty op, maybe mempty delay d, expr e]
 
 statement :: Statement -> Doc a
-statement (TimeCtrl  d stat     ) = hsep [delay d, defMap stat]
-statement (EventCtrl e stat     ) = hsep [event e, defMap stat]
-statement (SeqBlock s) = vsep ["begin", indent 2 . vsep $ statement <$> s, "end"]
-statement (BlockAssign    a     ) = hcat [genAssign "=" a, semi]
-statement (NonBlockAssign a     ) = hcat [genAssign "<=" a, semi]
-statement (TaskEnable     t     ) = hcat [task t, semi]
-statement (SysTaskEnable  t     ) = hcat ["$", task t, semi]
-statement (CondStmnt e t Nothing) = vsep [hsep ["if", parens $ expr e], indent 2 $ defMap t]
-statement (CondStmnt e t f) =
-    vsep [hsep ["if", parens $ expr e], indent 2 $ defMap t, "else", indent 2 $ defMap f]
-statement (ForLoop a e incr stmnt) =
-    vsep [ hsep
-           [ "for"
-           , parens . hsep $ punctuate semi
-               [ genAssign "=" a
-               , expr e
-               , genAssign "=" incr
-               ]
-           ]
-         , indent 2 $ statement stmnt]
+statement (TimeCtrl  d stat) = hsep [delay d, defMap stat]
+statement (EventCtrl e stat) = hsep [event e, defMap stat]
+statement (SeqBlock s) =
+    vsep ["begin", indent 2 . vsep $ statement <$> s, "end"]
+statement (BlockAssign    a) = hcat [genAssign "=" a, semi]
+statement (NonBlockAssign a) = hcat [genAssign "<=" a, semi]
+statement (TaskEnable     t) = hcat [task t, semi]
+statement (SysTaskEnable  t) = hcat ["$", task t, semi]
+statement (CondStmnt e t Nothing) =
+    vsep [hsep ["if", parens $ expr e], indent 2 $ defMap t]
+statement (CondStmnt e t f) = vsep
+    [ hsep ["if", parens $ expr e]
+    , indent 2 $ defMap t
+    , "else"
+    , indent 2 $ defMap f
+    ]
+statement (ForLoop a e incr stmnt) = vsep
+    [ hsep
+        [ "for"
+        , parens . hsep $ punctuate
+            semi
+            [genAssign "=" a, expr e, genAssign "=" incr]
+        ]
+    , indent 2 $ statement stmnt
+    ]
 
 task :: Task -> Doc a
-task (Task i e) | null e    = identifier i
-                | otherwise = hsep [identifier i, parens . hsep $ punctuate comma (expr <$> e)]
+task (Task i e)
+    | null e = identifier i
+    | otherwise = hsep
+        [identifier i, parens . hsep $ punctuate comma (expr <$> e)]
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: (Source a) => a -> IO ()

@@ -15,9 +15,9 @@ unitTests :: TestTree
 unitTests = testGroup
     "Unit tests"
     [ testCase "Transformation of AST" $ assertEqual
-          "Successful transformation"
-          transformExpectedResult
-          (transform trans transformTestData)
+        "Successful transformation"
+        transformExpectedResult
+        (transform trans transformTestData)
     , parseUnitTests
     , reduceUnitTests
     ]
@@ -43,17 +43,19 @@ transformTestData = BinOp
             )
         )
         BinOr
-        (Concat $
-            ( Concat $
-                (Concat $ (Id "id1") :| [Id "id2", Id "id2"]) :|
-                [ Id "id2"
-                , Id "id2"
-                , (Concat $ (Id "id2") :| [Id "id2", (Concat $ Id "id1" :| [Id "id2"])])
-                , Id "id2"
-                ]
-            ) :| [ Id "id1"
-                 , Id "id2"
-                 ]
+        (  Concat
+        $  (  Concat
+           $  (Concat $ (Id "id1") :| [Id "id2", Id "id2"])
+           :| [ Id "id2"
+              , Id "id2"
+              , (  Concat
+                $  (Id "id2")
+                :| [Id "id2", (Concat $ Id "id1" :| [Id "id2"])]
+                )
+              , Id "id2"
+              ]
+           )
+        :| [Id "id1", Id "id2"]
         )
     )
 
@@ -78,20 +80,18 @@ transformExpectedResult = BinOp
             )
         )
         BinOr
-        (Concat $
-            ( Concat $
-                (Concat $ (Id "id1") :| [Id "Replaced", Id "Replaced"]) :|
-                [ Id "Replaced"
-                , Id "Replaced"
-                , Concat $
-                    Id "Replaced" :|
-                    [ Id "Replaced"
-                    , Concat $ Id "id1" :| [Id "Replaced"]
-                    ]
-                , Id "Replaced"
-                ] ) :| [ Id "id1"
-                       , Id "Replaced"
-                       ]
+        (  Concat
+        $  (  Concat
+           $  (Concat $ (Id "id1") :| [Id "Replaced", Id "Replaced"])
+           :| [ Id "Replaced"
+              , Id "Replaced"
+              , Concat
+              $  Id "Replaced"
+              :| [Id "Replaced", Concat $ Id "id1" :| [Id "Replaced"]]
+              , Id "Replaced"
+              ]
+           )
+        :| [Id "id1", Id "Replaced"]
         )
     )
 

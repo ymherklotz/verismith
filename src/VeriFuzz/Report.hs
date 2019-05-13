@@ -199,7 +199,8 @@ descriptionToSynth (SynthDescription "xst" bin desc out) =
         $ maybe (xstOutput defaultXST) fromText out
 descriptionToSynth (SynthDescription "quartus" bin desc out) =
     QuartusSynth
-        . Quartus (fromText <$> bin) (fromMaybe (quartusDesc defaultQuartus) $ desc)
+        . Quartus (fromText <$> bin)
+                  (fromMaybe (quartusDesc defaultQuartus) $ desc)
         $ maybe (quartusOutput defaultQuartus) fromText out
 descriptionToSynth (SynthDescription "identity" _ desc out) =
     IdentitySynth
@@ -209,12 +210,12 @@ descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
 
 status :: Result Failed () -> Html
-status (Pass _)            = "Passed"
-status (Fail EmptyFail)    = "Failed"
-status (Fail EquivFail)    = "Equivalence failed"
-status (Fail SimFail)      = "Simulation failed"
-status (Fail SynthFail)    = "Synthesis failed"
-status (Fail EquivError)   = "Equivalence error"
+status (Pass _           ) = "Passed"
+status (Fail EmptyFail   ) = "Failed"
+status (Fail EquivFail   ) = "Equivalence failed"
+status (Fail SimFail     ) = "Simulation failed"
+status (Fail SynthFail   ) = "Synthesis failed"
+status (Fail EquivError  ) = "Equivalence error"
 status (Fail TimeoutError) = "Time out"
 
 synthStatusHtml :: SynthStatus -> Html
@@ -234,14 +235,23 @@ resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
     H.body $ do
         H.h1 $ "Fuzz Report - " <> H.toHtml name
         H.h2 "Synthesis Failure"
-        H.table . H.toHtml $
-            (H.tr . H.toHtml $
-             [H.th "Synthesis tool", H.th "Synthesis Status"])
+        H.table
+            . H.toHtml
+            $ ( H.tr
+              . H.toHtml
+              $ [H.th "Synthesis tool", H.th "Synthesis Status"]
+              )
             : fmap synthStatusHtml stat
         H.h2 "Equivalence Check Status"
-        H.table . H.toHtml $
-            (H.tr . H.toHtml $
-             [H.th "First tool", H.th "Second tool", H.th "Equivalence Status"])
+        H.table
+            . H.toHtml
+            $ ( H.tr
+              . H.toHtml
+              $ [ H.th "First tool"
+                , H.th "Second tool"
+                , H.th "Equivalence Status"
+                ]
+              )
             : fmap synthResultHtml synth
 
 printResultReport :: Text -> FuzzReport -> Text

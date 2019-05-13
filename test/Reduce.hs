@@ -13,7 +13,8 @@ Test reduction.
 {-# LANGUAGE QuasiQuotes #-}
 
 module Reduce
-    (reduceUnitTests)
+    ( reduceUnitTests
+    )
 where
 
 import           Data.List        ((\\))
@@ -23,13 +24,11 @@ import           VeriFuzz
 import           VeriFuzz.Reduce
 
 reduceUnitTests :: TestTree
-reduceUnitTests = testGroup "Reducer tests"
-    [ moduleReducerTest
-    , modItemReduceTest
-    , halveStatementsTest
-    , activeWireTest
-    ]
+reduceUnitTests = testGroup
+    "Reducer tests"
+    [moduleReducerTest, modItemReduceTest, halveStatementsTest, activeWireTest]
 
+-- brittany-disable-next-binding
 activeWireTest :: TestTree
 activeWireTest = testCase "Active wires" $ do
     findActiveWires verilog1 \\ ["x", "y", "z", "w"]          @?= []
@@ -76,6 +75,7 @@ module top(clk, y, x);
 endmodule
 |]
 
+-- brittany-disable-next-binding
 halveStatementsTest :: TestTree
 halveStatementsTest = testCase "Statements" $ do
     GenVerilog <$> halveStatements srcInfo1 @?= golden1
@@ -140,6 +140,7 @@ module top(clk, y, x);
 endmodule
 |])
 
+-- brittany-disable-next-binding
 modItemReduceTest :: TestTree
 modItemReduceTest = testCase "Module items" $ do
     GenVerilog <$> halveModItems srcInfo1 @?= golden1
@@ -175,6 +176,7 @@ module top(y, x);
 endmodule
 |])
 
+-- brittany-disable-next-binding
 moduleReducerTest :: TestTree
 moduleReducerTest = testCase "Module reducer" $ do
     halveModules srcInfo1 @?= golden1

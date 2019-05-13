@@ -111,10 +111,10 @@ halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
 halveNonEmpty :: Replace (NonEmpty a)
 halveNonEmpty l = case NonEmpty.splitAt (length l `div` 2) l of
-    ([], [])   -> None
-    ([], a:b)  -> Single $ a :| b
-    (a:b, [])  -> Single $ a :| b
-    (a:b, c:d) -> Dual (a :| b) $ c :| d
+    ([]   , []   ) -> None
+    ([]   , a : b) -> Single $ a :| b
+    (a : b, []   ) -> Single $ a :| b
+    (a : b, c : d) -> Dual (a :| b) $ c :| d
 
 -- | When given a Lens and a function that works on a lower replacement, it will
 -- go down, apply the replacement, and return a replacement of the original
@@ -182,21 +182,20 @@ halveModExpr a          = Single a
 -- | Remove all the undefined mod instances.
 cleanModInst :: SourceInfo -> SourceInfo
 cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
-    where
-        validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
-        cleaned = cleanModInst' validInst <$> srcInfo ^. infoSrc . _Wrapped
+  where
+    validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
+    cleaned   = cleanModInst' validInst <$> srcInfo ^. infoSrc . _Wrapped
 
 -- | Clean all the undefined module instances in a specific module using a
 -- context.
 cleanModInst' :: [Identifier] -> ModDecl -> ModDecl
 cleanModInst' ids m = m & modItems .~ newModItem
-    where
-        newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
+    where newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
 
 -- | Check if a mod instance is in the current context.
 validModInst :: [Identifier] -> ModItem -> Bool
 validModInst ids (ModInst i _ _) = i `elem` ids
-validModInst _ _                 = True
+validModInst _   _               = True
 
 -- | Adds a 'ModDecl' to a 'SourceInfo'.
 addMod :: ModDecl -> SourceInfo -> SourceInfo
@@ -212,21 +211,21 @@ relevantModItem :: ModDecl -> ModItem -> Bool
 relevantModItem (ModDecl _ out _ _ _) (ModCA (ContAssign i _)) =
     i `elem` fmap _portName out
 relevantModItem _ Decl{} = True
-relevantModItem _ _ = False
+relevantModItem _ _      = False
 
 isAssign :: Statement -> Bool
-isAssign (BlockAssign _)    = True
+isAssign (BlockAssign    _) = True
 isAssign (NonBlockAssign _) = True
 isAssign _                  = False
 
 lValName :: LVal -> [Identifier]
-lValName (RegId i) = [i]
+lValName (RegId i    ) = [i]
 lValName (RegExpr i _) = [i]
 lValName (RegSize i _) = [i]
 lValName (RegConcat e) = mapMaybe getId . concat $ universe <$> e
-    where
-        getId (Id i) = Just i
-        getId _      = Nothing
+  where
+    getId (Id i) = Just i
+    getId _      = Nothing
 
 portToId :: Port -> Identifier
 portToId (Port _ _ _ i) = i
@@ -236,38 +235,36 @@ paramToId (Parameter i _) = i
 
 findActiveWires :: ModDecl -> [Identifier]
 findActiveWires m@(ModDecl _ i o _ p) =
-    nub $ assignWires
-    <> assignStat
-    <> fmap portToId i
-    <> fmap portToId o
-    <> fmap paramToId p
-    where
-        assignWires =
-            m ^.. modItems . traverse
-            . modContAssign . contAssignNetLVal
-        assignStat =
-            concatMap lValName
-            $ (allStat ^.. traverse . stmntBA . assignReg)
+    nub
+        $  assignWires
+        <> assignStat
+        <> fmap portToId  i
+        <> fmap portToId  o
+        <> fmap paramToId p
+  where
+    assignWires = m ^.. modItems . traverse . modContAssign . contAssignNetLVal
+    assignStat =
+        concatMap lValName
+            $  (allStat ^.. traverse . stmntBA . assignReg)
             <> (allStat ^.. traverse . stmntNBA . assignReg)
-        allStat = filter isAssign . concat $ fmap universe stat
-        stat =
-            (m ^.. modItems . traverse . _Initial)
+    allStat = filter isAssign . concat $ fmap universe stat
+    stat =
+        (m ^.. modItems . traverse . _Initial)
             <> (m ^.. modItems . traverse . _Always)
 
 cleanSourceInfo :: SourceInfo -> SourceInfo
 cleanSourceInfo src = clean active src
-    where
-        active = findActiveWires (src ^. mainModule)
+    where active = findActiveWires (src ^. mainModule)
 
 -- | Returns true if the text matches the name of a module.
 matchesModName :: Text -> ModDecl -> Bool
 matchesModName top (ModDecl i _ _ _ _) = top == getIdentifier i
 
 halveStatement :: Replace Statement
-halveStatement (SeqBlock s)                      = SeqBlock <$> halve s
+halveStatement (SeqBlock s) = SeqBlock <$> halve s
 halveStatement (CondStmnt _ (Just s1) (Just s2)) = Dual s1 s2
-halveStatement (CondStmnt _ (Just s1) Nothing)   = Single s1
-halveStatement (CondStmnt _ Nothing (Just s1))   = Single s1
+halveStatement (CondStmnt _ (Just s1) Nothing) = Single s1
+halveStatement (CondStmnt _ Nothing (Just s1)) = Single s1
 halveStatement (EventCtrl e (Just s)) = EventCtrl e . Just <$> halveStatement s
 halveStatement (TimeCtrl e (Just s)) = TimeCtrl e . Just <$> halveStatement s
 halveStatement a = Single a
@@ -282,40 +279,39 @@ halveAlways a          = Single a
 halveModules :: Replace SourceInfo
 halveModules srcInfo@(SourceInfo top _) =
     cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
-    where
-        repl = halve . filter (not . matchesModName top)
-        main = srcInfo ^. mainModule
+  where
+    repl = halve . filter (not . matchesModName top)
+    main = srcInfo ^. mainModule
 
 moduleBot :: SourceInfo -> Bool
-moduleBot (SourceInfo _ (Verilog []))  = True
+moduleBot (SourceInfo _ (Verilog [] )) = True
 moduleBot (SourceInfo _ (Verilog [_])) = True
-moduleBot (SourceInfo _ (Verilog _))   = False
+moduleBot (SourceInfo _ (Verilog _  )) = False
 
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
 halveModItems :: Replace SourceInfo
 halveModItems srcInfo = cleanSourceInfo . addRelevant <$> src
-    where
-        repl = halve . filter (not . relevantModItem main)
-        relevant = filter (relevantModItem main) $ main ^. modItems
-        main = srcInfo ^. mainModule
-        src = combine (mainModule . modItems) repl srcInfo
-        addRelevant = mainModule . modItems %~ (relevant ++)
+  where
+    repl        = halve . filter (not . relevantModItem main)
+    relevant    = filter (relevantModItem main) $ main ^. modItems
+    main        = srcInfo ^. mainModule
+    src         = combine (mainModule . modItems) repl srcInfo
+    addRelevant = mainModule . modItems %~ (relevant ++)
 
 modItemBot :: SourceInfo -> Bool
-modItemBot srcInfo
-    | length modItemsNoDecl > 2 = False
-    | otherwise = True
-    where
-        modItemsNoDecl = filter noDecl $ srcInfo ^.. mainModule . modItems . traverse
-        noDecl Decl{} = False
-        noDecl _      = True
+modItemBot srcInfo | length modItemsNoDecl > 2 = False
+                   | otherwise                 = True
+  where
+    modItemsNoDecl =
+        filter noDecl $ srcInfo ^.. mainModule . modItems . traverse
+    noDecl Decl{} = False
+    noDecl _      = True
 
 halveStatements :: Replace SourceInfo
 halveStatements m =
     cleanSourceInfo <$> combine (mainModule . modItems) halves m
-    where
-        halves = traverse halveAlways
+    where halves = traverse halveAlways
 
 -- | Reduce expressions by splitting them in half and keeping the half that
 -- succeeds.
@@ -329,15 +325,18 @@ defaultBot :: SourceInfo -> Bool
 defaultBot = const False
 
 -- | Reduction using custom reduction strategies.
-reduce_ :: MonadSh m
-        => Text
-        -> Replace SourceInfo
-        -> (SourceInfo -> Bool)
-        -> (SourceInfo -> m Bool)
-        -> SourceInfo
-        -> m SourceInfo
+reduce_
+    :: MonadSh m
+    => Text
+    -> Replace SourceInfo
+    -> (SourceInfo -> Bool)
+    -> (SourceInfo -> m Bool)
+    -> SourceInfo
+    -> m SourceInfo
 reduce_ title repl bot eval src = do
-    liftSh . Shelly.echo $ "Reducing "
+    liftSh
+        .  Shelly.echo
+        $  "Reducing "
         <> title
         <> " (Modules: "
         <> showT (length . getVerilog $ _infoSrc src)
@@ -348,43 +347,43 @@ reduce_ title repl bot eval src = do
         <> ")"
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
-        (Single s, Single True    )  -> runIf s
-        (Dual _ r, Dual False True ) -> runIf r
-        (Dual l _, Dual True False ) -> runIf l
-        (Dual l r, Dual True True)   -> check l r
-        _                            -> return src
+        (Single s, Single True    ) -> runIf s
+        (Dual _ r, Dual False True) -> runIf r
+        (Dual l _, Dual True False) -> runIf l
+        (Dual l r, Dual True True ) -> check l r
+        _                           -> return src
   where
     replacement = repl src
-    runIf s = if s /= src && not (bot s) then reduce_ title repl bot eval s else return s
+    runIf s = if s /= src && not (bot s)
+        then reduce_ title repl bot eval s
+        else return s
     evalIfNotEmpty = eval
     check l r
         | bot l = return l
         | bot r = return r
         | otherwise = do
-              lreduced <- runIf l
-              rreduced <- runIf r
-              if _infoSrc lreduced < _infoSrc rreduced
-                  then return lreduced
-                  else return rreduced
+            lreduced <- runIf l
+            rreduced <- runIf r
+            if _infoSrc lreduced < _infoSrc rreduced
+                then return lreduced
+                else return rreduced
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.
-reduce :: MonadSh m
-       => (SourceInfo -> m Bool) -- ^ Failed or not.
-       -> SourceInfo              -- ^ Input verilog source to be reduced.
-       -> m SourceInfo           -- ^ Reduced output.
+reduce
+    :: MonadSh m
+    => (SourceInfo -> m Bool) -- ^ Failed or not.
+    -> SourceInfo              -- ^ Input verilog source to be reduced.
+    -> m SourceInfo           -- ^ Reduced output.
 reduce eval src =
     red "Modules" moduleBot halveModules src
-    >>= red "Module Items" modItemBot halveModItems
-    >>= red "Statements" defaultBot halveStatements
-    >>= red "Expressions" defaultBot halveExpr
+        >>= red "Module Items" modItemBot halveModItems
+        >>= red "Statements"   defaultBot halveStatements
+        >>= red "Expressions"  defaultBot halveExpr
     where red s bot a = reduce_ s a bot eval
 
-runScript :: MonadSh m
-          => Shelly.FilePath
-          -> Shelly.FilePath
-          -> SourceInfo
-          -> m Bool
+runScript
+    :: MonadSh m => Shelly.FilePath -> Shelly.FilePath -> SourceInfo -> m Bool
 runScript fp file src = do
     e <- liftSh $ do
         Shelly.writefile file $ genSource src
@@ -393,30 +392,32 @@ runScript fp file src = do
     return $ e == 0
 
 -- | Reduce using a script that is passed to it
-reduceWithScript :: (MonadSh m, MonadIO m)
-                 => Text
-                 -> Shelly.FilePath
-                 -> Shelly.FilePath
-                 -> m ()
+reduceWithScript
+    :: (MonadSh m, MonadIO m)
+    => Text
+    -> Shelly.FilePath
+    -> Shelly.FilePath
+    -> m ()
 reduceWithScript top script file = do
     liftSh . Shelly.cp file $ file <.> "original"
     srcInfo <- liftIO . parseSourceInfoFile top $ Shelly.toTextIgnore file
     void $ reduce (runScript script file) srcInfo
 
 -- | Reduce a 'SourceInfo' using two 'Synthesiser' that are passed to it.
-reduceSynth :: (Synthesiser a, Synthesiser b, MonadSh m)
-            => a
-            -> b
-            -> SourceInfo
-            -> m SourceInfo
+reduceSynth
+    :: (Synthesiser a, Synthesiser b, MonadSh m)
+    => a
+    -> b
+    -> SourceInfo
+    -> m SourceInfo
 reduceSynth a b = reduce synth
-    where
-        synth src' = liftSh $ do
-            r <- runResultT $ do
-                runSynth a src'
-                runSynth b src'
-                runEquiv a b src'
-            return $ case r of
-                Fail EquivFail -> True
-                Fail _         -> False
-                Pass _         -> False
+  where
+    synth src' = liftSh $ do
+        r <- runResultT $ do
+            runSynth a src'
+            runSynth b src'
+            runEquiv a b src'
+        return $ case r of
+            Fail EquivFail -> True
+            Fail _         -> False
+            Pass _         -> False

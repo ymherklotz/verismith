@@ -237,48 +237,39 @@ defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 fromXST :: XST -> SynthDescription
 fromXST (XST a b c) =
-    SynthDescription
-    "xst"
-    (toTextIgnore <$> a)
-    (Just b)
-    (Just $ toTextIgnore c)
+    SynthDescription "xst" (toTextIgnore <$> a) (Just b) (Just $ toTextIgnore c)
 
 fromYosys :: Yosys -> SynthDescription
-fromYosys (Yosys a b c) =
-    SynthDescription
-    "yosys"
-    (toTextIgnore <$> a)
-    (Just b)
-    (Just $ toTextIgnore c)
+fromYosys (Yosys a b c) = SynthDescription "yosys"
+                                           (toTextIgnore <$> a)
+                                           (Just b)
+                                           (Just $ toTextIgnore c)
 
 fromVivado :: Vivado -> SynthDescription
-fromVivado (Vivado a b c) =
-    SynthDescription
-    "vivado"
-    (toTextIgnore <$> a)
-    (Just b)
-    (Just $ toTextIgnore c)
+fromVivado (Vivado a b c) = SynthDescription "vivado"
+                                             (toTextIgnore <$> a)
+                                             (Just b)
+                                             (Just $ toTextIgnore c)
 
 fromQuartus :: Quartus -> SynthDescription
-fromQuartus (Quartus a b c) =
-    SynthDescription
-    "quartus"
-    (toTextIgnore <$> a)
-    (Just b)
-    (Just $ toTextIgnore c)
+fromQuartus (Quartus a b c) = SynthDescription "quartus"
+                                               (toTextIgnore <$> a)
+                                               (Just b)
+                                               (Just $ toTextIgnore c)
 
 defaultConfig :: Config
-defaultConfig = Config (Info (pack $(gitHash)) (pack $ showVersion version))
-                (Probability defModItem defStmnt defExpr)
-                (ConfProperty 20 Nothing 3 2 5)
-                []
-                [fromYosys defaultYosys, fromVivado defaultVivado]
+defaultConfig = Config
+    (Info (pack $(gitHash)) (pack $ showVersion version))
+    (Probability defModItem defStmnt defExpr)
+    (ConfProperty 20 Nothing 3 2 5)
+    []
+    [fromYosys defaultYosys, fromVivado defaultVivado]
   where
     defModItem =
         ProbModItem 5 -- Assign
-        1 -- Sequential Always
-        1 -- Combinational Always
-        1 -- Instantiation
+                      1 -- Sequential Always
+                        1 -- Combinational Always
+                          1 -- Instantiation
     defStmnt =
         ProbStatement 0 -- Blocking assignment
                         3 -- Non-blocking assignment
@@ -405,17 +396,21 @@ synthesiser =
         .=  synthOut
 
 infoCodec :: TomlCodec Info
-infoCodec = Info
-    <$> defaultValue (defaultConfig ^. configInfo . infoCommit) (Toml.text "commit")
-    .= _infoCommit
-    <*> defaultValue (defaultConfig ^. configInfo . infoVersion) (Toml.text "version")
-    .= _infoVersion
+infoCodec =
+    Info
+        <$> defaultValue (defaultConfig ^. configInfo . infoCommit)
+                         (Toml.text "commit")
+        .=  _infoCommit
+        <*> defaultValue (defaultConfig ^. configInfo . infoVersion)
+                         (Toml.text "version")
+        .=  _infoVersion
 
 configCodec :: TomlCodec Config
 configCodec =
     Config
-        <$> defaultValue (defaultConfig ^. configInfo) (Toml.table infoCodec "info")
-        .= _configInfo
+        <$> defaultValue (defaultConfig ^. configInfo)
+                         (Toml.table infoCodec "info")
+        .=  _configInfo
         <*> defaultValue (defaultConfig ^. configProbability)
                          (Toml.table probCodec "probability")
         .=  _configProbability

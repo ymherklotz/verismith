@@ -180,11 +180,12 @@ reduceOpts =
                 <> showDefault
                 <> value "top"
                 )
-        <*> (strOption
+        <*> (  strOption
             $  long "script"
             <> short 's'
             <> metavar "SCRIPT"
-            <> help "Script that determines if the current file is interesting, which is determined by the script returning 0."
+            <> help
+                   "Script that determines if the current file is interesting, which is determined by the script returning 0."
             )
 
 configOpts :: Parser Opts
@@ -204,8 +205,11 @@ configOpts =
             <> metavar "FILE"
             <> help "Config file for the current fuzz run."
             )
-        <*> (switch $ long "randomise" <> short 'r' <> help
-                "Randomise the given default config, or the default config by randomly switchin on and off options."
+        <*> (  switch
+            $  long "randomise"
+            <> short 'r'
+            <> help
+                   "Randomise the given default config, or the default config by randomly switchin on and off options."
             )
 
 argparse :: Parser Opts
@@ -278,7 +282,8 @@ opts = info
     )
 
 getConfig :: Maybe FilePath -> IO Config
-getConfig s = maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
+getConfig s =
+    maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
 
 -- | Randomly remove an option by setting it to 0.
 randDelete :: Int -> IO Int
@@ -288,58 +293,65 @@ randDelete i = do
 
 randomise :: Config -> IO Config
 randomise config@(Config a _ c d e) = do
-    mia <- randDelete $ cm ^. probModItemAssign
+    mia  <- randDelete $ cm ^. probModItemAssign
     misa <- return $ cm ^. probModItemSeqAlways
     mica <- randDelete $ cm ^. probModItemCombAlways
-    mii <- randDelete $ cm ^. probModItemInst
-    ssb <- randDelete $ cs ^. probStmntBlock
+    mii  <- randDelete $ cm ^. probModItemInst
+    ssb  <- randDelete $ cs ^. probStmntBlock
     ssnb <- randDelete $ cs ^. probStmntNonBlock
-    ssc <- randDelete $ cs ^. probStmntCond
-    ssf <- randDelete $ cs ^. probStmntFor
-    en <- return $ ce ^. probExprNum
-    ei <- randDelete $ ce ^. probExprId
-    ers <- randDelete $ ce ^. probExprRangeSelect
-    euo <- randDelete $ ce ^. probExprUnOp
-    ebo <- randDelete $ ce ^. probExprBinOp
-    ec <- randDelete $ ce ^. probExprCond
-    eco <- randDelete $ ce ^. probExprConcat
+    ssc  <- randDelete $ cs ^. probStmntCond
+    ssf  <- randDelete $ cs ^. probStmntFor
+    en   <- return $ ce ^. probExprNum
+    ei   <- randDelete $ ce ^. probExprId
+    ers  <- randDelete $ ce ^. probExprRangeSelect
+    euo  <- randDelete $ ce ^. probExprUnOp
+    ebo  <- randDelete $ ce ^. probExprBinOp
+    ec   <- randDelete $ ce ^. probExprCond
+    eco  <- randDelete $ ce ^. probExprConcat
     estr <- randDelete $ ce ^. probExprStr
     esgn <- randDelete $ ce ^. probExprSigned
-    eus <- randDelete $ ce ^. probExprUnsigned
-    return $ Config a (Probability
-                       (ProbModItem mia misa mica mii)
-                       (ProbStatement ssb ssnb ssc ssf)
-                       (ProbExpr en ei ers euo ebo ec eco estr esgn eus)) c d e
-    where
-        cm = config ^. configProbability . probModItem
-        cs = config ^. configProbability . probStmnt
-        ce = config ^. configProbability . probExpr
+    eus  <- randDelete $ ce ^. probExprUnsigned
+    return $ Config
+        a
+        (Probability (ProbModItem mia misa mica mii)
+                     (ProbStatement ssb ssnb ssc ssf)
+                     (ProbExpr en ei ers euo ebo ec eco estr esgn eus)
+        )
+        c
+        d
+        e
+  where
+    cm = config ^. configProbability . probModItem
+    cs = config ^. configProbability . probStmnt
+    ce = config ^. configProbability . probExpr
 
 handleOpts :: Opts -> IO ()
 handleOpts (Fuzz _ configF _ _ n) = do
     config <- getConfig configF
-    _ <- runFuzz config
-                   defaultYosys
-                   (fuzzMultiple n Nothing (proceduralSrc "top" config))
+    _      <- runFuzz config
+                      defaultYosys
+                      (fuzzMultiple n Nothing (proceduralSrc "top" config))
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c
     source <- proceduralIO "top" config
-    maybe (T.putStrLn $ genSource source)
-          (flip T.writeFile $ genSource source)
-          $ T.unpack . toTextIgnore <$> f
+    maybe (T.putStrLn $ genSource source) (flip T.writeFile $ genSource source)
+        $   T.unpack
+        .   toTextIgnore
+        <$> f
 handleOpts (Parse f) = do
     verilogSrc <- T.readFile file
     case parseVerilog (T.pack file) verilogSrc of
         Left  l -> print l
         Right v -> print $ GenVerilog v
     where file = T.unpack . toTextIgnore $ f
-handleOpts (Reduce f t s) = shelly $ reduceWithScript t s f
+handleOpts (Reduce    f t    s) = shelly $ reduceWithScript t s f
 handleOpts (ConfigOpt c conf r) = do
     config <- if r then getConfig conf >>= randomise else getConfig conf
-    maybe (T.putStrLn . encodeConfig $ config)
-        (`encodeConfigFile` config)
-        $ T.unpack . toTextIgnore <$> c
+    maybe (T.putStrLn . encodeConfig $ config) (`encodeConfigFile` config)
+        $   T.unpack
+        .   toTextIgnore
+        <$> c
 
 defaultMain :: IO ()
 defaultMain = do
@@ -415,9 +427,7 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText dir)
     catch_sh
-        (  (runResultT $ runEquiv defaultYosys defaultVivado src)
-        >> return True
-        )
+        ((runResultT $ runEquiv defaultYosys defaultVivado src) >> return True)
         ((\_ -> return False) :: RunFailed -> Sh Bool)
 
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
@@ -459,4 +469,5 @@ runEquivalence seed gm t d k i = do
     where n = t <> "_" <> T.pack (show i)
 
 runReduce :: SourceInfo -> IO SourceInfo
-runReduce s = shelly $ reduce (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s
+runReduce s =
+    shelly $ reduce (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s

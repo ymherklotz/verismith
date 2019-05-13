@@ -76,9 +76,13 @@ runFuzz conf yos m = shelly $ runFuzz' conf yos m
 runFuzz' :: Monad m => Config -> Yosys -> (Config -> Fuzz m b) -> m b
 runFuzz' conf yos m = runReaderT
     (evalStateT (m conf) (FuzzReport [] [] []))
-    (FuzzEnv (force $ defaultIdentitySynth : (descriptionToSynth <$> conf ^. configSynthesisers))
-             (force $ descriptionToSim <$> conf ^. configSimulators)
-             yos
+    (FuzzEnv
+        ( force
+        $ defaultIdentitySynth
+        : (descriptionToSynth <$> conf ^. configSynthesisers)
+        )
+        (force $ descriptionToSim <$> conf ^. configSimulators)
+        yos
     )
 
 synthesisers :: Monad m => Fuzz m [SynthTool]
@@ -140,8 +144,7 @@ pop f a = do
     finally (liftSh (cd f) >> a) . liftSh $ cd dir
 
 applyList :: [a -> b] -> [a] -> [b]
-applyList a b = apply' <$> zip a b
-    where apply' (a', b') = a' b'
+applyList a b = apply' <$> zip a b where apply' (a', b') = a' b'
 
 toSynthResult :: [(SynthTool, SynthTool)] -> [Result Failed ()] -> [SynthResult]
 toSynthResult a b = flip applyList b $ uncurry SynthResult <$> a
@@ -170,26 +173,25 @@ equivalence src = do
 
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _synthResults <$> get
-    where
-        withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail)) = True
-        withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail)) = True
-        withIdentity _                                           = False
+  where
+    withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail)) = True
+    withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail)) = True
+    withIdentity _                                                  = False
 
 -- | Always reduces with respect to 'Identity'.
 reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
 reduction src = do
     fails <- failEquivWithIdentity
-    _ <- liftSh $ mapM red fails
+    _     <- liftSh $ mapM red fails
     return ()
-    where
-        red (SynthResult a b _) = do
-            make dir
-            pop dir $ do
-                s <- reduceSynth a b src
-                writefile (fromText ".." </> dir <.> "v") $ genSource s
-                return s
-            where
-                dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
+  where
+    red (SynthResult a b _) = do
+        make dir
+        pop dir $ do
+            s <- reduceSynth a b src
+            writefile (fromText ".." </> dir <.> "v") $ genSource s
+            return s
+        where dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
 
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzz gen conf = do
@@ -204,12 +206,13 @@ fuzz gen conf = do
     synthesis src
     equivalence src
     reduction src
-    report <- get
+    report  <- get
     currdir <- liftSh pwd
     liftSh . writefile "index.html" $ printResultReport (bname currdir) report
     return report
-    where seed = conf ^. configProperty . propSeed
-          bname = T.pack . takeBaseName . T.unpack . toTextIgnore
+  where
+    seed  = conf ^. configProperty . propSeed
+    bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 fuzzInDir
     :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
@@ -260,8 +263,6 @@ sampleSeed s gen =
                           of
                               Nothing -> loop (n - 1)
                               Just x  -> do
-                                  liftSh
-                                      .  logT
-                                      $ showT seed
+                                  liftSh . logT $ showT seed
                                   return (seed, Hog.nodeValue x)
           in  loop (100 :: Int)
