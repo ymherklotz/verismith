@@ -15,8 +15,10 @@ Generate a report from a fuzz run.
 module VeriFuzz.Report
     ( SynthTool(..)
     , SynthStatus(..)
+    , SynthResult(..)
     , SimTool(..)
     , FuzzReport(..)
+    , printResultReport
     , synthResults
     , simResults
     , synthStatus
@@ -31,21 +33,21 @@ module VeriFuzz.Report
     )
 where
 
-import           Control.DeepSeq       (NFData, rnf)
-import           Control.Lens          hiding (Identity)
-import           Data.ByteString       (ByteString)
-import           Data.Maybe            (fromMaybe)
-import           Prelude               hiding (FilePath)
-import           Shelly                (fromText)
+import           Control.DeepSeq               (NFData, rnf)
+import           Control.Lens                  hiding (Identity)
+import           Data.ByteString               (ByteString)
+import           Data.Maybe                    (fromMaybe)
+import           Data.Text                     (Text)
+import           Data.Text.Lazy                (toStrict)
+import           Prelude                       hiding (FilePath)
+import           Shelly                        (fromText)
+import           Text.Blaze.Html               (Html)
+import           Text.Blaze.Html.Renderer.Text (renderHtml)
+import qualified Text.Blaze.Html5              as H
 import           VeriFuzz.Config
 import           VeriFuzz.Result
-import           VeriFuzz.Sim.Icarus
-import           VeriFuzz.Sim.Identity
+import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Quartus
-import           VeriFuzz.Sim.Vivado
-import           VeriFuzz.Sim.XST
-import           VeriFuzz.Sim.Yosys
 
 -- | Common type alias for synthesis results
 type UResult = Result Failed ()
@@ -136,7 +138,7 @@ defaultIcarusSim = IcarusSim defaultIcarus
 
 -- | The results from running a tool through a simulator. It can either fail or
 -- return a result, which is most likely a 'ByteString'.
-data SimResult = SimResult !SynthTool !SimTool !(BResult)
+data SimResult = SimResult !SynthTool !SimTool !BResult
                  deriving (Eq)
 
 instance Show SimResult where
@@ -145,7 +147,7 @@ instance Show SimResult where
 -- | The results of comparing the synthesised outputs of two files using a
 -- formal equivalence checker. This will either return a failure or an output
 -- which is most likely '()'.
-data SynthResult = SynthResult !SynthTool !SynthTool !(UResult)
+data SynthResult = SynthResult !SynthTool !SynthTool !UResult
                    deriving (Eq)
 
 instance Show SynthResult where
@@ -154,7 +156,7 @@ instance Show SynthResult where
 -- | The status of the synthesis using a simulator. This will be checked before
 -- attempting to run the equivalence checks on the simulator, as that would be
 -- unnecessary otherwise.
-data SynthStatus = SynthStatus !SynthTool !(UResult)
+data SynthStatus = SynthStatus !SynthTool !UResult
                  deriving (Eq)
 
 instance Show SynthStatus where
@@ -205,3 +207,40 @@ descriptionToSynth (SynthDescription "identity" _ desc out) =
         $ maybe (identityOutput defaultIdentity) fromText out
 descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
+
+status :: Result Failed () -> Html
+status (Pass _)         = "Passed"
+status (Fail EmptyFail) = "Failed"
+status (Fail EquivFail) = "Equivalence failed"
+status (Fail SimFail)   = "Simulation failed"
+status (Fail SynthFail) = "Synthesis failed"
+
+synthStatusHtml :: SynthStatus -> Html
+synthStatusHtml (SynthStatus synth res) = H.tr $ do
+    H.td . H.toHtml $ toText synth
+    H.td $ status res
+
+synthResultHtml :: SynthResult -> Html
+synthResultHtml (SynthResult synth1 synth2 res) = H.tr $ do
+    H.td . H.toHtml $ toText synth1
+    H.td . H.toHtml $ toText synth2
+    H.td $ status res
+
+resultReport :: Text -> FuzzReport -> Html
+resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
+    H.head . H.title $ "Fuzz Report - " <> H.toHtml name
+    H.body $ do
+        H.h1 "Fuzz Report"
+        H.h2 "Synthesis Failure"
+        H.table . H.toHtml $
+            (H.tr . H.toHtml $
+             [H.th "Synthesis tool", H.th "Synthesis Status"])
+            : fmap synthStatusHtml stat
+        H.h2 "Equivalence Check Status"
+        H.table . H.toHtml $
+            (H.tr . H.toHtml $
+             [H.th "First tool", H.th "Second tool", H.th "Equivalence Status"])
+            : fmap synthResultHtml synth
+
+printResultReport :: Text -> FuzzReport -> Text
+printResultReport t f = toStrict . renderHtml $ resultReport t f
