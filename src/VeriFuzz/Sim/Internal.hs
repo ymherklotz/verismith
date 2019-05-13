@@ -14,6 +14,7 @@ Class of the simulator and the synthesize tool.
 
 module VeriFuzz.Sim.Internal
     ( ResultSh
+    , resultSh
     , Tool(..)
     , Simulator(..)
     , Synthesiser(..)
@@ -39,6 +40,7 @@ where
 
 import           Control.Lens
 import           Control.Monad         (forM, void)
+import           Control.Monad.Catch   (throwM)
 import           Data.Bits             (shiftL)
 import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as B
@@ -51,6 +53,7 @@ import           Prelude               hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted         (MonadSh, liftSh)
 import           System.FilePath.Posix (takeBaseName)
+import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Verilog.AST
 
@@ -94,6 +97,13 @@ class Tool a => Synthesiser a where
 -- has instances for 'MonadSh' and 'MonadIO' if the 'Monad' it is parametrised
 -- with also has those instances.
 type ResultSh = ResultT Failed Sh
+
+resultSh :: ResultSh a -> Sh a
+resultSh s = do
+    result <- runResultT s
+    case result of
+        Fail e  -> throwM . RunFailed "" [] 1 $ showT e
+        Pass s' -> return s'
 
 checkPresent :: FilePath -> Text -> Sh (Maybe Text)
 checkPresent fp t = do

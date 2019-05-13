@@ -91,6 +91,7 @@ library
                , deepseq >= 1.4.4.0 && <1.5
                , template-haskell >=2.14.0 && <2.15
                , optparse-applicative >=0.14 && <0.15
+               , exceptions >=0.10.2 && <0.11
   default-extensions: OverloadedStrings
 
 executable verifuzz

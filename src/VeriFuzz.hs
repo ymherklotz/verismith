@@ -415,7 +415,7 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERIFUZZ_ROOT" curr
     cd (fromText dir)
     catch_sh
-        (  (runResultT $ runEquiv defaultYosys (Just defaultVivado) src)
+        (  (runResultT $ runEquiv defaultYosys defaultVivado src)
         >> return True
         )
         ((\_ -> return False) :: RunFailed -> Sh Bool)
@@ -442,7 +442,7 @@ runEquivalence seed gm t d k i = do
         _ <-
             catch_sh
                     (  runResultT
-                    $  runEquiv defaultYosys (Just defaultVivado) srcInfo
+                    $  runEquiv defaultYosys defaultVivado srcInfo
                     >> liftSh (logger "Test OK")
                     )
                 $ onFailure n
