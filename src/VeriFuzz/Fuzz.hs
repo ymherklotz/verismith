@@ -155,7 +155,7 @@ equivalence src = do
                 cp (fromText ".." </> fromText (toText b) </> synthOutput b)
                     $ synthOutput b
                 writefile "rtl.v" $ genSource src
-            runEquiv a (Just b) src
+            runEquiv a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport

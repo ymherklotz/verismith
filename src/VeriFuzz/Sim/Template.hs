@@ -47,10 +47,10 @@ outputText :: Synthesiser a => a -> Text
 outputText = toTextIgnore . synthOutput
 
 -- brittany-disable-next-binding
-yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> Maybe b -> SourceInfo -> Text
+yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> Text
 yosysSatConfig sim1 sim2 (SourceInfo top src) = [st|read_verilog #{outputText sim1}
 #{rename "_1" mis}
-read_verilog syn_#{idSim2}.v
+read_verilog syn_#{outputText sim2}.v
 #{rename "_2" mis}
 read_verilog #{top}.v
 proc; opt_clean
@@ -58,7 +58,6 @@ flatten #{top}
 sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 #{top}
 |]
   where
-    idSim2 = maybe "rtl" toText sim2
     mis = src ^.. getSourceId
 
 -- brittany-disable-next-binding
@@ -88,7 +87,7 @@ write_verilog -force #{outf}
 |]
 
 -- brittany-disable-next-binding
-sbyConfig :: (Synthesiser a, Synthesiser b) => a -> Maybe b -> SourceInfo -> Text
+sbyConfig :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> Text
 sbyConfig sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
 mode prove
@@ -99,13 +98,13 @@ abc pdr
 [script]
 #{readL}
 read -formal #{outputText sim1}
-read -formal #{maybe "rtl.v" outputText sim2}
+read -formal #{outputText sim2}
 read -formal top.v
 prep -top #{top}
 
 [files]
 #{depList}
-#{maybe "rtl.v" outputText sim2}
+#{outputText sim2}
 #{outputText sim1}
 top.v
 |]
