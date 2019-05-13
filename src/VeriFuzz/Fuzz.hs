@@ -47,8 +47,10 @@ import qualified Hedgehog.Internal.Tree           as Hog
 import           Prelude                          hiding (FilePath)
 import           Shelly                           hiding (get)
 import           Shelly.Lifted                    (MonadSh, liftSh)
+import           System.FilePath.Posix            (takeBaseName)
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
+import           VeriFuzz.Reduce
 import           VeriFuzz.Report
 import           VeriFuzz.Result
 import           VeriFuzz.Sim.Internal
@@ -74,7 +76,7 @@ runFuzz conf yos m = shelly $ runFuzz' conf yos m
 runFuzz' :: Monad m => Config -> Yosys -> (Config -> Fuzz m b) -> m b
 runFuzz' conf yos m = runReaderT
     (evalStateT (m conf) (FuzzReport [] [] []))
-    (FuzzEnv (force $ descriptionToSynth <$> conf ^. configSynthesisers)
+    (FuzzEnv (force $ defaultIdentitySynth : (descriptionToSynth <$> conf ^. configSynthesisers))
              (force $ descriptionToSim <$> conf ^. configSimulators)
              yos
     )
@@ -137,12 +139,16 @@ pop f a = do
     dir <- liftSh pwd
     finally (liftSh (cd f) >> a) . liftSh $ cd dir
 
+toSynthResult :: [(SynthTool, SynthTool)] -> [Result Failed ()] -> [SynthResult]
+toSynthResult a b = uncurry SynthResult <$> a <*> b
+
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
     synth <- passedSynthesis
     let synthComb =
             nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
     results <- liftSh $ mapM (uncurry equiv) synthComb
+    synthResults .= toSynthResult synthComb results
     liftSh $ inspect results
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
@@ -158,6 +164,26 @@ equivalence src = do
             runEquiv a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
+failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
+failEquivWithIdentity = filter withIdentity . _synthResults <$> get
+    where
+        withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail)) = True
+        withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail)) = True
+        withIdentity _                                           = False
+
+-- | Always reduces with respect to 'Identity'.
+reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
+reduction src = do
+    fails <- failEquivWithIdentity
+    _ <- liftSh $ mapM red fails
+    return ()
+    where
+        red (SynthResult a b _) = do
+            make dir
+            pop dir $ reduceSynth a b src
+            where
+                dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
+
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzz gen conf = do
     (seed', src) <- generateSample seed gen
@@ -170,8 +196,13 @@ fuzz gen conf = do
         .~ Just seed'
     synthesis src
     equivalence src
-    return mempty
+    reduction src
+    report <- get
+    currdir <- liftSh pwd
+    liftSh . writefile "index.html" $ printResultReport (bname currdir) report
+    return report
     where seed = conf ^. configProperty . propSeed
+          bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 fuzzInDir
     :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport

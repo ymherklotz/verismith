@@ -381,7 +381,7 @@ reduceWithScript top script file = do
     srcInfo <- liftIO . parseSourceInfoFile top $ Shelly.toTextIgnore file
     void $ reduce (runScript script file) srcInfo
 
--- | Reduce a 'SourceInfo' using two Synthesisers that are passed to it.
+-- | Reduce a 'SourceInfo' using two 'Synthesiser' that are passed to it.
 reduceSynth :: (Synthesiser a, Synthesiser b, MonadSh m)
             => a
             -> b
