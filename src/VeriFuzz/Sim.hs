@@ -16,6 +16,7 @@ module VeriFuzz.Sim
     -- ** Icarus
       Icarus(..)
     , defaultIcarus
+    -- * Synthesisers
     -- ** Yosys
     , Yosys(..)
     , defaultYosys
@@ -28,6 +29,9 @@ module VeriFuzz.Sim
     -- ** Quartus
     , Quartus(..)
     , defaultQuartus
+    -- ** Identity
+    , Identity(..)
+    , defaultIdentity
     -- * Equivalence
     , runEquiv
     -- * Simulation
@@ -39,6 +43,7 @@ module VeriFuzz.Sim
 where
 
 import           VeriFuzz.Sim.Icarus
+import           VeriFuzz.Sim.Identity
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Quartus
 import           VeriFuzz.Sim.Vivado
