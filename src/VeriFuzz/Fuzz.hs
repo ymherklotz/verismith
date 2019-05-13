@@ -26,7 +26,7 @@ where
 
 import           Control.DeepSeq                  (force)
 import           Control.Exception.Lifted         (finally)
-import           Control.Lens
+import           Control.Lens                     hiding ((<.>))
 import           Control.Monad                    (forM, void)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
@@ -139,8 +139,12 @@ pop f a = do
     dir <- liftSh pwd
     finally (liftSh (cd f) >> a) . liftSh $ cd dir
 
+applyList :: [a -> b] -> [a] -> [b]
+applyList a b = apply' <$> zip a b
+    where apply' (a', b') = a' b'
+
 toSynthResult :: [(SynthTool, SynthTool)] -> [Result Failed ()] -> [SynthResult]
-toSynthResult a b = uncurry SynthResult <$> a <*> b
+toSynthResult a b = flip applyList b $ uncurry SynthResult <$> a
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
@@ -180,7 +184,10 @@ reduction src = do
     where
         red (SynthResult a b _) = do
             make dir
-            pop dir $ reduceSynth a b src
+            pop dir $ do
+                s <- reduceSynth a b src
+                writefile (fromText ".." </> dir <.> "v") $ genSource s
+                return s
             where
                 dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
 
