@@ -42,8 +42,8 @@ verilog = QuasiQuoter { quoteExp = quoteVerilog
 quoteVerilog :: String -> TH.Q TH.Exp
 quoteVerilog s = do
     loc <- TH.location
-    let pos = TH.loc_filename loc
-    v <- case parseVerilog pos s of
+    let pos = T.pack $ TH.loc_filename loc
+    v <- case parseVerilog pos (T.pack s) of
         Right e -> return e
         Left e  -> fail $ show e
     liftDataWithText v

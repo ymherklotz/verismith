@@ -14,11 +14,13 @@ whole Verilog syntax, as the AST does not support it either.
 module VeriFuzz.Verilog.Parser
     ( -- * Parser
       parseVerilog
-    , parseModDecl
+    , parseVerilogFile
+    , parseSourceInfoFile
     -- ** Internal parsers
     , parseEvent
     , parseStatement
     , parseModItem
+    , parseModDecl
     , Parser
     )
 where
@@ -30,9 +32,13 @@ import           Data.Bits
 import           Data.Functor                (($>))
 import           Data.Functor.Identity       (Identity)
 import           Data.List                   (isInfixOf, isPrefixOf, null)
+import           Data.List.NonEmpty          (NonEmpty (..))
+import           Data.Text                   (Text)
 import qualified Data.Text                   as T
+import qualified Data.Text.IO                as T
 import           Text.Parsec                 hiding (satisfy)
 import           Text.Parsec.Expr
+import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Internal
@@ -129,10 +135,14 @@ parseFun = do
     expr <- parens parseExpr
     return $ Appl (Identifier $ T.pack f) expr
 
+parserNonEmpty :: [a] -> Parser (NonEmpty a)
+parserNonEmpty (a:b) = return $ a :| b
+parserNonEmpty []    = fail "Concatenation cannot be empty."
+
 parseTerm :: Parser Expr
 parseTerm =
     parens parseExpr
-        <|> (Concat <$> braces (commaSep parseExpr))
+        <|> (Concat <$> (braces (commaSep parseExpr) >>= parserNonEmpty))
         <|> parseFun
         <|> parseNum
         <|> try parseVecSelect
@@ -476,9 +486,19 @@ parseVerilogSrc = Verilog <$> many parseModDecl
 -- | Parse a 'String' containing verilog code. The parser currently only supports
 -- the subset of Verilog that is being generated randomly.
 parseVerilog
-    :: String -- ^ Name of parsed object.
-    -> String -- ^ Content to be parsed.
-    -> Either String Verilog -- ^ Returns 'String' with error
+    :: Text -- ^ Name of parsed object.
+    -> Text -- ^ Content to be parsed.
+    -> Either Text Verilog -- ^ Returns 'String' with error
                                          -- message if parse fails.
 parseVerilog s =
-    bimap show id . parse parseVerilogSrc s . alexScanTokens . preprocess [] s
+    bimap showT id . parse parseVerilogSrc (T.unpack s) . alexScanTokens . preprocess [] (T.unpack s) . T.unpack
+
+parseVerilogFile :: Text -> IO Verilog
+parseVerilogFile file = do
+    src <- T.readFile $ T.unpack file
+    case parseVerilog file src of
+        Left s  -> error $ T.unpack s
+        Right r -> return r
+
+parseSourceInfoFile :: Text -> Text -> IO SourceInfo
+parseSourceInfoFile top = fmap (SourceInfo top) . parseVerilogFile

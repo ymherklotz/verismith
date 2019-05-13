@@ -26,6 +26,7 @@ import           Test.Tasty.Hedgehog
 import           Test.Tasty.HUnit
 import           Text.Parsec
 import           VeriFuzz
+import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.Lex
 import           VeriFuzz.Verilog.Parser
 
@@ -69,9 +70,9 @@ parserIdempotent = Hog.property $ do
     let sv = vshow v
     p sv === (p . p) sv
   where
-    vshow = show . GenVerilog
+    vshow = showT . GenVerilog
     p sv =
-        either (\x -> show x <> "\n" <> sv) vshow $ parseVerilog "idempotent_test" sv
+        either (\x -> showT x <> "\n" <> sv) vshow $ parseVerilog "idempotent_test" sv
 
 parserTests :: TestTree
 parserTests = testGroup "Parser properties"
