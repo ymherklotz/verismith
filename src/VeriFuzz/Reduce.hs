@@ -394,6 +394,6 @@ reduceSynth a b = reduce synth
                 runSynth a src'
                 runSynth b src'
                 runEquiv a b src'
-            case r of
-                Fail _ -> return False
-                Pass _ -> return True
+            return $ case r of
+                Fail _ -> False
+                Pass _ -> True
