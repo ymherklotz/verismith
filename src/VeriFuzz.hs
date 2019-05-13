@@ -29,6 +29,7 @@ where
 
 import           Control.Concurrent
 import           Control.Lens
+import           Control.Monad.IO.Class   (liftIO)
 import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
 import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
@@ -333,7 +334,7 @@ handleOpts (Parse f) = do
         Left  l -> print l
         Right v -> print $ GenVerilog v
     where file = T.unpack . toTextIgnore $ f
-handleOpts (Reduce f t s) = reduceWithScript t s f
+handleOpts (Reduce f t s) = shelly $ reduceWithScript t s f
 handleOpts (ConfigOpt c conf r) = do
     config <- if r then getConfig conf >>= randomise else getConfig conf
     maybe (T.putStrLn . encodeConfig $ config)
@@ -458,4 +459,4 @@ runEquivalence seed gm t d k i = do
     where n = t <> "_" <> T.pack (show i)
 
 runReduce :: SourceInfo -> IO SourceInfo
-runReduce s = reduce (\s' -> not <$> checkEquivalence s' "reduce") s
+runReduce s = shelly $ reduce (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s

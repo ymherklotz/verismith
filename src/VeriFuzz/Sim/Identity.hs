@@ -45,8 +45,7 @@ instance NFData Identity where
     rnf = rwhnf
 
 runSynthIdentity :: Identity -> SourceInfo -> ResultSh ()
-runSynthIdentity (Identity _ out) src =
-    writefile out $ genSource src
+runSynthIdentity (Identity _ out) = writefile out . genSource
 
 defaultIdentity :: Identity
 defaultIdentity = Identity "identity" "syn_identity.v"

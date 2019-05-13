@@ -4,8 +4,9 @@ module Unit
 where
 
 import           Control.Lens
-import           Parser           (parseUnitTests)
-import           Reduce           (reduceUnitTests)
+import           Data.List.NonEmpty (NonEmpty (..))
+import           Parser             (parseUnitTests)
+import           Reduce             (reduceUnitTests)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz
@@ -42,17 +43,17 @@ transformTestData = BinOp
             )
         )
         BinOr
-        (Concat
-            [ Concat
-                [ Concat [Id "id1", Id "id2", Id "id2"]
+        (Concat $
+            ( Concat $
+                (Concat $ (Id "id1") :| [Id "id2", Id "id2"]) :|
+                [ Id "id2"
                 , Id "id2"
-                , Id "id2"
-                , Concat [Id "id2", Id "id2", Concat [Id "id1", Id "id2"]]
+                , (Concat $ (Id "id2") :| [Id "id2", (Concat $ Id "id1" :| [Id "id2"])])
                 , Id "id2"
                 ]
-            , Id "id1"
-            , Id "id2"
-            ]
+            ) :| [ Id "id1"
+                 , Id "id2"
+                 ]
         )
     )
 
@@ -77,21 +78,20 @@ transformExpectedResult = BinOp
             )
         )
         BinOr
-        (Concat
-            [ Concat
-                [ Concat [Id "id1", Id "Replaced", Id "Replaced"]
+        (Concat $
+            ( Concat $
+                (Concat $ (Id "id1") :| [Id "Replaced", Id "Replaced"]) :|
+                [ Id "Replaced"
                 , Id "Replaced"
-                , Id "Replaced"
-                , Concat
+                , Concat $
+                    Id "Replaced" :|
                     [ Id "Replaced"
-                    , Id "Replaced"
-                    , Concat [Id "id1", Id "Replaced"]
+                    , Concat $ Id "id1" :| [Id "Replaced"]
                     ]
                 , Id "Replaced"
-                ]
-            , Id "id1"
-            , Id "Replaced"
-            ]
+                ] ) :| [ Id "id1"
+                       , Id "Replaced"
+                       ]
         )
     )
 
