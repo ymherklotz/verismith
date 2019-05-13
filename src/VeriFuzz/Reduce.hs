@@ -41,6 +41,7 @@ import           Shelly                   ((<.>))
 import qualified Shelly
 import           Shelly.Lifted            (MonadSh, liftSh)
 import           VeriFuzz.Internal
+import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
@@ -382,9 +383,17 @@ reduceWithScript top script file = do
 
 -- | Reduce a 'SourceInfo' using two Synthesisers that are passed to it.
 reduceSynth :: (Synthesiser a, Synthesiser b, MonadSh m)
-            => Yosys
-            -> a
-            -> Maybe b
+            => a
+            -> b
             -> SourceInfo
             -> m SourceInfo
-reduceSynth = undefined
+reduceSynth a b = reduce synth
+    where
+        synth src' = liftSh $ do
+            r <- runResultT $ do
+                runSynth a src'
+                runSynth b src'
+                runEquiv a b src'
+            case r of
+                Fail _ -> return False
+                Pass _ -> return True
