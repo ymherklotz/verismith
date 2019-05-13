@@ -74,8 +74,10 @@ class Tool a => Simulator a where
 
 data Failed = EmptyFail
             | EquivFail
+            | EquivError
             | SimFail
             | SynthFail
+            | TimeoutError
             deriving (Eq, Show)
 
 instance Semigroup Failed where

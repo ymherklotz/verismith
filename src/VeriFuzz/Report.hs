@@ -209,11 +209,13 @@ descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
 
 status :: Result Failed () -> Html
-status (Pass _)         = "Passed"
-status (Fail EmptyFail) = "Failed"
-status (Fail EquivFail) = "Equivalence failed"
-status (Fail SimFail)   = "Simulation failed"
-status (Fail SynthFail) = "Synthesis failed"
+status (Pass _)            = "Passed"
+status (Fail EmptyFail)    = "Failed"
+status (Fail EquivFail)    = "Equivalence failed"
+status (Fail SimFail)      = "Simulation failed"
+status (Fail SynthFail)    = "Synthesis failed"
+status (Fail EquivError)   = "Equivalence error"
+status (Fail TimeoutError) = "Time out"
 
 synthStatusHtml :: SynthStatus -> Html
 synthStatusHtml (SynthStatus synth res) = H.tr $ do
@@ -230,7 +232,7 @@ resultReport :: Text -> FuzzReport -> Html
 resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
     H.head . H.title $ "Fuzz Report - " <> H.toHtml name
     H.body $ do
-        H.h1 "Fuzz Report"
+        H.h1 $ "Fuzz Report - " <> H.toHtml name
         H.h2 "Synthesis Failure"
         H.table . H.toHtml $
             (H.tr . H.toHtml $

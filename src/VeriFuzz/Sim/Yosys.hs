@@ -22,11 +22,13 @@ where
 
 import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Control.Lens
+import           Control.Monad            (void)
 import           Data.Text                (Text, unpack)
 import           Prelude                  hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted            (liftSh)
 import           Text.Shakespeare.Text    (st)
+import           VeriFuzz.Result
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
@@ -119,5 +121,13 @@ runEquiv sim1 sim2 srcInfo = do
         replaceMods (synthOutput sim2) "_2" srcInfo
         writefile "proof.sby" $ sbyConfig sim1 sim2 srcInfo
     liftSh $ logger "Running SymbiYosys"
-    execute_ EquivFail dir "symbiyosys" "sby" ["proof.sby"]
-    liftSh $ logger "SymbiYosys equivalence check passed"
+    e <- liftSh $ do
+        exe dir "symbiyosys" "sby" ["-f", "proof.sby"]
+        lastExitCode
+    case e of
+        0   -> liftSh $ logger "SymbiYosys equivalence check passed"
+        2   -> ResultT . return $ Fail EquivFail
+        124 -> ResultT . return $ Fail TimeoutError
+        _   -> ResultT . return $ Fail EquivError
+    where
+        exe dir name e = void . errExit False . logCommand dir name . timeout e
