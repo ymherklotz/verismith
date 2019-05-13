@@ -138,11 +138,11 @@ module VeriFuzz.Verilog.AST
     )
 where
 
-import           Control.Lens
+import           Control.Lens             hiding ((<|))
 import           Data.Data
 import           Data.Data.Lens
 import           Data.Functor.Foldable.TH (makeBaseFunctor)
-import           Data.List.NonEmpty       (NonEmpty)
+import           Data.List.NonEmpty       (NonEmpty (..), (<|))
 import           Data.String              (IsString, fromString)
 import           Data.Text                (Text)
 import           Data.Traversable         (sequenceA)
@@ -218,7 +218,7 @@ data Expr = Number {-# UNPACK #-} !BitVec
           | VecSelect {-# UNPACK #-} !Identifier !Expr
           | RangeSelect {-# UNPACK #-} !Identifier !Range
           -- ^ Symbols
-          | Concat ![Expr]
+          | Concat !(NonEmpty Expr)
           -- ^ Bit-wise concatenation of expressions represented by braces.
           | UnOp !UnaryOperator !Expr
           | BinOp !Expr !BinaryOperator !Expr
@@ -238,12 +238,12 @@ instance Num Expr where
 
 instance Semigroup Expr where
   (Concat a) <> (Concat b) = Concat $ a <> b
-  (Concat a) <> b = Concat $ a <> [b]
-  a <> (Concat b) = Concat $ a : b
-  a <> b = Concat [a, b]
+  (Concat a) <> b = Concat $ a <> (b :| [])
+  a <> (Concat b) = Concat $ a <| b
+  a <> b = Concat $ a <| b :| []
 
 instance Monoid Expr where
-  mempty = Concat []
+  mempty = Number 0
 
 instance IsString Expr where
   fromString = Str . fromString
@@ -254,7 +254,7 @@ instance Plated Expr where
 -- | Constant expression, which are known before simulation at compile time.
 data ConstExpr = ConstNum { _constNum :: {-# UNPACK #-} !BitVec }
                | ParamId { _constParamId :: {-# UNPACK #-} !Identifier }
-               | ConstConcat { _constConcat :: ![ConstExpr] }
+               | ConstConcat { _constConcat :: !(NonEmpty ConstExpr) }
                | ConstUnOp { _constUnOp :: !UnaryOperator
                            , _constPrim :: !ConstExpr
                            }
@@ -299,12 +299,12 @@ instance Num ConstExpr where
 
 instance Semigroup ConstExpr where
   (ConstConcat a) <> (ConstConcat b) = ConstConcat $ a <> b
-  (ConstConcat a) <> b = ConstConcat $ a <> [b]
-  a <> (ConstConcat b) = ConstConcat $ a : b
-  a <> b = ConstConcat [a, b]
+  (ConstConcat a) <> b = ConstConcat $ a <> (b :| [])
+  a <> (ConstConcat b) = ConstConcat $ a <| b
+  a <> b = ConstConcat $ a <| b :| []
 
 instance Monoid ConstExpr where
-  mempty = ConstConcat []
+  mempty = ConstNum 0
 
 instance IsString ConstExpr where
   fromString = ConstStr . fromString

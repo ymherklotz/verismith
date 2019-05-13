@@ -174,7 +174,7 @@ constExprWithContext ps prob size
         , ( prob ^. probExprCond
           , ConstCond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2
           )
-        , (prob ^. probExprConcat, ConstConcat <$> Hog.list (Hog.linear 1 10) (subexpr 2))
+        , (prob ^. probExprConcat, ConstConcat <$> Hog.nonEmpty (Hog.linear 0 10) (subexpr 2))
         ]
     | otherwise = constExprWithContext ps prob 0
     where subexpr y = constExprWithContext ps prob $ size `div` y
@@ -185,7 +185,7 @@ exprSafeList prob = [(prob ^. probExprNum, Number <$> genBitVec)]
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
     [ (prob ^. probExprNum     , Number <$> genBitVec)
-    , (prob ^. probExprConcat  , Concat <$> Hog.list (Hog.linear 1 10) (subexpr 2))
+    , (prob ^. probExprConcat  , Concat <$> Hog.nonEmpty (Hog.linear 0 10) (subexpr 2))
     , (prob ^. probExprUnOp    , UnOp <$> unOp <*> subexpr 2)
     , (prob ^. probExprStr, Str <$> Hog.text (Hog.linear 0 100) Hog.alphaNum)
     , (prob ^. probExprBinOp   , BinOp <$> subexpr 2 <*> binOp <*> subexpr 2)

@@ -139,7 +139,7 @@ expr (Number b             ) = showNum b
 expr (Id     i             ) = identifier i
 expr (VecSelect   i e      ) = hcat [identifier i, brackets $ expr e]
 expr (RangeSelect i r      ) = hcat [identifier i, range r]
-expr (Concat c             ) = braces . nest 4 . sep $ punctuate comma (expr <$> c)
+expr (Concat c             ) = braces . nest 4 . sep . punctuate comma $ toList (expr <$> c)
 expr (UnOp u e             ) = parens $ hcat [unaryOp u, expr e]
 expr (Cond l t f) = parens . nest 4 $ sep [expr l <+> "?", hsep [expr t, colon, expr f]]
 expr (Appl f e) = hcat [identifier f, parens $ expr e]
@@ -155,7 +155,7 @@ showNum (BitVec s n) =
 constExpr :: ConstExpr -> Doc a
 constExpr (ConstNum    b) = showNum b
 constExpr (ParamId     i) = identifier i
-constExpr (ConstConcat c) = braces . hsep $ punctuate comma (constExpr <$> c)
+constExpr (ConstConcat c) = braces . hsep . punctuate comma $ toList (constExpr <$> c)
 constExpr (ConstUnOp u e) = parens $ hcat [unaryOp u, constExpr e]
 constExpr (ConstBinOp eRhs bin eLhs) =
     parens $ hsep [constExpr eRhs, binaryOp bin, constExpr eLhs]
