@@ -32,7 +32,61 @@ reduceUnitTests = testGroup
     , activeWireTest
     , cleanTest
     , cleanAllTest
+    , removeDeclTest
     ]
+
+-- brittany-disable-next-binding
+removeDeclTest :: TestTree
+removeDeclTest = testCase "Remove declarations" $ do
+    GenVerilog (removeDecl srcInfo1) @?= golden1
+    where
+        srcInfo1 = SourceInfo "top" [verilog|
+module top;
+  wire a;
+  wire b;
+  wire c;
+  reg d;
+  reg e;
+  reg f;
+  reg g;
+  reg h;
+  wire i;
+  wire j;
+  initial d <= a;
+
+  always @* begin
+    f <= e;
+    g <= e;
+    if (1) begin
+      h <= h;
+    end
+  end
+
+  assign b = g;
+endmodule
+|]
+        golden1 = GenVerilog $ SourceInfo "top" [verilog|
+module top;
+  wire a;
+  wire b;
+  reg d;
+  reg e;
+  reg f;
+  reg g;
+  reg h;
+  initial d <= a;
+
+  always @* begin
+    f <= e;
+    g <= e;
+    if (1) begin
+      h <= h;
+    end
+  end
+
+  assign b = g;
+endmodule
+|]
 
 -- brittany-disable-next-binding
 cleanAllTest :: TestTree
