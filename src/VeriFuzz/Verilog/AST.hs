@@ -17,6 +17,7 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
@@ -132,6 +133,7 @@ module VeriFuzz.Verilog.AST
     , modConnName
     , modExpr
     -- * Useful Lenses and Traversals
+    , aModule
     , getModule
     , getSourceId
     , mainModule
@@ -524,6 +526,19 @@ getModule = _Wrapped . traverse
 getSourceId :: Traversal' Verilog Text
 getSourceId = getModule . modId . _Wrapped
 {-# INLINE getSourceId #-}
+
+-- | May need to change this to Traversal to be safe. For now it will fail when
+-- the main has not been properly set with.
+aModule :: Text -> Lens' SourceInfo ModDecl
+aModule t = lens get_ set_
+  where
+    set_ (SourceInfo top main) v =
+        SourceInfo top (main & getModule %~ update t v)
+    update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
+                                                    | otherwise = m
+    get_ (SourceInfo _ main) = head . filter (f t) $ main ^.. getModule
+    f top (ModDecl (Identifier i) _ _ _ _) = i == top
+
 
 -- | May need to change this to Traversal to be safe. For now it will fail when
 -- the main has not been properly set with.
