@@ -26,7 +26,52 @@ import           VeriFuzz.Reduce
 reduceUnitTests :: TestTree
 reduceUnitTests = testGroup
     "Reducer tests"
-    [moduleReducerTest, modItemReduceTest, halveStatementsTest, activeWireTest]
+    [ moduleReducerTest
+    , modItemReduceTest
+    , halveStatementsTest
+    , activeWireTest
+    , cleanTest
+    ]
+
+-- brittany-disable-next-binding
+cleanTest :: TestTree
+cleanTest = testCase "Clean expression" $ do
+    clean ["wire1", "wire2"] srcInfo1 @?= golden1
+    clean ["wire1", "wire3"] srcInfo2 @?= golden2
+    where
+        srcInfo1 = GenVerilog . SourceInfo "top" $ [verilog|
+module top;
+  wire wire1;
+  wire wire2;
+  wire wire3;
+  assign wire1 = wire2[wire3];
+endmodule
+|]
+        golden1 = GenVerilog . SourceInfo "top" $ [verilog|
+module top;
+  wire wire1;
+  wire wire2;
+  wire wire3;
+  assign wire1 = wire2[1'b0];
+endmodule
+|]
+        srcInfo2 = GenVerilog . SourceInfo "top" $ [verilog|
+module top;
+  wire wire1;
+  wire wire2;
+  wire wire3;
+  assign wire1 = wire2[wire3:wire1];
+endmodule
+|]
+        golden2 = GenVerilog . SourceInfo "top" $ [verilog|
+module top;
+  wire wire1;
+  wire wire2;
+  wire wire3;
+  assign wire1 = 1'b0;
+endmodule
+|]
+
 
 -- brittany-disable-next-binding
 activeWireTest :: TestTree
@@ -34,8 +79,9 @@ activeWireTest = testCase "Active wires" $ do
     findActiveWires verilog1 \\ ["x", "y", "z", "w"]          @?= []
     findActiveWires verilog2 \\ ["x", "y", "z"]               @?= []
     findActiveWires verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
+    findActiveWires verilog4 \\ ["x", "y", "w", "a", "b"]     @?= []
     where
-        verilog1 = head $ getVerilog [verilog|
+        verilog1 = SourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -46,7 +92,7 @@ module top(y, x);
   assign y = w + z;
 endmodule
 |]
-        verilog2 = head $ getVerilog [verilog|
+        verilog2 = SourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -55,7 +101,7 @@ module top(y, x);
   assign z = 0;
 endmodule
 |]
-        verilog3 = head $ getVerilog [verilog|
+        verilog3 = SourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -63,6 +109,7 @@ module top(clk, y, x);
   reg r1;
   reg r2;
   reg r3;
+  wire w;
   always @(posedge clk) begin
     r1 <= r3;
     r2 <= r1;
@@ -71,14 +118,39 @@ module top(clk, y, x);
   always @(posedge clk) begin
     r1 <= r2;
   end
+  random_inst inst(x, y, w);
   assign y = {r1, r2, r3};
+endmodule
+|]
+        verilog4 = SourceInfo "top" [verilog|
+module top(y, x);
+  input x;
+  output y;
+  wire z;
+  wire w;
+  wire a;
+  wire b;
+  wire c;
+  m1 m1(w, z);
+  m2 m2(.x(c), .z(a), .y(b));
+endmodule
+
+module m1(y, x);
+  input x;
+  output y;
+endmodule
+
+module m2(y, z, x);
+  input x;
+  output y;
+  output z;
 endmodule
 |]
 
 -- brittany-disable-next-binding
 halveStatementsTest :: TestTree
 halveStatementsTest = testCase "Statements" $ do
-    GenVerilog <$> halveStatements srcInfo1 @?= golden1
+    GenVerilog <$> halveStatements "top" srcInfo1 @?= golden1
     where
         srcInfo1 = SourceInfo "top" [verilog|
 module top(clk, y, x);
@@ -143,7 +215,7 @@ endmodule
 -- brittany-disable-next-binding
 modItemReduceTest :: TestTree
 modItemReduceTest = testCase "Module items" $ do
-    GenVerilog <$> halveModItems srcInfo1 @?= golden1
+    GenVerilog <$> halveModItems "top" srcInfo1 @?= golden1
     where
         srcInfo1 = SourceInfo "top" [verilog|
 module top(y, x);
