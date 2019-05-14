@@ -19,6 +19,7 @@ module VeriFuzz.Sim.Internal
     , Simulator(..)
     , Synthesiser(..)
     , Failed(..)
+    , renameSource
     , checkPresent
     , checkPresentModules
     , replace
@@ -94,6 +95,10 @@ class Tool a => Synthesiser a where
              -> ResultSh ()    -- ^ does not return any values
     synthOutput :: a -> FilePath
     setSynthOutput :: a -> FilePath -> a
+
+renameSource :: (Synthesiser a) => a -> SourceInfo -> SourceInfo
+renameSource a src =
+    src & infoSrc . _Wrapped . traverse . modId . _Wrapped %~ (<> toText a)
 
 -- | Type synonym for a 'ResultT' that will be used throughout 'VeriFuzz'. This
 -- has instances for 'MonadSh' and 'MonadIO' if the 'Monad' it is parametrised
