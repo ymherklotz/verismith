@@ -26,12 +26,15 @@ module VeriFuzz.Reduce
     , halveExpr
     , halveAssigns
     , findActiveWires
+    , clean
+    , filterExpr
     )
 where
 
 import           Control.Lens             hiding ((<.>))
 import           Control.Monad            (void)
 import           Control.Monad.IO.Class   (MonadIO, liftIO)
+import           Data.Foldable            (foldrM)
 import           Data.List                (nub)
 import           Data.List.NonEmpty       (NonEmpty (..))
 import qualified Data.List.NonEmpty       as NonEmpty
@@ -126,7 +129,11 @@ combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 -- these by 0.
 filterExpr :: [Identifier] -> Expr -> Expr
 filterExpr ids (Id i) = if i `elem` ids then Id i else Number 0
-filterExpr _   e      = e
+filterExpr ids (VecSelect i e) =
+    if i `elem` ids then VecSelect i e else Number 0
+filterExpr ids (RangeSelect i r) =
+    if i `elem` ids then RangeSelect i r else Number 0
+filterExpr _ e = e
 
 -- | Checks if a declaration is part of the current scope. If not, it returns
 -- 'False', otherwise 'True', as it should be kept.
@@ -227,20 +234,44 @@ lValName (RegConcat e) = mapMaybe getId . concat $ universe <$> e
     getId (Id i) = Just i
     getId _      = Nothing
 
+exprName :: Expr -> [Identifier]
+exprName (Id i           ) = [i]
+exprName (VecSelect   i _) = [i]
+exprName (RangeSelect i _) = [i]
+exprName (Concat i       ) = concat . NonEmpty.toList $ exprName <$> i
+exprName _                 = []
+
 portToId :: Port -> Identifier
 portToId (Port _ _ _ i) = i
 
 paramToId :: Parameter -> Identifier
 paramToId (Parameter i _) = i
 
-findActiveWires :: ModDecl -> [Identifier]
-findActiveWires m@(ModDecl _ i o _ p) =
+isModule :: Identifier -> ModDecl -> Bool
+isModule i (ModDecl n _ _ _ _) = i == n
+
+modInstActive :: [ModDecl] -> ModItem -> [Identifier]
+modInstActive decl (ModInst n _ i) = case m of
+    Nothing -> []
+    Just m' -> concat $ calcActive m' <$> zip i [0 ..]
+  where
+    m = safe head $ filter (isModule n) decl
+    calcActive (ModDecl _ o _ _ _) (ModConn e, n') | n' < length o = exprName e
+                                                   | otherwise     = []
+    calcActive (ModDecl _ o _ _ _) (ModConnNamed i' e, _)
+        | i' `elem` fmap _portName o = exprName e
+        | otherwise                  = []
+modInstActive _ _ = []
+
+findActiveWires :: SourceInfo -> [Identifier]
+findActiveWires src =
     nub
         $  assignWires
         <> assignStat
         <> fmap portToId  i
         <> fmap portToId  o
         <> fmap paramToId p
+        <> modinstwires
   where
     assignWires = m ^.. modItems . traverse . modContAssign . contAssignNetLVal
     assignStat =
@@ -251,10 +282,12 @@ findActiveWires m@(ModDecl _ i o _ p) =
     stat =
         (m ^.. modItems . traverse . _Initial)
             <> (m ^.. modItems . traverse . _Always)
+    modinstwires =
+        concat $ modInstActive (src ^. infoSrc . _Wrapped) <$> m ^. modItems
+    m@(ModDecl _ o i _ p) = src ^. mainModule
 
 cleanSourceInfo :: SourceInfo -> SourceInfo
-cleanSourceInfo src = clean active src
-    where active = findActiveWires (src ^. mainModule)
+cleanSourceInfo src = src & mainModule %~ clean (findActiveWires src)
 
 -- | Returns true if the text matches the name of a module.
 matchesModName :: Text -> ModDecl -> Bool
@@ -278,7 +311,10 @@ halveAlways a          = Single a
 -- removing the instantiations from the main module body.
 halveModules :: Replace SourceInfo
 halveModules srcInfo@(SourceInfo top _) =
-    cleanModInst . addMod main <$> combine (infoSrc . _Wrapped) repl srcInfo
+    cleanSourceInfo
+        .   cleanModInst
+        .   addMod main
+        <$> combine (infoSrc . _Wrapped) repl srcInfo
   where
     repl = halve . filter (not . matchesModName top)
     main = srcInfo ^. mainModule
@@ -290,36 +326,36 @@ moduleBot (SourceInfo _ (Verilog _  )) = False
 
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
-halveModItems :: Replace SourceInfo
-halveModItems srcInfo = cleanSourceInfo . addRelevant <$> src
+halveModItems :: Text -> Replace SourceInfo
+halveModItems t srcInfo = cleanSourceInfo . addRelevant <$> src
   where
     repl        = halve . filter (not . relevantModItem main)
     relevant    = filter (relevantModItem main) $ main ^. modItems
-    main        = srcInfo ^. mainModule
-    src         = combine (mainModule . modItems) repl srcInfo
-    addRelevant = mainModule . modItems %~ (relevant ++)
+    main        = srcInfo ^. aModule t
+    src         = combine (aModule t . modItems) repl srcInfo
+    addRelevant = aModule t . modItems %~ (relevant ++)
 
-modItemBot :: SourceInfo -> Bool
-modItemBot srcInfo | length modItemsNoDecl > 2 = False
-                   | otherwise                 = True
+modItemBot :: Text -> SourceInfo -> Bool
+modItemBot t srcInfo | length modItemsNoDecl > 2 = False
+                     | otherwise                 = True
   where
     modItemsNoDecl =
-        filter noDecl $ srcInfo ^.. mainModule . modItems . traverse
+        filter noDecl $ srcInfo ^.. aModule t . modItems . traverse
     noDecl Decl{} = False
     noDecl _      = True
 
-halveStatements :: Replace SourceInfo
-halveStatements m =
-    cleanSourceInfo <$> combine (mainModule . modItems) halves m
+halveStatements :: Text -> Replace SourceInfo
+halveStatements t m =
+    cleanSourceInfo <$> combine (aModule t . modItems) halves m
     where halves = traverse halveAlways
 
 -- | Reduce expressions by splitting them in half and keeping the half that
 -- succeeds.
-halveExpr :: Replace SourceInfo
-halveExpr = combine contexpr $ traverse halveModExpr
+halveExpr :: Text -> Replace SourceInfo
+halveExpr t = combine contexpr $ traverse halveModExpr
   where
     contexpr :: Lens' SourceInfo [ModItem]
-    contexpr = mainModule . modItems
+    contexpr = aModule t . modItems
 
 defaultBot :: SourceInfo -> Bool
 defaultBot = const False
@@ -340,10 +376,11 @@ reduce_ title repl bot eval src = do
         <> title
         <> " (Modules: "
         <> showT (length . getVerilog $ _infoSrc src)
-        <> ", Module Items in "
-        <> _infoTop src
-        <> ": "
-        <> showT (length (src ^. mainModule . modItems))
+        <> ", Module items: "
+        <> showT
+               (length
+                   (src ^.. infoSrc . _Wrapped . traverse . modItems . traverse)
+               )
         <> ")"
     replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
     case (replacement, replAnswer) of
@@ -377,10 +414,16 @@ reduce
     -> m SourceInfo           -- ^ Reduced output.
 reduce eval src =
     red "Modules" moduleBot halveModules src
-        >>= red "Module Items" modItemBot halveModItems
-        >>= red "Statements"   defaultBot halveStatements
-        >>= red "Expressions"  defaultBot halveExpr
-    where red s bot a = reduce_ s a bot eval
+        >>= redAll "Module Items" modItemBot         halveModItems
+        >>= redAll "Statements"   (const defaultBot) halveStatements
+        >>= redAll "Expressions"  (const defaultBot) halveExpr
+  where
+    red s bot a = reduce_ s a bot eval
+    red' s bot a t = reduce_ s (a t) (bot t) eval
+    redAll s bot halve' src' = foldrM
+        (\t -> red' (s <> " (" <> t <> ")") bot halve' t)
+        src'
+        (src' ^.. infoSrc . _Wrapped . traverse . modId . _Wrapped)
 
 runScript
     :: MonadSh m => Shelly.FilePath -> Shelly.FilePath -> SourceInfo -> m Bool
