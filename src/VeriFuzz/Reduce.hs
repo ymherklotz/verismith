@@ -27,6 +27,8 @@ module VeriFuzz.Reduce
     , halveAssigns
     , findActiveWires
     , clean
+    , cleanSourceInfo
+    , cleanSourceInfoAll
     , filterExpr
     )
 where
@@ -263,8 +265,8 @@ modInstActive decl (ModInst n _ i) = case m of
         | otherwise                  = []
 modInstActive _ _ = []
 
-findActiveWires :: SourceInfo -> [Identifier]
-findActiveWires src =
+findActiveWires :: Identifier -> SourceInfo -> [Identifier]
+findActiveWires t src =
     nub
         $  assignWires
         <> assignStat
@@ -284,14 +286,19 @@ findActiveWires src =
             <> (m ^.. modItems . traverse . _Always)
     modinstwires =
         concat $ modInstActive (src ^. infoSrc . _Wrapped) <$> m ^. modItems
-    m@(ModDecl _ o i _ p) = src ^. mainModule
+    m@(ModDecl _ o i _ p) = src ^. aModule t
 
-cleanSourceInfo :: SourceInfo -> SourceInfo
-cleanSourceInfo src = src & mainModule %~ clean (findActiveWires src)
+cleanSourceInfo :: Identifier -> SourceInfo -> SourceInfo
+cleanSourceInfo t src = src & aModule t %~ clean (findActiveWires t src)
+
+cleanSourceInfoAll :: SourceInfo -> SourceInfo
+cleanSourceInfoAll src = foldr cleanSourceInfo src allMods
+    where
+        allMods = src ^.. infoSrc . _Wrapped . traverse . modId
 
 -- | Returns true if the text matches the name of a module.
-matchesModName :: Text -> ModDecl -> Bool
-matchesModName top (ModDecl i _ _ _ _) = top == getIdentifier i
+matchesModName :: Identifier -> ModDecl -> Bool
+matchesModName top (ModDecl i _ _ _ _) = top == i
 
 halveStatement :: Replace Statement
 halveStatement (SeqBlock s) = SeqBlock <$> halve s
@@ -311,12 +318,12 @@ halveAlways a          = Single a
 -- removing the instantiations from the main module body.
 halveModules :: Replace SourceInfo
 halveModules srcInfo@(SourceInfo top _) =
-    cleanSourceInfo
+    cleanSourceInfoAll
         .   cleanModInst
         .   addMod main
         <$> combine (infoSrc . _Wrapped) repl srcInfo
   where
-    repl = halve . filter (not . matchesModName top)
+    repl = halve . filter (not . matchesModName (Identifier top))
     main = srcInfo ^. mainModule
 
 moduleBot :: SourceInfo -> Bool
@@ -326,8 +333,8 @@ moduleBot (SourceInfo _ (Verilog _  )) = False
 
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
-halveModItems :: Text -> Replace SourceInfo
-halveModItems t srcInfo = cleanSourceInfo . addRelevant <$> src
+halveModItems :: Identifier -> Replace SourceInfo
+halveModItems t srcInfo = cleanSourceInfo t . addRelevant <$> src
   where
     repl        = halve . filter (not . relevantModItem main)
     relevant    = filter (relevantModItem main) $ main ^. modItems
@@ -335,7 +342,7 @@ halveModItems t srcInfo = cleanSourceInfo . addRelevant <$> src
     src         = combine (aModule t . modItems) repl srcInfo
     addRelevant = aModule t . modItems %~ (relevant ++)
 
-modItemBot :: Text -> SourceInfo -> Bool
+modItemBot :: Identifier -> SourceInfo -> Bool
 modItemBot t srcInfo | length modItemsNoDecl > 2 = False
                      | otherwise                 = True
   where
@@ -344,14 +351,14 @@ modItemBot t srcInfo | length modItemsNoDecl > 2 = False
     noDecl Decl{} = False
     noDecl _      = True
 
-halveStatements :: Text -> Replace SourceInfo
+halveStatements :: Identifier -> Replace SourceInfo
 halveStatements t m =
-    cleanSourceInfo <$> combine (aModule t . modItems) halves m
+    cleanSourceInfo t <$> combine (aModule t . modItems) halves m
     where halves = traverse halveAlways
 
 -- | Reduce expressions by splitting them in half and keeping the half that
 -- succeeds.
-halveExpr :: Text -> Replace SourceInfo
+halveExpr :: Identifier -> Replace SourceInfo
 halveExpr t = combine contexpr $ traverse halveModExpr
   where
     contexpr :: Lens' SourceInfo [ModItem]
@@ -421,9 +428,9 @@ reduce eval src =
     red s bot a = reduce_ s a bot eval
     red' s bot a t = reduce_ s (a t) (bot t) eval
     redAll s bot halve' src' = foldrM
-        (\t -> red' (s <> " (" <> t <> ")") bot halve' t)
+        (\t -> red' (s <> " (" <> getIdentifier t <> ")") bot halve' t)
         src'
-        (src' ^.. infoSrc . _Wrapped . traverse . modId . _Wrapped)
+        (src' ^.. infoSrc . _Wrapped . traverse . modId)
 
 runScript
     :: MonadSh m => Shelly.FilePath -> Shelly.FilePath -> SourceInfo -> m Bool
