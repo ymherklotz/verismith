@@ -347,20 +347,18 @@ statement = do
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
 alwaysSeq :: StateGen ModItem
-alwaysSeq = do
-    stat <- seqBlock
-    return $ Always (EventCtrl (EPosEdge "clk") (Just stat))
+alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
 
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
-    outs    <-
-        fmap (Id . view portName) <$> (replicateM (length outP) $ nextPort Wire)
+    outs    <- fmap (Id . view portName)
+        <$> replicateM (length outP) (nextPort Wire)
     ins <-
         (Id "clk" :)
         .   fmap (Id . view portName)
         .   take (length inP - 1)
-        <$> (Hog.shuffle $ context ^. variables)
+        <$> Hog.shuffle (context ^. variables)
     ident <- makeIdentifier "modinst"
     Hog.choice
         [ return . ModInst i ident $ ModConn <$> outs <> ins
