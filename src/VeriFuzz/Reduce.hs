@@ -29,6 +29,7 @@ module VeriFuzz.Reduce
     , clean
     , cleanSourceInfo
     , cleanSourceInfoAll
+    , removeDecl
     , filterExpr
     )
 where
@@ -236,12 +237,22 @@ lValName (RegConcat e) = mapMaybe getId . concat $ universe <$> e
     getId (Id i) = Just i
     getId _      = Nothing
 
+-- | Pretending that expr is an LVal for the case that it is in a module
+-- instantiation.
 exprName :: Expr -> [Identifier]
 exprName (Id i           ) = [i]
 exprName (VecSelect   i _) = [i]
 exprName (RangeSelect i _) = [i]
 exprName (Concat i       ) = concat . NonEmpty.toList $ exprName <$> i
 exprName _                 = []
+
+-- | Returns the only identifiers that are directly tied to an expression. This
+-- is useful if one does not have to recurse deeper into the expressions.
+exprId :: Expr -> Maybe Identifier
+exprId (Id i           ) = Just i
+exprId (VecSelect   i _) = Just i
+exprId (RangeSelect i _) = Just i
+exprId _                 = Nothing
 
 portToId :: Port -> Identifier
 portToId (Port _ _ _ i) = i
@@ -264,6 +275,19 @@ modInstActive decl (ModInst n _ i) = case m of
         | i' `elem` fmap _portName o = exprName e
         | otherwise                  = []
 modInstActive _ _ = []
+
+fixModInst :: SourceInfo -> ModItem -> ModItem
+fixModInst (SourceInfo _ (Verilog decl)) (ModInst n g i) = case m of
+    Nothing -> error "Moditem not found"
+    Just m' -> ModInst n g . mapMaybe (fixModInst' m') $ zip i [0 ..]
+  where
+    m = safe head $ filter (isModule n) decl
+    fixModInst' (ModDecl _ o i' _ _) (ModConn e, n') | n' < length o + length i' = Just $ ModConn e
+                                                    | otherwise     = Nothing
+    fixModInst' (ModDecl _ o i'' _ _) (ModConnNamed i' e, _)
+        | i' `elem` fmap _portName (o <> i'') = Just $ ModConnNamed i' e
+        | otherwise                  = Nothing
+fixModInst _ a = a
 
 findActiveWires :: Identifier -> SourceInfo -> [Identifier]
 findActiveWires t src =
@@ -288,13 +312,14 @@ findActiveWires t src =
         concat $ modInstActive (src ^. infoSrc . _Wrapped) <$> m ^. modItems
     m@(ModDecl _ o i _ p) = src ^. aModule t
 
+-- | Clean a specific module. Have to be carful that the module is in the
+-- 'SourceInfo', otherwise it will crash.
 cleanSourceInfo :: Identifier -> SourceInfo -> SourceInfo
 cleanSourceInfo t src = src & aModule t %~ clean (findActiveWires t src)
 
 cleanSourceInfoAll :: SourceInfo -> SourceInfo
 cleanSourceInfoAll src = foldr cleanSourceInfo src allMods
-    where
-        allMods = src ^.. infoSrc . _Wrapped . traverse . modId
+    where allMods = src ^.. infoSrc . _Wrapped . traverse . modId
 
 -- | Returns true if the text matches the name of a module.
 matchesModName :: Identifier -> ModDecl -> Bool
@@ -364,6 +389,92 @@ halveExpr t = combine contexpr $ traverse halveModExpr
     contexpr :: Lens' SourceInfo [ModItem]
     contexpr = aModule t . modItems
 
+toIds :: [Expr] -> [Identifier]
+toIds = nub . mapMaybe exprId . concatMap universe
+
+toIdsConst :: [ConstExpr] -> [Identifier]
+toIdsConst = toIds . fmap constToExpr
+
+allStatIds' :: Statement -> [Identifier]
+allStatIds' s = nub $ assignIds <> otherExpr
+  where
+    assignIds =
+        toIds
+            $  (s ^.. stmntBA . assignExpr)
+            <> (s ^.. stmntNBA . assignExpr)
+            <> (s ^.. forAssign . assignExpr)
+            <> (s ^.. forIncr . assignExpr)
+    otherExpr = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
+
+allStatIds :: Statement -> [Identifier]
+allStatIds s = nub . concat $ allStatIds' <$> universe s
+
+fromRange :: Range -> [ConstExpr]
+fromRange r = [rangeMSB r, rangeLSB r]
+
+allExprIds :: ModDecl -> [Identifier]
+allExprIds m =
+    nub
+        $  contAssignIds
+        <> modInstIds
+        <> modInitialIds
+        <> modAlwaysIds
+        <> modPortIds
+        <> modDeclIds
+        <> paramIds
+  where
+    contAssignIds =
+        toIds $ m ^.. modItems . traverse . modContAssign . contAssignExpr
+    modInstIds =
+        toIds $ m ^.. modItems . traverse . modInstConns . traverse . modExpr
+    modInitialIds =
+        nub . concatMap allStatIds $ m ^.. modItems . traverse . _Initial
+    modAlwaysIds =
+        nub . concatMap allStatIds $ m ^.. modItems . traverse . _Always
+    modPortIds =
+        nub
+            .   concatMap (toIdsConst . fromRange)
+            $   m
+            ^.. modItems
+            .   traverse
+            .   declPort
+            .   portSize
+    modDeclIds = toIdsConst $ m ^.. modItems . traverse . declVal . _Just
+    paramIds =
+        toIdsConst
+            $  (m ^.. modItems . traverse . paramDecl . traverse . paramValue)
+            <> (   m
+               ^.. modItems
+               .   traverse
+               .   localParamDecl
+               .   traverse
+               .   localParamValue
+               )
+
+isUsedDecl :: [Identifier] -> ModItem -> Bool
+isUsedDecl ids (Decl _ (Port _ _ _ i) _) = i `elem` ids
+isUsedDecl _   _                         = True
+
+isUsedParam :: [Identifier] -> Parameter -> Bool
+isUsedParam ids (Parameter i _) = i `elem` ids
+
+isUsedPort :: [Identifier] -> Port -> Bool
+isUsedPort ids (Port _ _ _ i) = i `elem` ids
+
+removeDecl :: SourceInfo -> SourceInfo
+removeDecl src = foldr fix removed allMods
+  where
+    removeDecl' t src' =
+        src'
+            & (\a -> a & aModule t . modItems %~ filter (isUsedDecl (used <> findActiveWires t a)))
+            . (aModule t . modParams %~ filter (isUsedParam used))
+            . (aModule t . modInPorts %~ filter (isUsedPort used))
+      where
+        used = nub $ allExprIds (src' ^. aModule t)
+    allMods = src ^.. infoSrc . _Wrapped . traverse . modId
+    fix t a = a & aModule t . modItems %~ fmap (fixModInst a)
+    removed = foldr removeDecl' src allMods
+
 defaultBot :: SourceInfo -> Bool
 defaultBot = const False
 
@@ -420,7 +531,8 @@ reduce
     -> SourceInfo              -- ^ Input verilog source to be reduced.
     -> m SourceInfo           -- ^ Reduced output.
 reduce eval src =
-    red "Modules" moduleBot halveModules src
+    fmap removeDecl
+        $   red "Modules" moduleBot halveModules src
         >>= redAll "Module Items" modItemBot         halveModItems
         >>= redAll "Statements"   (const defaultBot) halveStatements
         >>= redAll "Expressions"  (const defaultBot) halveExpr
