@@ -31,7 +31,70 @@ reduceUnitTests = testGroup
     , halveStatementsTest
     , activeWireTest
     , cleanTest
+    , cleanAllTest
     ]
+
+-- brittany-disable-next-binding
+cleanAllTest :: TestTree
+cleanAllTest = testCase "Clean all" $ do
+    GenVerilog (cleanSourceInfoAll srcInfo1) @?= golden1
+    where
+        srcInfo1 = SourceInfo "top" [verilog|
+module top;
+  wire a;
+  wire b;
+  wire c;
+  wire d;
+  assign a = b + c;
+  assign b = c + d;
+endmodule
+
+module mod1;
+  wire a;
+  wire b;
+  wire c;
+  wire d;
+  assign a = b + c;
+  assign b = c + d;
+endmodule
+
+module mod2;
+  wire a;
+  wire b;
+  wire c;
+  wire d;
+  assign a = b + c;
+  assign b = c + d;
+endmodule
+|]
+        golden1 = GenVerilog $ SourceInfo "top" [verilog|
+module top;
+  wire a;
+  wire b;
+  wire c;
+  wire d;
+  assign a = b + 1'b0;
+  assign b = 1'b0 + 1'b0;
+endmodule
+
+module mod1;
+  wire a;
+  wire b;
+  wire c;
+  wire d;
+  assign a = b + 1'b0;
+  assign b = 1'b0 + 1'b0;
+endmodule
+
+module mod2;
+  wire a;
+  wire b;
+  wire c;
+  wire d;
+  assign a = b + 1'b0;
+  assign b = 1'b0 + 1'b0;
+endmodule
+|]
 
 -- brittany-disable-next-binding
 cleanTest :: TestTree
@@ -76,10 +139,10 @@ endmodule
 -- brittany-disable-next-binding
 activeWireTest :: TestTree
 activeWireTest = testCase "Active wires" $ do
-    findActiveWires verilog1 \\ ["x", "y", "z", "w"]          @?= []
-    findActiveWires verilog2 \\ ["x", "y", "z"]               @?= []
-    findActiveWires verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
-    findActiveWires verilog4 \\ ["x", "y", "w", "a", "b"]     @?= []
+    findActiveWires "top" verilog1 \\ ["x", "y", "z", "w"]          @?= []
+    findActiveWires "top" verilog2 \\ ["x", "y", "z"]               @?= []
+    findActiveWires "top" verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
+    findActiveWires "top" verilog4 \\ ["x", "y", "w", "a", "b"]     @?= []
     where
         verilog1 = SourceInfo "top" [verilog|
 module top(y, x);
