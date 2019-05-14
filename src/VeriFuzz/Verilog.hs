@@ -93,7 +93,6 @@ module VeriFuzz.Verilog
     , declDir
     , declPort
     , ModConn(..)
-    , modConn
     , modConnName
     , modExpr
     -- * Useful Lenses and Traversals

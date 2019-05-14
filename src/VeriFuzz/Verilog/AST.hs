@@ -129,7 +129,6 @@ module VeriFuzz.Verilog.AST
     , declPort
     , declVal
     , ModConn(..)
-    , modConn
     , modConnName
     , modExpr
     -- * Useful Lenses and Traversals
@@ -388,7 +387,7 @@ data Port = Port { _portType   :: !PortType
 -- @
 -- mod a(.y(y1), .x1(x11), .x2(x22));
 -- @
-data ModConn = ModConn { _modConn :: !Expr }
+data ModConn = ModConn { _modExpr :: !Expr }
              | ModConnNamed { _modConnName :: {-# UNPACK #-} !Identifier
                             , _modExpr     :: !Expr
                             }
@@ -536,7 +535,8 @@ aModule t = lens get_ set_
         SourceInfo top (main & getModule %~ update (getIdentifier t) v)
     update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
                                                     | otherwise = m
-    get_ (SourceInfo _ main) = head . filter (f $ getIdentifier t) $ main ^.. getModule
+    get_ (SourceInfo _ main) =
+        head . filter (f $ getIdentifier t) $ main ^.. getModule
     f top (ModDecl (Identifier i) _ _ _ _) = i == top
 
 
