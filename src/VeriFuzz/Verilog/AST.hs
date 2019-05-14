@@ -529,14 +529,14 @@ getSourceId = getModule . modId . _Wrapped
 
 -- | May need to change this to Traversal to be safe. For now it will fail when
 -- the main has not been properly set with.
-aModule :: Text -> Lens' SourceInfo ModDecl
+aModule :: Identifier -> Lens' SourceInfo ModDecl
 aModule t = lens get_ set_
   where
     set_ (SourceInfo top main) v =
-        SourceInfo top (main & getModule %~ update t v)
+        SourceInfo top (main & getModule %~ update (getIdentifier t) v)
     update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
                                                     | otherwise = m
-    get_ (SourceInfo _ main) = head . filter (f t) $ main ^.. getModule
+    get_ (SourceInfo _ main) = head . filter (f $ getIdentifier t) $ main ^.. getModule
     f top (ModDecl (Identifier i) _ _ _ _) = i == top
 
 
