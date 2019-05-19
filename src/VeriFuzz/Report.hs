@@ -234,28 +234,39 @@ resultReport :: Text -> FuzzReport -> Html
 resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
     H.head $ do
         H.title $ "Fuzz Report - " <> H.toHtml name
-        H.meta ! A.name "viewport" ! A.content "width=device-width, initial-scale=1"
+        H.meta ! A.name "viewport" ! A.content
+            "width=device-width, initial-scale=1"
         H.meta ! A.charset "utf8"
-        H.link ! A.rel "stylesheet" ! A.href "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
-    H.body . (H.section ! A.class_ "section") . (H.div ! A.class_ "container") $ do
-        H.h1 ! A.class_ "title" $ "Fuzz Report - " <> H.toHtml name
-        H.h2 ! A.class_ "subtitle" $ "Synthesis Failure"
-        H.table ! A.class_ "table" $ do
-            H.thead . H.toHtml $ ( H.tr
-                                   . H.toHtml
-                                   $ [H.th "Synthesis tool", H.th "Synthesis Status"]
-                                 )
-            H.tbody . H.toHtml $ fmap synthStatusHtml stat
-        H.h2 ! A.class_ "subtitle" $ "Equivalence Check Status"
-        H.table ! A.class_ "table" $ do
-            H.thead . H.toHtml $ ( H.tr
-                                   . H.toHtml
-                                   $ [ H.th "First tool"
-                                     , H.th "Second tool"
-                                     , H.th "Equivalence Status"
-                                     ]
-                                 )
-            H.tbody . H.toHtml $ fmap synthResultHtml synth
+        H.link
+            ! A.rel "stylesheet"
+            ! A.href
+                  "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
+    H.body
+        . (H.section ! A.class_ "section")
+        . (H.div ! A.class_ "container")
+        $ do
+              H.h1 ! A.class_ "title" $ "Fuzz Report - " <> H.toHtml name
+              H.h2 ! A.class_ "subtitle" $ "Synthesis Failure"
+              H.table ! A.class_ "table" $ do
+                  H.thead
+                      . H.toHtml
+                      $ ( H.tr
+                        . H.toHtml
+                        $ [H.th "Synthesis tool", H.th "Synthesis Status"]
+                        )
+                  H.tbody . H.toHtml $ fmap synthStatusHtml stat
+              H.h2 ! A.class_ "subtitle" $ "Equivalence Check Status"
+              H.table ! A.class_ "table" $ do
+                  H.thead
+                      . H.toHtml
+                      $ ( H.tr
+                        . H.toHtml
+                        $ [ H.th "First tool"
+                          , H.th "Second tool"
+                          , H.th "Equivalence Status"
+                          ]
+                        )
+                  H.tbody . H.toHtml $ fmap synthResultHtml synth
 
 printResultReport :: Text -> FuzzReport -> Text
 printResultReport t f = toStrict . renderHtml $ resultReport t f
