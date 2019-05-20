@@ -57,7 +57,7 @@ runSynthQuartus sim (SourceInfo top src) = do
         logger "Running Quartus synthesis"
     ex (exec "quartus_map")
        [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
-    ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
+    ex (exec "quartus_fit") [top, "--part=5CGTFD9E5F35C7N"]
     ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
     liftSh $ do
         cp (fromText "simulation/vcs" </> fromText top <.> "vo")
