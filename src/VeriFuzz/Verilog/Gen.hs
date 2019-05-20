@@ -29,6 +29,7 @@ import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.Foldable                    (fold)
 import           Data.Functor.Foldable            (cata)
+import           Data.List                        (foldl')
 import qualified Data.Text                        as T
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
@@ -99,7 +100,7 @@ gen :: Gen a -> StateGen a
 gen = lift . lift
 
 largeNum :: Gen Int
-largeNum = Hog.int Hog.linearBounded
+largeNum = Hog.int $ Hog.linear (-100) 100
 
 wireSize :: Gen Int
 wireSize = Hog.int $ Hog.linear 2 100
@@ -108,7 +109,7 @@ range :: Gen Range
 range = Range <$> fmap fromIntegral wireSize <*> pure 0
 
 genBitVec :: Gen BitVec
-genBitVec = BitVec <$> wireSize <*> fmap fromIntegral largeNum
+genBitVec = fmap fromIntegral largeNum
 
 binOp :: Gen BinaryOperator
 binOp = Hog.element
@@ -349,22 +350,29 @@ statement = do
 alwaysSeq :: StateGen ModItem
 alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
 
+resizePort :: Port -> Port -> StateGen ()
+resizePort (Port _ _ _ i) (Port _ _ ra _) = variables %= repl
+    where
+        repl = foldl' func []
+        func l p@(Port a b _ i')
+            | i' == i = Port a b ra i : l
+            | otherwise = p : l
+
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
-    outs    <- fmap (Id . view portName)
-        <$> replicateM (length outP) (nextPort Wire)
-    ins <-
-        (Id "clk" :)
-        .   fmap (Id . view portName)
-        .   take (length inP - 1)
-        <$> Hog.shuffle (context ^. variables)
+    outs    <- replicateM (length outP) (nextPort Wire)
+    ins <- take (length inP - 1) <$> Hog.shuffle (context ^. variables)
+    sequence_ $ uncurry resizePort <$> zip (outs <> ins) (outP <> inP)
     ident <- makeIdentifier "modinst"
     Hog.choice
-        [ return . ModInst i ident $ ModConn <$> outs <> ins
+        [ return . ModInst i ident $ ModConn <$> outE outs <> insE ins
         , ModInst i ident <$> Hog.shuffle
-            (zipWith ModConnNamed (view portName <$> outP <> inP) (outs <> ins))
+            (zipWith ModConnNamed (view portName <$> outP <> inP) (outE outs <> insE ins))
         ]
+    where
+        insE ins = Id "clk" : (Id . view portName <$> ins)
+        outE out = Id . view portName <$> out
 
 -- | Generates a module instance by also generating a new module if there are
 -- not enough modules currently in the context. It keeps generating new modules
