@@ -293,14 +293,14 @@ randDelete i = do
 
 randomise :: Config -> IO Config
 randomise config@(Config a _ c d e) = do
-    mia  <- randDelete $ cm ^. probModItemAssign
+    mia  <- return $ cm ^. probModItemAssign
     misa <- return $ cm ^. probModItemSeqAlways
-    mica <- randDelete $ cm ^. probModItemCombAlways
-    mii  <- randDelete $ cm ^. probModItemInst
-    ssb  <- randDelete $ cs ^. probStmntBlock
-    ssnb <- randDelete $ cs ^. probStmntNonBlock
-    ssc  <- randDelete $ cs ^. probStmntCond
-    ssf  <- randDelete $ cs ^. probStmntFor
+    mica <- return $ cm ^. probModItemCombAlways
+    mii  <- return $ cm ^. probModItemInst
+    ssb  <- return $ cs ^. probStmntBlock
+    ssnb <- return $ cs ^. probStmntNonBlock
+    ssc  <- return $ cs ^. probStmntCond
+    ssf  <- return $ cs ^. probStmntFor
     en   <- return $ ce ^. probExprNum
     ei   <- randDelete $ ce ^. probExprId
     ers  <- randDelete $ ce ^. probExprRangeSelect
