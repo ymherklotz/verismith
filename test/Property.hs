@@ -32,11 +32,18 @@ import           VeriFuzz.Verilog.Parser
 randomDAG' :: Gen Circuit
 randomDAG' = Hog.resize 30 randomDAG
 
-simpleGraph :: Property
-simpleGraph = Hog.property $ do
+acyclicGraph :: Property
+acyclicGraph = Hog.property $ do
     xs <- Hog.forAllWith (const "") randomDAG'
     Hog.assert $ simp xs
-    where simp = G.isSimple . getCircuit
+  where
+    simp g =
+        (== G.noNodes (getCircuit g))
+            . sum
+            . fmap length
+            . G.scc
+            . getCircuit
+            $ g
 
 type GenFunctor f a b c =
     ( Functor f
@@ -76,7 +83,7 @@ propertyResultInterrupted = do
 propertyTests :: TestTree
 propertyTests = testGroup
     "Property Tests"
-    [ testProperty "simple graph generation check" simpleGraph
-    , testProperty "fmap for Result"               propertyResultInterrupted
+    [ testProperty "acyclic graph generation check" acyclicGraph
+    , testProperty "fmap for Result"                propertyResultInterrupted
     , parserTests
     ]

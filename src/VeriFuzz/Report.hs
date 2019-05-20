@@ -41,9 +41,10 @@ import           Data.Text                     (Text)
 import           Data.Text.Lazy                (toStrict)
 import           Prelude                       hiding (FilePath)
 import           Shelly                        (fromText)
-import           Text.Blaze.Html               (Html)
+import           Text.Blaze.Html               (Html, (!))
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5              as H
+import qualified Text.Blaze.Html5.Attributes   as A
 import           VeriFuzz.Config
 import           VeriFuzz.Result
 import           VeriFuzz.Sim
@@ -210,49 +211,62 @@ descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
 
 status :: Result Failed () -> Html
-status (Pass _           ) = "Passed"
-status (Fail EmptyFail   ) = "Failed"
-status (Fail EquivFail   ) = "Equivalence failed"
-status (Fail SimFail     ) = "Simulation failed"
-status (Fail SynthFail   ) = "Synthesis failed"
-status (Fail EquivError  ) = "Equivalence error"
-status (Fail TimeoutError) = "Time out"
+status (Pass _           ) = H.td ! A.class_ "is-success" $ "Passed"
+status (Fail EmptyFail   ) = H.td ! A.class_ "is-danger" $ "Failed"
+status (Fail EquivFail   ) = H.td ! A.class_ "is-danger" $ "Equivalence failed"
+status (Fail SimFail     ) = H.td ! A.class_ "is-danger" $ "Simulation failed"
+status (Fail SynthFail   ) = H.td ! A.class_ "is-danger" $ "Synthesis failed"
+status (Fail EquivError  ) = H.td ! A.class_ "is-danger" $ "Equivalence error"
+status (Fail TimeoutError) = H.td ! A.class_ "is-warning" $ "Time out"
 
 synthStatusHtml :: SynthStatus -> Html
 synthStatusHtml (SynthStatus synth res) = H.tr $ do
     H.td . H.toHtml $ toText synth
-    H.td $ status res
+    status res
 
 synthResultHtml :: SynthResult -> Html
 synthResultHtml (SynthResult synth1 synth2 res) = H.tr $ do
     H.td . H.toHtml $ toText synth1
     H.td . H.toHtml $ toText synth2
-    H.td $ status res
+    status res
 
 resultReport :: Text -> FuzzReport -> Html
 resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
-    H.head . H.title $ "Fuzz Report - " <> H.toHtml name
-    H.body $ do
-        H.h1 $ "Fuzz Report - " <> H.toHtml name
-        H.h2 "Synthesis Failure"
-        H.table
-            . H.toHtml
-            $ ( H.tr
-              . H.toHtml
-              $ [H.th "Synthesis tool", H.th "Synthesis Status"]
-              )
-            : fmap synthStatusHtml stat
-        H.h2 "Equivalence Check Status"
-        H.table
-            . H.toHtml
-            $ ( H.tr
-              . H.toHtml
-              $ [ H.th "First tool"
-                , H.th "Second tool"
-                , H.th "Equivalence Status"
-                ]
-              )
-            : fmap synthResultHtml synth
+    H.head $ do
+        H.title $ "Fuzz Report - " <> H.toHtml name
+        H.meta ! A.name "viewport" ! A.content
+            "width=device-width, initial-scale=1"
+        H.meta ! A.charset "utf8"
+        H.link
+            ! A.rel "stylesheet"
+            ! A.href
+                  "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
+    H.body
+        . (H.section ! A.class_ "section")
+        . (H.div ! A.class_ "container")
+        $ do
+              H.h1 ! A.class_ "title" $ "Fuzz Report - " <> H.toHtml name
+              H.h2 ! A.class_ "subtitle" $ "Synthesis Failure"
+              H.table ! A.class_ "table" $ do
+                  H.thead
+                      . H.toHtml
+                      $ ( H.tr
+                        . H.toHtml
+                        $ [H.th "Synthesis tool", H.th "Synthesis Status"]
+                        )
+                  H.tbody . H.toHtml $ fmap synthStatusHtml stat
+              H.h2 ! A.class_ "subtitle" $ "Equivalence Check Status"
+              H.table ! A.class_ "table" $ do
+                  H.thead
+                      . H.toHtml
+                      $ ( H.tr
+                        . H.toHtml
+                        $ [ H.th "First tool"
+                          , H.th "Second tool"
+                          , H.th "Equivalence Status"
+                          ]
+                        )
+                  H.tbody . H.toHtml $ fmap synthResultHtml synth
 
 printResultReport :: Text -> FuzzReport -> Text
 printResultReport t f = toStrict . renderHtml $ resultReport t f

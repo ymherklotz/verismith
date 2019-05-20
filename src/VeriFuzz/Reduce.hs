@@ -282,11 +282,12 @@ fixModInst (SourceInfo _ (Verilog decl)) (ModInst n g i) = case m of
     Just m' -> ModInst n g . mapMaybe (fixModInst' m') $ zip i [0 ..]
   where
     m = safe head $ filter (isModule n) decl
-    fixModInst' (ModDecl _ o i' _ _) (ModConn e, n') | n' < length o + length i' = Just $ ModConn e
-                                                    | otherwise     = Nothing
+    fixModInst' (ModDecl _ o i' _ _) (ModConn e, n')
+        | n' < length o + length i' = Just $ ModConn e
+        | otherwise                 = Nothing
     fixModInst' (ModDecl _ o i'' _ _) (ModConnNamed i' e, _)
         | i' `elem` fmap _portName (o <> i'') = Just $ ModConnNamed i' e
-        | otherwise                  = Nothing
+        | otherwise                           = Nothing
 fixModInst _ a = a
 
 findActiveWires :: Identifier -> SourceInfo -> [Identifier]
@@ -466,11 +467,12 @@ removeDecl src = foldr fix removed allMods
   where
     removeDecl' t src' =
         src'
-            & (\a -> a & aModule t . modItems %~ filter (isUsedDecl (used <> findActiveWires t a)))
+            & (\a -> a & aModule t . modItems %~ filter
+                  (isUsedDecl (used <> findActiveWires t a))
+              )
             . (aModule t . modParams %~ filter (isUsedParam used))
             . (aModule t . modInPorts %~ filter (isUsedPort used))
-      where
-        used = nub $ allExprIds (src' ^. aModule t)
+        where used = nub $ allExprIds (src' ^. aModule t)
     allMods = src ^.. infoSrc . _Wrapped . traverse . modId
     fix t a = a & aModule t . modItems %~ fmap (fixModInst a)
     removed = foldr removeDecl' src allMods
