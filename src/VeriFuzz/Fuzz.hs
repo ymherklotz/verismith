@@ -154,7 +154,11 @@ equivalence src = do
     synth <- passedSynthesis
 --    let synthComb =
 --            nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
-    let synthComb = nubBy tupEq . filter (uncurry (/=)) $ (,) defaultIdentitySynth <$> synth
+    let synthComb =
+            nubBy tupEq
+                .   filter (uncurry (/=))
+                $   (,) defaultIdentitySynth
+                <$> synth
     results <- liftSh $ mapM (uncurry equiv) synthComb
     synthResults .= toSynthResult synthComb results
     liftSh $ inspect results
