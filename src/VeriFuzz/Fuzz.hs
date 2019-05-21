@@ -27,14 +27,14 @@ where
 import           Control.DeepSeq                  (force)
 import           Control.Exception.Lifted         (finally)
 import           Control.Lens                     hiding ((<.>))
-import           Control.Monad                    (forM)
+import           Control.Monad                    (forM, replicateM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Control      (MonadBaseControl)
 import           Control.Monad.Trans.Maybe        (runMaybeT)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
-import           Data.List                        (nubBy)
+import           Data.List                        (nubBy, sort)
 import           Data.Maybe                       (isNothing)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as T
@@ -124,17 +124,6 @@ synthesis src = do
     exec a = toolRun ("synthesisis with " <> toText a) . runResultT $ do
         liftSh . mkdir_p . fromText $ toText a
         pop (fromText $ toText a) $ runSynth a src
-
-generateSample
-    :: (MonadIO m, MonadSh m)
-    => Maybe Seed
-    -> Gen SourceInfo
-    -> Fuzz m (Seed, SourceInfo)
-generateSample seed gen = do
-    logT "Sampling Verilog from generator"
-    (t, v) <- timeit $ sampleSeed seed gen
-    logT $ "Generated Verilog (" <> showT t <> ")"
-    return v
 
 passedSynthesis :: MonadSh m => Fuzz m [SynthTool]
 passedSynthesis = fmap toSynth . filter passed . _fuzzSynthStatus <$> get
@@ -246,9 +235,38 @@ whenMaybe b x = if b then Just <$> x else pure Nothing
 getTime :: (Num n) => Maybe (n, a) -> n
 getTime = maybe 0 fst
 
+generateSample
+    :: (MonadIO m, MonadSh m)
+    => Fuzz m (Seed, SourceInfo)
+    -> Fuzz m (Seed, SourceInfo)
+generateSample f = do
+    logT "Sampling Verilog from generator"
+    (t, v@(s, _)) <- timeit f
+    logT $ "Chose " <> showT s
+    logT $ "Generated Verilog (" <> showT t <> ")"
+    return v
+
+verilogSize :: (Source a) => a -> Int
+verilogSize = length . lines . T.unpack . genSource
+
+sampleVerilogHat :: (MonadIO m, MonadSh m) => Int -> Maybe Seed -> Gen SourceInfo -> Fuzz m (Seed, SourceInfo)
+sampleVerilogHat _ seed@(Just _) gen = sampleSeed seed gen
+sampleVerilogHat n Nothing gen = do
+    res <- replicateM n $ sampleSeed Nothing gen
+    let sizes = fmap getSize res
+    let samples = fmap snd . sort $ zip sizes res
+    liftIO $ Hog.sample . Hog.frequency $ freqs samples
+    where
+        getSize (_, s) = verilogSize s
+        freqs l = zip hat (return <$> l)
+            where
+                h = length l `div` 2
+                hat = (+ h) . negate . abs .  (h - ) <$> [1..length l]
+
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzz gen conf = do
-    (seed', src) <- generateSample seed gen
+    (seed', src) <- generateSample genMethod
+    let size = length . lines . T.unpack $ genSource src
     liftSh
         .  writefile "config.toml"
         .  encodeConfig
@@ -268,6 +286,7 @@ fuzz gen conf = do
                             (vi fuzzSynthResults)
                             (vi fuzzSimResults)
                             (vi fuzzSynthStatus)
+                            size
                             tsynth
                             tequiv
                             (getTime redResult)
@@ -276,9 +295,14 @@ fuzz gen conf = do
   where
     seed  = conf ^. configProperty . propSeed
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
+    genMethod = case conf ^. configProperty . propSampleMethod of
+            "hat" ->
+                sampleVerilogHat (conf ^. configProperty . propSampleSize) seed gen
+            _ ->
+                sampleSeed seed gen
 
 relativeFuzzReport :: (MonadSh m) => FuzzReport -> m FuzzReport
-relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _) = liftSh $ do
+relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _ _) = liftSh $ do
     newPath <- relPath dir
     return $ (fuzzDir .~ newPath) fr
 
@@ -336,7 +360,5 @@ sampleSeed s gen =
                               $ Hog.runGenT 30 seed gen
                           of
                               Nothing -> loop (n - 1)
-                              Just x  -> do
-                                  liftSh . logT $ showT seed
-                                  return (seed, Hog.nodeValue x)
+                              Just x  -> return (seed, Hog.nodeValue x)
           in  loop (100 :: Int)
