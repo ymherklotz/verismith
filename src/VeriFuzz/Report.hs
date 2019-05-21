@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes      #-}
 {-|
 Module      : VeriFuzz.Report
 Description : Generate a report from a fuzz run.
@@ -16,12 +17,18 @@ module VeriFuzz.Report
     ( SynthTool(..)
     , SynthStatus(..)
     , SynthResult(..)
+    , SimResult(..)
     , SimTool(..)
     , FuzzReport(..)
     , printResultReport
+    , printSummary
     , synthResults
     , simResults
     , synthStatus
+    , equivTime
+    , fuzzDir
+    , reducTime
+    , synthTime
     , defaultIcarusSim
     , defaultVivadoSynth
     , defaultYosysSynth
@@ -34,18 +41,25 @@ module VeriFuzz.Report
 where
 
 import           Control.DeepSeq               (NFData, rnf)
-import           Control.Lens                  hiding (Identity)
+import           Control.Lens                  hiding (Identity, (<.>))
+import           Data.Bifunctor                (bimap)
 import           Data.ByteString               (ByteString)
 import           Data.Maybe                    (fromMaybe)
+import           Data.Monoid                   (Endo)
 import           Data.Text                     (Text)
 import           Data.Text.Lazy                (toStrict)
+import           Data.Time
+import           Data.Vector                   (fromList)
 import           Prelude                       hiding (FilePath)
-import           Shelly                        (fromText)
+import           Shelly                        (FilePath, fromText,
+                                                toTextIgnore, (<.>), (</>))
+import           Statistics.Sample             (meanVariance)
 import           Text.Blaze.Html               (Html, (!))
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5              as H
 import qualified Text.Blaze.Html5.Attributes   as A
 import           VeriFuzz.Config
+import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
@@ -139,45 +153,53 @@ defaultIcarusSim = IcarusSim defaultIcarus
 
 -- | The results from running a tool through a simulator. It can either fail or
 -- return a result, which is most likely a 'ByteString'.
-data SimResult = SimResult !SynthTool !SimTool !BResult
+data SimResult = SimResult !SynthTool !SimTool !BResult !NominalDiffTime
                  deriving (Eq)
 
 instance Show SimResult where
-    show (SimResult synth sim r) = show synth <> ", " <> show sim <> ": " <> show r
+    show (SimResult synth sim r d) = show synth <> ", " <> show sim <> ": " <> show r <> " (" <> show d <> ")"
+
+getSimResult :: SimResult -> UResult
+getSimResult (SimResult _ _ (Pass _) _) = Pass ()
+getSimResult (SimResult _ _ (Fail b) _) = Fail b
 
 -- | The results of comparing the synthesised outputs of two files using a
 -- formal equivalence checker. This will either return a failure or an output
 -- which is most likely '()'.
-data SynthResult = SynthResult !SynthTool !SynthTool !UResult
+data SynthResult = SynthResult !SynthTool !SynthTool !UResult !NominalDiffTime
                    deriving (Eq)
 
 instance Show SynthResult where
-    show (SynthResult synth synth2 r) = show synth <> ", " <> show synth2 <> ": " <> show r
+    show (SynthResult synth synth2 r d) = show synth <> ", " <> show synth2 <> ": " <> show r <> " (" <> show d <> ")"
+
+getSynthResult :: SynthResult -> UResult
+getSynthResult (SynthResult _ _ a _) = a
 
 -- | The status of the synthesis using a simulator. This will be checked before
 -- attempting to run the equivalence checks on the simulator, as that would be
 -- unnecessary otherwise.
-data SynthStatus = SynthStatus !SynthTool !UResult
+data SynthStatus = SynthStatus !SynthTool !UResult !NominalDiffTime
                  deriving (Eq)
 
+getSynthStatus :: SynthStatus -> UResult
+getSynthStatus (SynthStatus _ a _) = a
+
 instance Show SynthStatus where
-    show (SynthStatus synth r) = "synthesis " <> show synth <> ": " <> show r
+    show (SynthStatus synth r d) = "synthesis " <> show synth <> ": " <> show r <> " (" <> show d <> ")"
 
 -- | The complete state that will be used during fuzzing, which contains the
 -- results from all the operations.
-data FuzzReport = FuzzReport { _synthResults :: ![SynthResult]
+data FuzzReport = FuzzReport { _fuzzDir      :: {-# UNPACK #-} !FilePath
+                             , _synthResults :: ![SynthResult]
                              , _simResults   :: ![SimResult]
                              , _synthStatus  :: ![SynthStatus]
+                             , _synthTime    :: {-# UNPACK #-} !NominalDiffTime
+                             , _equivTime    :: {-# UNPACK #-} !NominalDiffTime
+                             , _reducTime    :: {-# UNPACK #-} !NominalDiffTime
                              }
                   deriving (Eq, Show)
 
 $(makeLenses ''FuzzReport)
-
-instance Semigroup FuzzReport where
-    FuzzReport a1 b1 c1 <> FuzzReport a2 b2 c2 = FuzzReport (a1 <> a2) (b1 <> b2) (c1 <> c2)
-
-instance Monoid FuzzReport where
-    mempty = FuzzReport [] [] []
 
 descriptionToSim :: SimDescription -> SimTool
 descriptionToSim (SimDescription "icarus") = defaultIcarusSim
@@ -201,11 +223,11 @@ descriptionToSynth (SynthDescription "xst" bin desc out) =
 descriptionToSynth (SynthDescription "quartus" bin desc out) =
     QuartusSynth
         . Quartus (fromText <$> bin)
-                  (fromMaybe (quartusDesc defaultQuartus) $ desc)
+                  (fromMaybe (quartusDesc defaultQuartus) desc)
         $ maybe (quartusOutput defaultQuartus) fromText out
 descriptionToSynth (SynthDescription "identity" _ desc out) =
     IdentitySynth
-        . Identity (fromMaybe (identityDesc defaultIdentity) $ desc)
+        . Identity (fromMaybe (identityDesc defaultIdentity) desc)
         $ maybe (identityOutput defaultIdentity) fromText out
 descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
@@ -220,42 +242,46 @@ status (Fail EquivError  ) = H.td ! A.class_ "is-danger" $ "Equivalence error"
 status (Fail TimeoutError) = H.td ! A.class_ "is-warning" $ "Time out"
 
 synthStatusHtml :: SynthStatus -> Html
-synthStatusHtml (SynthStatus synth res) = H.tr $ do
+synthStatusHtml (SynthStatus synth res diff) = H.tr $ do
     H.td . H.toHtml $ toText synth
     status res
+    H.td . H.toHtml $ showT diff
 
 synthResultHtml :: SynthResult -> Html
-synthResultHtml (SynthResult synth1 synth2 res) = H.tr $ do
+synthResultHtml (SynthResult synth1 synth2 res diff) = H.tr $ do
     H.td . H.toHtml $ toText synth1
     H.td . H.toHtml $ toText synth2
     status res
+    H.td . H.toHtml $ showT diff
+
+resultHead :: Text -> Html
+resultHead name = H.head $ do
+    H.title $ "Fuzz Report - " <> H.toHtml name
+    H.meta ! A.name "viewport" ! A.content "width=device-width, initial-scale=1"
+    H.meta ! A.charset "utf8"
+    H.link
+        ! A.rel "stylesheet"
+        ! A.href
+              "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
 
 resultReport :: Text -> FuzzReport -> Html
-resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
-    H.head $ do
-        H.title $ "Fuzz Report - " <> H.toHtml name
-        H.meta ! A.name "viewport" ! A.content
-            "width=device-width, initial-scale=1"
-        H.meta ! A.charset "utf8"
-        H.link
-            ! A.rel "stylesheet"
-            ! A.href
-                  "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
+resultReport name (FuzzReport _ synth _ stat _ _ _) = H.docTypeHtml $ do
+    resultHead name
     H.body
         . (H.section ! A.class_ "section")
         . (H.div ! A.class_ "container")
         $ do
-              H.h1 ! A.class_ "title" $ "Fuzz Report - " <> H.toHtml name
-              H.h2 ! A.class_ "subtitle" $ "Synthesis Failure"
+              H.h1 ! A.class_ "title is-1" $ "Fuzz Report - " <> H.toHtml name
+              H.h2 ! A.class_ "title is-2" $ "Synthesis"
               H.table ! A.class_ "table" $ do
                   H.thead
                       . H.toHtml
                       $ ( H.tr
                         . H.toHtml
-                        $ [H.th "Synthesis tool", H.th "Synthesis Status"]
+                        $ [H.th "Tool", H.th "Status", H.th "Run time"]
                         )
                   H.tbody . H.toHtml $ fmap synthStatusHtml stat
-              H.h2 ! A.class_ "subtitle" $ "Equivalence Check Status"
+              H.h2 ! A.class_ "title is-2" $ "Equivalence Check"
               H.table ! A.class_ "table" $ do
                   H.thead
                       . H.toHtml
@@ -263,10 +289,95 @@ resultReport name (FuzzReport synth _ stat) = H.docTypeHtml $ do
                         . H.toHtml
                         $ [ H.th "First tool"
                           , H.th "Second tool"
-                          , H.th "Equivalence Status"
+                          , H.th "Status"
+                          , H.th "Run time"
                           ]
                         )
                   H.tbody . H.toHtml $ fmap synthResultHtml synth
 
+resultStatus :: Result a b -> Html
+resultStatus (Pass _) = H.td ! A.class_ "is-success" $ "Passed"
+resultStatus (Fail _) = H.td ! A.class_ "is-danger" $ "Failed"
+
+fuzzStats
+    :: (Real a1, Traversable t)
+    => ((a1 -> Const (Endo [a1]) a1) -> a2 -> Const (Endo [a1]) a2)
+    -> t a2
+    -> (Double, Double)
+fuzzStats sel fr = meanVariance converted
+    where converted = fromList . fmap realToFrac $ fr ^.. traverse . sel
+
+fuzzStatus :: Text -> FuzzReport -> Html
+fuzzStatus name (FuzzReport dir s1 s2 s3 t1 t2 t3) = H.tr $ do
+    H.td
+        . ( H.a
+          ! A.href
+                ( H.textValue
+                $ toTextIgnore (dir </> fromText "index" <.> "html")
+                )
+          )
+        $ H.toHtml name
+    resultStatus
+        $  mconcat (fmap getSynthResult s1)
+        <> mconcat (fmap getSimResult s2)
+        <> mconcat (fmap getSynthStatus s3)
+    H.td . H.string $ show t1
+    H.td . H.string $ show t2
+    H.td . H.string $ show t3
+
+summary :: Text -> [FuzzReport] -> Html
+summary name fuzz = H.docTypeHtml $ do
+    resultHead name
+    H.body
+        . (H.section ! A.class_ "section")
+        . (H.div ! A.class_ "container")
+        $ do
+              H.h1 ! A.class_ "title is-1" $ "FuzzReport - " <> H.toHtml name
+              H.table ! A.class_ "table" $ do
+                  H.thead . H.tr $ H.toHtml
+                      [ H.th "Name"
+                      , H.th "Status"
+                      , H.th "Synthesis time"
+                      , H.th "Equivalence check time"
+                      , H.th "Reduction time"
+                      ]
+                  H.tbody
+                      . H.toHtml
+                      . fmap
+                            (\(i, r) ->
+                                fuzzStatus ("Fuzz " <> showT (i :: Int)) r
+                            )
+                      $ zip [1 ..] fuzz
+                  H.tfoot . H.toHtml $ do
+                      H.tr $ H.toHtml
+                          [ H.td $ H.strong "Total"
+                          , H.td mempty
+                          , sumUp synthTime
+                          , sumUp equivTime
+                          , sumUp reducTime
+                          ]
+                      H.tr $ H.toHtml
+                          [ H.td $ H.strong "Mean"
+                          , H.td mempty
+                          , fst $ meanVar synthTime
+                          , fst $ meanVar equivTime
+                          , fst $ meanVar reducTime
+                          ]
+                      H.tr $ H.toHtml
+                          [ H.td $ H.strong "Variance"
+                          , H.td mempty
+                          , snd $ meanVar synthTime
+                          , snd $ meanVar equivTime
+                          , snd $ meanVar reducTime
+                          ]
+  where
+    sumUp s = showHtml . sum $ fuzz ^.. traverse . s
+    meanVar s = bimap d2T d2T $ fuzzStats s fuzz
+    showHtml = H.td . H.string . show
+    d2T      = showHtml . (realToFrac :: Double -> NominalDiffTime)
+
 printResultReport :: Text -> FuzzReport -> Text
 printResultReport t f = toStrict . renderHtml $ resultReport t f
+
+printSummary :: Text -> [FuzzReport] -> Text
+printSummary t f = toStrict . renderHtml $ summary t f
