@@ -27,7 +27,7 @@ where
 import           Control.DeepSeq                  (force)
 import           Control.Exception.Lifted         (finally)
 import           Control.Lens                     hiding ((<.>))
-import           Control.Monad                    (forM, void)
+import           Control.Monad                    (forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Control      (MonadBaseControl)
@@ -39,6 +39,7 @@ import           Data.Maybe                       (isNothing)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as T
 import           Data.Time
+import           Data.Tuple                       (swap)
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Internal.Gen            as Hog
 import           Hedgehog.Internal.Seed           (Seed)
@@ -64,9 +65,17 @@ data FuzzEnv = FuzzEnv { getSynthesisers :: ![SynthTool]
                        }
                deriving (Eq, Show)
 
+data FuzzState = FuzzState { _fuzzSynthResults :: ![SynthResult]
+                           , _fuzzSimResults   :: ![SimResult]
+                           , _fuzzSynthStatus  :: ![SynthStatus]
+                           }
+                 deriving (Eq, Show)
+
+$(makeLenses ''FuzzState)
+
 -- | The main type for the fuzzing, which contains an environment that can be
 -- read from and the current state of all the results.
-type Fuzz m = StateT FuzzReport (ReaderT FuzzEnv m)
+type Fuzz m = StateT FuzzState (ReaderT FuzzEnv m)
 
 type MonadFuzz m = (MonadBaseControl IO m, MonadIO m, MonadSh m)
 
@@ -75,7 +84,7 @@ runFuzz conf yos m = shelly $ runFuzz' conf yos m
 
 runFuzz' :: Monad m => Config -> Yosys -> (Config -> Fuzz m b) -> m b
 runFuzz' conf yos m = runReaderT
-    (evalStateT (m conf) (FuzzReport [] [] []))
+    (evalStateT (m conf) (FuzzState [] [] []))
     (FuzzEnv
         ( force
         $ defaultIdentitySynth
@@ -106,12 +115,13 @@ timeit a = do
 
 synthesis :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 synthesis src = do
-    synth   <- synthesisers
-    results <- liftSh $ mapM exec synth
-    synthStatus .= zipWith SynthStatus synth results
-    liftSh $ inspect results
+    synth    <- synthesisers
+    resTimes <- liftSh $ mapM exec synth
+    fuzzSynthStatus
+        .= applyList (uncurry . SynthStatus <$> synth) (fmap swap resTimes)
+    liftSh $ inspect resTimes
   where
-    exec a = runResultT $ do
+    exec a = toolRun ("synthesisis with " <> toText a) . runResultT $ do
         liftSh . mkdir_p . fromText $ toText a
         pop (fromText $ toText a) $ runSynth a src
 
@@ -127,11 +137,11 @@ generateSample seed gen = do
     return v
 
 passedSynthesis :: MonadSh m => Fuzz m [SynthTool]
-passedSynthesis = fmap toSynth . filter passed . _synthStatus <$> get
+passedSynthesis = fmap toSynth . filter passed . _fuzzSynthStatus <$> get
   where
-    passed (SynthStatus _ (Pass _)) = True
-    passed _                        = False
-    toSynth (SynthStatus s _) = s
+    passed (SynthStatus _ (Pass _) _) = True
+    passed _                          = False
+    toSynth (SynthStatus s _ _) = s
 
 make :: MonadSh m => FilePath -> m ()
 make f = liftSh $ do
@@ -146,8 +156,21 @@ pop f a = do
 applyList :: [a -> b] -> [a] -> [b]
 applyList a b = apply' <$> zip a b where apply' (a', b') = a' b'
 
-toSynthResult :: [(SynthTool, SynthTool)] -> [Result Failed ()] -> [SynthResult]
-toSynthResult a b = flip applyList b $ uncurry SynthResult <$> a
+applyLots :: (a -> b -> c -> d -> e) -> [(a, b)] -> [(c, d)] -> [e]
+applyLots func a b = applyList (uncurry . uncurry func <$> a) b
+
+toSynthResult
+    :: [(SynthTool, SynthTool)]
+    -> [(NominalDiffTime, Result Failed ())]
+    -> [SynthResult]
+toSynthResult a b = applyLots SynthResult a $ fmap swap b
+
+toolRun :: (MonadIO m, MonadSh m) => Text -> m a -> m (NominalDiffTime, a)
+toolRun t m = do
+    logT $ "Running " <> t
+    (diff, res) <- timeit m
+    logT $ "Finished " <> t <> " (" <> showT diff <> ")"
+    return (diff, res)
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
@@ -159,29 +182,40 @@ equivalence src = do
                 .   filter (uncurry (/=))
                 $   (,) defaultIdentitySynth
                 <$> synth
-    results <- liftSh $ mapM (uncurry equiv) synthComb
-    synthResults .= toSynthResult synthComb results
-    liftSh $ inspect results
+    resTimes <- liftSh $ mapM (uncurry equiv) synthComb
+    fuzzSynthResults .= toSynthResult synthComb resTimes
+    liftSh $ inspect resTimes
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equiv a b = runResultT $ do
-        make dir
-        pop dir $ do
-            liftSh $ do
-                cp (fromText ".." </> fromText (toText a) </> synthOutput a)
-                    $ synthOutput a
-                cp (fromText ".." </> fromText (toText b) </> synthOutput b)
-                    $ synthOutput b
-                writefile "rtl.v" $ genSource src
-            runEquiv a b src
+    equiv a b =
+        toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
+            . runResultT
+            $ do
+                  make dir
+                  pop dir $ do
+                      liftSh $ do
+                          cp
+                                  (   fromText ".."
+                                  </> fromText (toText a)
+                                  </> synthOutput a
+                                  )
+                              $ synthOutput a
+                          cp
+                                  (   fromText ".."
+                                  </> fromText (toText b)
+                                  </> synthOutput b
+                                  )
+                              $ synthOutput b
+                          writefile "rtl.v" $ genSource src
+                      runEquiv a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
-failEquivWithIdentity = filter withIdentity . _synthResults <$> get
+failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
   where
-    withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail)) = True
-    withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail)) = True
-    withIdentity _                                                  = False
+    withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail) _) = True
+    withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail) _) = True
+    withIdentity _                                                    = False
 
 -- | Always reduces with respect to 'Identity'.
 reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
@@ -190,13 +224,27 @@ reduction src = do
     _     <- liftSh $ mapM red fails
     return ()
   where
-    red (SynthResult a b _) = do
+    red (SynthResult a b _ _) = do
         make dir
         pop dir $ do
             s <- reduceSynth a b src
             writefile (fromText ".." </> dir <.> "v") $ genSource s
             return s
         where dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
+
+titleRun
+    :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)
+titleRun t f = do
+    logT $ "--- Starting " <> t <> " ---"
+    (diff, res) <- timeit f
+    logT $ "--- Finished " <> t <> " (" <> showT diff <> ") ---"
+    return (diff, res)
+
+whenMaybe :: Applicative m => Bool -> m a -> m (Maybe a)
+whenMaybe b x = if b then Just <$> x else pure Nothing
+
+getTime :: (Num n) => Maybe (n, a) -> n
+getTime = maybe 0 fst
 
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzz gen conf = do
@@ -207,23 +255,39 @@ fuzz gen conf = do
         $  conf
         &  configProperty
         .  propSeed
-        .~ Just seed'
-    synthesis src
-    equivalence src
-    reduction src
-    report  <- get
+        ?~ seed'
+    (tsynth, _) <- titleRun "Synthesis" $ synthesis src
+    (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
+    fails       <- failEquivWithIdentity
+    redResult <- whenMaybe (not $ null fails) . titleRun "Reduction" $ reduction
+        src
+    state_  <- get
     currdir <- liftSh pwd
+    let vi = flip view state_
+    let report = FuzzReport currdir
+                            (vi fuzzSynthResults)
+                            (vi fuzzSimResults)
+                            (vi fuzzSynthStatus)
+                            tsynth
+                            tequiv
+                            (getTime redResult)
     liftSh . writefile "index.html" $ printResultReport (bname currdir) report
     return report
   where
     seed  = conf ^. configProperty . propSeed
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
+relativeFuzzReport :: (MonadSh m) => FuzzReport -> m FuzzReport
+relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _) = liftSh $ do
+    newPath <- relPath dir
+    return $ (fuzzDir .~ newPath) fr
+
 fuzzInDir
     :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzzInDir fp src conf = do
     make fp
-    pop fp $ fuzz src conf
+    res <- pop fp $ fuzz src conf
+    relativeFuzzReport res
 
 fuzzMultiple
     :: MonadFuzz m
@@ -231,7 +295,7 @@ fuzzMultiple
     -> Maybe FilePath
     -> Gen SourceInfo
     -> Config
-    -> Fuzz m FuzzReport
+    -> Fuzz m [FuzzReport]
 fuzzMultiple n fp src conf = do
     x <- case fp of
         Nothing -> do
@@ -243,11 +307,16 @@ fuzzMultiple n fp src conf = do
                 <> formatTime defaultTimeLocale "%Y-%m-%d_%H-%M-%S" ct
         Just f -> return f
     make x
-    when (isNothing seed) . void . pop x . forM [1 .. n] $ fuzzDir
-    unless (isNothing seed) . void . pop x $ fuzzDir (1 :: Int)
-    return mempty
+    pop x $ do
+        results <- if isNothing seed
+            then forM [1 .. n] fuzzDir'
+            else (: []) <$> fuzzDir' (1 :: Int)
+        liftSh . writefile (fromText "index" <.> "html") $ printSummary
+            "Fuzz Summary"
+            results
+        return results
   where
-    fuzzDir n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
+    fuzzDir' n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
     seed = conf ^. configProperty . propSeed
 
 sampleSeed :: MonadSh m => Maybe Seed -> Gen a -> m (Seed, a)
