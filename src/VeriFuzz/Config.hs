@@ -61,6 +61,8 @@ module VeriFuzz.Config
     , probStmntNonBlock
     , probStmntCond
     , probStmntFor
+    , propSampleSize
+    , propSampleMethod
     , propSize
     , propSeed
     , propStmntDepth
@@ -189,11 +191,13 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                }
                  deriving (Eq, Show)
 
-data ConfProperty = ConfProperty { _propSize       :: {-# UNPACK #-} !Int
-                                 , _propSeed       :: !(Maybe Seed)
-                                 , _propStmntDepth :: {-# UNPACK #-} !Int
-                                 , _propModDepth   :: {-# UNPACK #-} !Int
-                                 , _propMaxModules :: {-# UNPACK #-} !Int
+data ConfProperty = ConfProperty { _propSize         :: {-# UNPACK #-} !Int
+                                 , _propSeed         :: !(Maybe Seed)
+                                 , _propStmntDepth   :: {-# UNPACK #-} !Int
+                                 , _propModDepth     :: {-# UNPACK #-} !Int
+                                 , _propMaxModules   :: {-# UNPACK #-} !Int
+                                 , _propSampleMethod :: !Text
+                                 , _propSampleSize   :: {-# UNPACK #-} !Int
                                  }
                   deriving (Eq, Show)
 
@@ -261,7 +265,7 @@ defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr)
-    (ConfProperty 20 Nothing 3 2 5)
+    (ConfProperty 20 Nothing 3 2 5 "random" 10)
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -374,6 +378,10 @@ propCodec =
         .=  _propModDepth
         <*> defaultValue (defProp propMaxModules) (int "module" "max")
         .=  _propMaxModules
+        <*> defaultValue (defProp propSampleMethod) (Toml.text (twoKey "sample" "method"))
+        .= _propSampleMethod
+        <*> defaultValue (defProp propSampleSize) (int "sample" "size")
+        .= _propSampleSize
     where defProp i = defaultConfig ^. configProperty . i
 
 simulator :: TomlCodec SimDescription
