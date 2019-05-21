@@ -64,9 +64,7 @@ runSynthXST sim (SourceInfo top src) = do
         writefile xstFile $ xstSynthConfig top
         writefile prjFile [st|verilog work "rtl.v"|]
         writefile "rtl.v" $ genSource src
-        logger "XST: run"
     exec "xst" ["-ifn", toTextIgnore xstFile]
-    liftSh $ logger "XST: netgen"
     exec
         "netgen"
         [ "-w"
@@ -75,15 +73,12 @@ runSynthXST sim (SourceInfo top src) = do
         , toTextIgnore $ modFile <.> "ngc"
         , toTextIgnore $ synthOutput sim
         ]
-    liftSh $ do
-        logger "XST: clean"
-        noPrint $ run_
-            "sed"
-            [ "-i"
-            , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
-            , toTextIgnore $ synthOutput sim
-            ]
-        logger "XST: done"
+    liftSh . noPrint $ run_
+        "sed"
+        [ "-i"
+        , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
+        , toTextIgnore $ synthOutput sim
+        ]
   where
     modFile = fromText top
     xstFile = modFile <.> "xst"

@@ -65,13 +65,11 @@ runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
     dir <- pwd
     writefile inpf $ genSource src
-    logger "Yosys: synthesis"
     logCommand_ dir "yosys" $ timeout
         (yosysPath sim)
         [ "-p"
         , "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out
         ]
-    logger "Yosys: synthesis done"
   where
     inpf = "rtl.v"
     inp  = toTextIgnore inpf
@@ -95,10 +93,7 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
         writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
     runSynth sim1 srcInfo
     runSynth sim2 srcInfo
-    liftSh $ do
-        logger "Yosys: equivalence check"
-        run_ (yosysPath yosys) [toTextIgnore checkFile]
-        logger "Yosys: equivalence done"
+    liftSh $ run_ (yosysPath yosys) [toTextIgnore checkFile]
     where checkFile = fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
 
 runEquiv
@@ -115,12 +110,11 @@ runEquiv sim1 sim2 srcInfo = do
         replaceMods (synthOutput sim1) "_1" srcInfo
         replaceMods (synthOutput sim2) "_2" srcInfo
         writefile "proof.sby" $ sbyConfig sim1 sim2 srcInfo
-    liftSh $ logger "Running SymbiYosys"
     e <- liftSh $ do
         exe dir "symbiyosys" "sby" ["-f", "proof.sby"]
         lastExitCode
     case e of
-        0   -> liftSh $ logger "SymbiYosys equivalence check passed"
+        0   -> ResultT . return $ Pass ()
         2   -> ResultT . return $ Fail EquivFail
         124 -> ResultT . return $ Fail TimeoutError
         _   -> ResultT . return $ Fail EquivError

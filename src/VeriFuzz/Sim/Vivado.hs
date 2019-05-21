@@ -57,12 +57,10 @@ runSynthVivado sim (SourceInfo top src) = do
             sim
         writefile "rtl.v" $ genSource src
         run_ "sed" ["s/^module/(* use_dsp=\"no\" *) module/;", "-i", "rtl.v"]
-        logger "Vivado: run"
     let exec_ n = execute_
             SynthFail
             dir
             "vivado"
             (maybe (fromText n) (</> fromText n) $ vivadoBin sim)
     exec_ "vivado" ["-mode", "batch", "-source", toTextIgnore vivadoTcl]
-    liftSh $ logger "Vivado: done"
     where vivadoTcl = fromText ("vivado_" <> top) <.> "tcl"

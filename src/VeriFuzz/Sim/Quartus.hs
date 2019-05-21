@@ -52,9 +52,7 @@ runSynthQuartus :: Quartus -> SourceInfo -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let ex = execute_ SynthFail dir "quartus"
-    liftSh $ do
-        writefile inpf $ genSource src
-        logger "Running Quartus synthesis"
+    liftSh . writefile inpf $ genSource src
     ex (exec "quartus_map")
        [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
     ex (exec "quartus_fit") [top, "--part=5CGTFD9E5F35C7N"]
@@ -68,7 +66,6 @@ runSynthQuartus sim (SourceInfo top src) = do
             , "s,^// DATE.*,,; s,^tri1 (.*);,wire \\1 = 1;,; /^\\/\\/ +synopsys/ d;"
             , toTextIgnore $ synthOutput sim
             ]
-        logger "Quartus synthesis done"
   where
     inpf = "rtl.v"
     exec s = maybe (fromText s) (</> fromText s) $ quartusBin sim
