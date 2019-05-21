@@ -42,7 +42,7 @@ data Result a b = Fail a
                 deriving (Eq, Show)
 
 instance Semigroup (Result a b) where
-    Fail _ <> b = b
+    Pass _ <> a = a
     a <> _ = a
 
 instance (Monoid b) => Monoid (Result a b) where
