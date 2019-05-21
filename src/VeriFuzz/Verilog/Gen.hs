@@ -459,7 +459,7 @@ calcRange ps i (Range l r) = eval l - eval r + 1
 moduleDef :: Maybe Identifier -> StateGen ModDecl
 moduleDef top = do
     name     <- moduleName top
-    portList <- some $ nextPort Wire
+    portList <- Hog.list (Hog.linear 4 10) $ nextPort Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
     ps       <- many parameter
     context  <- get
