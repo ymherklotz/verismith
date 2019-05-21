@@ -17,7 +17,7 @@ This module generates the code from the Verilog AST defined in
 module VeriFuzz.Verilog.CodeGen
     ( -- * Code Generation
       GenVerilog(..)
-    , genSource
+    , Source(..)
     , render
     )
 where

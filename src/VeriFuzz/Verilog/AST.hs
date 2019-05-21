@@ -492,7 +492,7 @@ newtype Verilog = Verilog { getVerilog :: [ModDecl] }
 data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
                              , _infoSrc :: !Verilog
                              }
-                  deriving (Eq, Show)
+                  deriving (Eq, Ord, Data, Show)
 
 $(makeLenses ''Expr)
 $(makeLenses ''ConstExpr)
