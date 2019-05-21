@@ -1,0 +1,43 @@
+[probability]
+  expr.binary = 5
+  expr.concatenation = 5
+  expr.number = 1
+  expr.rangeselect = 5
+  expr.signed = 5
+  expr.string = 0
+  expr.ternary = 5
+  expr.unary = 5
+  expr.unsigned = 5
+  expr.variable = 5
+  moditem.assign = 2
+  moditem.combinational = 0
+  moditem.instantiation = 0
+  moditem.sequential = 3
+  statement.blocking = 0
+  statement.conditional = 1
+  statement.forloop = 0
+  statement.nonblocking = 2
+
+[property]
+  module.depth = 2
+  module.max = 5
+  size = 20
+  statement.depth = 3
+
+[[synthesiser]]
+  description = "yosys"
+  name = "yosys"
+  output = "syn_yosys.v"
+  bin = "/home/ymh15/.local/bin"
+
+[[synthesiser]]
+  description = "vivado"
+  name = "vivado"
+  output = "syn_vivado.v"
+  bin = "/usr/local/Xilinx/Vivado/2018.2/bin"
+
+[[synthesiser]]
+  description = "xst"
+  name = "xst"
+  output = "syn_xst.v"
+  bin = "/usr/local/Xilinx/ise/ISE/bin/lin64"
