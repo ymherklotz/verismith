@@ -231,9 +231,6 @@ someI m f = do
     amount <- gen $ Hog.int (Hog.linear 1 m)
     replicateM amount f
 
-some :: StateGen a -> StateGen [a]
-some = someI 50
-
 many :: StateGen a -> StateGen [a]
 many f = do
     amount <- gen $ Hog.int (Hog.linear 0 50)
