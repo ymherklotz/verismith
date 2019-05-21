@@ -27,6 +27,7 @@ module VeriFuzz.Report
     , synthStatus
     , equivTime
     , fuzzDir
+    , fileLines
     , reducTime
     , synthTime
     , defaultIcarusSim
@@ -189,10 +190,11 @@ instance Show SynthStatus where
 
 -- | The complete state that will be used during fuzzing, which contains the
 -- results from all the operations.
-data FuzzReport = FuzzReport { _fuzzDir      :: {-# UNPACK #-} !FilePath
+data FuzzReport = FuzzReport { _fuzzDir      :: !FilePath
                              , _synthResults :: ![SynthResult]
                              , _simResults   :: ![SimResult]
                              , _synthStatus  :: ![SynthStatus]
+                             , _fileLines    :: {-# UNPACK #-} !Int
                              , _synthTime    :: {-# UNPACK #-} !NominalDiffTime
                              , _equivTime    :: {-# UNPACK #-} !NominalDiffTime
                              , _reducTime    :: {-# UNPACK #-} !NominalDiffTime
@@ -265,7 +267,7 @@ resultHead name = H.head $ do
               "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css"
 
 resultReport :: Text -> FuzzReport -> Html
-resultReport name (FuzzReport _ synth _ stat _ _ _) = H.docTypeHtml $ do
+resultReport name (FuzzReport _ synth _ stat _ _ _ _) = H.docTypeHtml $ do
     resultHead name
     H.body
         . (H.section ! A.class_ "section")
@@ -308,7 +310,7 @@ fuzzStats sel fr = meanVariance converted
     where converted = fromList . fmap realToFrac $ fr ^.. traverse . sel
 
 fuzzStatus :: Text -> FuzzReport -> Html
-fuzzStatus name (FuzzReport dir s1 s2 s3 t1 t2 t3) = H.tr $ do
+fuzzStatus name (FuzzReport dir s1 s2 s3 sz t1 t2 t3) = H.tr $ do
     H.td
         . ( H.a
           ! A.href
@@ -321,6 +323,7 @@ fuzzStatus name (FuzzReport dir s1 s2 s3 t1 t2 t3) = H.tr $ do
         $  mconcat (fmap getSynthResult s1)
         <> mconcat (fmap getSimResult s2)
         <> mconcat (fmap getSynthStatus s3)
+    H.td . H.string $ show sz
     H.td . H.string $ show t1
     H.td . H.string $ show t2
     H.td . H.string $ show t3
@@ -337,6 +340,7 @@ summary name fuzz = H.docTypeHtml $ do
                   H.thead . H.tr $ H.toHtml
                       [ H.th "Name"
                       , H.th "Status"
+                      , H.th "Size (loc)"
                       , H.th "Synthesis time"
                       , H.th "Equivalence check time"
                       , H.th "Reduction time"
@@ -352,6 +356,7 @@ summary name fuzz = H.docTypeHtml $ do
                       H.tr $ H.toHtml
                           [ H.td $ H.strong "Total"
                           , H.td mempty
+                          , H.td . H.string . show . sum $ fuzz ^.. traverse . fileLines
                           , sumUp synthTime
                           , sumUp equivTime
                           , sumUp reducTime
@@ -359,6 +364,7 @@ summary name fuzz = H.docTypeHtml $ do
                       H.tr $ H.toHtml
                           [ H.td $ H.strong "Mean"
                           , H.td mempty
+                          , fst $ bimap d2I d2I $ fuzzStats fileLines fuzz
                           , fst $ meanVar synthTime
                           , fst $ meanVar equivTime
                           , fst $ meanVar reducTime
@@ -366,6 +372,7 @@ summary name fuzz = H.docTypeHtml $ do
                       H.tr $ H.toHtml
                           [ H.td $ H.strong "Variance"
                           , H.td mempty
+                          , snd $ bimap d2I d2I $ fuzzStats fileLines fuzz
                           , snd $ meanVar synthTime
                           , snd $ meanVar equivTime
                           , snd $ meanVar reducTime
@@ -375,6 +382,7 @@ summary name fuzz = H.docTypeHtml $ do
     meanVar s = bimap d2T d2T $ fuzzStats s fuzz
     showHtml = H.td . H.string . show
     d2T      = showHtml . (realToFrac :: Double -> NominalDiffTime)
+    d2I  = H.td . H.string . show
 
 printResultReport :: Text -> FuzzReport -> Text
 printResultReport t f = toStrict . renderHtml $ resultReport t f
