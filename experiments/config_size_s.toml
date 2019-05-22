@@ -23,6 +23,8 @@
   module.max = 5
   size = 15
   statement.depth = 2
+  sample.method = "hat"
+  sample.size = 10
 
 [[synthesiser]]
   description = "yosys"

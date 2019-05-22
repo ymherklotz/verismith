@@ -296,9 +296,11 @@ fuzz gen conf = do
     seed  = conf ^. configProperty . propSeed
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
     genMethod = case conf ^. configProperty . propSampleMethod of
-            "hat" ->
+            "hat" -> do
+                logT "Using the hat function"
                 sampleVerilogHat (conf ^. configProperty . propSampleSize) seed gen
-            _ ->
+            _ -> do
+                logT "Using first seed"
                 sampleSeed seed gen
 
 relativeFuzzReport :: (MonadSh m) => FuzzReport -> m FuzzReport
