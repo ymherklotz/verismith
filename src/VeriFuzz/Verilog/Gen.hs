@@ -231,11 +231,6 @@ someI m f = do
     amount <- gen $ Hog.int (Hog.linear 1 m)
     replicateM amount f
 
-many :: StateGen a -> StateGen [a]
-many f = do
-    amount <- gen $ Hog.int (Hog.linear 0 50)
-    replicateM amount f
-
 makeIdentifier :: T.Text -> StateGen Identifier
 makeIdentifier prefix = do
     context <- get
@@ -458,7 +453,7 @@ moduleDef top = do
     name     <- moduleName top
     portList <- Hog.list (Hog.linear 4 10) $ nextPort Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
-    ps       <- many parameter
+    ps       <- Hog.list (Hog.linear 0 10) parameter
     context  <- get
     let local = filter (`notElem` portList) $ _variables context
     let
@@ -473,7 +468,7 @@ moduleDef top = do
     let comb  = combineAssigns_ yport local
     return
         . declareMod local
-        . ModDecl name [yport] (clock : portList) (mi <> [comb])
+        . ModDecl name [yport] (clock : portList) (comb : mi)
         $ ps
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
