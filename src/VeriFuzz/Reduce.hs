@@ -502,28 +502,25 @@ reduce_ title repl bot eval src = do
                    (src ^.. infoSrc . _Wrapped . traverse . modItems . traverse)
                )
         <> ")"
-    replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
-    case (replacement, replAnswer) of
-        (Single s, Single True    ) -> runIf s
-        (Dual _ r, Dual False True) -> runIf r
-        (Dual l _, Dual True False) -> runIf l
-        (Dual l r, Dual True True ) -> check l r
-        _                           -> return src
+    case repl src of
+        Single s -> do
+            red <- eval s
+            if red then runIf s else return s
+        Dual l r -> do
+            red <- eval l
+            if red && cond l
+                then reduce_ title repl bot eval l
+                else do
+                    red' <- eval r
+                    if red' && cond r
+                        then reduce_ title repl bot eval r
+                        else if l < r then return l else return r
+        None -> return src
   where
-    replacement = repl src
-    runIf s = if s /= src && not (bot s)
+    runIf s = if cond s
         then reduce_ title repl bot eval s
         else return s
-    evalIfNotEmpty = eval
-    check l r
-        | bot l = return l
-        | bot r = return r
-        | otherwise = do
-            lreduced <- runIf l
-            rreduced <- runIf r
-            if _infoSrc lreduced < _infoSrc rreduced
-                then return lreduced
-                else return rreduced
+    cond s = s /= src && not (bot s)
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.

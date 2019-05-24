@@ -224,9 +224,9 @@ reduction src = do
 titleRun
     :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)
 titleRun t f = do
-    logT $ "--- Starting " <> t <> " ---"
+    logT $ "### Starting " <> t <> " ###"
     (diff, res) <- timeit f
-    logT $ "--- Finished " <> t <> " (" <> showT diff <> ") ---"
+    logT $ "### Finished " <> t <> " (" <> showT diff <> ") ###"
     return (diff, res)
 
 whenMaybe :: Applicative m => Bool -> m a -> m (Maybe a)
