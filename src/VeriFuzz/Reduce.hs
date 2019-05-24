@@ -111,7 +111,7 @@ instance Traversable Replacement where
 
 -- | Split a list in two halves.
 halve :: Replace [a]
-halve []  = None
+halve []  = Single []
 halve [_] = Single []
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
@@ -253,6 +253,12 @@ exprId (Id i           ) = Just i
 exprId (VecSelect   i _) = Just i
 exprId (RangeSelect i _) = Just i
 exprId _                 = Nothing
+
+eventId :: Event -> Maybe Identifier
+eventId (EId i)      = Just i
+eventId (EPosEdge i) = Just i
+eventId (ENegEdge i) = Just i
+eventId _            = Nothing
 
 portToId :: Port -> Identifier
 portToId (Port _ _ _ i) = i
@@ -396,16 +402,19 @@ toIds = nub . mapMaybe exprId . concatMap universe
 toIdsConst :: [ConstExpr] -> [Identifier]
 toIdsConst = toIds . fmap constToExpr
 
+toIdsEvent :: [Event] -> [Identifier]
+toIdsEvent = nub . mapMaybe eventId . concatMap universe
+
 allStatIds' :: Statement -> [Identifier]
-allStatIds' s = nub $ assignIds <> otherExpr
+allStatIds' s = nub $ assignIds <> otherExpr <> eventProcessedIds
   where
-    assignIds =
-        toIds
+    assignIds = toIds
             $  (s ^.. stmntBA . assignExpr)
             <> (s ^.. stmntNBA . assignExpr)
             <> (s ^.. forAssign . assignExpr)
             <> (s ^.. forIncr . assignExpr)
     otherExpr = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
+    eventProcessedIds = toIdsEvent $ s ^.. statEvent
 
 allStatIds :: Statement -> [Identifier]
 allStatIds s = nub . concat $ allStatIds' <$> universe s
@@ -505,22 +514,22 @@ reduce_ title repl bot eval src = do
     case repl src of
         Single s -> do
             red <- eval s
-            if red then runIf s else return s
+            if red
+                then if cond s then recReduction s else return s
+                else return src
         Dual l r -> do
             red <- eval l
-            if red && cond l
-                then reduce_ title repl bot eval l
+            if red
+                then if cond l then recReduction l else return l
                 else do
                     red' <- eval r
-                    if red' && cond r
-                        then reduce_ title repl bot eval r
-                        else if l < r then return l else return r
+                    if red'
+                        then if cond r then recReduction r else return r
+                        else return src
         None -> return src
   where
-    runIf s = if cond s
-        then reduce_ title repl bot eval s
-        else return s
     cond s = s /= src && not (bot s)
+    recReduction = reduce_ title repl bot eval
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.

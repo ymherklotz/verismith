@@ -121,7 +121,7 @@ synthesis src = do
         .= applyList (uncurry . SynthStatus <$> synth) (fmap swap resTimes)
     liftSh $ inspect resTimes
   where
-    exec a = toolRun ("synthesisis with " <> toText a) . runResultT $ do
+    exec a = toolRun ("synthesis with " <> toText a) . runResultT $ do
         liftSh . mkdir_p . fromText $ toText a
         pop (fromText $ toText a) $ runSynth a src
 

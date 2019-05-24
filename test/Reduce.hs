@@ -52,6 +52,7 @@ module top;
   reg h;
   wire i;
   wire j;
+  wire clk;
   initial d <= a;
 
   always @* begin
@@ -61,6 +62,8 @@ module top;
       h <= h;
     end
   end
+
+  always @(posedge clk);
 
   assign b = g;
 endmodule
@@ -74,6 +77,7 @@ module top;
   reg f;
   reg g;
   reg h;
+  wire clk;
   initial d <= a;
 
   always @* begin
@@ -83,6 +87,8 @@ module top;
       h <= h;
     end
   end
+
+  always @(posedge clk);
 
   assign b = g;
 endmodule

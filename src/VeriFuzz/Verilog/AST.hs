@@ -169,6 +169,9 @@ data Event = EId {-# UNPACK #-} !Identifier
            | EComb !Event !Event
            deriving (Eq, Show, Ord, Data)
 
+instance Plated Event where
+    plate = uniplate
+
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
                     | BinMinus   -- ^ @-@
