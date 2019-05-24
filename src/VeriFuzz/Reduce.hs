@@ -543,7 +543,7 @@ reduce eval src =
         $   red "Modules" moduleBot halveModules src
         >>= redAll "Module Items" modItemBot         halveModItems
         >>= redAll "Statements"   (const defaultBot) halveStatements
-        >>= redAll "Expressions"  (const defaultBot) halveExpr
+        -- >>= redAll "Expressions"  (const defaultBot) halveExpr
   where
     red s bot a = reduce_ s a bot eval
     red' s bot a t = reduce_ s (a t) (bot t) eval
