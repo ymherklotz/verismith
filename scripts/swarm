@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+
+import subprocess
+
+def main():
+        i = 0
+        name = "output_large_rand"
+        config = "experiments/config_large.toml"
+        iterations = 20
+        while True:
+                subprocess.call(["verifuzz", "config", "-c", config, "-o", "config_random.toml", "--randomise"])
+                subprocess.call(["verifuzz", "fuzz", "-o", name + str(i), "-c", "config_random.toml", "-n", str(iterations)])
+                i += 1
+
+if __name__ == '__main__':
+        main()

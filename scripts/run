@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+
+import subprocess
+
+def main():
+        i = 0
+        name = "output_yosys_all"
+        config = "experiments/yosys_all.toml"
+        iterations = 50
+        while True:
+                subprocess.call(["verifuzz", "fuzz", "-o", name + str(i), "-c", config, "-n", str(iterations)])
+                i += 1
+
+if __name__ == '__main__':
+        main()
