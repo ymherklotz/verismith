@@ -591,3 +591,16 @@ reduceSynth a b = reduce synth
             Fail EquivFail -> True
             Fail _         -> False
             Pass _         -> False
+
+reduceSynthesis :: (Synthesiser a, MonadSh m)
+                => a
+                -> SourceInfo
+                -> m SourceInfo
+reduceSynthesis a = reduce synth
+    where
+        synth src = liftSh $ do
+            r <- runResultT $ runSynth a src
+            return $ case r of
+                Fail SynthFail -> True
+                Fail _         -> False
+                Pass _         -> False
