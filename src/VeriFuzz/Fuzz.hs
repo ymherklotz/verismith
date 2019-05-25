@@ -21,6 +21,9 @@ module VeriFuzz.Fuzz
     , fuzzMultiple
     , runFuzz
     , sampleSeed
+    -- * Helpers
+    , make
+    , pop
     )
 where
 
