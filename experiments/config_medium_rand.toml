@@ -1,0 +1,50 @@
+
+[info]
+  commit = "d14ec7f57e678fdf478d3c138fe74b03cf8f0523"
+  version = "0.3.0.0"
+
+[probability]
+  expr.binary = 5
+  expr.concatenation = 0
+  expr.number = 1
+  expr.rangeselect = 0
+  expr.signed = 0
+  expr.string = 0
+  expr.ternary = 5
+  expr.unary = 5
+  expr.unsigned = 5
+  expr.variable = 5
+  moditem.assign = 2
+  moditem.combinational = 0
+  moditem.instantiation = 0
+  moditem.sequential = 3
+  statement.blocking = 0
+  statement.conditional = 1
+  statement.forloop = 0
+  statement.nonblocking = 2
+
+[property]
+  module.depth = 2
+  module.max = 5
+  sample.method = "hat"
+  sample.size = 10
+  size = 20
+  statement.depth = 5
+
+[[synthesiser]]
+  bin = "/home/ymh15/.local/bin"
+  description = "yosys"
+  name = "yosys"
+  output = "syn_yosys.v"
+
+[[synthesiser]]
+  bin = "/usr/local/Xilinx/Vivado/2018.2/bin"
+  description = "vivado"
+  name = "vivado"
+  output = "syn_vivado.v"
+
+[[synthesiser]]
+  bin = "/usr/local/Xilinx/ise/ISE/bin/lin64"
+  description = "xst"
+  name = "xst"
+  output = "syn_xst.v"
