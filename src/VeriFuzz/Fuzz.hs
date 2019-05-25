@@ -229,7 +229,7 @@ reduction src = do
             writefile (fromText ".." </> dir <.> "v") $ genSource s
             return s
         where dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
-    redSynth (SynthStatus a _ _) = do
+    redSynth a = do
         make dir
         pop dir $ do
             s <- reduceSynthesis a src
