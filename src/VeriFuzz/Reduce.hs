@@ -35,26 +35,27 @@ module VeriFuzz.Reduce
     )
 where
 
-import           Control.Lens             hiding ((<.>))
-import           Control.Monad            (void)
-import           Control.Monad.IO.Class   (MonadIO, liftIO)
-import           Data.Foldable            (foldrM)
-import           Data.List                (nub)
-import           Data.List.NonEmpty       (NonEmpty (..))
-import qualified Data.List.NonEmpty       as NonEmpty
-import           Data.Maybe               (mapMaybe)
-import           Data.Text                (Text)
-import           Shelly                   ((<.>))
+import           Control.Lens            hiding ((<.>))
+import           Control.Monad           (void)
+import           Control.Monad.IO.Class  (MonadIO, liftIO)
+import           Data.Foldable           (foldrM)
+import           Data.List               (nub)
+import           Data.List.NonEmpty      (NonEmpty (..))
+import qualified Data.List.NonEmpty      as NonEmpty
+import           Data.Maybe              (mapMaybe)
+import           Data.Text               (Text)
+import           Shelly                  ((<.>))
 import qualified Shelly
-import           Shelly.Lifted            (MonadSh, liftSh)
+import           Shelly.Lifted           (MonadSh, liftSh)
 import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Verilog
 import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 import           VeriFuzz.Verilog.Parser
+
 
 -- $strategy
 -- The reduction strategy has multiple different steps. 'reduce' will run these
@@ -334,6 +335,7 @@ matchesModName :: Identifier -> ModDecl -> Bool
 matchesModName top (ModDecl i _ _ _ _) = top == i
 
 halveStatement :: Replace Statement
+halveStatement (SeqBlock [s]) = halveStatement s
 halveStatement (SeqBlock s) = SeqBlock <$> halve s
 halveStatement (CondStmnt _ (Just s1) (Just s2)) = Dual s1 s2
 halveStatement (CondStmnt _ (Just s1) Nothing) = Single s1

@@ -29,6 +29,7 @@ reduceUnitTests = testGroup
     [ moduleReducerTest
     , modItemReduceTest
     , halveStatementsTest
+    , statementReducerTest
     , activeWireTest
     , cleanTest
     , cleanAllTest
@@ -370,6 +371,94 @@ module top(y, x);
   assign w = 1'b0;
 endmodule
 |])
+
+-- brittany-disable-next-binding
+statementReducerTest :: TestTree
+statementReducerTest = testCase "Statement reducer" $ do
+    GenVerilog <$> halveStatements "top" srcInfo1 @?= fmap GenVerilog golden1
+    GenVerilog <$> halveStatements "top" srcInfo2 @?= fmap GenVerilog golden2
+    where
+        srcInfo1 = SourceInfo "top" [verilog|
+module top(y, x);
+  output wire [4:0] y;
+  input wire [4:0] x;
+
+  always @(posedge clk) begin
+    a <= 1;
+    b <= 2;
+    c <= 3;
+    d <= 4;
+  end
+
+  always @(posedge clk) begin
+    a <= 1;
+    b <= 2;
+    c <= 3;
+    d <= 4;
+  end
+endmodule
+|]
+        golden1 = Dual (SourceInfo "top" [verilog|
+module top(y, x);
+  output wire [4:0] y;
+  input wire [4:0] x;
+
+  always @(posedge clk) begin
+    a <= 1;
+    b <= 2;
+  end
+
+  always @(posedge clk) begin
+    a <= 1;
+    b <= 2;
+  end
+endmodule
+|]) $ SourceInfo "top" [verilog|
+module top(y, x);
+  output wire [4:0] y;
+  input wire [4:0] x;
+
+  always @(posedge clk) begin
+    c <= 3;
+    d <= 4;
+  end
+
+  always @(posedge clk) begin
+    c <= 3;
+    d <= 4;
+  end
+endmodule
+|]
+        srcInfo2 = SourceInfo "top" [verilog|
+module top(y, x);
+  output wire [4:0] y;
+  input wire [4:0] x;
+
+  always @(posedge clk) begin
+    if (x)
+      y <= 2;
+    else
+      y <= 3;
+  end
+endmodule
+|]
+        golden2 = Dual (SourceInfo "top" [verilog|
+module top(y, x);
+  output wire [4:0] y;
+  input wire [4:0] x;
+
+  always @(posedge clk)
+      y <= 2;
+endmodule
+|]) $ SourceInfo "top" [verilog|
+module top(y, x);
+  output wire [4:0] y;
+  input wire [4:0] x;
+
+  always @(posedge clk)
+      y <= 3;
+endmodule
+|]
 
 -- brittany-disable-next-binding
 moduleReducerTest :: TestTree

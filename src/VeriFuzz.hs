@@ -400,9 +400,10 @@ handleOpts (Reduce f t _ ls' True) = do
                     runSynth b src
                     runEquiv a b src
             case res of
-                Pass _         -> putStrLn "Equivalence check passed"
-                Fail EquivFail -> error "Equivalence check failed"
-                Fail _         -> error "Equivalence check errored out"
+                Pass _            -> putStrLn "Equivalence check passed"
+                Fail EquivFail    -> putStrLn "Equivalence check failed"
+                Fail TimeoutError -> putStrLn "Equivalence check timed out"
+                Fail _            -> putStrLn "Equivalence check error"
             return ()
         as -> do
             putStrLn "Synthesis check"
