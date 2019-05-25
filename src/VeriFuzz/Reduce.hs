@@ -17,6 +17,7 @@ module VeriFuzz.Reduce
     ( -- $strategy
       reduceWithScript
     , reduceSynth
+    , reduceSynthesis
     , reduce
     , reduce_
     , Replacement(..)

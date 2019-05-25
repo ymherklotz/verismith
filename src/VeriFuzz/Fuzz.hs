@@ -132,6 +132,13 @@ passedSynthesis = fmap toSynth . filter passed . _fuzzSynthStatus <$> get
     passed _                          = False
     toSynth (SynthStatus s _ _) = s
 
+failedSynthesis :: MonadSh m => Fuzz m [SynthTool]
+failedSynthesis = fmap toSynth . filter failed . _fuzzSynthStatus <$> get
+  where
+    failed (SynthStatus _ (Fail SynthFail) _) = True
+    failed _                                  = False
+    toSynth (SynthStatus s _ _) = s
+
 make :: MonadSh m => FilePath -> m ()
 make f = liftSh $ do
     mkdir_p f
@@ -210,7 +217,9 @@ failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
 reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
 reduction src = do
     fails <- failEquivWithIdentity
+    synthFails <- failedSynthesis
     _     <- liftSh $ mapM red fails
+    _     <- liftSh $ mapM redSynth synthFails
     return ()
   where
     red (SynthResult a b _ _) = do
@@ -220,6 +229,13 @@ reduction src = do
             writefile (fromText ".." </> dir <.> "v") $ genSource s
             return s
         where dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
+    redSynth (SynthStatus a _ _) = do
+        make dir
+        pop dir $ do
+            s <- reduceSynthesis a src
+            writefile (fromText ".." </> dir <.> "v") $ genSource s
+            return s
+        where dir = fromText $ "reduce_" <> toText a
 
 titleRun
     :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)
