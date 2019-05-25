@@ -62,11 +62,12 @@ yosysPath :: Yosys -> FilePath
 yosysPath sim = maybe (fromText "yosys") (</> fromText "yosys") $ yosysBin sim
 
 runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
-runSynthYosys sim (SourceInfo _ src) = (<?> SynthFail) . liftSh $ do
-    dir <- pwd
-    writefile inpf $ genSource src
-    logCommand_ dir "yosys" $ timeout
-        (yosysPath sim)
+runSynthYosys sim (SourceInfo _ src) = do
+    dir <- liftSh $ do
+        dir' <- pwd
+        writefile inpf $ genSource src
+        return dir'
+    execute_ SynthFail dir "yosys" (yosysPath sim)
         [ "-p"
         , "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out
         ]
