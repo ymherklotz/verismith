@@ -4,8 +4,8 @@ import subprocess
 
 def main():
         i = 0
-        name = "output_large_rand"
-        config = "experiments/config_large.toml"
+        name = "output_swarm_medium2_rand"
+        config = "experiments/config_medium.toml"
         iterations = 20
         while True:
                 subprocess.call(["verifuzz", "config", "-c", config, "-o", "config_random.toml", "--randomise"])

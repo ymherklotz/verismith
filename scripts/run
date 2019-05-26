@@ -4,8 +4,8 @@ import subprocess
 
 def main():
         i = 0
-        name = "output_yosys_all"
-        config = "experiments/yosys_all.toml"
+        name = "output_vivado_all"
+        config = "experiments/vivado_all.toml"
         iterations = 50
         while True:
                 subprocess.call(["verifuzz", "fuzz", "-o", name + str(i), "-c", config, "-n", str(iterations)])
