@@ -296,7 +296,8 @@ fuzz gen conf = do
     (tsynth, _) <- titleRun "Synthesis" $ synthesis src
     (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
     fails       <- failEquivWithIdentity
-    redResult <- whenMaybe (not $ null fails) . titleRun "Reduction" $ reduction
+    synthFails <- failedSynthesis
+    redResult <- whenMaybe (not $ null fails && null synthFails) . titleRun "Reduction" $ reduction
         src
     state_  <- get
     currdir <- liftSh pwd
