@@ -12,7 +12,7 @@ def main(file_, output):
     sec = re.compile(r"([0-9.]+)s")
 
     soup = BeautifulSoup(file_contents, "html.parser")
-    table = soup.select_one("table")
+    table = soup.select_one("table.table")
     headers = [th.text for th in table.select("tr th")]
     vals = [[td.text for td in row.find_all("td")] for row in table.select("tr + tr")][:-2]
 
