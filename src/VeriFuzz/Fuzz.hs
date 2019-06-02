@@ -76,6 +76,8 @@ data FuzzState = FuzzState { _fuzzSynthResults :: ![SynthResult]
 
 $(makeLenses ''FuzzState)
 
+type Frequency a = [(Seed, a)] -> [(Int, Gen (Seed, a))]
+
 -- | The main type for the fuzzing, which contains an environment that can be
 -- read from and the current state of all the results.
 type Fuzz m = StateT FuzzState (ReaderT FuzzEnv m)
@@ -268,19 +270,39 @@ generateSample f = do
 verilogSize :: (Source a) => a -> Int
 verilogSize = length . lines . T.unpack . genSource
 
-sampleVerilogHat :: (MonadIO m, MonadSh m) => Int -> Maybe Seed -> Gen SourceInfo -> Fuzz m (Seed, SourceInfo)
-sampleVerilogHat _ seed@(Just _) gen = sampleSeed seed gen
-sampleVerilogHat n Nothing gen = do
+sampleVerilog
+  :: (MonadSh m, MonadIO m, Source a, Ord a) =>
+     Frequency a -> Int -> Maybe Seed -> Gen a -> m (Seed, a)
+sampleVerilog _ _ seed@(Just _) gen = sampleSeed seed gen
+sampleVerilog freq n Nothing gen = do
     res <- replicateM n $ sampleSeed Nothing gen
     let sizes = fmap getSize res
     let samples = fmap snd . sort $ zip sizes res
-    liftIO $ Hog.sample . Hog.frequency $ freqs samples
+    liftIO $ Hog.sample . Hog.frequency $ freq samples
     where
         getSize (_, s) = verilogSize s
-        freqs l = zip hat (return <$> l)
-            where
-                h = length l `div` 2
-                hat = (+ h) . negate . abs .  (h - ) <$> [1..length l]
+
+hatFreqs :: Frequency a
+hatFreqs l = zip hat (return <$> l)
+    where
+        h = length l `div` 2
+        hat = (+ h) . negate . abs .  (h - ) <$> [1..length l]
+
+meanFreqs :: Source a => Frequency a
+meanFreqs l = zip hat (return <$> l)
+    where
+        hat = calc <$> sizes
+        calc i = if abs (mean - i) == min_ then 1 else 0
+        mean = sum sizes `div` length l
+        min_ = minimum $ abs . (mean -) <$> sizes
+        sizes = verilogSize . snd <$> l
+
+medianFreqs :: Frequency a
+medianFreqs l = zip hat (return <$> l)
+    where
+        h = length l `div` 2
+        hat = set_ <$> [1..length l]
+        set_ n = if n == h then 1 else 0
 
 fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
 fuzz gen conf = do
@@ -315,13 +337,20 @@ fuzz gen conf = do
   where
     seed  = conf ^. configProperty . propSeed
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
-    genMethod = case conf ^. configProperty . propSampleMethod of
+    genMethod = case T.toLower $ conf ^. configProperty . propSampleMethod of
             "hat" -> do
                 logT "Using the hat function"
-                sampleVerilogHat (conf ^. configProperty . propSampleSize) seed gen
+                sv hatFreqs
+            "mean" -> do
+                logT "Using the mean function"
+                sv meanFreqs
+            "median" -> do
+                logT "Using the median function"
+                sv medianFreqs
             _ -> do
                 logT "Using first seed"
                 sampleSeed seed gen
+    sv a = sampleVerilog a (conf ^. configProperty . propSampleSize) seed gen
 
 relativeFuzzReport :: (MonadSh m) => FuzzReport -> m FuzzReport
 relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _ _) = liftSh $ do
