@@ -377,13 +377,14 @@ removeId i = transform trans
 
 combineAssigns :: Port -> [ModItem] -> [ModItem]
 combineAssigns p a =
-    a <> [ModCA . ContAssign (p ^. portName) . fold $ Id <$> assigns]
+    a <> [ModCA . ContAssign (p ^. portName) . UnOp UnXor . fold $ Id <$> assigns]
     where assigns = a ^.. traverse . modContAssign . contAssignNetLVal
 
 combineAssigns_ :: Port -> [Port] -> ModItem
 combineAssigns_ p ps =
     ModCA
         .   ContAssign (p ^. portName)
+        .   UnOp UnXor
         .   fold
         $   Id
         <$> ps
