@@ -514,24 +514,26 @@ reduce_ title repl bot eval src = do
                    (src ^.. infoSrc . _Wrapped . traverse . modItems . traverse)
                )
         <> ")"
-    case repl src of
-        Single s -> do
-            red <- eval s
-            if red
-                then if cond s then recReduction s else return s
-                else return src
-        Dual l r -> do
-            red <- eval l
-            if red
-                then if cond l then recReduction l else return l
-                else do
-                    red' <- eval r
-                    if red'
-                        then if cond r then recReduction r else return r
-                        else return src
-        None -> return src
+    if bot src
+        then return src
+        else case repl src of
+                 Single s -> do
+                     red <- eval s
+                     if red
+                         then if cond s then recReduction s else return s
+                         else return src
+                 Dual l r -> do
+                     red <- eval l
+                     if red
+                         then if cond l then recReduction l else return l
+                         else do
+                             red' <- eval r
+                             if red'
+                                 then if cond r then recReduction r else return r
+                                 else return src
+                 None -> return src
   where
-    cond s = s /= src && not (bot s)
+    cond s = s /= src
     recReduction = reduce_ title repl bot eval
 
 -- | Reduce an input to a minimal representation. It follows the reduction
