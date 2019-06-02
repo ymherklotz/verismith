@@ -464,7 +464,7 @@ moduleDef top = do
                 ^.. traverse
                 .   portSize
     let clock = Port Wire False 1 "clk"
-    let yport = Port Wire False 1 "y"
+    let yport = if True then Port Wire False 1 "y" else Port Wire False size "y"
     let comb  = combineAssigns_ yport local
     return
         . declareMod local
