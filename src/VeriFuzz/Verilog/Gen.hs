@@ -464,9 +464,10 @@ moduleDef top = do
                 $   local
                 ^.. traverse
                 .   portSize
+    let combine = config ^. configProperty . propCombine
     let clock = Port Wire False 1 "clk"
-    let yport = if True then Port Wire False 1 "y" else Port Wire False size "y"
-    let comb  = combineAssigns_ (config ^. configProperty . propCombine) yport local
+    let yport = if combine then Port Wire False 1 "y" else Port Wire False size "y"
+    let comb  = combineAssigns_ combine yport local
     return
         . declareMod local
         . ModDecl name [yport] (clock : portList) (comb : mi)
