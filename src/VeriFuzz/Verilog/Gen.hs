@@ -455,6 +455,7 @@ moduleDef top = do
     mi       <- Hog.list (Hog.linear 4 100) modItem
     ps       <- Hog.list (Hog.linear 0 10) parameter
     context  <- get
+    config <- lift ask
     let local = filter (`notElem` portList) $ _variables context
     let
         size =
@@ -465,7 +466,7 @@ moduleDef top = do
                 .   portSize
     let clock = Port Wire False 1 "clk"
     let yport = if True then Port Wire False 1 "y" else Port Wire False size "y"
-    let comb  = combineAssigns_ yport local
+    let comb  = combineAssigns_ (config ^. configProperty . propCombine) yport local
     return
         . declareMod local
         . ModDecl name [yport] (clock : portList) (comb : mi)

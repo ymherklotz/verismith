@@ -68,6 +68,7 @@ module VeriFuzz.Config
     , propStmntDepth
     , propModDepth
     , propMaxModules
+    , propCombine
     , parseConfigFile
     , parseConfig
     , encodeConfig
@@ -198,6 +199,7 @@ data ConfProperty = ConfProperty { _propSize         :: {-# UNPACK #-} !Int
                                  , _propMaxModules   :: {-# UNPACK #-} !Int
                                  , _propSampleMethod :: !Text
                                  , _propSampleSize   :: {-# UNPACK #-} !Int
+                                 , _propCombine      :: {-# UNPACK #-} !Bool
                                  }
                   deriving (Eq, Show)
 
@@ -265,7 +267,7 @@ defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr)
-    (ConfProperty 20 Nothing 3 2 5 "random" 10)
+    (ConfProperty 20 Nothing 3 2 5 "random" 10 False)
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -382,6 +384,8 @@ propCodec =
         .= _propSampleMethod
         <*> defaultValue (defProp propSampleSize) (int "sample" "size")
         .= _propSampleSize
+        <*> defaultValue (defProp propCombine) (Toml.bool (twoKey "output" "combine"))
+        .= _propCombine
     where defProp i = defaultConfig ^. configProperty . i
 
 simulator :: TomlCodec SimDescription
