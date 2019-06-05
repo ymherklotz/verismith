@@ -111,12 +111,15 @@ parseSynth val | val == "yosys" = Just TYosys
                | otherwise      = Nothing
 
 parseSynthDesc :: String -> Maybe SynthDescription
-parseSynthDesc val | val == "yosys" = Just $ SynthDescription "yosys" Nothing Nothing Nothing
-                   | val == "vivado" = Just $ SynthDescription "vivado" Nothing Nothing Nothing
-                   | val == "xst"   = Just $ SynthDescription "xst" Nothing Nothing Nothing
-                   | val == "quartus"   = Just $ SynthDescription "quartus" Nothing Nothing Nothing
-                   | val == "identity"   = Just $ SynthDescription "identity" Nothing Nothing Nothing
-                   | otherwise      = Nothing
+parseSynthDesc val
+    | val == "yosys" = Just $ SynthDescription "yosys" Nothing Nothing Nothing
+    | val == "vivado" = Just $ SynthDescription "vivado" Nothing Nothing Nothing
+    | val == "xst" = Just $ SynthDescription "xst" Nothing Nothing Nothing
+    | val == "quartus" = Just
+    $ SynthDescription "quartus" Nothing Nothing Nothing
+    | val == "identity" = Just
+    $ SynthDescription "identity" Nothing Nothing Nothing
+    | otherwise = Nothing
 
 parseSim :: String -> Maybe OptTool
 parseSim val | val == "icarus" = Just TIcarus
@@ -191,22 +194,26 @@ reduceOpts =
                 <> showDefault
                 <> value "top"
                 )
-        <*> (  optional . strOption
+        <*> (  optional
+            .  strOption
             $  long "script"
             <> metavar "SCRIPT"
             <> help
                    "Script that determines if the current file is interesting, which is determined by the script returning 0."
             )
-        <*> (many . option (optReader parseSynthDesc) $
-                 short 's'
-                 <> long "synth"
-                 <> metavar "SYNTH"
-                 <> help "Specify synthesiser to use."
-                 )
-    <*> (switch $
-        short 'r'
-        <> long "rerun"
-        <> help "Only rerun the current synthesis file with all the synthesisers.")
+        <*> (  many
+            .  option (optReader parseSynthDesc)
+            $  short 's'
+            <> long "synth"
+            <> metavar "SYNTH"
+            <> help "Specify synthesiser to use."
+            )
+        <*> (  switch
+            $  short 'r'
+            <> long "rerun"
+            <> help
+                   "Only rerun the current synthesis file with all the synthesisers."
+            )
 
 configOpts :: Parser Opts
 configOpts =
@@ -386,8 +393,7 @@ handleOpts (Reduce f t _ ls' False) = do
         _ -> do
             putStrLn "Not reducing because no synthesiser was specified"
             return ()
-    where
-        dir = fromText "reduce"
+    where dir = fromText "reduce"
 handleOpts (Reduce f t _ ls' True) = do
     src <- parseSourceInfoFile t (toTextIgnore f)
     case descriptionToSynth <$> ls' of
@@ -409,7 +415,7 @@ handleOpts (Reduce f t _ ls' True) = do
             putStrLn "Synthesis check"
             _ <- shelly . runResultT $ mapM (flip runSynth src) as
             return ()
-        where dir = fromText "equiv"
+    where dir = fromText "equiv"
 handleOpts (ConfigOpt c conf r) = do
     config <- if r then getConfig conf >>= randomise else getConfig conf
     maybe (T.putStrLn . encodeConfig $ config) (`encodeConfigFile` config)

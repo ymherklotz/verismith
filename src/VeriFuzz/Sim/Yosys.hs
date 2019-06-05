@@ -67,7 +67,11 @@ runSynthYosys sim (SourceInfo _ src) = do
         dir' <- pwd
         writefile inpf $ genSource src
         return dir'
-    execute_ SynthFail dir "yosys" (yosysPath sim)
+    execute_
+        SynthFail
+        dir
+        "yosys"
+        (yosysPath sim)
         [ "-p"
         , "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out
         ]

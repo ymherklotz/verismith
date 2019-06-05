@@ -356,7 +356,13 @@ summary name fuzz = H.docTypeHtml $ do
                       H.tr $ H.toHtml
                           [ H.td $ H.strong "Total"
                           , H.td mempty
-                          , H.td . H.string . show . sum $ fuzz ^.. traverse . fileLines
+                          , H.td
+                          .   H.string
+                          .   show
+                          .   sum
+                          $   fuzz
+                          ^.. traverse
+                          .   fileLines
                           , sumUp synthTime
                           , sumUp equivTime
                           , sumUp reducTime
@@ -382,7 +388,7 @@ summary name fuzz = H.docTypeHtml $ do
     meanVar s = bimap d2T d2T $ fuzzStats s fuzz
     showHtml = H.td . H.string . show
     d2T      = showHtml . (realToFrac :: Double -> NominalDiffTime)
-    d2I  = H.td . H.string . show
+    d2I      = H.td . H.string . show
 
 printResultReport :: Text -> FuzzReport -> Text
 printResultReport t f = toStrict . renderHtml $ resultReport t f

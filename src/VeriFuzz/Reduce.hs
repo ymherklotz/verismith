@@ -257,7 +257,7 @@ exprId (RangeSelect i _) = Just i
 exprId _                 = Nothing
 
 eventId :: Event -> Maybe Identifier
-eventId (EId i)      = Just i
+eventId (EId      i) = Just i
 eventId (EPosEdge i) = Just i
 eventId (ENegEdge i) = Just i
 eventId _            = Nothing
@@ -411,12 +411,13 @@ toIdsEvent = nub . mapMaybe eventId . concatMap universe
 allStatIds' :: Statement -> [Identifier]
 allStatIds' s = nub $ assignIds <> otherExpr <> eventProcessedIds
   where
-    assignIds = toIds
+    assignIds =
+        toIds
             $  (s ^.. stmntBA . assignExpr)
             <> (s ^.. stmntNBA . assignExpr)
             <> (s ^.. forAssign . assignExpr)
             <> (s ^.. forIncr . assignExpr)
-    otherExpr = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
+    otherExpr         = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
     eventProcessedIds = toIdsEvent $ s ^.. statEvent
 
 allStatIds :: Statement -> [Identifier]
@@ -517,21 +518,21 @@ reduce_ title repl bot eval src = do
     if bot src
         then return src
         else case repl src of
-                 Single s -> do
-                     red <- eval s
-                     if red
-                         then if cond s then recReduction s else return s
-                         else return src
-                 Dual l r -> do
-                     red <- eval l
-                     if red
-                         then if cond l then recReduction l else return l
-                         else do
-                             red' <- eval r
-                             if red'
-                                 then if cond r then recReduction r else return r
-                                 else return src
-                 None -> return src
+            Single s -> do
+                red <- eval s
+                if red
+                    then if cond s then recReduction s else return s
+                    else return src
+            Dual l r -> do
+                red <- eval l
+                if red
+                    then if cond l then recReduction l else return l
+                    else do
+                        red' <- eval r
+                        if red'
+                            then if cond r then recReduction r else return r
+                            else return src
+            None -> return src
   where
     cond s = s /= src
     recReduction = reduce_ title repl bot eval
@@ -597,15 +598,12 @@ reduceSynth a b = reduce synth
             Fail _         -> False
             Pass _         -> False
 
-reduceSynthesis :: (Synthesiser a, MonadSh m)
-                => a
-                -> SourceInfo
-                -> m SourceInfo
+reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo -> m SourceInfo
 reduceSynthesis a = reduce synth
-    where
-        synth src = liftSh $ do
-            r <- runResultT $ runSynth a src
-            return $ case r of
-                Fail SynthFail -> True
-                Fail _         -> False
-                Pass _         -> False
+  where
+    synth src = liftSh $ do
+        r <- runResultT $ runSynth a src
+        return $ case r of
+            Fail SynthFail -> True
+            Fail _         -> False
+            Pass _         -> False

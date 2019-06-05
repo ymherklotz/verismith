@@ -380,12 +380,14 @@ propCodec =
         .=  _propModDepth
         <*> defaultValue (defProp propMaxModules) (int "module" "max")
         .=  _propMaxModules
-        <*> defaultValue (defProp propSampleMethod) (Toml.text (twoKey "sample" "method"))
-        .= _propSampleMethod
+        <*> defaultValue (defProp propSampleMethod)
+                         (Toml.text (twoKey "sample" "method"))
+        .=  _propSampleMethod
         <*> defaultValue (defProp propSampleSize) (int "sample" "size")
-        .= _propSampleSize
-        <*> defaultValue (defProp propCombine) (Toml.bool (twoKey "output" "combine"))
-        .= _propCombine
+        .=  _propSampleSize
+        <*> defaultValue (defProp propCombine)
+                         (Toml.bool (twoKey "output" "combine"))
+        .=  _propCombine
     where defProp i = defaultConfig ^. configProperty . i
 
 simulator :: TomlCodec SimDescription

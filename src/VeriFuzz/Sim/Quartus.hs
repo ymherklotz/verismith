@@ -53,7 +53,12 @@ runSynthQuartus sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let ex = execute_ SynthFail dir "quartus"
     liftSh . writefile inpf $ genSource src
-    liftSh . noPrint $ run_ "sed" ["-i", "s/^module/(* multstyle = \"logic\" *) module/;", toTextIgnore inpf]
+    liftSh . noPrint $ run_
+        "sed"
+        [ "-i"
+        , "s/^module/(* multstyle = \"logic\" *) module/;"
+        , toTextIgnore inpf
+        ]
     ex (exec "quartus_map")
        [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
     ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
