@@ -18,17 +18,19 @@ module VeriFuzz.Sim.Template
     , xstSynthConfig
     , vivadoSynthConfig
     , sbyConfig
+    , icarusTestbench
     )
 where
 
-import           Control.Lens          ((^..))
-import           Data.Text             (Text)
-import qualified Data.Text             as T
-import           Prelude               hiding (FilePath)
+import           Control.Lens             ((^..))
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text (st)
+import           Text.Shakespeare.Text    (st)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
+import           VeriFuzz.Verilog.CodeGen
 
 rename :: Text -> [Text] -> Text
 rename end entries =
@@ -117,3 +119,15 @@ top.v
         .   fromText
         <$> deps
     readL = T.intercalate "\n" $ mappend "read -formal " <$> deps
+
+icarusTestbench :: (Synthesiser a) => Verilog -> a -> Text
+icarusTestbench t synth1 = [st|
+`include "data/cells_cmos.v"
+`include "data/cells_cyclone_v.v"
+`include "data/cells_verific.v"
+`include "data/cells_xilinx_7.v"
+`include "data/cells_yosys.v"
+`include "#{synthOutput synth1}"
+
+#{genSource t}
+|]

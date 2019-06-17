@@ -211,12 +211,56 @@ equivalence src = do
                       runEquiv a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
+simulation :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
+simulation src = do
+    synth <- passEquiv
+--    let synthComb =
+--            nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
+    let synthComb =
+            nubBy tupEq
+                .   filter (uncurry (/=))
+                $   (,) defaultIdentitySynth
+                <$> synth
+    resTimes <- liftSh $ mapM (uncurry equiv) synthComb
+    fuzzSynthResults .= toSynthResult synthComb resTimes
+    liftSh $ inspect resTimes
+  where
+    tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
+    equiv a b =
+        toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
+            . runResultT
+            $ do
+                  make dir
+                  pop dir $ do
+                      liftSh $ do
+                          cp
+                                  (   fromText ".."
+                                  </> fromText (toText a)
+                                  </> synthOutput a
+                                  )
+                              $ synthOutput a
+                          cp
+                                  (   fromText ".."
+                                  </> fromText (toText b)
+                                  </> synthOutput b
+                                  )
+                              $ synthOutput b
+                          writefile "rtl.v" $ genSource src
+                      runEquiv a b src
+        where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
+
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
   where
     withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail) _) = True
     withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail) _) = True
     withIdentity _                                                    = False
+
+passEquiv :: (MonadSh m) => Fuzz m [SynthResult]
+passEquiv = filter withIdentity . _fuzzSynthResults <$> get
+  where
+    withIdentity (SynthResult _ _ (Pass _) _) = True
+    withIdentity _                            = False
 
 -- | Always reduces with respect to 'Identity'.
 reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
@@ -320,6 +364,7 @@ fuzz gen conf = do
         ?~ seed'
     (tsynth, _) <- titleRun "Synthesis" $ synthesis src
     (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
+    (tsim, _) <- titleRun "Equivalence Check" $ simulation src
     fails       <- failEquivWithIdentity
     synthFails  <- failedSynthesis
     redResult   <-

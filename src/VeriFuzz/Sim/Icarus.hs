@@ -123,3 +123,43 @@ runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
         dir
         "vvp"
         (runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"])
+
+runSimIc
+    :: (Synthesiser a) => a -> SourceInfo -> [ByteString] -> ResultSh ByteString
+runSimIc sim1 srcInfo bss = do
+    dir <- liftSh pwd
+    let top = srcInfo ^. mainModule
+    let inConcat = (RegConcat (Id . fromPort <$> (top ^. modInPorts)))
+    let tb = ModDecl
+             "testbench"
+             []
+             []
+             [ Initial
+               $ fold [ BlockAssign (Assign "clk" Nothing 0)
+                      , BlockAssign (Assign  inConcat Nothing 0)
+                      ]
+               <> (SysTaskEnable $ Task "finish" [])
+             , Always . TimeCtrl 5 $ BlockAssign (Assign "clk" Nothing (UnNot (Id "clk")))
+             , Always . EventCtrl (EPosEdge "clk") $ SysTaskEnable $ Task "strobe" ["%b", Id "y"]
+             ]
+             []
+    liftSh $ do
+        writefile "top.v"
+            .  genSource
+            .  initMod
+            .  makeTopAssert
+            $  srcInfo
+            ^. mainModule
+        replaceMods (synthOutput sim1) "_1" srcInfo
+        replaceMods (synthOutput sim2) "_2" srcInfo
+        writefile "proof.sby" $ sbyConfig sim1 sim2 srcInfo
+    e <- liftSh $ do
+        exe dir "symbiyosys" "sby" ["-f", "proof.sby"]
+        lastExitCode
+    case e of
+        0   -> ResultT . return $ Pass ()
+        2   -> ResultT . return $ Fail EquivFail
+        124 -> ResultT . return $ Fail TimeoutError
+        _   -> ResultT . return $ Fail EquivError
+  where
+    exe dir name e = void . errExit False . logCommand dir name . timeout e
