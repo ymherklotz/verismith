@@ -37,6 +37,11 @@ import           Control.Monad.Trans.Control      (MonadBaseControl)
 import           Control.Monad.Trans.Maybe        (runMaybeT)
 import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
+import qualified Crypto.Random.DRBG               as C
+import           Data.ByteString                  (ByteString)
+import           Data.ByteString.Builder          (byteStringHex,
+                                                   toLazyByteString)
+import qualified Data.ByteString.Lazy             as L
 import           Data.List                        (nubBy, sort)
 import           Data.Maybe                       (isNothing)
 import           Data.Text                        (Text)
@@ -57,6 +62,7 @@ import           VeriFuzz.Internal
 import           VeriFuzz.Reduce
 import           VeriFuzz.Report
 import           VeriFuzz.Result
+import           VeriFuzz.Sim.Icarus
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Yosys
 import           VeriFuzz.Verilog.AST
@@ -211,23 +217,17 @@ equivalence src = do
                       runEquiv a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-simulation :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
+simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
 simulation src = do
     synth <- passEquiv
---    let synthComb =
---            nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
-    let synthComb =
-            nubBy tupEq
-                .   filter (uncurry (/=))
-                $   (,) defaultIdentitySynth
-                <$> synth
-    resTimes <- liftSh $ mapM (uncurry equiv) synthComb
-    fuzzSynthResults .= toSynthResult synthComb resTimes
+    vals <- liftIO $ generateByteString 20
+    resTimes <- liftSh $ mapM (equiv vals) $ conv <$> synth
     liftSh $ inspect resTimes
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equiv a b =
-        toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
+    conv (SynthResult a _ _ _) = a
+    equiv b a =
+        toolRun ("simulation for " <> toText a)
             . runResultT
             $ do
                   make dir
@@ -239,15 +239,22 @@ simulation src = do
                                   </> synthOutput a
                                   )
                               $ synthOutput a
-                          cp
-                                  (   fromText ".."
-                                  </> fromText (toText b)
-                                  </> synthOutput b
-                                  )
-                              $ synthOutput b
                           writefile "rtl.v" $ genSource src
-                      runEquiv a b src
-        where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
+                      runSimIc defaultIcarus a src b
+        where dir = fromText $ "simulation_" <> toText a
+
+-- | Generate a specific number of random bytestrings of size 256.
+randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
+randomByteString gen n bytes
+    | n == 0    = ranBytes : bytes
+    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
+    where Right (ranBytes, newGen) = C.genBytes 32 gen
+
+-- | generates the specific number of bytestring with a random seed.
+generateByteString :: Int -> IO [ByteString]
+generateByteString n = do
+    gen <- C.newGenIO :: IO C.CtrDRBG
+    return $ randomByteString gen n []
 
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
@@ -364,7 +371,7 @@ fuzz gen conf = do
         ?~ seed'
     (tsynth, _) <- titleRun "Synthesis" $ synthesis src
     (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
-    (tsim, _) <- titleRun "Equivalence Check" $ simulation src
+    (tsim, _)   <- titleRun "Simulation" $ simulation src
     fails       <- failEquivWithIdentity
     synthFails  <- failedSynthesis
     redResult   <-

@@ -127,7 +127,7 @@ icarusTestbench t synth1 = [st|
 `include "data/cells_verific.v"
 `include "data/cells_xilinx_7.v"
 `include "data/cells_yosys.v"
-`include "#{synthOutput synth1}"
+`include "#{toTextIgnore $ synthOutput synth1}"
 
 #{genSource t}
 |]
