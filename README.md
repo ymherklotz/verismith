@@ -14,6 +14,15 @@ and the following simulator:
 
 - [Icarus Verilog](http://iverilog.icarus.com)
 
+## Supported Verilog Constructs
+
+The fuzzer generates combinational and behavioural Verilog to test the various
+tools.
+
+There is a [presentation](https://yannherklotz.com/docs/presentation.pdf) about
+VeriFuzz and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes
+over all the details of the implementation and results that were found.
+
 ## Reported bugs
 
 21 bugs were found in total over the course of a month. 8 of those bugs were
@@ -32,13 +41,13 @@ reported and 3 were fixed.
 
 ### Vivado
 
-| Type | Issue                                                                                                               | Confirmed | Fixed |
-|------|---------------------------------------------------------------------------------------------------------------------|-----------|-------|
-| C    | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787) | ✓         | 𐄂     |
-| C   | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                    | ✓         | 𐄂     |
-| MS | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789) | ✓ | 𐄂 |
-| MS | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓ | 𐄂 |
-| MS | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419) | ✓ | 𐄂 |
+| Type | Issue                                                                                                                               | Confirmed | Fixed |
+|------|-------------------------------------------------------------------------------------------------------------------------------------|-----------|-------|
+| C    | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | 𐄂     |
+| C    | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                                    | ✓         | 𐄂     |
+| MS   | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789)             | ✓         | 𐄂     |
+| MS   | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | 𐄂     |
+| MS   | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | 𐄂     |
 
 ## Build the Fuzzer
 
@@ -78,3 +87,13 @@ To run the test-suites:
 ```
 stack test
 ```
+
+## Acknowledgement
+
+Clifford Wolf's [VlogHammer](http://www.clifford.at/yosys/vloghammer.html) is an
+existing Verilog fuzzer that generates random Verilog expressions. It was the
+inspiration for the general structure of this fuzzer, which extends the fuzzing
+to the behavioural parts of Verilog.
+
+Tom Hawkins' Verilog parser was used to write the lexer, the parser was then
+rewritten using [Parsec](https://hackage.haskell.org/package/parsec).
