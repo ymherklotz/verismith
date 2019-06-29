@@ -1,7 +1,10 @@
 # VeriFuzz [![Build Status](https://travis-ci.com/ymherklotz/verifuzz.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verifuzz)
 
 Verilog Fuzzer to test the major verilog compilers by generating random, valid
-verilog.
+verilog. There is a
+[presentation](https://yannherklotz.com/docs/presentation.pdf) about VeriFuzz
+and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes over all the
+details of the implementation and results that were found.
 
 It currently supports the following synthesisers:
 
@@ -17,11 +20,18 @@ and the following simulator:
 ## Supported Verilog Constructs
 
 The fuzzer generates combinational and behavioural Verilog to test the various
-tools.
+tools. The most notable constructs that are supported and generated are the
+following:
 
-There is a [presentation](https://yannherklotz.com/docs/presentation.pdf) about
-VeriFuzz and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes
-over all the details of the implementation and results that were found.
+- module definitions with parameter definitions, inputs and outputs
+- module items, such as instantiations, continuous assignment, always blocks,
+  initial blocks, parameter and local parameter declarations
+- most expressions, for example concatenation, arithmetic operations, ternary
+    conditional operator
+- behavioural code in sequential always blocks
+- behavioural control flow such as if-else and for loops
+- declaration of wires and variables of any size, signed or unsigned
+- bit selection from wires and variables
 
 ## Reported bugs
 
