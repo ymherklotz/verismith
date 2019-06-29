@@ -21,17 +21,21 @@ and the following simulator:
 
 ### Yosys
 
-| Type | Issue                                                      | Confirmed | Fixed |   |
-|------|------------------------------------------------------------|-----------|-------|---|
-| MS   | [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) | ✓         | ✓     |   |
-| MS   | [Issue 997](https://github.com/YosysHQ/yosys/issues/997)   | ✓         | ✓     |   |
-| C    | [Issue 993](https://github.com/YosysHQ/yosys/issues/993)   | ✓         | ✓     |   |
+| Type | Issue                                                      | Confirmed | Fixed |
+|------|------------------------------------------------------------|-----------|-------|
+| MS   | [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) | ✓         | ✓     |
+| MS   | [Issue 997](https://github.com/YosysHQ/yosys/issues/997)   | ✓         | ✓     |
+| C    | [Issue 993](https://github.com/YosysHQ/yosys/issues/993)   | ✓         | ✓     |
 
 ### Vivado
 
-| Type | Issue                                                                                               | Confirmed | Fixed |
-|------|-----------------------------------------------------------------------------------------------------|-----------|-------|
-| C    | https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787 |           |       |
+| Type | Issue                                                                                                               | Confirmed | Fixed |
+|------|---------------------------------------------------------------------------------------------------------------------|-----------|-------|
+| C    | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787) | ✓         | 𐄂     |
+| C   | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                    | ✓         | 𐄂     |
+| MS | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789) | ✓ | 𐄂 |
+| MS | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓ | 𐄂 |
+| MS | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419) | ✓ | 𐄂 |
 
 ## Build the Fuzzer
 
