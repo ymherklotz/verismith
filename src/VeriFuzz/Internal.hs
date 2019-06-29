@@ -20,12 +20,14 @@ module VeriFuzz.Internal
     )
 where
 
-import           Data.ByteString         (ByteString)
-import           Data.ByteString.Builder (byteStringHex, toLazyByteString)
-import qualified Data.ByteString.Lazy    as L
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import           Data.Text.Encoding      (decodeUtf8)
+import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Builder        ( byteStringHex
+                                                , toLazyByteString
+                                                )
+import qualified Data.ByteString.Lazy          as L
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Text.Encoding             ( decodeUtf8 )
 
 -- | Function to show a bytestring in a hex format.
 showBS :: ByteString -> Text

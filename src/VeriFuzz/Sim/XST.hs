@@ -18,12 +18,17 @@ module VeriFuzz.Sim.XST
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           Text.Shakespeare.Text    (st)
+import           Shelly.Lifted                  ( liftSh )
+import           Text.Shakespeare.Text          ( st )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST

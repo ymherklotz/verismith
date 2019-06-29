@@ -139,14 +139,18 @@ module VeriFuzz.Verilog.AST
     )
 where
 
-import           Control.Lens             hiding ((<|))
+import           Control.Lens            hiding ( (<|) )
 import           Data.Data
 import           Data.Data.Lens
-import           Data.Functor.Foldable.TH (makeBaseFunctor)
-import           Data.List.NonEmpty       (NonEmpty (..), (<|))
-import           Data.String              (IsString, fromString)
-import           Data.Text                (Text)
-import           Data.Traversable         (sequenceA)
+import           Data.Functor.Foldable.TH       ( makeBaseFunctor )
+import           Data.List.NonEmpty             ( NonEmpty(..)
+                                                , (<|)
+                                                )
+import           Data.String                    ( IsString
+                                                , fromString
+                                                )
+import           Data.Text                      ( Text )
+import           Data.Traversable               ( sequenceA )
 import           VeriFuzz.Verilog.BitVec
 
 -- | Identifier in Verilog. This is just a string of characters that can either

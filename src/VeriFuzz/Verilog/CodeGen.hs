@@ -22,13 +22,15 @@ module VeriFuzz.Verilog.CodeGen
     )
 where
 
-import           Data.Data                 (Data)
-import           Data.List.NonEmpty        (NonEmpty (..), toList)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
+import           Data.Data                      ( Data )
+import           Data.List.NonEmpty             ( NonEmpty(..)
+                                                , toList
+                                                )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc
-import           Numeric                   (showHex)
-import           VeriFuzz.Internal         hiding (comma)
+import           Numeric                        ( showHex )
+import           VeriFuzz.Internal       hiding ( comma )
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 

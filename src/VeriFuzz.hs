@@ -28,27 +28,29 @@ module VeriFuzz
 where
 
 import           Control.Concurrent
-import           Control.Lens             hiding ((<.>))
-import           Control.Monad.IO.Class   (liftIO)
-import qualified Crypto.Random.DRBG       as C
-import           Data.ByteString          (ByteString)
-import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
-import qualified Data.ByteString.Lazy     as L
-import qualified Data.Graph.Inductive     as G
-import qualified Data.Graph.Inductive.Dot as G
-import           Data.Maybe               (isNothing)
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           Data.Text.Encoding       (decodeUtf8)
-import qualified Data.Text.IO             as T
-import           Hedgehog                 (Gen)
-import qualified Hedgehog.Gen             as Hog
-import           Hedgehog.Internal.Seed   (Seed)
+import           Control.Lens            hiding ( (<.>) )
+import           Control.Monad.IO.Class         ( liftIO )
+import qualified Crypto.Random.DRBG            as C
+import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Builder        ( byteStringHex
+                                                , toLazyByteString
+                                                )
+import qualified Data.ByteString.Lazy          as L
+import qualified Data.Graph.Inductive          as G
+import qualified Data.Graph.Inductive.Dot      as G
+import           Data.Maybe                     ( isNothing )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Text.Encoding             ( decodeUtf8 )
+import qualified Data.Text.IO                  as T
+import           Hedgehog                       ( Gen )
+import qualified Hedgehog.Gen                  as Hog
+import           Hedgehog.Internal.Seed         ( Seed )
 import           Options.Applicative
-import           Prelude                  hiding (FilePath)
-import           Shelly                   hiding (command)
-import           Shelly.Lifted            (liftSh)
-import           System.Random            (randomIO)
+import           Prelude                 hiding ( FilePath )
+import           Shelly                  hiding ( command )
+import           Shelly.Lifted                  ( liftSh )
+import           System.Random                  ( randomIO )
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
@@ -58,7 +60,7 @@ import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog
-import           VeriFuzz.Verilog.Parser  (parseSourceInfoFile)
+import           VeriFuzz.Verilog.Parser        ( parseSourceInfoFile )
 
 data OptTool = TYosys
           | TXST

@@ -35,18 +35,22 @@ module VeriFuzz.Reduce
     )
 where
 
-import           Control.Lens            hiding ((<.>))
-import           Control.Monad           (void)
-import           Control.Monad.IO.Class  (MonadIO, liftIO)
-import           Data.Foldable           (foldrM)
-import           Data.List               (nub)
-import           Data.List.NonEmpty      (NonEmpty (..))
-import qualified Data.List.NonEmpty      as NonEmpty
-import           Data.Maybe              (mapMaybe)
-import           Data.Text               (Text)
-import           Shelly                  ((<.>))
+import           Control.Lens            hiding ( (<.>) )
+import           Control.Monad                  ( void )
+import           Control.Monad.IO.Class         ( MonadIO
+                                                , liftIO
+                                                )
+import           Data.Foldable                  ( foldrM )
+import           Data.List                      ( nub )
+import           Data.List.NonEmpty             ( NonEmpty(..) )
+import qualified Data.List.NonEmpty            as NonEmpty
+import           Data.Maybe                     ( mapMaybe )
+import           Data.Text                      ( Text )
+import           Shelly                         ( (<.>) )
 import qualified Shelly
-import           Shelly.Lifted           (MonadSh, liftSh)
+import           Shelly.Lifted                  ( MonadSh
+                                                , liftSh
+                                                )
 import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Sim

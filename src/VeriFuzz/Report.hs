@@ -41,23 +41,33 @@ module VeriFuzz.Report
     )
 where
 
-import           Control.DeepSeq               (NFData, rnf)
-import           Control.Lens                  hiding (Identity, (<.>))
-import           Data.Bifunctor                (bimap)
-import           Data.ByteString               (ByteString)
-import           Data.Maybe                    (fromMaybe)
-import           Data.Monoid                   (Endo)
-import           Data.Text                     (Text)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                )
+import           Control.Lens            hiding ( Identity
+                                                , (<.>)
+                                                )
+import           Data.Bifunctor                 ( bimap )
+import           Data.ByteString                ( ByteString )
+import           Data.Maybe                     ( fromMaybe )
+import           Data.Monoid                    ( Endo )
+import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import           Data.Text.Lazy                (toStrict)
+import           Data.Text.Lazy                 ( toStrict )
 import           Data.Time
-import           Data.Vector                   (fromList)
-import           Prelude                       hiding (FilePath)
-import           Shelly                        (FilePath, fromText,
-                                                toTextIgnore, (<.>), (</>))
-import           Statistics.Sample             (meanVariance)
-import           Text.Blaze.Html               (Html, (!))
-import           Text.Blaze.Html.Renderer.Text (renderHtml)
+import           Data.Vector                    ( fromList )
+import           Prelude                 hiding ( FilePath )
+import           Shelly                         ( FilePath
+                                                , fromText
+                                                , toTextIgnore
+                                                , (<.>)
+                                                , (</>)
+                                                )
+import           Statistics.Sample              ( meanVariance )
+import           Text.Blaze.Html                ( Html
+                                                , (!)
+                                                )
+import           Text.Blaze.Html.Renderer.Text  ( renderHtml )
 import qualified Text.Blaze.Html5              as H
 import qualified Text.Blaze.Html5.Attributes   as A
 import           VeriFuzz.Config

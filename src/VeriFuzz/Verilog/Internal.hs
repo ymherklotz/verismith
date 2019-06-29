@@ -29,7 +29,7 @@ module VeriFuzz.Verilog.Internal
 where
 
 import           Control.Lens
-import           Data.Text            (Text)
+import           Data.Text                      ( Text )
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem

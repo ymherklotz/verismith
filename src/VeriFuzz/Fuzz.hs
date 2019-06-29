@@ -27,33 +27,40 @@ module VeriFuzz.Fuzz
     )
 where
 
-import           Control.DeepSeq                  (force)
-import           Control.Exception.Lifted         (finally)
-import           Control.Lens                     hiding ((<.>))
-import           Control.Monad                    (forM, replicateM)
+import           Control.DeepSeq                ( force )
+import           Control.Exception.Lifted       ( finally )
+import           Control.Lens            hiding ( (<.>) )
+import           Control.Monad                  ( forM
+                                                , replicateM
+                                                )
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class        (lift)
-import           Control.Monad.Trans.Control      (MonadBaseControl)
-import           Control.Monad.Trans.Maybe        (runMaybeT)
-import           Control.Monad.Trans.Reader       hiding (local)
+import           Control.Monad.Trans.Class      ( lift )
+import           Control.Monad.Trans.Control    ( MonadBaseControl )
+import           Control.Monad.Trans.Maybe      ( runMaybeT )
+import           Control.Monad.Trans.Reader
+                                         hiding ( local )
 import           Control.Monad.Trans.State.Strict
-import qualified Crypto.Random.DRBG               as C
-import           Data.ByteString                  (ByteString)
-import           Data.List                        (nubBy, sort)
-import           Data.Maybe                       (isNothing)
-import           Data.Text                        (Text)
-import qualified Data.Text                        as T
+import qualified Crypto.Random.DRBG            as C
+import           Data.ByteString                ( ByteString )
+import           Data.List                      ( nubBy
+                                                , sort
+                                                )
+import           Data.Maybe                     ( isNothing )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Data.Time
-import           Data.Tuple                       (swap)
-import           Hedgehog                         (Gen)
-import qualified Hedgehog.Internal.Gen            as Hog
-import           Hedgehog.Internal.Seed           (Seed)
-import qualified Hedgehog.Internal.Seed           as Hog
-import qualified Hedgehog.Internal.Tree           as Hog
-import           Prelude                          hiding (FilePath)
-import           Shelly                           hiding (get)
-import           Shelly.Lifted                    (MonadSh, liftSh)
-import           System.FilePath.Posix            (takeBaseName)
+import           Data.Tuple                     ( swap )
+import           Hedgehog                       ( Gen )
+import qualified Hedgehog.Internal.Gen         as Hog
+import           Hedgehog.Internal.Seed         ( Seed )
+import qualified Hedgehog.Internal.Seed        as Hog
+import qualified Hedgehog.Internal.Tree        as Hog
+import           Prelude                 hiding ( FilePath )
+import           Shelly                  hiding ( get )
+import           Shelly.Lifted                  ( MonadSh
+                                                , liftSh
+                                                )
+import           System.FilePath.Posix          ( takeBaseName )
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Reduce
@@ -144,7 +151,7 @@ failedSynthesis :: MonadSh m => Fuzz m [SynthTool]
 failedSynthesis = fmap toSynth . filter failed . _fuzzSynthStatus <$> get
   where
     failed (SynthStatus _ (Fail SynthFail) _) = True
-    failed _                                  = False
+    failed _ = False
     toSynth (SynthStatus s _ _) = s
 
 make :: MonadSh m => FilePath -> m ()
@@ -216,27 +223,24 @@ equivalence src = do
 
 simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
 simulation src = do
-    synth <- passEquiv
-    vals <- liftIO $ generateByteString 20
+    synth    <- passEquiv
+    vals     <- liftIO $ generateByteString 20
+    ident    <- liftSh $ equiv vals defaultIdentitySynth
     resTimes <- liftSh $ mapM (equiv vals) $ conv <$> synth
-    liftSh $ inspect resTimes
+    liftSh
+        .   inspect
+        $   (\(_, r) -> bimap show (T.unpack . T.take 10 . showBS) r)
+        <$> (ident : resTimes)
   where
-    conv (SynthResult a _ _ _) = a
-    equiv b a =
-        toolRun ("simulation for " <> toText a)
-            . runResultT
-            $ do
-                  make dir
-                  pop dir $ do
-                      liftSh $ do
-                          cp
-                                  (   fromText ".."
-                                  </> fromText (toText a)
-                                  </> synthOutput a
-                                  )
-                              $ synthOutput a
-                          writefile "rtl.v" $ genSource src
-                      runSimIc defaultIcarus a src b
+    conv (SynthResult _ a _ _) = a
+    equiv b a = toolRun ("simulation for " <> toText a) . runResultT $ do
+        make dir
+        pop dir $ do
+            liftSh $ do
+                cp (fromText ".." </> fromText (toText a) </> synthOutput a)
+                    $ synthOutput a
+                writefile "rtl.v" $ genSource src
+            runSimIc defaultIcarus a src b
         where dir = fromText $ "simulation_" <> toText a
 
 -- | Generate a specific number of random bytestrings of size 256.
@@ -257,7 +261,7 @@ failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
   where
     withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail) _) = True
     withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail) _) = True
-    withIdentity _                                                    = False
+    withIdentity _ = False
 
 passEquiv :: (MonadSh m) => Fuzz m [SynthResult]
 passEquiv = filter withIdentity . _fuzzSynthResults <$> get
@@ -367,7 +371,7 @@ fuzz gen conf = do
         ?~ seed'
     (tsynth, _) <- titleRun "Synthesis" $ synthesis src
     (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
-    (_, _)   <- titleRun "Simulation" $ simulation src
+    (_     , _) <- titleRun "Simulation" $ simulation src
     fails       <- failEquivWithIdentity
     synthFails  <- failedSynthesis
     redResult   <-

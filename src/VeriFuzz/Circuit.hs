@@ -26,8 +26,8 @@ module VeriFuzz.Circuit
 where
 
 import           Control.Lens
-import           Hedgehog                (Gen)
-import qualified Hedgehog.Gen            as Hog
+import           Hedgehog                       ( Gen )
+import qualified Hedgehog.Gen                  as Hog
 import           VeriFuzz.Circuit.Base
 import           VeriFuzz.Circuit.Gen
 import           VeriFuzz.Circuit.Random

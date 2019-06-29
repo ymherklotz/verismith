@@ -16,11 +16,16 @@ module VeriFuzz.Sim.Vivado
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted            (liftSh)
+import           Shelly.Lifted                  ( liftSh )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST

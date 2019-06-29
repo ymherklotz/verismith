@@ -31,9 +31,14 @@ import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Control
-import           Data.Bifunctor              (Bifunctor (..))
-import           Shelly                      (RunFailed (..), Sh, catch_sh)
-import           Shelly.Lifted               (MonadSh, liftSh)
+import           Data.Bifunctor                 ( Bifunctor(..) )
+import           Shelly                         ( RunFailed(..)
+                                                , Sh
+                                                , catch_sh
+                                                )
+import           Shelly.Lifted                  ( MonadSh
+                                                , liftSh
+                                                )
 
 -- | Result type which is equivalent to 'Either' or 'Error'. This is
 -- reimplemented so that there is full control over the 'Monad' definition and

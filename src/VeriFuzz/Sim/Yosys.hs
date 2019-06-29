@@ -20,14 +20,19 @@ module VeriFuzz.Sim.Yosys
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
 import           Control.Lens
-import           Control.Monad            (void)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.Monad                  ( void )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           Text.Shakespeare.Text    (st)
+import           Shelly.Lifted                  ( liftSh )
+import           Text.Shakespeare.Text          ( st )
 import           VeriFuzz.Result
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template

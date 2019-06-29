@@ -17,28 +17,35 @@ module VeriFuzz.Sim.Icarus
     )
 where
 
-import           Control.DeepSeq           (NFData, rnf, rwhnf)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
 import           Control.Lens
-import           Control.Monad             (void)
-import           Crypto.Hash               (Digest, hash)
-import           Crypto.Hash.Algorithms    (SHA256)
-import           Data.Binary               (encode)
+import           Control.Monad                  ( void )
+import           Crypto.Hash                    ( Digest
+                                                , hash
+                                                )
+import           Crypto.Hash.Algorithms         ( SHA256 )
+import           Data.Binary                    ( encode )
 import           Data.Bits
-import qualified Data.ByteArray            as BA (convert)
-import           Data.ByteString           (ByteString)
-import qualified Data.ByteString           as B
-import           Data.ByteString.Lazy      (toStrict)
-import qualified Data.ByteString.Lazy      as L (ByteString)
-import           Data.Char                 (digitToInt)
-import           Data.Foldable             (fold)
-import           Data.List                 (transpose)
-import           Data.Maybe                (listToMaybe)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
-import           Numeric                   (readInt)
-import           Prelude                   hiding (FilePath)
+import qualified Data.ByteArray                as BA
+                                                ( convert )
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as B
+import           Data.ByteString.Lazy           ( toStrict )
+import qualified Data.ByteString.Lazy          as L
+                                                ( ByteString )
+import           Data.Char                      ( digitToInt )
+import           Data.Foldable                  ( fold )
+import           Data.List                      ( transpose )
+import           Data.Maybe                     ( listToMaybe )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Numeric                        ( readInt )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted             (liftSh)
+import           Shelly.Lifted                  ( liftSh )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
@@ -129,37 +136,60 @@ runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
         (runFoldLines (mempty :: ByteString) callback (vvpPath sim) ["main"])
 
 fromBytes :: ByteString -> Integer
-fromBytes = B.foldl' f 0
-  where
-    f a b = a `shiftL` 8 .|. fromIntegral b
+fromBytes = B.foldl' f 0 where f a b = a `shiftL` 8 .|. fromIntegral b
 
 runSimIc
-    :: (Synthesiser b) => Icarus -> b -> SourceInfo -> [ByteString] -> ResultSh ByteString
+    :: (Synthesiser b)
+    => Icarus
+    -> b
+    -> SourceInfo
+    -> [ByteString]
+    -> ResultSh ByteString
 runSimIc sim1 synth1 srcInfo bss = do
     dir <- liftSh pwd
-    let top = srcInfo ^. mainModule
+    let top      = srcInfo ^. mainModule
     let inConcat = (RegConcat (Id . fromPort <$> (top ^. modInPorts)))
-    let tb = instantiateMod top $ ModDecl
-             "testbench"
-             []
-             []
-             [ Initial
-               $ fold [ BlockAssign (Assign "clk" Nothing 0)
-                      , BlockAssign (Assign  inConcat Nothing 0)
-                      ]
-                 <> fold ((\r -> TimeCtrl 10 (Just $ BlockAssign (Assign inConcat Nothing r)))
-                     . fromInteger . fromBytes <$> bss)
-                 <> (SysTaskEnable $ Task "finish" [])
-             , Always . TimeCtrl 5 . Just $ BlockAssign (Assign "clk" Nothing (UnOp UnNot (Id "clk")))
-             , Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable $ Task "strobe" ["%b", Id "y"]
-             ]
-             []
+    let
+        tb = instantiateMod top $ ModDecl
+            "testbench"
+            []
+            []
+            [ Initial
+            $  fold
+                   [ BlockAssign (Assign "clk" Nothing 0)
+                   , BlockAssign (Assign inConcat Nothing 0)
+                   ]
+            <> fold
+                   (   (\r -> TimeCtrl
+                           10
+                           (Just $ BlockAssign (Assign inConcat Nothing r))
+                       )
+                   .   fromInteger
+                   .   fromBytes
+                   <$> bss
+                   )
+            <> (SysTaskEnable $ Task "finish" [])
+            , Always . TimeCtrl 5 . Just $ BlockAssign
+                (Assign "clk" Nothing (UnOp UnNot (Id "clk")))
+            , Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable $ Task
+                "strobe"
+                ["%b", Id "y"]
+            ]
+            []
 
     liftSh . writefile "testbench.v" $ icarusTestbench (Verilog [tb]) synth1
     liftSh $ exe dir "icarus" "iverilog" ["-o", "main", "testbench.v"]
-    liftSh $ B.take 8 . BA.convert . (hash :: ByteString -> Digest SHA256) <$> logCommand
-        dir
-        "vvp"
-        (runFoldLines (mempty :: ByteString) callback (vvpPath sim1) ["main"])
+    liftSh
+        $   B.take 8
+        .   BA.convert
+        .   (hash :: ByteString -> Digest SHA256)
+        <$> logCommand
+                dir
+                "vvp"
+                (runFoldLines (mempty :: ByteString)
+                              callback
+                              (vvpPath sim1)
+                              ["main"]
+                )
   where
     exe dir name e = void . errExit False . logCommand dir name . timeout e

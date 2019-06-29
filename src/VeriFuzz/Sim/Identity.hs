@@ -16,11 +16,16 @@ module VeriFuzz.Sim.Identity
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
-import           Shelly                   (FilePath)
-import           Shelly.Lifted            (writefile)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
+import           Shelly                         ( FilePath )
+import           Shelly.Lifted                  ( writefile )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
