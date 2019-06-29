@@ -16,6 +16,9 @@ and the following simulator:
 
 ## Reported bugs
 
+21 bugs were found in total over the course of a month. 8 of those bugs were
+reported and 3 were fixed.
+
 - **MS** :: Mis-synthesis
 - **C** :: Crash
 
