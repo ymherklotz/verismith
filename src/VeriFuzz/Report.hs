@@ -48,6 +48,7 @@ import           Data.ByteString               (ByteString)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Monoid                   (Endo)
 import           Data.Text                     (Text)
+import qualified Data.Text                     as T
 import           Data.Text.Lazy                (toStrict)
 import           Data.Time
 import           Data.Vector                   (fromList)
@@ -158,7 +159,7 @@ data SimResult = SimResult !SynthTool !SimTool !BResult !NominalDiffTime
                  deriving (Eq)
 
 instance Show SimResult where
-    show (SimResult synth sim r d) = show synth <> ", " <> show sim <> ": " <> show r <> " (" <> show d <> ")"
+    show (SimResult synth sim r d) = show synth <> ", " <> show sim <> ": " <> show (bimap show (T.unpack . showBS) r) <> " (" <> show d <> ")"
 
 getSimResult :: SimResult -> UResult
 getSimResult (SimResult _ _ (Pass _) _) = Pass ()

@@ -22,12 +22,12 @@ import           Control.Lens
 import           Control.Monad             (void)
 import           Crypto.Hash               (Digest, hash)
 import           Crypto.Hash.Algorithms    (SHA256)
-import           Data.Binary               (decode, encode)
+import           Data.Binary               (encode)
 import           Data.Bits
 import qualified Data.ByteArray            as BA (convert)
 import           Data.ByteString           (ByteString)
 import qualified Data.ByteString           as B
-import           Data.ByteString.Lazy      (fromStrict, toStrict)
+import           Data.ByteString.Lazy      (toStrict)
 import qualified Data.ByteString.Lazy      as L (ByteString)
 import           Data.Char                 (digitToInt)
 import           Data.Foldable             (fold)

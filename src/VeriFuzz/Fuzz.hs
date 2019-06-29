@@ -39,9 +39,6 @@ import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import qualified Crypto.Random.DRBG               as C
 import           Data.ByteString                  (ByteString)
-import           Data.ByteString.Builder          (byteStringHex,
-                                                   toLazyByteString)
-import qualified Data.ByteString.Lazy             as L
 import           Data.List                        (nubBy, sort)
 import           Data.Maybe                       (isNothing)
 import           Data.Text                        (Text)
@@ -224,7 +221,6 @@ simulation src = do
     resTimes <- liftSh $ mapM (equiv vals) $ conv <$> synth
     liftSh $ inspect resTimes
   where
-    tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
     conv (SynthResult a _ _ _) = a
     equiv b a =
         toolRun ("simulation for " <> toText a)
@@ -371,7 +367,7 @@ fuzz gen conf = do
         ?~ seed'
     (tsynth, _) <- titleRun "Synthesis" $ synthesis src
     (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
-    (tsim, _)   <- titleRun "Simulation" $ simulation src
+    (_, _)   <- titleRun "Simulation" $ simulation src
     fails       <- failEquivWithIdentity
     synthFails  <- failedSynthesis
     redResult   <-
