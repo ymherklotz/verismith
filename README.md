@@ -14,6 +14,25 @@ and the following simulator:
 
 - [Icarus Verilog](http://iverilog.icarus.com)
 
+## Reported bugs
+
+- **MS** :: Mis-synthesis
+- **C** :: Crash
+
+### Yosys
+
+| Type | Issue                                                      | Confirmed | Fixed |   |
+|------|------------------------------------------------------------|-----------|-------|---|
+| MS   | [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) | ✓         | ✓     |   |
+| MS   | [Issue 997](https://github.com/YosysHQ/yosys/issues/997)   | ✓         | ✓     |   |
+| C    | [Issue 993](https://github.com/YosysHQ/yosys/issues/993)   | ✓         | ✓     |   |
+
+### Vivado
+
+| Type | Issue                                                                                               | Confirmed | Fixed |
+|------|-----------------------------------------------------------------------------------------------------|-----------|-------|
+| C    | https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787 |           |       |
+
 ## Build the Fuzzer
 
 The fuzzer is split into an executable (in the [app](/app) folder) and a
