@@ -95,6 +95,47 @@ To run the test-suites:
 stack test
 ```
 
+## Configuration
+
+VeriFuzz can be configured using a [TOML](https://github.com/toml-lang/toml)
+file. There are four main sections in the configuration file, an example can be
+seen [here](/examples/config.toml).
+
+### Information section 
+
+Contains information about the command line tool being used, such as the hash of
+the commit it was compiled with and the version of the tool. The tool then
+verifies that these match the current configuration, and will emit a warning if
+they do not. This ensures that if one wants a deterministic run and is therefore
+passing a seed to the generation, that it will always give the same
+result. Different versions might change some aspects of the Verilog generation,
+which would affect how a seed would generate Verilog.
+
+### Probability section 
+
+Provides a way to assign frequency values to each of the nodes in the
+AST. During the state-based generation, each node is chosen randomly based on
+those probabilities. This provides a simple way to drastically change the
+Verilog that is generated, by changing how often a construct is chosen or by not
+generating a construct at all.
+
+### Property section 
+
+Changes properties of the generated Verilog code, such as the size of the
+output, maximum statement or module depth and sampling method of Verilog
+programs. This section also allows a seed to be specified, which would mean that
+only that particular seed will be used in the fuzz run. This is extremely useful
+when wanting to replay a specific failure and the output is missing.
+
+### Synthesiser section 
+
+Accepts a list of synthesisers which will be fuzzed. These have to first be
+defined in the code and implement the required interface. They can then be
+configured by having a name assigned to them and the name of the output Verilog
+file. By each having a different name, multiple instances of the same
+synthesiser can be included in a fuzz run. The instances might differ in the
+optimisations that are performed, or in the version of the synthesiser.
+
 ## Acknowledgement
 
 Clifford Wolf's [VlogHammer](http://www.clifford.at/yosys/vloghammer.html) is an
