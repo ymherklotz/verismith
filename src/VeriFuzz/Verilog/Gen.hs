@@ -362,7 +362,7 @@ instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
     outs    <- replicateM (length outP) (nextPort Wire)
-    ins <- take (length inP - 1) <$> Hog.shuffle (context ^. variables)
+    ins <- take (length inP) <$> Hog.shuffle (context ^. variables)
     sequence_ $ uncurry resizePort <$> zip (outs <> ins) (outP <> inP)
     ident <- makeIdentifier "modinst"
     Hog.choice
