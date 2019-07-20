@@ -8,3 +8,6 @@ TAGS
 .shelly
 failed
 output*
+.ghc*
+cabal.project.local
+dist*
