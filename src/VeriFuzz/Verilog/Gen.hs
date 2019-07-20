@@ -11,6 +11,7 @@ Various useful generators.
 -}
 
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module VeriFuzz.Verilog.Gen
     ( -- * Generation methods
@@ -41,6 +42,10 @@ import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Eval
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
+
+-- Temporary imports
+import           Debug.Trace
+import           VeriFuzz.Verilog.CodeGen
 
 data Context = Context { _variables   :: [Port]
                        , _parameters  :: [Parameter]
@@ -350,21 +355,27 @@ statement = do
 alwaysSeq :: StateGen ModItem
 alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
 
-resizePort :: Port -> Port -> StateGen ()
-resizePort (Port _ _ _ i) (Port _ _ ra _) = variables %= repl
+-- | Should resize a port that connects to a module port if the latter is
+-- larger.  This should not cause any problems if the same net is used as input
+-- multiple times, and is resized multiple times, as it should only get larger.
+resizePort :: [Parameter] -> Identifier -> Range -> [Port] -> [Port]
+resizePort ps i ra = foldl' func []
     where
-        repl = foldl' func []
-        func l p@(Port a b _ i')
-            | i' == i = Port a b ra i : l
+        func l p@(Port _ _ ri i')
+            | i' == i && calc ri < calc ra = (p & portSize .~ ra) : l
             | otherwise = p : l
+        calc = calcRange ps $ Just 64
 
+-- | Instantiate a module, where the outputs are new nets that are created, and
+-- the inputs are taken from existing ports in the context.
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
     outs    <- replicateM (length outP) (nextPort Wire)
     ins <- take (length inP) <$> Hog.shuffle (context ^. variables)
-    sequence_ $ uncurry resizePort <$> zip (outs <> ins) (outP <> inP)
+    mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inP ^.. traverse . portSize
     ident <- makeIdentifier "modinst"
+    vs <- view variables <$> get
     Hog.choice
         [ return . ModInst i ident $ ModConn <$> outE outs <> insE ins
         , ModInst i ident <$> Hog.shuffle
@@ -373,6 +384,9 @@ instantiate (ModDecl i outP inP _ _) = do
     where
         insE ins = Id "clk" : (Id . view portName <$> ins)
         outE out = Id . view portName <$> out
+        process p r = do
+            params <- view parameters <$> get
+            variables %= resizePort params p r
 
 -- | Generates a module instance by also generating a new module if there are
 -- not enough modules currently in the context. It keeps generating new modules

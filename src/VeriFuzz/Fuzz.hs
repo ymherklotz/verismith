@@ -91,8 +91,8 @@ synthesisers = lift $ asks getSynthesisers
 --simulators :: (Monad m) => Fuzz () m [SimTool]
 --simulators = lift $ asks getSimulators
 
-combinations :: [a] -> [b] -> [(a, b)]
-combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
+--combinations :: [a] -> [b] -> [(a, b)]
+--combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
 
 logT :: MonadSh m => Text -> m ()
 logT = liftSh . logger
