@@ -2,6 +2,8 @@
 TAGS
 *.jou
 *.log
+*~
+cabal.project.local
 
 # Folders
 .stack-work
@@ -9,5 +11,4 @@ TAGS
 failed
 output*
 .ghc*
-cabal.project.local
 dist*
