@@ -139,14 +139,18 @@ module VeriFuzz.Verilog.AST
     )
 where
 
-import           Control.Lens             hiding ((<|))
+import           Control.Lens            hiding ( (<|) )
 import           Data.Data
 import           Data.Data.Lens
-import           Data.Functor.Foldable.TH (makeBaseFunctor)
-import           Data.List.NonEmpty       (NonEmpty (..), (<|))
-import           Data.String              (IsString, fromString)
-import           Data.Text                (Text)
-import           Data.Traversable         (sequenceA)
+import           Data.Functor.Foldable.TH       ( makeBaseFunctor )
+import           Data.List.NonEmpty             ( NonEmpty(..)
+                                                , (<|)
+                                                )
+import           Data.String                    ( IsString
+                                                , fromString
+                                                )
+import           Data.Text                      ( Text )
+import           Data.Traversable               ( sequenceA )
 import           VeriFuzz.Verilog.BitVec
 
 -- | Identifier in Verilog. This is just a string of characters that can either
@@ -168,6 +172,9 @@ data Event = EId {-# UNPACK #-} !Identifier
            | EOr !Event !Event
            | EComb !Event !Event
            deriving (Eq, Show, Ord, Data)
+
+instance Plated Event where
+    plate = uniplate
 
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator = BinPlus    -- ^ @+@
@@ -492,7 +499,7 @@ newtype Verilog = Verilog { getVerilog :: [ModDecl] }
 data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
                              , _infoSrc :: !Verilog
                              }
-                  deriving (Eq, Show)
+                  deriving (Eq, Ord, Data, Show)
 
 $(makeLenses ''Expr)
 $(makeLenses ''ConstExpr)

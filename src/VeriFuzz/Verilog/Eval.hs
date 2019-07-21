@@ -17,9 +17,9 @@ module VeriFuzz.Verilog.Eval
 where
 
 import           Data.Bits
-import           Data.Foldable           (fold)
-import           Data.Functor.Foldable   hiding (fold)
-import           Data.Maybe              (listToMaybe)
+import           Data.Foldable                  ( fold )
+import           Data.Functor.Foldable   hiding ( fold )
+import           Data.Maybe                     ( listToMaybe )
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 

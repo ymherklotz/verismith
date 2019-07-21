@@ -17,6 +17,7 @@ module VeriFuzz.Reduce
     ( -- $strategy
       reduceWithScript
     , reduceSynth
+    , reduceSynthesis
     , reduce
     , reduce_
     , Replacement(..)
@@ -34,26 +35,31 @@ module VeriFuzz.Reduce
     )
 where
 
-import           Control.Lens             hiding ((<.>))
-import           Control.Monad            (void)
-import           Control.Monad.IO.Class   (MonadIO, liftIO)
-import           Data.Foldable            (foldrM)
-import           Data.List                (nub)
-import           Data.List.NonEmpty       (NonEmpty (..))
-import qualified Data.List.NonEmpty       as NonEmpty
-import           Data.Maybe               (mapMaybe)
-import           Data.Text                (Text)
-import           Shelly                   ((<.>))
+import           Control.Lens            hiding ( (<.>) )
+import           Control.Monad                  ( void )
+import           Control.Monad.IO.Class         ( MonadIO
+                                                , liftIO
+                                                )
+import           Data.Foldable                  ( foldrM )
+import           Data.List                      ( nub )
+import           Data.List.NonEmpty             ( NonEmpty(..) )
+import qualified Data.List.NonEmpty            as NonEmpty
+import           Data.Maybe                     ( mapMaybe )
+import           Data.Text                      ( Text )
+import           Shelly                         ( (<.>) )
 import qualified Shelly
-import           Shelly.Lifted            (MonadSh, liftSh)
+import           Shelly.Lifted                  ( MonadSh
+                                                , liftSh
+                                                )
 import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
+import           VeriFuzz.Verilog
 import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Mutate
 import           VeriFuzz.Verilog.Parser
+
 
 -- $strategy
 -- The reduction strategy has multiple different steps. 'reduce' will run these
@@ -111,7 +117,7 @@ instance Traversable Replacement where
 
 -- | Split a list in two halves.
 halve :: Replace [a]
-halve []  = None
+halve []  = Single []
 halve [_] = Single []
 halve l   = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
@@ -254,6 +260,12 @@ exprId (VecSelect   i _) = Just i
 exprId (RangeSelect i _) = Just i
 exprId _                 = Nothing
 
+eventId :: Event -> Maybe Identifier
+eventId (EId      i) = Just i
+eventId (EPosEdge i) = Just i
+eventId (ENegEdge i) = Just i
+eventId _            = Nothing
+
 portToId :: Port -> Identifier
 portToId (Port _ _ _ i) = i
 
@@ -327,6 +339,7 @@ matchesModName :: Identifier -> ModDecl -> Bool
 matchesModName top (ModDecl i _ _ _ _) = top == i
 
 halveStatement :: Replace Statement
+halveStatement (SeqBlock [s]) = halveStatement s
 halveStatement (SeqBlock s) = SeqBlock <$> halve s
 halveStatement (CondStmnt _ (Just s1) (Just s2)) = Dual s1 s2
 halveStatement (CondStmnt _ (Just s1) Nothing) = Single s1
@@ -396,8 +409,11 @@ toIds = nub . mapMaybe exprId . concatMap universe
 toIdsConst :: [ConstExpr] -> [Identifier]
 toIdsConst = toIds . fmap constToExpr
 
+toIdsEvent :: [Event] -> [Identifier]
+toIdsEvent = nub . mapMaybe eventId . concatMap universe
+
 allStatIds' :: Statement -> [Identifier]
-allStatIds' s = nub $ assignIds <> otherExpr
+allStatIds' s = nub $ assignIds <> otherExpr <> eventProcessedIds
   where
     assignIds =
         toIds
@@ -405,7 +421,8 @@ allStatIds' s = nub $ assignIds <> otherExpr
             <> (s ^.. stmntNBA . assignExpr)
             <> (s ^.. forAssign . assignExpr)
             <> (s ^.. forIncr . assignExpr)
-    otherExpr = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
+    otherExpr         = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
+    eventProcessedIds = toIdsEvent $ s ^.. statEvent
 
 allStatIds :: Statement -> [Identifier]
 allStatIds s = nub . concat $ allStatIds' <$> universe s
@@ -502,28 +519,27 @@ reduce_ title repl bot eval src = do
                    (src ^.. infoSrc . _Wrapped . traverse . modItems . traverse)
                )
         <> ")"
-    replAnswer <- sequenceA $ evalIfNotEmpty <$> replacement
-    case (replacement, replAnswer) of
-        (Single s, Single True    ) -> runIf s
-        (Dual _ r, Dual False True) -> runIf r
-        (Dual l _, Dual True False) -> runIf l
-        (Dual l r, Dual True True ) -> check l r
-        _                           -> return src
+    if bot src
+        then return src
+        else case repl src of
+            Single s -> do
+                red <- eval s
+                if red
+                    then if cond s then recReduction s else return s
+                    else return src
+            Dual l r -> do
+                red <- eval l
+                if red
+                    then if cond l then recReduction l else return l
+                    else do
+                        red' <- eval r
+                        if red'
+                            then if cond r then recReduction r else return r
+                            else return src
+            None -> return src
   where
-    replacement = repl src
-    runIf s = if s /= src && not (bot s)
-        then reduce_ title repl bot eval s
-        else return s
-    evalIfNotEmpty = eval
-    check l r
-        | bot l = return l
-        | bot r = return r
-        | otherwise = do
-            lreduced <- runIf l
-            rreduced <- runIf r
-            if _infoSrc lreduced < _infoSrc rreduced
-                then return lreduced
-                else return rreduced
+    cond s = s /= src
+    recReduction = reduce_ title repl bot eval
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.
@@ -537,7 +553,7 @@ reduce eval src =
         $   red "Modules" moduleBot halveModules src
         >>= redAll "Module Items" modItemBot         halveModItems
         >>= redAll "Statements"   (const defaultBot) halveStatements
-        >>= redAll "Expressions"  (const defaultBot) halveExpr
+        -- >>= redAll "Expressions"  (const defaultBot) halveExpr
   where
     red s bot a = reduce_ s a bot eval
     red' s bot a t = reduce_ s (a t) (bot t) eval
@@ -583,5 +599,15 @@ reduceSynth a b = reduce synth
             runEquiv a b src'
         return $ case r of
             Fail EquivFail -> True
+            Fail _         -> False
+            Pass _         -> False
+
+reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo -> m SourceInfo
+reduceSynthesis a = reduce synth
+  where
+    synth src = liftSh $ do
+        r <- runResultT $ runSynth a src
+        return $ case r of
+            Fail SynthFail -> True
             Fail _         -> False
             Pass _         -> False

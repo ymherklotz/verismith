@@ -16,11 +16,16 @@ module VeriFuzz.Sim.Vivado
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted            (liftSh)
+import           Shelly.Lifted                  ( liftSh )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
@@ -56,13 +61,16 @@ runSynthVivado sim (SourceInfo top src) = do
         writefile vivadoTcl . vivadoSynthConfig top . toTextIgnore $ synthOutput
             sim
         writefile "rtl.v" $ genSource src
-        run_ "sed" ["s/^module/(* use_dsp=\"no\" *) module/;", "-i", "rtl.v"]
-        logger "Vivado: run"
+        run_
+            "sed"
+            [ "s/^module/(* use_dsp48=\"no\" *) (* use_dsp=\"no\" *) module/;"
+            , "-i"
+            , "rtl.v"
+            ]
     let exec_ n = execute_
             SynthFail
             dir
             "vivado"
             (maybe (fromText n) (</> fromText n) $ vivadoBin sim)
     exec_ "vivado" ["-mode", "batch", "-source", toTextIgnore vivadoTcl]
-    liftSh $ logger "Vivado: done"
     where vivadoTcl = fromText ("vivado_" <> top) <.> "tcl"

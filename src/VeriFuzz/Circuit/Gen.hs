@@ -15,9 +15,11 @@ module VeriFuzz.Circuit.Gen
     )
 where
 
-import           Data.Graph.Inductive      (LNode, Node)
-import qualified Data.Graph.Inductive      as G
-import           Data.Maybe                (catMaybes)
+import           Data.Graph.Inductive           ( LNode
+                                                , Node
+                                                )
+import qualified Data.Graph.Inductive          as G
+import           Data.Maybe                     ( catMaybes )
 import           VeriFuzz.Circuit.Base
 import           VeriFuzz.Circuit.Internal
 import           VeriFuzz.Verilog.AST

@@ -17,18 +17,20 @@ This module generates the code from the Verilog AST defined in
 module VeriFuzz.Verilog.CodeGen
     ( -- * Code Generation
       GenVerilog(..)
-    , genSource
+    , Source(..)
     , render
     )
 where
 
-import           Data.Data                 (Data)
-import           Data.List.NonEmpty        (NonEmpty (..), toList)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
+import           Data.Data                      ( Data )
+import           Data.List.NonEmpty             ( NonEmpty(..)
+                                                , toList
+                                                )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc
-import           Numeric                   (showHex)
-import           VeriFuzz.Internal         hiding (comma)
+import           Numeric                        ( showHex )
+import           VeriFuzz.Internal       hiding ( comma )
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 

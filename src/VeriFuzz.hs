@@ -28,27 +28,29 @@ module VeriFuzz
 where
 
 import           Control.Concurrent
-import           Control.Lens
-import           Control.Monad.IO.Class   (liftIO)
-import qualified Crypto.Random.DRBG       as C
-import           Data.ByteString          (ByteString)
-import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
-import qualified Data.ByteString.Lazy     as L
-import qualified Data.Graph.Inductive     as G
-import qualified Data.Graph.Inductive.Dot as G
-import           Data.Maybe               (isNothing)
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           Data.Text.Encoding       (decodeUtf8)
-import qualified Data.Text.IO             as T
-import           Hedgehog                 (Gen)
-import qualified Hedgehog.Gen             as Hog
-import           Hedgehog.Internal.Seed   (Seed)
+import           Control.Lens            hiding ( (<.>) )
+import           Control.Monad.IO.Class         ( liftIO )
+import qualified Crypto.Random.DRBG            as C
+import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Builder        ( byteStringHex
+                                                , toLazyByteString
+                                                )
+import qualified Data.ByteString.Lazy          as L
+import qualified Data.Graph.Inductive          as G
+import qualified Data.Graph.Inductive.Dot      as G
+import           Data.Maybe                     ( isNothing )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Text.Encoding             ( decodeUtf8 )
+import qualified Data.Text.IO                  as T
+import           Hedgehog                       ( Gen )
+import qualified Hedgehog.Gen                  as Hog
+import           Hedgehog.Internal.Seed         ( Seed )
 import           Options.Applicative
-import           Prelude                  hiding (FilePath)
-import           Shelly                   hiding (command)
-import           Shelly.Lifted            (liftSh)
-import           System.Random            (randomIO)
+import           Prelude                 hiding ( FilePath )
+import           Shelly                  hiding ( command )
+import           Shelly.Lifted                  ( liftSh )
+import           System.Random                  ( randomIO )
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
@@ -58,6 +60,7 @@ import           VeriFuzz.Result
 import           VeriFuzz.Sim
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog
+import           VeriFuzz.Verilog.Parser        ( parseSourceInfoFile )
 
 data OptTool = TYosys
           | TXST
@@ -79,9 +82,11 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
                      }
           | Parse { fileName :: {-# UNPACK #-} !FilePath
                   }
-          | Reduce { fileName     :: {-# UNPACK #-} !FilePath
-                   , top          :: {-# UNPACK #-} !Text
-                   , reduceScript :: {-# UNPACK #-} !FilePath
+          | Reduce { fileName        :: {-# UNPACK #-} !FilePath
+                   , top             :: {-# UNPACK #-} !Text
+                   , reduceScript    :: {-# UNPACK #-} !(Maybe FilePath)
+                   , synthesiserDesc :: ![SynthDescription]
+                   , rerun           :: Bool
                    }
           | ConfigOpt { writeConfig :: !(Maybe FilePath)
                       , configFile  :: !(Maybe FilePath)
@@ -106,6 +111,17 @@ parseSynth :: String -> Maybe OptTool
 parseSynth val | val == "yosys" = Just TYosys
                | val == "xst"   = Just TXST
                | otherwise      = Nothing
+
+parseSynthDesc :: String -> Maybe SynthDescription
+parseSynthDesc val
+    | val == "yosys" = Just $ SynthDescription "yosys" Nothing Nothing Nothing
+    | val == "vivado" = Just $ SynthDescription "vivado" Nothing Nothing Nothing
+    | val == "xst" = Just $ SynthDescription "xst" Nothing Nothing Nothing
+    | val == "quartus" = Just
+    $ SynthDescription "quartus" Nothing Nothing Nothing
+    | val == "identity" = Just
+    $ SynthDescription "identity" Nothing Nothing Nothing
+    | otherwise = Nothing
 
 parseSim :: String -> Maybe OptTool
 parseSim val | val == "icarus" = Just TIcarus
@@ -180,12 +196,25 @@ reduceOpts =
                 <> showDefault
                 <> value "top"
                 )
-        <*> (  strOption
+        <*> (  optional
+            .  strOption
             $  long "script"
-            <> short 's'
             <> metavar "SCRIPT"
             <> help
                    "Script that determines if the current file is interesting, which is determined by the script returning 0."
+            )
+        <*> (  many
+            .  option (optReader parseSynthDesc)
+            $  short 's'
+            <> long "synth"
+            <> metavar "SYNTH"
+            <> help "Specify synthesiser to use."
+            )
+        <*> (  switch
+            $  short 'r'
+            <> long "rerun"
+            <> help
+                   "Only rerun the current synthesis file with all the synthesisers."
             )
 
 configOpts :: Parser Opts
@@ -346,7 +375,49 @@ handleOpts (Parse f) = do
         Left  l -> print l
         Right v -> print $ GenVerilog v
     where file = T.unpack . toTextIgnore $ f
-handleOpts (Reduce    f t    s) = shelly $ reduceWithScript t s f
+handleOpts (Reduce f t _ ls' False) = do
+    src <- parseSourceInfoFile t (toTextIgnore f)
+    case descriptionToSynth <$> ls' of
+        a : b : _ -> do
+            putStrLn "Reduce with equivalence check"
+            shelly $ do
+                make dir
+                pop dir $ do
+                    src' <- reduceSynth a b src
+                    writefile (fromText ".." </> dir <.> "v") $ genSource src'
+        a : _ -> do
+            putStrLn "Reduce with synthesis failure"
+            shelly $ do
+                make dir
+                pop dir $ do
+                    src' <- reduceSynthesis a src
+                    writefile (fromText ".." </> dir <.> "v") $ genSource src'
+        _ -> do
+            putStrLn "Not reducing because no synthesiser was specified"
+            return ()
+    where dir = fromText "reduce"
+handleOpts (Reduce f t _ ls' True) = do
+    src <- parseSourceInfoFile t (toTextIgnore f)
+    case descriptionToSynth <$> ls' of
+        a : b : _ -> do
+            putStrLn "Starting equivalence check"
+            res <- shelly . runResultT $ do
+                make dir
+                pop dir $ do
+                    runSynth a src
+                    runSynth b src
+                    runEquiv a b src
+            case res of
+                Pass _            -> putStrLn "Equivalence check passed"
+                Fail EquivFail    -> putStrLn "Equivalence check failed"
+                Fail TimeoutError -> putStrLn "Equivalence check timed out"
+                Fail _            -> putStrLn "Equivalence check error"
+            return ()
+        as -> do
+            putStrLn "Synthesis check"
+            _ <- shelly . runResultT $ mapM (flip runSynth src) as
+            return ()
+    where dir = fromText "equiv"
 handleOpts (ConfigOpt c conf r) = do
     config <- if r then getConfig conf >>= randomise else getConfig conf
     maybe (T.putStrLn . encodeConfig $ config) (`encodeConfigFile` config)

@@ -10,6 +10,8 @@ Portability : POSIX
 Verilog implementation with random generation and mutations.
 -}
 
+{-# LANGUAGE QuasiQuotes #-}
+
 module VeriFuzz.Verilog
     ( SourceInfo(..)
     , Verilog(..)

@@ -18,13 +18,14 @@ module VeriFuzz.Circuit.Random
     )
 where
 
-import           Data.Graph.Inductive              (Context)
-import qualified Data.Graph.Inductive              as G
-import           Data.Graph.Inductive.PatriciaTree (Gr)
-import           Data.List                         (nub)
-import           Hedgehog                          (Gen)
-import qualified Hedgehog.Gen                      as Hog
-import qualified Hedgehog.Range                    as Hog
+import           Data.Graph.Inductive           ( Context )
+import qualified Data.Graph.Inductive          as G
+import           Data.Graph.Inductive.PatriciaTree
+                                                ( Gr )
+import           Data.List                      ( nub )
+import           Hedgehog                       ( Gen )
+import qualified Hedgehog.Gen                  as Hog
+import qualified Hedgehog.Range                as Hog
 import           VeriFuzz.Circuit.Base
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]

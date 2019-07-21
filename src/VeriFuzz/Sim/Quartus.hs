@@ -16,11 +16,16 @@ module VeriFuzz.Sim.Quartus
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted            (liftSh)
+import           Shelly.Lifted                  ( liftSh )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
@@ -52,12 +57,16 @@ runSynthQuartus :: Quartus -> SourceInfo -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let ex = execute_ SynthFail dir "quartus"
-    liftSh $ do
-        writefile inpf $ genSource src
-        logger "Running Quartus synthesis"
+    liftSh . writefile inpf $ genSource src
+    liftSh . noPrint $ run_
+        "sed"
+        [ "-i"
+        , "s/^module/(* multstyle = \"logic\" *) module/;"
+        , toTextIgnore inpf
+        ]
     ex (exec "quartus_map")
        [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
-    ex (exec "quartus_fit") [top, "--part=5CGTFD9E5F35C7N"]
+    ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
     ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
     liftSh $ do
         cp (fromText "simulation/vcs" </> fromText top <.> "vo")
@@ -68,7 +77,6 @@ runSynthQuartus sim (SourceInfo top src) = do
             , "s,^// DATE.*,,; s,^tri1 (.*);,wire \\1 = 1;,; /^\\/\\/ +synopsys/ d;"
             , toTextIgnore $ synthOutput sim
             ]
-        logger "Quartus synthesis done"
   where
     inpf = "rtl.v"
     exec s = maybe (fromText s) (</> fromText s) $ quartusBin sim

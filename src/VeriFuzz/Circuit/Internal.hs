@@ -19,9 +19,11 @@ module VeriFuzz.Circuit.Internal
     )
 where
 
-import           Data.Graph.Inductive (Graph, Node)
-import qualified Data.Graph.Inductive as G
-import qualified Data.Text            as T
+import           Data.Graph.Inductive           ( Graph
+                                                , Node
+                                                )
+import qualified Data.Graph.Inductive          as G
+import qualified Data.Text                     as T
 
 -- | Convert an integer into a label.
 --

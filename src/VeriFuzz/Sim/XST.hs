@@ -18,12 +18,17 @@ module VeriFuzz.Sim.XST
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq                ( NFData
+                                                , rnf
+                                                , rwhnf
+                                                )
+import           Data.Text                      ( Text
+                                                , unpack
+                                                )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           Text.Shakespeare.Text    (st)
+import           Shelly.Lifted                  ( liftSh )
+import           Text.Shakespeare.Text          ( st )
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST
@@ -64,9 +69,7 @@ runSynthXST sim (SourceInfo top src) = do
         writefile xstFile $ xstSynthConfig top
         writefile prjFile [st|verilog work "rtl.v"|]
         writefile "rtl.v" $ genSource src
-        logger "XST: run"
     exec "xst" ["-ifn", toTextIgnore xstFile]
-    liftSh $ logger "XST: netgen"
     exec
         "netgen"
         [ "-w"
@@ -75,15 +78,12 @@ runSynthXST sim (SourceInfo top src) = do
         , toTextIgnore $ modFile <.> "ngc"
         , toTextIgnore $ synthOutput sim
         ]
-    liftSh $ do
-        logger "XST: clean"
-        noPrint $ run_
-            "sed"
-            [ "-i"
-            , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
-            , toTextIgnore $ synthOutput sim
-            ]
-        logger "XST: done"
+    liftSh . noPrint $ run_
+        "sed"
+        [ "-i"
+        , "/^`ifndef/,/^`endif/ d; s/ *Timestamp: .*//;"
+        , toTextIgnore $ synthOutput sim
+        ]
   where
     modFile = fromText top
     xstFile = modFile <.> "xst"

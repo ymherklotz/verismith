@@ -8,7 +8,7 @@ module cyclonev_lcell_comb (
                             );
 
    input dataa, datab, datac, datad, datae, dataf, datag, cin, sharein;
-   output reg combout, sumout, cout, shareout;
+   output reg combout = 0, sumout = 0, cout = 0, shareout = 0;
 
    parameter lut_mask = 64'hFFFFFFFFFFFFFFFF;
    parameter shared_arith = "off";
@@ -63,25 +63,8 @@ module cyclonev_lcell_comb (
       begin
          e0_mask = mask[15:0];
          e1_mask = mask[31:16];
-         begin
-            e0_lut = lut4(e0_mask, dataa, datab, datac, datad);
-            e1_lut = lut4(e1_mask, dataa, datab, datac, datad);
-            if (datae === 1'bX) // X propogation
-              begin
-                 if (e0_lut == e1_lut)
-                   begin
-                      lut5 = e0_lut;
-                   end
-                 else
-                   begin
-                      lut5 = 1'bX;
-                   end
-              end
-            else
-              begin
-                 lut5 = (datae == 1'b1) ? e1_lut : e0_lut;
-              end
-         end
+         e0_lut = lut4(e0_mask, dataa, datab, datac, datad);
+         e1_lut = lut4(e1_mask, dataa, datab, datac, datad);
       end
    endfunction
 
@@ -101,29 +84,7 @@ module cyclonev_lcell_comb (
       begin
          f0_mask = mask[31:0];
          f1_mask = mask[63:32];
-         begin
-            lut6 = mask[{dataf, datae, datad, datac, datab, dataa}];
-            if (lut6 === 1'bX)
-              begin
-                 f0_lut = lut5(f0_mask, dataa, datab, datac, datad, datae);
-                 f1_lut = lut5(f1_mask, dataa, datab, datac, datad, datae);
-                 if (dataf === 1'bX) // X propogation
-                   begin
-                      if (f0_lut == f1_lut)
-                        begin
-                           lut6 = f0_lut;
-                        end
-                      else
-                        begin
-                           lut6 = 1'bX;
-                        end
-                   end
-                 else
-                   begin
-                      lut6 = (dataf == 1'b1) ? f1_lut : f0_lut;
-                   end
-              end
-         end
+         lut6 = mask[{dataf, datae, datad, datac, datab, dataa}];
       end
    endfunction
 
@@ -257,10 +218,15 @@ module dffeas (d, clk, ena, clrn, prn, aload, asdata, sclr, sload, devclrn, devp
    input devclrn; 
    input devpor; 
 
-   output reg q;
+   output reg q = 0;
 
-   always @(posedge clk) begin
-      q <= d;
+   always @(posedge clk or posedge aload) begin
+      if (aload == 1'b1)
+        q <= asdata;
+      else if (sload == 1'b1)
+        q <= asdata;
+      else
+        q <= d;
    end
 
 endmodule

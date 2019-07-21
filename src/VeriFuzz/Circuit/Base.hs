@@ -18,7 +18,10 @@ module VeriFuzz.Circuit.Base
     )
 where
 
-import           Data.Graph.Inductive (Gr, LEdge, LNode)
+import           Data.Graph.Inductive           ( Gr
+                                                , LEdge
+                                                , LNode
+                                                )
 import           System.Random
 
 -- | The types for all the gates.

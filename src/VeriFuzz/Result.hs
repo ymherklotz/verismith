@@ -31,8 +31,14 @@ import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Control
-import           Shelly                      (RunFailed (..), Sh, catch_sh)
-import           Shelly.Lifted               (MonadSh, liftSh)
+import           Data.Bifunctor                 ( Bifunctor(..) )
+import           Shelly                         ( RunFailed(..)
+                                                , Sh
+                                                , catch_sh
+                                                )
+import           Shelly.Lifted                  ( MonadSh
+                                                , liftSh
+                                                )
 
 -- | Result type which is equivalent to 'Either' or 'Error'. This is
 -- reimplemented so that there is full control over the 'Monad' definition and
@@ -42,7 +48,7 @@ data Result a b = Fail a
                 deriving (Eq, Show)
 
 instance Semigroup (Result a b) where
-    Fail _ <> b = b
+    Pass _ <> a = a
     a <> _ = a
 
 instance (Monoid b) => Monoid (Result a b) where
@@ -63,6 +69,10 @@ instance Monad (Result a) where
 
 instance MonadBase (Result a) (Result a) where
     liftBase = id
+
+instance Bifunctor Result where
+    bimap a _ (Fail c) = Fail $ a c
+    bimap _ b (Pass c) = Pass $ b c
 
 -- | The transformer for the 'Result' type. This
 newtype ResultT a m b = ResultT { runResultT :: m (Result a b) }

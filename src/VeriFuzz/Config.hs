@@ -61,11 +61,14 @@ module VeriFuzz.Config
     , probStmntNonBlock
     , probStmntCond
     , probStmntFor
+    , propSampleSize
+    , propSampleMethod
     , propSize
     , propSeed
     , propStmntDepth
     , propModDepth
     , propMaxModules
+    , propCombine
     , parseConfigFile
     , parseConfig
     , encodeConfig
@@ -74,18 +77,22 @@ module VeriFuzz.Config
     )
 where
 
-import           Control.Applicative    (Alternative)
-import           Control.Lens           hiding ((.=))
-import           Data.List.NonEmpty     (NonEmpty (..))
-import           Data.Maybe             (fromMaybe)
-import           Data.Text              (Text, pack)
-import qualified Data.Text.IO           as T
-import           Data.Version           (showVersion)
+import           Control.Applicative            ( Alternative )
+import           Control.Lens            hiding ( (.=) )
+import           Data.List.NonEmpty             ( NonEmpty(..) )
+import           Data.Maybe                     ( fromMaybe )
+import           Data.Text                      ( Text
+                                                , pack
+                                                )
+import qualified Data.Text.IO                  as T
+import           Data.Version                   ( showVersion )
 import           Development.GitRev
-import           Hedgehog.Internal.Seed (Seed)
-import           Paths_verifuzz         (version)
-import           Shelly                 (toTextIgnore)
-import           Toml                   (TomlCodec, (.=))
+import           Hedgehog.Internal.Seed         ( Seed )
+import           Paths_verifuzz                 ( version )
+import           Shelly                         ( toTextIgnore )
+import           Toml                           ( TomlCodec
+                                                , (.=)
+                                                )
 import qualified Toml
 import           VeriFuzz.Sim.Quartus
 import           VeriFuzz.Sim.Vivado
@@ -189,11 +196,14 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                }
                  deriving (Eq, Show)
 
-data ConfProperty = ConfProperty { _propSize       :: {-# UNPACK #-} !Int
-                                 , _propSeed       :: !(Maybe Seed)
-                                 , _propStmntDepth :: {-# UNPACK #-} !Int
-                                 , _propModDepth   :: {-# UNPACK #-} !Int
-                                 , _propMaxModules :: {-# UNPACK #-} !Int
+data ConfProperty = ConfProperty { _propSize         :: {-# UNPACK #-} !Int
+                                 , _propSeed         :: !(Maybe Seed)
+                                 , _propStmntDepth   :: {-# UNPACK #-} !Int
+                                 , _propModDepth     :: {-# UNPACK #-} !Int
+                                 , _propMaxModules   :: {-# UNPACK #-} !Int
+                                 , _propSampleMethod :: !Text
+                                 , _propSampleSize   :: {-# UNPACK #-} !Int
+                                 , _propCombine      :: {-# UNPACK #-} !Bool
                                  }
                   deriving (Eq, Show)
 
@@ -261,7 +271,7 @@ defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr)
-    (ConfProperty 20 Nothing 3 2 5)
+    (ConfProperty 20 Nothing 3 2 5 "random" 10 False)
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -374,6 +384,14 @@ propCodec =
         .=  _propModDepth
         <*> defaultValue (defProp propMaxModules) (int "module" "max")
         .=  _propMaxModules
+        <*> defaultValue (defProp propSampleMethod)
+                         (Toml.text (twoKey "sample" "method"))
+        .=  _propSampleMethod
+        <*> defaultValue (defProp propSampleSize) (int "sample" "size")
+        .=  _propSampleSize
+        <*> defaultValue (defProp propCombine)
+                         (Toml.bool (twoKey "output" "combine"))
+        .=  _propCombine
     where defProp i = defaultConfig ^. configProperty . i
 
 simulator :: TomlCodec SimDescription

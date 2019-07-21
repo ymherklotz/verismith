@@ -4,9 +4,9 @@ module Unit
 where
 
 import           Control.Lens
-import           Data.List.NonEmpty (NonEmpty (..))
-import           Parser             (parseUnitTests)
-import           Reduce             (reduceUnitTests)
+import           Data.List.NonEmpty             ( NonEmpty(..) )
+import           Parser                         ( parseUnitTests )
+import           Reduce                         ( reduceUnitTests )
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz

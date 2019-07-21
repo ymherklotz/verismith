@@ -18,8 +18,8 @@ module VeriFuzz.Verilog.Quote
 where
 
 import           Data.Data
-import qualified Data.Text                  as T
-import qualified Language.Haskell.TH        as TH
+import qualified Data.Text                     as T
+import qualified Language.Haskell.TH           as TH
 import           Language.Haskell.TH.Quote
 import           Language.Haskell.TH.Syntax
 import           VeriFuzz.Verilog.Parser

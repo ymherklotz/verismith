@@ -14,13 +14,24 @@ module VeriFuzz.Internal
     ( -- * Useful functions
       safe
     , showT
+    , showBS
     , comma
     , commaNL
     )
 where
 
-import           Data.Text (Text)
-import qualified Data.Text as T
+import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Builder        ( byteStringHex
+                                                , toLazyByteString
+                                                )
+import qualified Data.ByteString.Lazy          as L
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Text.Encoding             ( decodeUtf8 )
+
+-- | Function to show a bytestring in a hex format.
+showBS :: ByteString -> Text
+showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
 
 -- | Converts unsafe list functions in the Prelude to a safe version.
 safe :: ([a] -> b) -> [a] -> Maybe b

@@ -40,20 +40,26 @@ module VeriFuzz.Sim.Internal
 where
 
 import           Control.Lens
-import           Control.Monad         (forM, void)
-import           Control.Monad.Catch   (throwM)
-import           Data.Bits             (shiftL)
-import           Data.ByteString       (ByteString)
-import qualified Data.ByteString       as B
-import           Data.Maybe            (catMaybes)
-import           Data.Text             (Text)
-import qualified Data.Text             as T
-import           Data.Time.Format      (defaultTimeLocale, formatTime)
-import           Data.Time.LocalTime   (getZonedTime)
-import           Prelude               hiding (FilePath)
+import           Control.Monad                  ( forM
+                                                , void
+                                                )
+import           Control.Monad.Catch            ( throwM )
+import           Data.Bits                      ( shiftL )
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as B
+import           Data.Maybe                     ( catMaybes )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Time.Format               ( defaultTimeLocale
+                                                , formatTime
+                                                )
+import           Data.Time.LocalTime            ( getZonedTime )
+import           Prelude                 hiding ( FilePath )
 import           Shelly
-import           Shelly.Lifted         (MonadSh, liftSh)
-import           System.FilePath.Posix (takeBaseName)
+import           Shelly.Lifted                  ( MonadSh
+                                                , liftSh
+                                                )
+import           System.FilePath.Posix          ( takeBaseName )
 import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Verilog.AST
@@ -188,21 +194,28 @@ logCommand_ :: FilePath -> Text -> Sh a -> Sh ()
 logCommand_ fp name = void . logCommand fp name
 
 execute
-    :: (MonadSh m, Monad m, Monoid a)
-    => a
+    :: (MonadSh m, Monad m)
+    => Failed
     -> FilePath
     -> Text
     -> FilePath
     -> [Text]
-    -> ResultT a m Text
-execute f dir name e = annotate f . liftSh . logCommand dir name . timeout e
+    -> ResultT Failed m Text
+execute f dir name e cs = do
+    (res, exitCode) <- liftSh $ do
+        res <- errExit False . logCommand dir name $ timeout e cs
+        (,) res <$> lastExitCode
+    case exitCode of
+        0   -> ResultT . return $ Pass res
+        124 -> ResultT . return $ Fail TimeoutError
+        _   -> ResultT . return $ Fail f
 
 execute_
-    :: (MonadSh m, Monad m, Monoid a)
-    => a
+    :: (MonadSh m, Monad m)
+    => Failed
     -> FilePath
     -> Text
     -> FilePath
     -> [Text]
-    -> ResultT a m ()
+    -> ResultT Failed m ()
 execute_ a b c d = void . execute a b c d
