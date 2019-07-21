@@ -3,12 +3,13 @@
 , fgl-visualize, filepath, gitrev, hedgehog, hedgehog-fn, lens
 , lifted-base, memory, monad-control, optparse-applicative, parsec
 , prettyprinter, random, recursion-schemes, shakespeare, shelly
-, stdenv, tasty, tasty-hedgehog, tasty-hunit, template-haskell
-, text, time, tomland, transformers, transformers-base
+, statistics, stdenv, tasty, tasty-hedgehog, tasty-hunit
+, template-haskell, text, time, tomland, transformers
+, transformers-base, vector
 }:
 mkDerivation {
   pname = "verifuzz";
-  version = "0.2.0.0";
+  version = "0.3.0.0";
   src = ./.;
   isLibrary = true;
   isExecutable = true;
@@ -18,7 +19,8 @@ mkDerivation {
     exceptions fgl fgl-visualize filepath gitrev hedgehog lens
     lifted-base memory monad-control optparse-applicative parsec
     prettyprinter random recursion-schemes shakespeare shelly
-    template-haskell text time tomland transformers transformers-base
+    statistics template-haskell text time tomland transformers
+    transformers-base vector
   ];
   libraryToolDepends = [ alex ];
   executableHaskellDepends = [ base ];
