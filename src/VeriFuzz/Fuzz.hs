@@ -27,40 +27,33 @@ module VeriFuzz.Fuzz
     )
 where
 
-import           Control.DeepSeq                ( force )
-import           Control.Exception.Lifted       ( finally )
-import           Control.Lens            hiding ( (<.>) )
-import           Control.Monad                  ( forM
-                                                , replicateM
-                                                )
+import           Control.DeepSeq                  (force)
+import           Control.Exception.Lifted         (finally)
+import           Control.Lens                     hiding ((<.>))
+import           Control.Monad                    (forM, replicateM)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class      ( lift )
-import           Control.Monad.Trans.Control    ( MonadBaseControl )
-import           Control.Monad.Trans.Maybe      ( runMaybeT )
-import           Control.Monad.Trans.Reader
-                                         hiding ( local )
+import           Control.Monad.Trans.Class        (lift)
+import           Control.Monad.Trans.Control      (MonadBaseControl)
+import           Control.Monad.Trans.Maybe        (runMaybeT)
+import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
-import qualified Crypto.Random.DRBG            as C
-import           Data.ByteString                ( ByteString )
-import           Data.List                      ( nubBy
-                                                , sort
-                                                )
-import           Data.Maybe                     ( isNothing )
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
+import qualified Crypto.Random.DRBG               as C
+import           Data.ByteString                  (ByteString)
+import           Data.List                        (nubBy, sort)
+import           Data.Maybe                       (isNothing)
+import           Data.Text                        (Text)
+import qualified Data.Text                        as T
 import           Data.Time
-import           Data.Tuple                     ( swap )
-import           Hedgehog                       ( Gen )
-import qualified Hedgehog.Internal.Gen         as Hog
-import           Hedgehog.Internal.Seed         ( Seed )
-import qualified Hedgehog.Internal.Seed        as Hog
-import qualified Hedgehog.Internal.Tree        as Hog
-import           Prelude                 hiding ( FilePath )
-import           Shelly                  hiding ( get )
-import           Shelly.Lifted                  ( MonadSh
-                                                , liftSh
-                                                )
-import           System.FilePath.Posix          ( takeBaseName )
+import           Data.Tuple                       (swap)
+import           Hedgehog                         (Gen)
+import qualified Hedgehog.Internal.Gen            as Hog
+import           Hedgehog.Internal.Seed           (Seed)
+import qualified Hedgehog.Internal.Seed           as Hog
+import qualified Hedgehog.Internal.Tree           as Hog
+import           Prelude                          hiding (FilePath)
+import           Shelly                           hiding (get)
+import           Shelly.Lifted                    (MonadSh, liftSh)
+import           System.FilePath.Posix            (takeBaseName)
 import           VeriFuzz.Config
 import           VeriFuzz.Internal
 import           VeriFuzz.Reduce
@@ -151,7 +144,7 @@ failedSynthesis :: MonadSh m => Fuzz m [SynthTool]
 failedSynthesis = fmap toSynth . filter failed . _fuzzSynthStatus <$> get
   where
     failed (SynthStatus _ (Fail SynthFail) _) = True
-    failed _ = False
+    failed _                                  = False
     toSynth (SynthStatus s _ _) = s
 
 make :: MonadSh m => FilePath -> m ()
@@ -261,7 +254,7 @@ failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
   where
     withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail) _) = True
     withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail) _) = True
-    withIdentity _ = False
+    withIdentity _                                                    = False
 
 passEquiv :: (MonadSh m) => Fuzz m [SynthResult]
 passEquiv = filter withIdentity . _fuzzSynthResults <$> get
@@ -470,3 +463,4 @@ sampleSeed s gen =
                               Nothing -> loop (n - 1)
                               Just x  -> return (seed, Hog.nodeValue x)
           in  loop (100 :: Int)
+

@@ -12,3 +12,4 @@ failed
 output*
 .ghc*
 dist*
+.direnv
