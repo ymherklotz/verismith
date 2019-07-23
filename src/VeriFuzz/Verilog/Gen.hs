@@ -466,6 +466,9 @@ calcRange ps i (Range l r) = eval l - eval r + 1
   where
     eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (`resize` a) i
 
+notIdentElem :: Port -> [Port] -> Bool
+notIdentElem p = notElem (p ^. portName) . toListOf (traverse . portName)
+
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
 -- defined wires, so that it correctly reflects the internal state of the
@@ -478,7 +481,7 @@ moduleDef top = do
     ps       <- Hog.list (Hog.linear 0 10) parameter
     context  <- get
     config   <- lift ask
-    let local = filter (`notElem` portList) $ _variables context
+    let local = filter (`notIdentElem` portList) $ _variables context
     let
         size =
             evalRange (_parameters context) 32
