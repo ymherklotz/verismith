@@ -3,7 +3,7 @@ Module      : VeriFuzz.Result
 Description : Result monadic type.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -31,14 +31,9 @@ import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Control
-import           Data.Bifunctor                 ( Bifunctor(..) )
-import           Shelly                         ( RunFailed(..)
-                                                , Sh
-                                                , catch_sh
-                                                )
-import           Shelly.Lifted                  ( MonadSh
-                                                , liftSh
-                                                )
+import           Data.Bifunctor              (Bifunctor (..))
+import           Shelly                      (RunFailed (..), Sh, catch_sh)
+import           Shelly.Lifted               (MonadSh, liftSh)
 
 -- | Result type which is equivalent to 'Either' or 'Error'. This is
 -- reimplemented so that there is full control over the 'Monad' definition and

@@ -3,7 +3,7 @@ Module      : Parser
 Description : Test the parser.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -17,15 +17,10 @@ module Parser
 where
 
 import           Control.Lens
-import           Data.Either                    ( either
-                                                , isRight
-                                                )
-import           Hedgehog                       ( Gen
-                                                , Property
-                                                , (===)
-                                                )
-import qualified Hedgehog                      as Hog
-import qualified Hedgehog.Gen                  as Hog
+import           Data.Either             (either, isRight)
+import           Hedgehog                (Gen, Property, (===))
+import qualified Hedgehog                as Hog
+import qualified Hedgehog.Gen            as Hog
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Test.Tasty.HUnit

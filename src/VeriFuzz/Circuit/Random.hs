@@ -3,7 +3,7 @@ Module      : VeriFuzz.Circuit.Random
 Description : Random generation for DAG
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -18,14 +18,13 @@ module VeriFuzz.Circuit.Random
     )
 where
 
-import           Data.Graph.Inductive           ( Context )
-import qualified Data.Graph.Inductive          as G
-import           Data.Graph.Inductive.PatriciaTree
-                                                ( Gr )
-import           Data.List                      ( nub )
-import           Hedgehog                       ( Gen )
-import qualified Hedgehog.Gen                  as Hog
-import qualified Hedgehog.Range                as Hog
+import           Data.Graph.Inductive              (Context)
+import qualified Data.Graph.Inductive              as G
+import           Data.Graph.Inductive.PatriciaTree (Gr)
+import           Data.List                         (nub)
+import           Hedgehog                          (Gen)
+import qualified Hedgehog.Gen                      as Hog
+import qualified Hedgehog.Range                    as Hog
 import           VeriFuzz.Circuit.Base
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]

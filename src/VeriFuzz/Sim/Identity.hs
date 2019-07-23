@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.Identity
 Description : The identity simulator and synthesiser.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -16,16 +16,11 @@ module VeriFuzz.Sim.Identity
     )
 where
 
-import           Control.DeepSeq                ( NFData
-                                                , rnf
-                                                , rwhnf
-                                                )
-import           Data.Text                      ( Text
-                                                , unpack
-                                                )
-import           Prelude                 hiding ( FilePath )
-import           Shelly                         ( FilePath )
-import           Shelly.Lifted                  ( writefile )
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
+import           Data.Text                (Text, unpack)
+import           Prelude                  hiding (FilePath)
+import           Shelly                   (FilePath)
+import           Shelly.Lifted            (writefile)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen

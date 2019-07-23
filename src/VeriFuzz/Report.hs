@@ -4,7 +4,7 @@ Module      : VeriFuzz.Report
 Description : Generate a report from a fuzz run.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -41,33 +41,23 @@ module VeriFuzz.Report
     )
 where
 
-import           Control.DeepSeq                ( NFData
-                                                , rnf
-                                                )
-import           Control.Lens            hiding ( Identity
-                                                , (<.>)
-                                                )
-import           Data.Bifunctor                 ( bimap )
-import           Data.ByteString                ( ByteString )
-import           Data.Maybe                     ( fromMaybe )
-import           Data.Monoid                    ( Endo )
-import           Data.Text                      ( Text )
+import           Control.DeepSeq               (NFData, rnf)
+import           Control.Lens                  hiding (Identity, (<.>))
+import           Data.Bifunctor                (bimap)
+import           Data.ByteString               (ByteString)
+import           Data.Maybe                    (fromMaybe)
+import           Data.Monoid                   (Endo)
+import           Data.Text                     (Text)
 import qualified Data.Text                     as T
-import           Data.Text.Lazy                 ( toStrict )
+import           Data.Text.Lazy                (toStrict)
 import           Data.Time
-import           Data.Vector                    ( fromList )
-import           Prelude                 hiding ( FilePath )
-import           Shelly                         ( FilePath
-                                                , fromText
-                                                , toTextIgnore
-                                                , (<.>)
-                                                , (</>)
-                                                )
-import           Statistics.Sample              ( meanVariance )
-import           Text.Blaze.Html                ( Html
-                                                , (!)
-                                                )
-import           Text.Blaze.Html.Renderer.Text  ( renderHtml )
+import           Data.Vector                   (fromList)
+import           Prelude                       hiding (FilePath)
+import           Shelly                        (FilePath, fromText,
+                                                toTextIgnore, (<.>), (</>))
+import           Statistics.Sample             (meanVariance)
+import           Text.Blaze.Html               (Html, (!))
+import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5              as H
 import qualified Text.Blaze.Html5.Attributes   as A
 import           VeriFuzz.Config
@@ -206,9 +196,9 @@ data FuzzReport = FuzzReport { _fuzzDir      :: !FilePath
                              , _simResults   :: ![SimResult]
                              , _synthStatus  :: ![SynthStatus]
                              , _fileLines    :: {-# UNPACK #-} !Int
-                             , _synthTime    :: {-# UNPACK #-} !NominalDiffTime
-                             , _equivTime    :: {-# UNPACK #-} !NominalDiffTime
-                             , _reducTime    :: {-# UNPACK #-} !NominalDiffTime
+                             , _synthTime    :: !NominalDiffTime
+                             , _equivTime    :: !NominalDiffTime
+                             , _reducTime    :: !NominalDiffTime
                              }
                   deriving (Eq, Show)
 

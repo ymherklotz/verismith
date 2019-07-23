@@ -3,7 +3,7 @@ Module      : Reduce
 Description : Test reduction.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -17,7 +17,7 @@ module Reduce
     )
 where
 
-import           Data.List                      ( (\\) )
+import           Data.List        ((\\))
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           VeriFuzz

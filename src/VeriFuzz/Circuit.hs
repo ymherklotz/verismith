@@ -3,7 +3,7 @@ Module      : VeriFuzz.Circuit
 Description : Definition of the circuit graph.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -26,8 +26,8 @@ module VeriFuzz.Circuit
 where
 
 import           Control.Lens
-import           Hedgehog                       ( Gen )
-import qualified Hedgehog.Gen                  as Hog
+import           Hedgehog                (Gen)
+import qualified Hedgehog.Gen            as Hog
 import           VeriFuzz.Circuit.Base
 import           VeriFuzz.Circuit.Gen
 import           VeriFuzz.Circuit.Random

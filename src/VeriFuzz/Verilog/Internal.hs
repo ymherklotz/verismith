@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog.Internal
 Description : Defaults and common functions.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -29,7 +29,7 @@ module VeriFuzz.Verilog.Internal
 where
 
 import           Control.Lens
-import           Data.Text                      ( Text )
+import           Data.Text            (Text)
 import           VeriFuzz.Verilog.AST
 
 regDecl :: Identifier -> ModItem

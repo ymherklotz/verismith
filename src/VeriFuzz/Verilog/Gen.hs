@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog.Gen
 Description : Various useful generators.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -30,7 +30,7 @@ import           Control.Monad.Trans.Reader       hiding (local)
 import           Control.Monad.Trans.State.Strict
 import           Data.Foldable                    (fold)
 import           Data.Functor.Foldable            (cata)
-import           Data.List                        (foldl')
+import           Data.List                        (foldl', partition)
 import qualified Data.Text                        as T
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
@@ -44,6 +44,7 @@ import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
 
 -- Temporary imports
+import           Data.Char                        (toLower)
 import           Debug.Trace
 import           VeriFuzz.Verilog.CodeGen
 
@@ -353,18 +354,23 @@ alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
 resizePort :: [Parameter] -> Identifier -> Range -> [Port] -> [Port]
 resizePort ps i ra = foldl' func []
     where
-        func l p@(Port _ _ ri i')
-            | i' == i && calc ri < calc ra = (p & portSize .~ ra) : l
+        func l p@(Port t _ ri i')
+            | i' == i && calc ri < calc ra = trace (fmap toLower (show t) <> " " <> show (GenVerilog i) <> ": " <> (show $ calc ri) <> " to " <> (show $ calc ra)) $ (p & portSize .~ ra) : l
             | otherwise = p : l
         calc = calcRange ps $ Just 64
 
 -- | Instantiate a module, where the outputs are new nets that are created, and
 -- the inputs are taken from existing ports in the context.
+--
+-- 1 is subtracted from the inputs for the length because the clock is not
+-- counted and is assumed to be there, this should be made nicer by filtering
+-- out the clock instead. I think that in general there should be a special
+-- representation for the clock.
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
     outs    <- replicateM (length outP) (nextPort Wire)
-    ins <- take (length inP) <$> Hog.shuffle (context ^. variables)
+    ins <- take (length inP - 1) <$> Hog.shuffle (context ^. variables)
     mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inP ^.. traverse . portSize
     ident <- makeIdentifier "modinst"
     vs <- view variables <$> get
@@ -466,8 +472,8 @@ calcRange ps i (Range l r) = eval l - eval r + 1
   where
     eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (`resize` a) i
 
-notIdentElem :: Port -> [Port] -> Bool
-notIdentElem p = notElem (p ^. portName) . toListOf (traverse . portName)
+identElem :: Port -> [Port] -> Bool
+identElem p = elem (p ^. portName) . toListOf (traverse . portName)
 
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
@@ -481,7 +487,7 @@ moduleDef top = do
     ps       <- Hog.list (Hog.linear 0 10) parameter
     context  <- get
     config   <- lift ask
-    let local = filter (`notIdentElem` portList) $ _variables context
+    let (newPorts, local) = partition (`identElem` portList) $ _variables context
     let
         size =
             evalRange (_parameters context) 32
@@ -496,7 +502,7 @@ moduleDef top = do
     let comb = combineAssigns_ combine yport local
     return
         . declareMod local
-        . ModDecl name [yport] (clock : portList) (comb : mi)
+        . ModDecl name [yport] (clock : newPorts) (comb : mi)
         $ ps
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and

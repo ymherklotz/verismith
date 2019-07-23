@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.Template
 Description : Template file for different configuration files
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 

@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.Yosys
 Description : Yosys simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -20,19 +20,14 @@ module VeriFuzz.Sim.Yosys
     )
 where
 
-import           Control.DeepSeq                ( NFData
-                                                , rnf
-                                                , rwhnf
-                                                )
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
 import           Control.Lens
-import           Control.Monad                  ( void )
-import           Data.Text                      ( Text
-                                                , unpack
-                                                )
-import           Prelude                 hiding ( FilePath )
+import           Control.Monad            (void)
+import           Data.Text                (Text, unpack)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted                  ( liftSh )
-import           Text.Shakespeare.Text          ( st )
+import           Shelly.Lifted            (liftSh)
+import           Text.Shakespeare.Text    (st)
 import           VeriFuzz.Result
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template

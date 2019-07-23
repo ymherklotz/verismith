@@ -3,7 +3,7 @@ Module      : Verilog.Circuit.Gen
 Description : Generate verilog from circuit.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -15,11 +15,9 @@ module VeriFuzz.Circuit.Gen
     )
 where
 
-import           Data.Graph.Inductive           ( LNode
-                                                , Node
-                                                )
-import qualified Data.Graph.Inductive          as G
-import           Data.Maybe                     ( catMaybes )
+import           Data.Graph.Inductive      (LNode, Node)
+import qualified Data.Graph.Inductive      as G
+import           Data.Maybe                (catMaybes)
 import           VeriFuzz.Circuit.Base
 import           VeriFuzz.Circuit.Internal
 import           VeriFuzz.Verilog.AST

@@ -3,7 +3,7 @@ Module      : VeriFuzz.Circuit.Internal
 Description : Internal helpers for generation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -19,11 +19,9 @@ module VeriFuzz.Circuit.Internal
     )
 where
 
-import           Data.Graph.Inductive           ( Graph
-                                                , Node
-                                                )
-import qualified Data.Graph.Inductive          as G
-import qualified Data.Text                     as T
+import           Data.Graph.Inductive (Graph, Node)
+import qualified Data.Graph.Inductive as G
+import qualified Data.Text            as T
 
 -- | Convert an integer into a label.
 --

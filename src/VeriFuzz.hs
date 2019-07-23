@@ -3,7 +3,7 @@ Module      : VeriFuzz
 Description : VeriFuzz
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 -}
@@ -82,7 +82,7 @@ data Opts = Fuzz { fuzzOutput :: {-# UNPACK #-} !Text
                   }
           | Reduce { fileName        :: {-# UNPACK #-} !FilePath
                    , top             :: {-# UNPACK #-} !Text
-                   , reduceScript    :: {-# UNPACK #-} !(Maybe FilePath)
+                   , reduceScript    :: !(Maybe FilePath)
                    , synthesiserDesc :: ![SynthDescription]
                    , rerun           :: Bool
                    }

@@ -3,7 +3,7 @@ Module      : VeriFuzz.Config
 Description : Configuration file format and parser.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 

@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.Quartus
 Description : Quartus synthesiser implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -16,16 +16,11 @@ module VeriFuzz.Sim.Quartus
     )
 where
 
-import           Control.DeepSeq                ( NFData
-                                                , rnf
-                                                , rwhnf
-                                                )
-import           Data.Text                      ( Text
-                                                , unpack
-                                                )
-import           Prelude                 hiding ( FilePath )
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
+import           Data.Text                (Text, unpack)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted                  ( liftSh )
+import           Shelly.Lifted            (liftSh)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen

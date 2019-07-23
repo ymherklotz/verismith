@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog.Quote
 Description : QuasiQuotation for verilog code in Haskell.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -18,8 +18,8 @@ module VeriFuzz.Verilog.Quote
 where
 
 import           Data.Data
-import qualified Data.Text                     as T
-import qualified Language.Haskell.TH           as TH
+import qualified Data.Text                  as T
+import qualified Language.Haskell.TH        as TH
 import           Language.Haskell.TH.Quote
 import           Language.Haskell.TH.Syntax
 import           VeriFuzz.Verilog.Parser

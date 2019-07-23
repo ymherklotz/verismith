@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.XST
 Description : XST (ise) simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -18,17 +18,12 @@ module VeriFuzz.Sim.XST
     )
 where
 
-import           Control.DeepSeq                ( NFData
-                                                , rnf
-                                                , rwhnf
-                                                )
-import           Data.Text                      ( Text
-                                                , unpack
-                                                )
-import           Prelude                 hiding ( FilePath )
+import           Control.DeepSeq          (NFData, rnf, rwhnf)
+import           Data.Text                (Text, unpack)
+import           Prelude                  hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted                  ( liftSh )
-import           Text.Shakespeare.Text          ( st )
+import           Shelly.Lifted            (liftSh)
+import           Text.Shakespeare.Text    (st)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST

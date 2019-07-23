@@ -3,7 +3,7 @@ Module      : VeriFuzz.Internal
 Description : Shared high level code used in the other modules internally.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -20,14 +20,12 @@ module VeriFuzz.Internal
     )
 where
 
-import           Data.ByteString                ( ByteString )
-import           Data.ByteString.Builder        ( byteStringHex
-                                                , toLazyByteString
-                                                )
-import qualified Data.ByteString.Lazy          as L
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Data.Text.Encoding             ( decodeUtf8 )
+import           Data.ByteString         (ByteString)
+import           Data.ByteString.Builder (byteStringHex, toLazyByteString)
+import qualified Data.ByteString.Lazy    as L
+import           Data.Text               (Text)
+import qualified Data.Text               as T
+import           Data.Text.Encoding      (decodeUtf8)
 
 -- | Function to show a bytestring in a hex format.
 showBS :: ByteString -> Text

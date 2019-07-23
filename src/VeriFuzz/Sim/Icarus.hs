@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.Icarus
 Description : Icarus verilog module.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -17,35 +17,28 @@ module VeriFuzz.Sim.Icarus
     )
 where
 
-import           Control.DeepSeq                ( NFData
-                                                , rnf
-                                                , rwhnf
-                                                )
+import           Control.DeepSeq           (NFData, rnf, rwhnf)
 import           Control.Lens
-import           Control.Monad                  ( void )
-import           Crypto.Hash                    ( Digest
-                                                , hash
-                                                )
-import           Crypto.Hash.Algorithms         ( SHA256 )
-import           Data.Binary                    ( encode )
+import           Control.Monad             (void)
+import           Crypto.Hash               (Digest, hash)
+import           Crypto.Hash.Algorithms    (SHA256)
+import           Data.Binary               (encode)
 import           Data.Bits
-import qualified Data.ByteArray                as BA
-                                                ( convert )
-import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString               as B
-import           Data.ByteString.Lazy           ( toStrict )
-import qualified Data.ByteString.Lazy          as L
-                                                ( ByteString )
-import           Data.Char                      ( digitToInt )
-import           Data.Foldable                  ( fold )
-import           Data.List                      ( transpose )
-import           Data.Maybe                     ( listToMaybe )
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Numeric                        ( readInt )
-import           Prelude                 hiding ( FilePath )
+import qualified Data.ByteArray            as BA (convert)
+import           Data.ByteString           (ByteString)
+import qualified Data.ByteString           as B
+import           Data.ByteString.Lazy      (toStrict)
+import qualified Data.ByteString.Lazy      as L (ByteString)
+import           Data.Char                 (digitToInt)
+import           Data.Foldable             (fold)
+import           Data.List                 (transpose)
+import           Data.Maybe                (listToMaybe)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import           Numeric                   (readInt)
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted                  ( liftSh )
+import           Shelly.Lifted             (liftSh)
 import           VeriFuzz.Sim.Internal
 import           VeriFuzz.Sim.Template
 import           VeriFuzz.Verilog.AST

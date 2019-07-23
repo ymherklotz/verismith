@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog
 Description : Verilog implementation with random generation and mutations.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 

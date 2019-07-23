@@ -8,7 +8,7 @@ homepage: https://github.com/ymherklotz/VeriFuzz#readme
 license: BSD3
 license-file: LICENSE
 author: Yann Herklotz
-maintainer: yann [at] ymhg [dot] org
+maintainer: yann [at] yannherklotz [dot] com
 copyright: 2018 Yann Herklotz
 category: Web
 build-type: Custom

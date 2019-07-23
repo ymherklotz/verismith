@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog.Eval
 Description : Evaluation of Verilog expressions and statements.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -17,9 +17,9 @@ module VeriFuzz.Verilog.Eval
 where
 
 import           Data.Bits
-import           Data.Foldable                  ( fold )
-import           Data.Functor.Foldable   hiding ( fold )
-import           Data.Maybe                     ( listToMaybe )
+import           Data.Foldable           (fold)
+import           Data.Functor.Foldable   hiding (fold)
+import           Data.Maybe              (listToMaybe)
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
 

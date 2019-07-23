@@ -3,7 +3,7 @@ Module      : VeriFuzz.Circuit.Base
 Description : Base types for the circuit module.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -18,10 +18,7 @@ module VeriFuzz.Circuit.Base
     )
 where
 
-import           Data.Graph.Inductive           ( Gr
-                                                , LEdge
-                                                , LNode
-                                                )
+import           Data.Graph.Inductive (Gr, LEdge, LNode)
 import           System.Random
 
 -- | The types for all the gates.

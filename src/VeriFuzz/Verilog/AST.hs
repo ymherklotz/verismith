@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog.AST
 Description : Definition of the Verilog AST types.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Poratbility : POSIX
 
@@ -139,18 +139,14 @@ module VeriFuzz.Verilog.AST
     )
 where
 
-import           Control.Lens            hiding ( (<|) )
+import           Control.Lens             hiding ((<|))
 import           Data.Data
 import           Data.Data.Lens
-import           Data.Functor.Foldable.TH       ( makeBaseFunctor )
-import           Data.List.NonEmpty             ( NonEmpty(..)
-                                                , (<|)
-                                                )
-import           Data.String                    ( IsString
-                                                , fromString
-                                                )
-import           Data.Text                      ( Text )
-import           Data.Traversable               ( sequenceA )
+import           Data.Functor.Foldable.TH (makeBaseFunctor)
+import           Data.List.NonEmpty       (NonEmpty (..), (<|))
+import           Data.String              (IsString, fromString)
+import           Data.Text                (Text)
+import           Data.Traversable         (sequenceA)
 import           VeriFuzz.Verilog.BitVec
 
 -- | Identifier in Verilog. This is just a string of characters that can either

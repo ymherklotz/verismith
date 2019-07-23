@@ -3,7 +3,7 @@ Module      : VeriFuzz.Verilog.Mutate
 Description : Functions to mutate the Verilog AST.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -41,12 +41,10 @@ module VeriFuzz.Verilog.Mutate
 where
 
 import           Control.Lens
-import           Data.Foldable                  ( fold )
-import           Data.Maybe                     ( catMaybes
-                                                , fromMaybe
-                                                )
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
+import           Data.Foldable             (fold)
+import           Data.Maybe                (catMaybes, fromMaybe)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
 import           VeriFuzz.Circuit.Internal
 import           VeriFuzz.Internal
 import           VeriFuzz.Verilog.AST
@@ -323,11 +321,10 @@ makeTopAssert = (modItems %~ (++ [assert])) . makeTop 2
 -- | Provide declarations for all the ports that are passed to it. If they are
 -- registers, it should assign them to 0.
 declareMod :: [Port] -> ModDecl -> ModDecl
-declareMod ports = initMod . (modItems %~ (decl ++))
+declareMod ports = initMod . (modItems %~ (fmap decl ports ++))
   where
-    decl = declf <$> ports
-    declf p@(Port Reg _ _ _) = Decl Nothing p (Just 0)
-    declf p                  = Decl Nothing p Nothing
+    decl p@(Port Reg _ _ _) = Decl Nothing p (Just 0)
+    decl p                  = Decl Nothing p Nothing
 
 -- | Simplify an 'Expr' by using constants to remove 'BinaryOperator' and
 -- simplify expressions. To make this work effectively, it should be run until
@@ -339,30 +336,30 @@ declareMod ports = initMod . (modItems %~ (decl ++))
 -- >>> GenVerilog . simplify $ (Id "y") + (Id "x")
 -- (y + x)
 simplify :: Expr -> Expr
-simplify (BinOp (Number (BitVec _ 1)) BinAnd e) = e
-simplify (BinOp e BinAnd (Number (BitVec _ 1))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinAnd _) = Number 0
-simplify (BinOp _ BinAnd (Number (BitVec _ 0))) = Number 0
-simplify (BinOp e BinPlus (Number (BitVec _ 0))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinPlus e) = e
+simplify (BinOp (Number (BitVec _ 1)) BinAnd e)   = e
+simplify (BinOp e BinAnd (Number (BitVec _ 1)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinAnd _)   = Number 0
+simplify (BinOp _ BinAnd (Number (BitVec _ 0)))   = Number 0
+simplify (BinOp e BinPlus (Number (BitVec _ 0)))  = e
+simplify (BinOp (Number (BitVec _ 0)) BinPlus e)  = e
 simplify (BinOp e BinMinus (Number (BitVec _ 0))) = e
 simplify (BinOp (Number (BitVec _ 0)) BinMinus e) = e
 simplify (BinOp e BinTimes (Number (BitVec _ 1))) = e
 simplify (BinOp (Number (BitVec _ 1)) BinTimes e) = e
 simplify (BinOp _ BinTimes (Number (BitVec _ 0))) = Number 0
 simplify (BinOp (Number (BitVec _ 0)) BinTimes _) = Number 0
-simplify (BinOp e BinOr (Number (BitVec _ 0))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinOr e) = e
-simplify (BinOp e BinLSL (Number (BitVec _ 0))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinLSL e) = e
-simplify (BinOp e BinLSR (Number (BitVec _ 0))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinLSR e) = e
-simplify (BinOp e BinASL (Number (BitVec _ 0))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinASL e) = e
-simplify (BinOp e BinASR (Number (BitVec _ 0))) = e
-simplify (BinOp (Number (BitVec _ 0)) BinASR e) = e
-simplify (UnOp UnPlus e) = e
-simplify e               = e
+simplify (BinOp e BinOr (Number (BitVec _ 0)))    = e
+simplify (BinOp (Number (BitVec _ 0)) BinOr e)    = e
+simplify (BinOp e BinLSL (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinLSL e)   = e
+simplify (BinOp e BinLSR (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinLSR e)   = e
+simplify (BinOp e BinASL (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinASL e)   = e
+simplify (BinOp e BinASR (Number (BitVec _ 0)))   = e
+simplify (BinOp (Number (BitVec _ 0)) BinASR e)   = e
+simplify (UnOp UnPlus e)                          = e
+simplify e                                        = e
 
 -- | Remove all 'Identifier' that do not appeare in the input list from an
 -- 'Expr'. The identifier will be replaced by @1'b0@, which can then later be

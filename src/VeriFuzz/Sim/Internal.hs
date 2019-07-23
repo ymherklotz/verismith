@@ -3,7 +3,7 @@ Module      : VeriFuzz.Sim.Internal
 Description : Class of the simulator.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
-Maintainer  : ymherklotz [at] gmail [dot] com
+Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
@@ -40,26 +40,20 @@ module VeriFuzz.Sim.Internal
 where
 
 import           Control.Lens
-import           Control.Monad                  ( forM
-                                                , void
-                                                )
-import           Control.Monad.Catch            ( throwM )
-import           Data.Bits                      ( shiftL )
-import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString               as B
-import           Data.Maybe                     ( catMaybes )
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Data.Time.Format               ( defaultTimeLocale
-                                                , formatTime
-                                                )
-import           Data.Time.LocalTime            ( getZonedTime )
-import           Prelude                 hiding ( FilePath )
+import           Control.Monad         (forM, void)
+import           Control.Monad.Catch   (throwM)
+import           Data.Bits             (shiftL)
+import           Data.ByteString       (ByteString)
+import qualified Data.ByteString       as B
+import           Data.Maybe            (catMaybes)
+import           Data.Text             (Text)
+import qualified Data.Text             as T
+import           Data.Time.Format      (defaultTimeLocale, formatTime)
+import           Data.Time.LocalTime   (getZonedTime)
+import           Prelude               hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted                  ( MonadSh
-                                                , liftSh
-                                                )
-import           System.FilePath.Posix          ( takeBaseName )
+import           Shelly.Lifted         (MonadSh, liftSh)
+import           System.FilePath.Posix (takeBaseName)
 import           VeriFuzz.Internal
 import           VeriFuzz.Result
 import           VeriFuzz.Verilog.AST
