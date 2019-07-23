@@ -4,6 +4,7 @@ TAGS
 *.log
 *~
 cabal.project.local
+result
 
 # Folders
 .stack-work

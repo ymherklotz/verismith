@@ -79,7 +79,7 @@ library
                , parsec >=3.1 && <3.2
                , transformers >=0.5 && <0.6
                , transformers-base >=0.4.5 && <0.5
-               , tomland >=1.0 && <1.1
+               , tomland >=1.0 && <1.2
                , prettyprinter >=1.2.0.1 && <1.3
                , array >=0.5 && <0.6
                , recursion-schemes >=5.0.2 && <5.2

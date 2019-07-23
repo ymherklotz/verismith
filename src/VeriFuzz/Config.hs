@@ -77,22 +77,18 @@ module VeriFuzz.Config
     )
 where
 
-import           Control.Applicative            ( Alternative )
-import           Control.Lens            hiding ( (.=) )
-import           Data.List.NonEmpty             ( NonEmpty(..) )
-import           Data.Maybe                     ( fromMaybe )
-import           Data.Text                      ( Text
-                                                , pack
-                                                )
-import qualified Data.Text.IO                  as T
-import           Data.Version                   ( showVersion )
+import           Control.Applicative    (Alternative)
+import           Control.Lens           hiding ((.=))
+import           Data.List.NonEmpty     (NonEmpty (..))
+import           Data.Maybe             (fromMaybe)
+import           Data.Text              (Text, pack)
+import qualified Data.Text.IO           as T
+import           Data.Version           (showVersion)
 import           Development.GitRev
-import           Hedgehog.Internal.Seed         ( Seed )
-import           Paths_verifuzz                 ( version )
-import           Shelly                         ( toTextIgnore )
-import           Toml                           ( TomlCodec
-                                                , (.=)
-                                                )
+import           Hedgehog.Internal.Seed (Seed)
+import           Paths_verifuzz         (version)
+import           Shelly                 (toTextIgnore)
+import           Toml                   (TomlCodec, (.=))
 import qualified Toml
 import           VeriFuzz.Sim.Quartus
 import           VeriFuzz.Sim.Vivado
@@ -203,7 +199,7 @@ data ConfProperty = ConfProperty { _propSize         :: {-# UNPACK #-} !Int
                                  , _propMaxModules   :: {-# UNPACK #-} !Int
                                  , _propSampleMethod :: !Text
                                  , _propSampleSize   :: {-# UNPACK #-} !Int
-                                 , _propCombine      :: {-# UNPACK #-} !Bool
+                                 , _propCombine      :: !Bool
                                  }
                   deriving (Eq, Show)
 
