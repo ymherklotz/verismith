@@ -58,29 +58,54 @@ reported and 3 were fixed.
 
 ## Build the Fuzzer
 
-The fuzzer is split into an executable (in the [app](/app) folder) and a
-library (in the [src](/src) folder). To build the executable, you will need
-[stack](https://docs.haskellstack.org/en/stable/README/) installed. Building
-directly using [cabal-install](https://www.haskell.org/cabal/download.html) is
-possible but not recommended and not directly supported.
+The fuzzer now supports building with [nix](https://nixos.org/nix/manual/),
+which pulls in all the extra dependencies that are needed to build the
+project. The main files and their functions are described below:
 
-To build the executable:
+- `default.nix`: describes the main Haskell package and it's dependencies that
+  have to be pulled in.
+- `shell.nix`: describes how to set up a shell with `nix-shell` which has all
+  the needed dependencies present.
+- `release.nix`: passes the versions of the packages that should be used to the
+  description of the fuzzer in `default.nix`, which also overrides some
+  dependencies so that everything builds nicely. The exact versions of the
+  packages that should be overridden are in [nix](/nix).
 
-```
-stack build
+It may be possible to build it purely with
+[cabal-install](https://hackage.haskell.org/package/cabal-install), however
+it may not have all the right versions of the dependencies that are needed.
+
+Instead, stack could be used and the `stack.yaml` file could contain the
+overrides that are used by nix.
+
+### Build with nix
+
+Nix build is completely supported, therefore if nix is installed, building the
+project is as simple as
+
+``` shell
+nix-build release.nix
 ```
 
-To run the executable:
+If one wants to work in the project with all the right dependencies loaded, one
+can use
 
-```
-stack exec verifuzz
+``` shell
+nix-shell
 ```
 
-To install the executable (which defaults to installing it in `~/.local`):
+### Build with cabal and nix
 
+After entering a development environment with `nix-shell`, the project can
+safely be built with `cabal-install`.
+
+``` shell
+cabal v2-configure
+cabal v2-build
 ```
-stack install
-```
+
+This should not have to download any extra dependencies and just have to build
+the actual project itself.
 
 ## Running tests
 
