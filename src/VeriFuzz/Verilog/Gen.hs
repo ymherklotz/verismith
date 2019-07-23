@@ -370,18 +370,21 @@ instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
     outs    <- replicateM (length outP) (nextPort Wire)
-    ins <- take (length inP - 1) <$> Hog.shuffle (context ^. variables)
-    mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inP ^.. traverse . portSize
+    ins <- take (length inpFixed) <$> Hog.shuffle (context ^. variables)
+    mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inpFixed ^.. traverse . portSize
     ident <- makeIdentifier "modinst"
     vs <- view variables <$> get
     Hog.choice
-        [ return . ModInst i ident $ ModConn <$> outE outs <> insE ins
+        [ return . ModInst i ident $ ModConn <$> toE (outs <> clkPort <> ins)
         , ModInst i ident <$> Hog.shuffle
-            (zipWith ModConnNamed (view portName <$> outP <> inP) (outE outs <> insE ins))
+            (zipWith ModConnNamed (view portName <$> outP <> clkPort <> inpFixed) (toE $ outs <> clkPort <> ins))
         ]
     where
-        insE ins = Id "clk" : (Id . view portName <$> ins)
-        outE out = Id . view portName <$> out
+        toE ins = Id . view portName <$> ins
+        (inpFixed, clkPort) = partition filterFunc inP
+        filterFunc (Port _ _ _ n)
+            | n == "clk" = False
+            | otherwise = True
         process p r = do
             params <- view parameters <$> get
             variables %= resizePort params p r
