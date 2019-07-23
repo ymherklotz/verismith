@@ -107,19 +107,6 @@ cabal v2-build
 This should not have to download any extra dependencies and just have to build
 the actual project itself.
 
-## Running tests
-
-There are two test-suites that currently test the library. One of the
-test-suites tests the random code generation and generation of the acyclic
-graph. It also contains some property based tests for this. The other test-suite
-uses `doctest` to test the examples that are in the documentation.
-
-To run the test-suites:
-
-```
-stack test
-```
-
 ## Configuration
 
 VeriFuzz can be configured using a [TOML](https://github.com/toml-lang/toml)
