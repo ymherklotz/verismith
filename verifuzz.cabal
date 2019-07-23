@@ -1,5 +1,5 @@
 name: verifuzz
-version: 0.3.0.0
+version: 0.3.1.0
 synopsis: Random verilog generation and simulator testing.
 description:
   VeriFuzz provides random verilog generation modules
@@ -9,7 +9,7 @@ license: BSD3
 license-file: LICENSE
 author: Yann Herklotz
 maintainer: yann [at] yannherklotz [dot] com
-copyright: 2018 Yann Herklotz
+copyright: 2018-2019 Yann Herklotz
 category: Web
 build-type: Custom
 cabal-version: >=1.10
