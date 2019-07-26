@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Gen
+Module      : VeriFuzz.Generate
 Description : Various useful generators.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -13,7 +13,7 @@ Various useful generators.
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
-module VeriFuzz.Verilog.Gen
+module VeriFuzz.Generate
     ( -- * Generation methods
       procedural
     , proceduralIO

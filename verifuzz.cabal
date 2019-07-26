@@ -35,6 +35,7 @@ library
                  , VeriFuzz.Circuit.Random
                  , VeriFuzz.Config
                  , VeriFuzz.Fuzz
+                 , VeriFuzz.Generate
                  , VeriFuzz.Internal
                  , VeriFuzz.Reduce
                  , VeriFuzz.Report
@@ -53,7 +54,6 @@ library
                  , VeriFuzz.Verilog.BitVec
                  , VeriFuzz.Verilog.CodeGen
                  , VeriFuzz.Verilog.Eval
-                 , VeriFuzz.Verilog.Gen
                  , VeriFuzz.Verilog.Internal
                  , VeriFuzz.Verilog.Lex
                  , VeriFuzz.Verilog.Mutate
