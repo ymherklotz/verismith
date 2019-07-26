@@ -10,9 +10,11 @@ Portability : POSIX
 Unsigned BitVec implementation.
 -}
 
+{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DeriveTraversable  #-}
 
 module VeriFuzz.Verilog.BitVec
@@ -23,16 +25,18 @@ module VeriFuzz.Verilog.BitVec
     )
 where
 
+import           Control.DeepSeq (NFData)
 import           Data.Bits
 import           Data.Data
 import           Data.Ratio
+import           GHC.Generics    (Generic)
 
 -- | Bit Vector that stores the bits in an arbitrary container together with the
 -- size.
 data BitVecF a = BitVec { width :: {-# UNPACK #-} !Int
                         , value :: !a
                         }
-               deriving (Show, Eq, Ord, Data, Functor, Foldable, Traversable)
+               deriving (Show, Eq, Ord, Data, Functor, Foldable, Traversable, Generic, NFData)
 
 -- | Specialisation of the above with Integer, so that infinitely large bit
 -- vectors can be stored.

@@ -10,16 +10,17 @@ Poratbility : POSIX
 Defines the types to build a Verilog AST.
 -}
 
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveFoldable             #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveTraversable          #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveFoldable        #-}
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveTraversable     #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module VeriFuzz.Verilog.AST
     ( -- * Top level types
@@ -139,25 +140,45 @@ module VeriFuzz.Verilog.AST
     )
 where
 
+import           Control.DeepSeq          (NFData)
 import           Control.Lens             hiding ((<|))
 import           Data.Data
 import           Data.Data.Lens
 import           Data.Functor.Foldable.TH (makeBaseFunctor)
 import           Data.List.NonEmpty       (NonEmpty (..), (<|))
 import           Data.String              (IsString, fromString)
-import           Data.Text                (Text)
+import           Data.Text                (Text, pack)
 import           Data.Traversable         (sequenceA)
+import           GHC.Generics             (Generic)
 import           VeriFuzz.Verilog.BitVec
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { getIdentifier :: Text }
-                   deriving (Eq, Show, Ord, Data, IsString, Semigroup, Monoid)
+                   deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+instance IsString Identifier where
+    fromString = Identifier . pack
+
+instance Semigroup Identifier where
+    Identifier a <> Identifier b = Identifier $ a <> b
+
+instance Monoid Identifier where
+    mempty = Identifier mempty
 
 -- | Verilog syntax for adding a delay, which is represented as @#num@.
 newtype Delay = Delay { _getDelay :: Int }
-                deriving (Eq, Show, Ord, Data, Num)
+                deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+instance Num Delay where
+    Delay a + Delay b = Delay $ a + b
+    Delay a - Delay b = Delay $ a - b
+    Delay a * Delay b = Delay $ a * b
+    negate (Delay a) = Delay $ negate a
+    abs (Delay a) = Delay $ abs a
+    signum (Delay a) = Delay $ signum a
+    fromInteger = Delay . fromInteger
 
 -- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
 data Event = EId {-# UNPACK #-} !Identifier
@@ -167,7 +188,7 @@ data Event = EId {-# UNPACK #-} !Identifier
            | ENegEdge {-# UNPACK #-} !Identifier
            | EOr !Event !Event
            | EComb !Event !Event
-           deriving (Eq, Show, Ord, Data)
+           deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Plated Event where
     plate = uniplate
@@ -198,7 +219,7 @@ data BinaryOperator = BinPlus    -- ^ @+@
                     | BinLSR     -- ^ @>>@
                     | BinASL     -- ^ @<<<@
                     | BinASR     -- ^ @>>>@
-                    deriving (Eq, Show, Ord, Data)
+                    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Unary operators that are currently supported by the generator.
 data UnaryOperator = UnPlus    -- ^ @+@
@@ -212,7 +233,7 @@ data UnaryOperator = UnPlus    -- ^ @+@
                    | UnXor     -- ^ @^@
                    | UnNxor    -- ^ @~^@
                    | UnNxorInv -- ^ @^~@
-                   deriving (Eq, Show, Ord, Data)
+                   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
@@ -229,7 +250,7 @@ data Expr = Number {-# UNPACK #-} !BitVec
           | Cond !Expr !Expr !Expr
           | Appl !Identifier !Expr
           | Str {-# UNPACK #-} !Text
-          deriving (Eq, Show, Ord, Data)
+          deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Num Expr where
   a + b = BinOp a BinPlus b
@@ -271,7 +292,7 @@ data ConstExpr = ConstNum { _constNum :: {-# UNPACK #-} !BitVec }
                            , _constFalse :: !ConstExpr
                            }
                | ConstStr { _constStr :: {-# UNPACK #-} !Text }
-               deriving (Eq, Show, Ord, Data)
+               deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 constToExpr :: ConstExpr -> Expr
 constToExpr (ConstNum    a   ) = Number a
@@ -320,7 +341,7 @@ instance Plated ConstExpr where
 
 data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
                  , _taskExpr :: [Expr]
-                 } deriving (Eq, Show, Ord, Data)
+                 } deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Type that represents the left hand side of an assignment, which can be a
 -- concatenation such as in:
@@ -336,7 +357,7 @@ data LVal = RegId { _regId :: {-# UNPACK #-} !Identifier }
                     , _regSizeRange :: {-# UNPACK #-} !Range
                     }
           | RegConcat { _regConc :: [Expr] }
-          deriving (Eq, Show, Ord, Data)
+          deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance IsString LVal where
   fromString = RegId . fromString
@@ -345,13 +366,13 @@ instance IsString LVal where
 data PortDir = PortIn    -- ^ Input direction for port (@input@).
              | PortOut   -- ^ Output direction for port (@output@).
              | PortInOut -- ^ Inout direction for port (@inout@).
-             deriving (Eq, Show, Ord, Data)
+             deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Currently, only @wire@ and @reg@ are supported, as the other net types are
 -- not that common and not a priority.
 data PortType = Wire
               | Reg
-              deriving (Eq, Show, Ord, Data)
+              deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Range that can be associated with any port or left hand side. Contains the
 -- msb and lsb bits as 'ConstExpr'. This means that they can be generated using
@@ -359,7 +380,7 @@ data PortType = Wire
 data Range = Range { rangeMSB :: !ConstExpr
                    , rangeLSB :: !ConstExpr
                    }
-             deriving (Eq, Show, Ord, Data)
+             deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Num Range where
     (Range s1 a) + (Range s2 b) = Range (s1 + s2) $ a + b
@@ -382,7 +403,7 @@ data Port = Port { _portType   :: !PortType
                  , _portSigned :: !Bool
                  , _portSize   :: {-# UNPACK #-} !Range
                  , _portName   :: {-# UNPACK #-} !Identifier
-                 } deriving (Eq, Show, Ord, Data)
+                 } deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | This is currently a type because direct module declaration should also be
 -- added:
@@ -394,16 +415,16 @@ data ModConn = ModConn { _modExpr :: !Expr }
              | ModConnNamed { _modConnName :: {-# UNPACK #-} !Identifier
                             , _modExpr     :: !Expr
                             }
-             deriving (Eq, Show, Ord, Data)
+             deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 data Assign = Assign { _assignReg   :: !LVal
                      , _assignDelay :: !(Maybe Delay)
                      , _assignExpr  :: !Expr
-                     } deriving (Eq, Show, Ord, Data)
+                     } deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 data ContAssign = ContAssign { _contAssignNetLVal :: {-# UNPACK #-} !Identifier
                              , _contAssignExpr    :: !Expr
-                             } deriving (Eq, Show, Ord, Data)
+                             } deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Statements in Verilog.
 data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
@@ -426,7 +447,7 @@ data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
                      , _forIncr   :: !Assign
                      , _forStmnt  :: Statement
                      } -- ^ Loop bounds shall be statically computable for a for loop.
-           deriving (Eq, Show, Ord, Data)
+           deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Plated Statement where
     plate = uniplate
@@ -444,14 +465,14 @@ instance Monoid Statement where
 data Parameter = Parameter { _paramIdent :: {-# UNPACK #-} !Identifier
                            , _paramValue :: ConstExpr
                            }
-               deriving (Eq, Show, Ord, Data)
+               deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Local parameter that can be assigned anywhere using @localparam@. It cannot
 -- be changed by initialising the module.
 data LocalParam = LocalParam { _localParamIdent :: {-# UNPACK #-} !Identifier
                              , _localParamValue :: ConstExpr
                              }
-                deriving (Eq, Show, Ord, Data)
+                deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA { _modContAssign :: !ContAssign }
@@ -467,7 +488,7 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
                     }
              | ParamDecl { _paramDecl :: NonEmpty Parameter }
              | LocalParamDecl { _localParamDecl :: NonEmpty LocalParam }
-             deriving (Eq, Show, Ord, Data)
+             deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
@@ -476,7 +497,7 @@ data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
                        , _modItems    :: ![ModItem]
                        , _modParams   :: ![Parameter]
                        }
-             deriving (Eq, Show, Ord, Data)
+             deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e       ) = ModConn <$> f e
@@ -490,12 +511,18 @@ traverseModItem _ e = pure e
 
 -- | The complete sourcetext for the Verilog module.
 newtype Verilog = Verilog { getVerilog :: [ModDecl] }
-                   deriving (Eq, Show, Ord, Data, Semigroup, Monoid)
+                   deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+instance Semigroup Verilog where
+    Verilog a <> Verilog b = Verilog $ a <> b
+
+instance Monoid Verilog where
+    mempty = Verilog mempty
 
 data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
                              , _infoSrc :: !Verilog
                              }
-                  deriving (Eq, Ord, Data, Show)
+                  deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''Expr)
 $(makeLenses ''ConstExpr)

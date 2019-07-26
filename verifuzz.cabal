@@ -96,6 +96,7 @@ library
                , blaze-html >=0.9.0.1 && <0.10
                , statistics >=0.14.0.2 && <0.16
                , vector >=0.12.0.1 && <0.13
+               , unordered-containers >=0.2.10 && <0.3
   default-extensions: OverloadedStrings
 
 executable verifuzz
@@ -105,6 +106,17 @@ executable verifuzz
   ghc-options: -threaded
   build-depends: base >= 4.7 && < 5
                , verifuzz
+  default-extensions: OverloadedStrings
+
+benchmark benchmark
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Benchmark.hs
+  build-depends: base >=4 && <5
+               , verifuzz
+               , criterion >=1.5.5 && <1.6
+               , lens >=4.16.1 && <4.18
   default-extensions: OverloadedStrings
 
 test-suite test

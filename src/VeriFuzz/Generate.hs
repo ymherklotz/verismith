@@ -20,6 +20,44 @@ module VeriFuzz.Generate
     , proceduralSrc
     , proceduralSrcIO
     , randomMod
+    -- ** Generate Functions
+    , gen
+    , largeNum
+    , wireSize
+    , range
+    , genBitVec
+    , binOp
+    , unOp
+    , constExprWithContext
+    , exprSafeList
+    , exprRecList
+    , exprWithContext
+    , makeIdentifier
+    , nextPort
+    , newPort
+    , scopedExpr
+    , contAssign
+    , lvalFromPort
+    , assignment
+    , seqBlock
+    , conditional
+    , forLoop
+    , statement
+    , alwaysSeq
+    , instantiate
+    , modInst
+    , modItem
+    , constExpr
+    , parameter
+    , moduleDef
+    -- ** Helpers
+    , someI
+    , probability
+    , askProbability
+    , resizePort
+    , moduleName
+    , evalRange
+    , calcRange
     )
 where
 
@@ -42,11 +80,6 @@ import           VeriFuzz.Verilog.BitVec
 import           VeriFuzz.Verilog.Eval
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
-
--- Temporary imports
-import           Data.Char                        (toLower)
-import           Debug.Trace
-import           VeriFuzz.Verilog.CodeGen
 
 data Context = Context { _variables   :: [Port]
                        , _parameters  :: [Parameter]
@@ -103,21 +136,45 @@ randomMod inps total = do
     end   = drop inps
     start = take inps
 
+-- | Converts a 'Port' to an 'LVal' by only keeping the 'Identifier' of the
+-- 'Port'.
+lvalFromPort :: Port -> LVal
+lvalFromPort (Port _ _ _ i) = RegId i
+
+-- | Returns the probability from the configuration.
+probability :: Config -> Probability
+probability c = c ^. configProbability
+
+-- | Gets the current probabilities from the 'State'.
+askProbability :: StateGen Probability
+askProbability = lift $ asks probability
+
+-- | Lifts a 'Gen' into the 'StateGen' monad.
 gen :: Gen a -> StateGen a
 gen = lift . lift
 
+-- | Generates a random large number, which can also be negative.
 largeNum :: Gen Int
 largeNum = Hog.int $ Hog.linear (-100) 100
 
+-- | Generates a random size for a wire so that it is not too small and not too
+-- large.
 wireSize :: Gen Int
 wireSize = Hog.int $ Hog.linear 2 100
 
+-- | Generates a random range by using the 'wireSize' and 0 as the lower bound.
 range :: Gen Range
 range = Range <$> fmap fromIntegral wireSize <*> pure 0
 
+-- | Generate a random bit vector using 'largeNum'.
 genBitVec :: Gen BitVec
 genBitVec = fmap fromIntegral largeNum
 
+-- | Return a random 'BinaryOperator'. This currently excludes 'BinDiv',
+-- 'BinMod' because they can take a long time to synthesis, and 'BinCEq',
+-- 'BinCNEq', because these are not synthesisable. 'BinPower' is also excluded
+-- because it can only be used in conjunction with base powers of 2 which is
+-- currently not enforced.
 binOp :: Gen BinaryOperator
 binOp = Hog.element
     [ BinPlus
@@ -147,6 +204,7 @@ binOp = Hog.element
     , BinASR
     ]
 
+-- | Generate a random 'UnaryOperator'.
 unOp :: Gen UnaryOperator
 unOp = Hog.element
     [ UnPlus
@@ -162,6 +220,7 @@ unOp = Hog.element
     , UnNxorInv
     ]
 
+-- | Generate a random 'ConstExpr' by using the current context of 'Parameter'.
 constExprWithContext :: [Parameter] -> ProbExpr -> Hog.Size -> Gen ConstExpr
 constExprWithContext ps prob size
     | size == 0 = Hog.frequency
@@ -189,9 +248,13 @@ constExprWithContext ps prob size
     | otherwise = constExprWithContext ps prob 0
     where subexpr y = constExprWithContext ps prob $ size `div` y
 
+-- | The list of safe 'Expr', meaning that these will not recurse and will end
+-- the 'Expr' generation.
 exprSafeList :: ProbExpr -> [(Int, Gen Expr)]
 exprSafeList prob = [(prob ^. probExprNum, Number <$> genBitVec)]
 
+-- | List of 'Expr' that have the chance to recurse and will therefore not be
+-- used when the expression grows too large.
 exprRecList :: ProbExpr -> (Hog.Size -> Gen Expr) -> [(Int, Gen Expr)]
 exprRecList prob subexpr =
     [ (prob ^. probExprNum, Number <$> genBitVec)
@@ -206,6 +269,8 @@ exprRecList prob subexpr =
     , (prob ^. probExprUnsigned, Appl <$> pure "$unsigned" <*> subexpr 2)
     ]
 
+-- | Select a random port from a list of ports and generate a safe bit selection
+-- for that port.
 rangeSelect :: [Parameter] -> [Port] -> Gen Expr
 rangeSelect ps ports = do
     p <- Hog.element ports
@@ -215,6 +280,8 @@ rangeSelect ps ports = do
     return . RangeSelect (_portName p) $ Range (fromIntegral msb)
                                                (fromIntegral lsb)
 
+-- | Generate a random expression from the 'Context' with a guarantee that it
+-- will terminate using the list of safe 'Expr'.
 exprWithContext :: ProbExpr -> [Parameter] -> [Port] -> Hog.Size -> Gen Expr
 exprWithContext prob ps [] n | n == 0 = Hog.frequency $ exprSafeList prob
                              | n > 0 = Hog.frequency $ exprRecList prob subexpr
@@ -234,11 +301,15 @@ exprWithContext prob ps l n
     = exprWithContext prob ps l 0
     where subexpr y = exprWithContext prob ps l $ n `div` y
 
+-- | Runs a 'StateGen' for a random number of times, limited by an 'Int' that is
+-- passed to it.
 someI :: Int -> StateGen a -> StateGen [a]
 someI m f = do
     amount <- gen $ Hog.int (Hog.linear 1 m)
     replicateM amount f
 
+-- | Make a new name with a prefix and the current nameCounter. The nameCounter
+-- is then increased so that the label is unique.
 makeIdentifier :: T.Text -> StateGen Identifier
 makeIdentifier prefix = do
     context <- get
@@ -252,18 +323,26 @@ getPort' pt i c = case filter portId c of
     []    -> newPort i pt
     where portId (Port pt' _ _ i') = i == i' && pt == pt'
 
+-- | Makes a new 'Identifier' and then checks if the 'Port' already exists, if
+-- it does the existant 'Port' is returned, otherwise a new port is created with
+-- 'newPort'. This is used subsequently in all the functions to create a port,
+-- in case a port with the same name was already created. This could be because
+-- the generation is currently in the other branch of an if-statement.
 nextPort :: PortType -> StateGen Port
 nextPort pt = do
     context <- get
     ident   <- makeIdentifier . T.toLower $ showT pt
     getPort' pt ident (_variables context)
 
+-- | Creates a new port based on the current name counter and adds it to the
+-- current context.
 newPort :: Identifier -> PortType -> StateGen Port
 newPort ident pt = do
     p <- gen $ Port pt <$> Hog.bool <*> range <*> pure ident
     variables %= (p :)
     return p
 
+-- | Generates an expression from variables that are currently in scope.
 scopedExpr :: StateGen Expr
 scopedExpr = do
     context <- get
@@ -273,27 +352,22 @@ scopedExpr = do
         . exprWithContext (_probExpr prob) (_parameters context)
         $ _variables context
 
+-- | Generates a random continuous assignment and assigns it to a random wire
+-- that is created.
 contAssign :: StateGen ContAssign
 contAssign = do
     expr <- scopedExpr
     p    <- nextPort Wire
     return $ ContAssign (p ^. portName) expr
 
-lvalFromPort :: Port -> LVal
-lvalFromPort (Port _ _ _ i) = RegId i
-
-probability :: Config -> Probability
-probability c = c ^. configProbability
-
-askProbability :: StateGen Probability
-askProbability = lift $ asks probability
-
+-- | Generate a random assignment and assign it to a random 'Reg'.
 assignment :: StateGen Assign
 assignment = do
     expr <- scopedExpr
     lval <- lvalFromPort <$> nextPort Reg
     return $ Assign lval Nothing expr
 
+-- | Generate a random 'Statement' safely, by also increasing the depth counter.
 seqBlock :: StateGen Statement
 seqBlock = do
     stmntDepth -= 1
@@ -301,6 +375,10 @@ seqBlock = do
     stmntDepth += 1
     return tstat
 
+-- | Generate a random conditional 'Statement'. The nameCounter is reset between
+-- branches so that port names can be reused. This is safe because if a 'Port'
+-- is not reused, it is left at 0, as all the 'Reg' are initialised to 0 at the
+-- start.
 conditional :: StateGen Statement
 conditional = do
     expr  <- scopedExpr
@@ -313,6 +391,8 @@ conditional = do
     nameCounter .= max nc' nc''
     return $ CondStmnt expr (Just tstat) (Just fstat)
 
+-- | Generate a random for loop by creating a new variable name for the counter
+-- and then generating random statements in the body.
 forLoop :: StateGen Statement
 forLoop = do
     num <- Hog.int (Hog.linear 0 20)
@@ -323,6 +403,7 @@ forLoop = do
         <$> seqBlock
     where varId v = Id (v ^. regId)
 
+-- | Choose a 'Statement' to generate.
 statement :: StateGen Statement
 statement = do
     prob <- askProbability
@@ -336,6 +417,7 @@ statement = do
         ]
     where onDepth c n = if c ^. stmntDepth > 0 then n else 0
 
+-- | Generate a sequential always block which is dependent on the clock.
 alwaysSeq :: StateGen ModItem
 alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
 
@@ -346,7 +428,7 @@ resizePort :: [Parameter] -> Identifier -> Range -> [Port] -> [Port]
 resizePort ps i ra = foldl' func []
     where
         func l p@(Port t _ ri i')
-            | i' == i && calc ri < calc ra = trace (fmap toLower (show t) <> " " <> show (GenVerilog i) <> ": " <> (show $ calc ri) <> " to " <> (show $ calc ra)) $ (p & portSize .~ ra) : l
+            | i' == i && calc ri < calc ra = (p & portSize .~ ra) : l
             | otherwise = p : l
         calc = calcRange ps $ Just 64
 

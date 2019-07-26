@@ -1,11 +1,12 @@
 { mkDerivation, alex, array, base, binary, blaze-html, bytestring
-, Cabal, cabal-doctest, cryptonite, deepseq, DRBG, exceptions, fgl
-, fgl-visualize, filepath, gitrev, hedgehog, hedgehog-fn, lens
-, lifted-base, memory, monad-control, optparse-applicative, parsec
-, prettyprinter, random, recursion-schemes, shakespeare, shelly
-, statistics, stdenv, tasty, tasty-hedgehog, tasty-hunit
-, template-haskell, text, time, tomland, transformers
-, transformers-base, vector
+, Cabal, cabal-doctest, criterion, cryptonite, deepseq, DRBG
+, exceptions, fgl, fgl-visualize, filepath, gitrev, hedgehog
+, hedgehog-fn, lens, lifted-base, memory, monad-control
+, optparse-applicative, parsec, prettyprinter, random
+, recursion-schemes, shakespeare, shelly, statistics, stdenv, tasty
+, tasty-hedgehog, tasty-hunit, template-haskell, text, time
+, tomland, transformers, transformers-base, unordered-containers
+, vector
 }:
 mkDerivation {
   pname = "verifuzz";
@@ -20,7 +21,7 @@ mkDerivation {
     lifted-base memory monad-control optparse-applicative parsec
     prettyprinter random recursion-schemes shakespeare shelly
     statistics template-haskell text time tomland transformers
-    transformers-base vector
+    transformers-base unordered-containers vector
   ];
   libraryToolDepends = [ alex ];
   executableHaskellDepends = [ base ];
@@ -28,6 +29,7 @@ mkDerivation {
     base fgl hedgehog hedgehog-fn lens parsec shakespeare tasty
     tasty-hedgehog tasty-hunit text
   ];
+  benchmarkHaskellDepends = [ base criterion lens ];
   homepage = "https://github.com/ymherklotz/VeriFuzz#readme";
   description = "Random verilog generation and simulator testing";
   license = stdenv.lib.licenses.bsd3;
