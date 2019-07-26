@@ -12,12 +12,21 @@ Portability : POSIX
 
 module VeriFuzz
     ( defaultMain
+    -- * Types
     , Opts(..)
+    , SourceInfo(..)
+    -- * Run functions
     , runEquivalence
     , runSimulation
     , runReduce
     , draw
-    , SourceInfo(..)
+    -- * Verilog generation functions
+    , procedural
+    , proceduralIO
+    , proceduralSrc
+    , proceduralSrcIO
+    , randomMod
+    -- * Extra modules
     , module VeriFuzz.Verilog
     , module VeriFuzz.Config
     , module VeriFuzz.Circuit
@@ -52,6 +61,7 @@ import           System.Random            (randomIO)
 import           VeriFuzz.Circuit
 import           VeriFuzz.Config
 import           VeriFuzz.Fuzz
+import           VeriFuzz.Generate
 import           VeriFuzz.Reduce
 import           VeriFuzz.Report
 import           VeriFuzz.Result

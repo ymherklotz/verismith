@@ -16,11 +16,6 @@ module VeriFuzz.Verilog
     ( SourceInfo(..)
     , Verilog(..)
     , parseVerilog
-    , procedural
-    , proceduralIO
-    , proceduralSrc
-    , proceduralSrcIO
-    , randomMod
     , GenVerilog(..)
     , genSource
     -- * Primitives
@@ -105,7 +100,6 @@ module VeriFuzz.Verilog
     )
 where
 
-import           VeriFuzz.Generate
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.CodeGen
 import           VeriFuzz.Verilog.Parser
