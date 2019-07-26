@@ -69,6 +69,8 @@ module VeriFuzz.Config
     , propModDepth
     , propMaxModules
     , propCombine
+    , propDeterminism
+    , propNonDeterminism
     , parseConfigFile
     , parseConfig
     , encodeConfig
@@ -192,14 +194,36 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                }
                  deriving (Eq, Show)
 
-data ConfProperty = ConfProperty { _propSize         :: {-# UNPACK #-} !Int
-                                 , _propSeed         :: !(Maybe Seed)
-                                 , _propStmntDepth   :: {-# UNPACK #-} !Int
-                                 , _propModDepth     :: {-# UNPACK #-} !Int
-                                 , _propMaxModules   :: {-# UNPACK #-} !Int
-                                 , _propSampleMethod :: !Text
-                                 , _propSampleSize   :: {-# UNPACK #-} !Int
-                                 , _propCombine      :: !Bool
+data ConfProperty = ConfProperty { _propSize           :: {-# UNPACK #-} !Int
+                                 -- ^ The size of the generated Verilog.
+                                 , _propSeed           :: !(Maybe Seed)
+                                 -- ^ A possible seed that could be used to
+                                 -- generate the same Verilog.
+                                 , _propStmntDepth     :: {-# UNPACK #-} !Int
+                                 -- ^ The maximum statement depth that should be
+                                 -- reached.
+                                 , _propModDepth       :: {-# UNPACK #-} !Int
+                                 -- ^ The maximium module depth that should be
+                                 -- reached.
+                                 , _propMaxModules     :: {-# UNPACK #-} !Int
+                                 -- ^ The maximum number of modules that are
+                                 -- allowed to be created at each level.
+                                 , _propSampleMethod   :: !Text
+                                 -- ^ The sampling method that should be used to
+                                 -- generate specific distributions of random
+                                 -- programs.
+                                 , _propSampleSize     :: {-# UNPACK #-} !Int
+                                 -- ^ The number of samples to take for the
+                                 -- sampling method.
+                                 , _propCombine        :: !Bool
+                                 -- ^ If the output should be combined into one
+                                 -- bit or not.
+                                 , _propNonDeterminism :: {-# UNPACK #-} !Int
+                                 -- ^ The frequency at which nondeterminism
+                                 -- should be generated.
+                                 , _propDeterminism    :: {-# UNPACK #-} !Int
+                                 -- ^ The frequency at which determinism should
+                                 -- be generated.
                                  }
                   deriving (Eq, Show)
 
@@ -267,7 +291,7 @@ defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr)
-    (ConfProperty 20 Nothing 3 2 5 "random" 10 False)
+    (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1)
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -388,6 +412,10 @@ propCodec =
         <*> defaultValue (defProp propCombine)
                          (Toml.bool (twoKey "output" "combine"))
         .=  _propCombine
+        <*> defaultValue (defProp propNonDeterminism) (Toml.int "nondeterminism")
+        .=  _propNonDeterminism
+        <*> defaultValue (defProp propDeterminism) (Toml.int "determinism")
+        .=  _propDeterminism
     where defProp i = defaultConfig ^. configProperty . i
 
 simulator :: TomlCodec SimDescription

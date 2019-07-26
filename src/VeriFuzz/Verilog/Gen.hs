@@ -54,6 +54,7 @@ data Context = Context { _variables   :: [Port]
                        , _nameCounter :: {-# UNPACK #-} !Int
                        , _stmntDepth  :: {-# UNPACK #-} !Int
                        , _modDepth    :: {-# UNPACK #-} !Int
+                       , _determinism :: !Bool
                        }
 
 makeLenses ''Context
@@ -312,16 +313,6 @@ conditional = do
     nameCounter .= max nc' nc''
     return $ CondStmnt expr (Just tstat) (Just fstat)
 
---constToExpr :: ConstExpr -> Expr
---constToExpr (ConstNum s n    ) = Number s n
---constToExpr (ParamId     i   ) = Id i
---constToExpr (ConstConcat c   ) = Concat $ constToExpr <$> c
---constToExpr (ConstUnOp u p   ) = UnOp u (constToExpr p)
---constToExpr (ConstBinOp a b c) = BinOp (constToExpr a) b (constToExpr c)
---constToExpr (ConstCond a b c) =
---    Cond (constToExpr a) (constToExpr b) (constToExpr c)
---constToExpr (ConstStr s) = Str s
-
 forLoop :: StateGen Statement
 forLoop = do
     num <- Hog.int (Hog.linear 0 20)
@@ -435,21 +426,27 @@ modInst = do
 -- | Generate a random module item.
 modItem :: StateGen ModItem
 modItem = do
-    prob    <- askProbability
+    conf    <- lift ask
+    let prob = conf ^. configProbability
     context <- get
     let defProb i = prob ^. probModItem . i
+    det <- Hog.frequency [ (conf ^. configProperty . propDeterminism, return True)
+                         , (conf ^. configProperty . propNonDeterminism, return False) ]
+    determinism .= det
     Hog.frequency
         [ (defProb probModItemAssign   , ModCA <$> contAssign)
         , (defProb probModItemSeqAlways, alwaysSeq)
         , ( if context ^. modDepth > 0 then defProb probModItemInst else 0
-          , modInst
-          )
+          , modInst )
         ]
 
+-- | Either return the 'Identifier' that was passed to it, or generate a new
+-- 'Identifier' based on the current 'nameCounter'.
 moduleName :: Maybe Identifier -> StateGen Identifier
 moduleName (Just t) = return t
 moduleName Nothing  = makeIdentifier "module"
 
+-- | Generate a random 'ConstExpr' by using the current context of 'Parameters'.
 constExpr :: StateGen ConstExpr
 constExpr = do
     prob    <- askProbability
@@ -457,6 +454,9 @@ constExpr = do
     gen . Hog.sized $ constExprWithContext (context ^. parameters)
                                            (prob ^. probExpr)
 
+-- | Generate a random 'Parameter' and assign it to a constant expression which
+-- it will be initialised to. The assumption is that this constant expression
+-- should always be able to be evaluated with the current context of parameters.
 parameter :: StateGen Parameter
 parameter = do
     ident <- makeIdentifier "param"
@@ -470,11 +470,14 @@ evalRange :: [Parameter] -> Int -> Range -> Range
 evalRange ps n (Range l r) = Range (eval l) (eval r)
     where eval = ConstNum . cata (evaluateConst ps) . resize n
 
+-- | Calculate a range to an int by maybe resizing the ranges to a value.
 calcRange :: [Parameter] -> Maybe Int -> Range -> Int
 calcRange ps i (Range l r) = eval l - eval r + 1
   where
     eval a = fromIntegral . cata (evaluateConst ps) $ maybe a (`resize` a) i
 
+-- | Filter out a port based on it's name instead of equality of the ports. This
+-- is because the ports might not be equal if the sizes are being updated.
 identElem :: Port -> [Port] -> Bool
 identElem p = elem (p ^. portName) . toListOf (traverse . portName)
 
@@ -492,7 +495,7 @@ moduleDef top = do
     config   <- lift ask
     let (newPorts, local) = partition (`identElem` portList) $ _variables context
     let
-        size =
+         size =
             evalRange (_parameters context) 32
                 .   sum
                 $   local
@@ -518,15 +521,21 @@ procedural top config = do
     return . Verilog $ mainMod : st ^. modules
   where
     context =
-        Context [] [] [] 0 (confProp propStmntDepth) $ confProp propModDepth
+        Context [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
+-- | Samples the 'Gen' directly to generate random 'Verilog' using the 'T.Text' as
+-- the name of the main module and the configuration 'Config' to influence the
+-- generation.
 proceduralIO :: T.Text -> Config -> IO Verilog
 proceduralIO t = Hog.sample . procedural t
 
+-- | Given a 'T.Text' and a 'Config' will generate a 'SourceInfo' which has the
+-- top module set to the right name.
 proceduralSrc :: T.Text -> Config -> Gen SourceInfo
 proceduralSrc t c = SourceInfo t <$> procedural t c
 
+-- | Sampled and wrapped into a 'SourceInfo' with the given top module name.
 proceduralSrcIO :: T.Text -> Config -> IO SourceInfo
 proceduralSrcIO t c = SourceInfo t <$> proceduralIO t c
