@@ -1,2 +1,6 @@
 sudo: true     # runs the build without docker
-language: nix
+
+language: nix  # automatically runs nix-build
+
+git:
+  depth: 3     # not 1 to build commits in the queue
