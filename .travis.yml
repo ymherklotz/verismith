@@ -1,1 +1,2 @@
+sudo: true     # runs the build without docker
 language: nix
