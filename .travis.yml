@@ -1,5 +1,3 @@
-sudo: true     # runs the build without docker
-
 language: nix  # automatically runs nix-build
 
 git:

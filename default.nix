@@ -8,5 +8,7 @@ let
         tasty-hedgehog = haskellPackagesNew.callPackage ./nix/tasty-hedgehog.nix {};
       };
   };
+  variant = if doBenchmark then nixpkgs.pkgs.haskell.lib.doBenchmark else nixpkgs.pkgs.lib.id;
+  verifuzz = haskellPackages.callCabal2nix "verifuzz" (./.) {};
 in
-  haskellPackages.callCabal2nix "verifuzz" (./.) {}
+  variant verifuzz
