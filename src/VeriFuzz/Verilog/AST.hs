@@ -145,6 +145,7 @@ import           Control.Lens             hiding ((<|))
 import           Data.Data
 import           Data.Data.Lens
 import           Data.Functor.Foldable.TH (makeBaseFunctor)
+import           Data.Hashable            (Hashable)
 import           Data.List.NonEmpty       (NonEmpty (..), (<|))
 import           Data.String              (IsString, fromString)
 import           Data.Text                (Text, pack)
@@ -156,7 +157,7 @@ import           VeriFuzz.Verilog.BitVec
 -- be lowercase and uppercase for now. This might change in the future though,
 -- as Verilog supports many more characters in Identifiers.
 newtype Identifier = Identifier { getIdentifier :: Text }
-                   deriving (Eq, Show, Ord, Data, Generic, NFData)
+                   deriving (Eq, Show, Ord, Data, Generic, NFData, Hashable)
 
 instance IsString Identifier where
     fromString = Identifier . pack

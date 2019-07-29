@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Eval
+Module      : VeriFuzz.Eval
 Description : Evaluation of Verilog expressions and statements.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Evaluation of Verilog expressions and statements.
 -}
 
-module VeriFuzz.Verilog.Eval
+module VeriFuzz.Eval
     ( evaluateConst
     , resize
     )
@@ -19,11 +19,11 @@ where
 import           Data.Bits
 import           Data.Foldable           (fold)
 import           Data.Functor.Foldable   hiding (fold)
+import qualified Data.HashMap.Lazy       as Map (lookup)
 import           Data.Maybe              (listToMaybe)
+import           VeriFuzz.Context
 import           VeriFuzz.Verilog.AST
 import           VeriFuzz.Verilog.BitVec
-
-type Bindings = [Parameter]
 
 paramIdent_ :: Parameter -> Identifier
 paramIdent_ (Parameter i _) = i
@@ -88,13 +88,11 @@ applyBinary BinLSR     = toInt shiftR
 applyBinary BinASL     = toInt shiftL
 applyBinary BinASR     = toInt shiftR
 
--- | Evaluates a 'ConstExpr' using a context of 'Bindings' as input.
-evaluateConst :: Bindings -> ConstExprF BitVec -> BitVec
+-- | Evaluates a 'ConstExpr' using a context of 'ParamContext' as input.
+evaluateConst :: ParamContext -> ConstExprF BitVec -> BitVec
 evaluateConst _ (ConstNumF b) = b
 evaluateConst p (ParamIdF i) =
-    cata (evaluateConst p) . maybe 0 paramValue_ . listToMaybe $ filter
-        ((== i) . paramIdent_)
-        p
+    cata (evaluateConst p) . maybe 0 paramValue_ $ Map.lookup i p
 evaluateConst _ (ConstConcatF c       ) = fold c
 evaluateConst _ (ConstUnOpF unop c    ) = applyUnary unop c
 evaluateConst _ (ConstBinOpF a binop b) = applyBinary binop a b

@@ -61,6 +61,13 @@ module VeriFuzz.Verilog
     , ContAssign(..)
     , contAssignNetLVal
     , contAssignExpr
+    -- ** Parameters
+    , Parameter(..)
+    , paramIdent
+    , paramValue
+    , LocalParam(..)
+    , localParamIdent
+    , localParamValue
     -- * Statment
     , Statement(..)
     , statDelay

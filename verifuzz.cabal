@@ -34,6 +34,8 @@ library
                  , VeriFuzz.Circuit.Internal
                  , VeriFuzz.Circuit.Random
                  , VeriFuzz.Config
+                 , VeriFuzz.Context
+                 , VeriFuzz.Eval
                  , VeriFuzz.Fuzz
                  , VeriFuzz.Generate
                  , VeriFuzz.Internal
@@ -53,7 +55,6 @@ library
                  , VeriFuzz.Verilog.AST
                  , VeriFuzz.Verilog.BitVec
                  , VeriFuzz.Verilog.CodeGen
-                 , VeriFuzz.Verilog.Eval
                  , VeriFuzz.Verilog.Internal
                  , VeriFuzz.Verilog.Lex
                  , VeriFuzz.Verilog.Mutate
@@ -97,6 +98,7 @@ library
                , statistics >=0.14.0.2 && <0.16
                , vector >=0.12.0.1 && <0.13
                , unordered-containers >=0.2.10 && <0.3
+               , hashable >=1.2.7 && <1.4
   default-extensions: OverloadedStrings
 
 executable verifuzz
