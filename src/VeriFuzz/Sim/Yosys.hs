@@ -73,7 +73,7 @@ runSynthYosys sim (SourceInfo _ src) = do
         "yosys"
         (yosysPath sim)
         [ "-p"
-        , "read -formal " <> inp <> "; synth; write_verilog -noattr " <> out
+        , "read_verilog " <> inp <> "; synth; write_verilog -noattr " <> out
         ]
   where
     inpf = "rtl.v"
