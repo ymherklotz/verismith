@@ -151,9 +151,10 @@ optimisations that are performed, or in the version of the synthesiser.
 ## Acknowledgement
 
 Clifford Wolf's [VlogHammer](http://www.clifford.at/yosys/vloghammer.html) is an
-existing Verilog fuzzer that generates random Verilog expressions. It was the
-inspiration for the general structure of this fuzzer, which extends the fuzzing
-to the behavioural parts of Verilog.
+existing Verilog fuzzer that generates random Verilog to test how expressions
+are handled in synthesis tools and simulators. It was the inspiration for the
+general structure of this fuzzer, which extends the fuzzing to the behavioural
+parts of Verilog.
 
 Tom Hawkins' Verilog parser was used to write the lexer, the parser was then
 rewritten using [Parsec](https://hackage.haskell.org/package/parsec).
