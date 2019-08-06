@@ -2,7 +2,7 @@
 
 sudo yum -y update
 
-sudo yum -y install git gcc gcc-c++ tcl-devel python3 \
+sudo yum -y install git gcc gcc-c++ clang zlib-devel tcl-devel python3 \
      graphviz xdot gperf gmp-devel make flex autoconf \
      readline-devel tmux boost libffi-devel bison ncurses-compat-libs
 
@@ -15,7 +15,8 @@ sudo mount /dev/nvme1n1p1 /mnt/work
 sudo chown -R ec2-user:ec2-user /mnt/tools/home/ec2-user
 sudo chown -R ec2-user:ec2-user /mnt/work
 
-curl -sSL https://get.haskellstack.org/ | sh
+curl https://nixos.org/nix/install | sh
+. $HOME/.nix-profile/etc/profile.d/nix.sh
 
 { cat <<EOF
 export PATH="/mnt/tools/opt/yosys/master/bin:\${PATH}"
