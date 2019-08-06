@@ -148,6 +148,33 @@ file. By each having a different name, multiple instances of the same
 synthesiser can be included in a fuzz run. The instances might differ in the
 optimisations that are performed, or in the version of the synthesiser.
 
+## Benchmark Results
+
+Current benchmark results to compare against.
+
+``` text
+benchmarking generation/default
+time                 21.16 ms   (17.34 ms .. 24.27 ms)
+                     0.877 R²   (0.742 R² .. 0.977 R²)
+mean                 20.74 ms   (18.40 ms .. 22.70 ms)
+std dev              4.741 ms   (3.372 ms .. 7.002 ms)
+variance introduced by outliers: 85% (severely inflated)
+
+benchmarking generation/depth
+time                 155.9 ms   (90.11 ms .. 209.1 ms)
+                     0.855 R²   (0.680 R² .. 0.983 R²)
+mean                 92.37 ms   (67.36 ms .. 118.2 ms)
+std dev              40.56 ms   (33.70 ms .. 49.28 ms)
+variance introduced by outliers: 88% (severely inflated)
+
+benchmarking generation/size
+time                 117.9 ms   (10.21 ms .. 209.1 ms)
+                     0.616 R²   (0.030 R² .. 0.992 R²)
+mean                 160.5 ms   (126.2 ms .. 187.1 ms)
+std dev              45.03 ms   (27.55 ms .. 68.66 ms)
+variance introduced by outliers: 70% (severely inflated)
+```
+
 ## Acknowledgement
 
 Clifford Wolf's [VlogHammer](http://www.clifford.at/yosys/vloghammer.html) is an
