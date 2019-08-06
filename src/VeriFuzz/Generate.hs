@@ -81,18 +81,33 @@ import           VeriFuzz.Verilog.Eval
 import           VeriFuzz.Verilog.Internal
 import           VeriFuzz.Verilog.Mutate
 
-data Context = Context { _variables   :: [Port]
-                       , _parameters  :: [Parameter]
-                       , _modules     :: [ModDecl]
-                       , _nameCounter :: {-# UNPACK #-} !Int
-                       , _stmntDepth  :: {-# UNPACK #-} !Int
-                       , _modDepth    :: {-# UNPACK #-} !Int
-                       , _determinism :: !Bool
+data PortInfo = PortInfo { _portInfoPort :: {-# UNPACK #-} !Port
+                         , _portInfoDet  :: !Bool
+                         }
+
+$(makeLenses ''PortInfo)
+
+data Context = Context { _contextVariables   :: ![PortInfo]
+                       , _contextParameters  :: ![Parameter]
+                       , _contextModules     :: ![ModDecl]
+                       , _contextNameCounter :: {-# UNPACK #-} !Int
+                       , _contextStmntDepth  :: {-# UNPACK #-} !Int
+                       , _contextModDepth    :: {-# UNPACK #-} !Int
+                       , _contextDeterminism :: !Bool
                        }
 
-makeLenses ''Context
+$(makeLenses ''Context)
 
 type StateGen =  StateT Context (ReaderT Config Gen)
+
+fromPort :: Port -> PortInfo
+fromPort p = PortInfo p True
+
+portsFromContext :: Traversal' Context Port
+portsFromContext = contextVariables . traverse . portInfoPort
+
+_portsFromContext :: Context -> [Port]
+_portsFromContext c = c ^.. contextVariables . traverse . portInfoPort
 
 toId :: Int -> Identifier
 toId = Identifier . ("w" <>) . T.pack . show
@@ -105,9 +120,21 @@ toPort ident = do
 sumSize :: [Port] -> Range
 sumSize ps = sum $ ps ^.. traverse . portSize
 
+legacySafeProb = ProbExpr { _probExprNum = 1
+                          , _probExprId = 1
+                          , _probExprRangeSelect = 0
+                          , _probExprUnOp = 1
+                          , _probExprBinOp = 1
+                          , _probExprCond = 1
+                          , _probExprConcat = 0
+                          , _probExprStr = 0
+                          , _probExprSigned = 1
+                          , _probExprUnsigned = 1
+                          }
+
 random :: [Port] -> (Expr -> ContAssign) -> Gen ModItem
 random ctx fun = do
-    expr <- Hog.sized (exprWithContext (ProbExpr 1 1 0 1 1 1 1 0 1 1) [] ctx)
+    expr <- Hog.sized (exprWithContext legacySafeProb [] ctx)
     return . ModCA $ fun expr
 
 --randomAssigns :: [Identifier] -> [Gen ModItem]
@@ -226,13 +253,13 @@ constExprWithContext ps prob size
     | size == 0 = Hog.frequency
         [ (prob ^. probExprNum, ConstNum <$> genBitVec)
         , ( if null ps then 0 else prob ^. probExprId
-          , ParamId . view paramIdent <$> Hog.element ps
+          , ParamId . _paramIdent <$> Hog.element ps
           )
         ]
     | size > 0 = Hog.frequency
         [ (prob ^. probExprNum, ConstNum <$> genBitVec)
         , ( if null ps then 0 else prob ^. probExprId
-          , ParamId . view paramIdent <$> Hog.element ps
+          , ParamId . _paramIdent <$> Hog.element ps
           )
         , (prob ^. probExprUnOp, ConstUnOp <$> unOp <*> subexpr 2)
         , ( prob ^. probExprBinOp
@@ -290,11 +317,11 @@ exprWithContext prob ps [] n | n == 0 = Hog.frequency $ exprSafeList prob
 exprWithContext prob ps l n
     | n == 0
     = Hog.frequency
-        $ (prob ^. probExprId, Id . fromPort <$> Hog.element l)
+        $ (prob ^. probExprId, Id . _portName <$> Hog.element l)
         : exprSafeList prob
     | n > 0
     = Hog.frequency
-        $ (prob ^. probExprId         , Id . fromPort <$> Hog.element l)
+        $ (prob ^. probExprId         , Id . _portName <$> Hog.element l)
         : (prob ^. probExprRangeSelect, rangeSelect ps l)
         : exprRecList prob subexpr
     | otherwise
@@ -313,8 +340,8 @@ someI m f = do
 makeIdentifier :: T.Text -> StateGen Identifier
 makeIdentifier prefix = do
     context <- get
-    let ident = Identifier $ prefix <> showT (context ^. nameCounter)
-    nameCounter += 1
+    let ident = Identifier $ prefix <> showT (context ^. contextNameCounter)
+    contextNameCounter += 1
     return ident
 
 getPort' :: PortType -> Identifier -> [Port] -> StateGen Port
@@ -332,14 +359,14 @@ nextPort :: PortType -> StateGen Port
 nextPort pt = do
     context <- get
     ident   <- makeIdentifier . T.toLower $ showT pt
-    getPort' pt ident (_variables context)
+    getPort' pt ident (_portsFromContext context)
 
 -- | Creates a new port based on the current name counter and adds it to the
 -- current context.
 newPort :: Identifier -> PortType -> StateGen Port
 newPort ident pt = do
     p <- gen $ Port pt <$> Hog.bool <*> range <*> pure ident
-    variables %= (p :)
+    contextVariables %= (fromPort p :)
     return p
 
 -- | Generates an expression from variables that are currently in scope.
@@ -349,8 +376,8 @@ scopedExpr = do
     prob    <- askProbability
     gen
         . Hog.sized
-        . exprWithContext (_probExpr prob) (_parameters context)
-        $ _variables context
+        . exprWithContext (_probExpr prob) (_contextParameters context)
+        $ _portsFromContext context
 
 -- | Generates a random continuous assignment and assigns it to a random wire
 -- that is created.
@@ -370,9 +397,9 @@ assignment = do
 -- | Generate a random 'Statement' safely, by also increasing the depth counter.
 seqBlock :: StateGen Statement
 seqBlock = do
-    stmntDepth -= 1
+    contextStmntDepth -= 1
     tstat <- SeqBlock <$> someI 20 statement
-    stmntDepth += 1
+    contextStmntDepth += 1
     return tstat
 
 -- | Generate a random conditional 'Statement'. The nameCounter is reset between
@@ -382,13 +409,13 @@ seqBlock = do
 conditional :: StateGen Statement
 conditional = do
     expr  <- scopedExpr
-    nc    <- _nameCounter <$> get
+    nc    <- _contextNameCounter <$> get
     tstat <- seqBlock
-    nc'   <- _nameCounter <$> get
-    nameCounter .= nc
+    nc'   <- _contextNameCounter <$> get
+    contextNameCounter .= nc
     fstat <- seqBlock
-    nc''  <- _nameCounter <$> get
-    nameCounter .= max nc' nc''
+    nc''  <- _contextNameCounter <$> get
+    contextNameCounter .= max nc' nc''
     return $ CondStmnt expr (Just tstat) (Just fstat)
 
 -- | Generate a random for loop by creating a new variable name for the counter
@@ -415,7 +442,7 @@ statement = do
         , (onDepth cont (defProb probStmntCond), conditional)
         , (onDepth cont (defProb probStmntFor) , forLoop)
         ]
-    where onDepth c n = if c ^. stmntDepth > 0 then n else 0
+    where onDepth c n = if c ^. contextStmntDepth > 0 then n else 0
 
 -- | Generate a sequential always block which is dependent on the clock.
 alwaysSeq :: StateGen ModItem
@@ -424,12 +451,11 @@ alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
 -- | Should resize a port that connects to a module port if the latter is
 -- larger.  This should not cause any problems if the same net is used as input
 -- multiple times, and is resized multiple times, as it should only get larger.
-resizePort :: [Parameter] -> Identifier -> Range -> [Port] -> [Port]
-resizePort ps i ra = foldl' func []
+resizePort :: [Parameter] -> Identifier -> Range -> Port -> Port
+resizePort ps i ra p@(Port t _ ri i')
+    | i' == i && calc ri < calc ra = (p & portSize .~ ra)
+    | otherwise = p
     where
-        func l p@(Port t _ ri i')
-            | i' == i && calc ri < calc ra = (p & portSize .~ ra) : l
-            | otherwise = p : l
         calc = calcRange ps $ Just 64
 
 -- | Instantiate a module, where the outputs are new nets that are created, and
@@ -443,24 +469,24 @@ instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
     outs    <- replicateM (length outP) (nextPort Wire)
-    ins <- take (length inpFixed) <$> Hog.shuffle (context ^. variables)
+    ins <- take (length inpFixed) <$> Hog.shuffle (_portsFromContext context)
     mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inpFixed ^.. traverse . portSize
     ident <- makeIdentifier "modinst"
-    vs <- view variables <$> get
+    vs <- _portsFromContext <$> get
     Hog.choice
         [ return . ModInst i ident $ ModConn <$> toE (outs <> clkPort <> ins)
         , ModInst i ident <$> Hog.shuffle
-            (zipWith ModConnNamed (view portName <$> outP <> clkPort <> inpFixed) (toE $ outs <> clkPort <> ins))
+            (zipWith ModConnNamed (_portName <$> outP <> clkPort <> inpFixed) (toE $ outs <> clkPort <> ins))
         ]
     where
-        toE ins = Id . view portName <$> ins
+        toE ins = Id . _portName <$> ins
         (inpFixed, clkPort) = partition filterFunc inP
         filterFunc (Port _ _ _ n)
             | n == "clk" = False
             | otherwise = True
         process p r = do
-            params <- view parameters <$> get
-            variables %= resizePort params p r
+            params <- _contextParameters <$> get
+            portsFromContext %= resizePort params p r
 
 -- | Generates a module instance by also generating a new module if there are
 -- not enough modules currently in the context. It keeps generating new modules
@@ -486,24 +512,24 @@ modInst = do
     prob    <- lift ask
     context <- get
     let maxMods = prob ^. configProperty . propMaxModules
-    if length (context ^. modules) < maxMods
+    if length (_contextModules context) < maxMods
         then do
-            let currMods = context ^. modules
-            let params   = context ^. parameters
-            let vars     = context ^. variables
-            modules .= []
-            variables .= []
-            parameters .= []
-            modDepth -= 1
+            let currMods = _contextModules context
+            let params   = _contextParameters context
+            let vars     = _contextVariables context
+            contextModules .= []
+            contextVariables .= []
+            contextParameters .= []
+            contextModDepth -= 1
             chosenMod <- moduleDef Nothing
             ncont     <- get
-            let genMods = ncont ^. modules
-            modDepth += 1
-            parameters .= params
-            variables .= vars
-            modules .= chosenMod : currMods <> genMods
+            let genMods = _contextModules ncont
+            contextModDepth += 1
+            contextParameters .= params
+            contextVariables .= vars
+            contextModules .= chosenMod : currMods <> genMods
             instantiate chosenMod
-        else Hog.element (context ^. modules) >>= instantiate
+        else Hog.element (_contextModules context) >>= instantiate
 
 -- | Generate a random module item.
 modItem :: StateGen ModItem
@@ -514,16 +540,16 @@ modItem = do
     let defProb i = prob ^. probModItem . i
     det <- Hog.frequency [ (conf ^. configProperty . propDeterminism, return True)
                          , (conf ^. configProperty . propNonDeterminism, return False) ]
-    determinism .= det
+    contextDeterminism .= det
     Hog.frequency
         [ (defProb probModItemAssign   , ModCA <$> contAssign)
         , (defProb probModItemSeqAlways, alwaysSeq)
-        , ( if context ^. modDepth > 0 then defProb probModItemInst else 0
+        , ( if context ^. contextModDepth > 0 then defProb probModItemInst else 0
           , modInst )
         ]
 
 -- | Either return the 'Identifier' that was passed to it, or generate a new
--- 'Identifier' based on the current 'nameCounter'.
+-- 'Identifier' based on the current 'contextNameCounter'.
 moduleName :: Maybe Identifier -> StateGen Identifier
 moduleName (Just t) = return t
 moduleName Nothing  = makeIdentifier "module"
@@ -533,7 +559,7 @@ constExpr :: StateGen ConstExpr
 constExpr = do
     prob    <- askProbability
     context <- get
-    gen . Hog.sized $ constExprWithContext (context ^. parameters)
+    gen . Hog.sized $ constExprWithContext (context ^. contextParameters)
                                            (prob ^. probExpr)
 
 -- | Generate a random 'Parameter' and assign it to a constant expression which
@@ -544,7 +570,7 @@ parameter = do
     ident <- makeIdentifier "param"
     cexpr <- constExpr
     let param = Parameter ident cexpr
-    parameters %= (param :)
+    contextParameters %= (param :)
     return param
 
 -- | Evaluate a range to an integer, and cast it back to a range.
@@ -575,10 +601,10 @@ moduleDef top = do
     ps       <- Hog.list (Hog.linear 0 10) parameter
     context  <- get
     config   <- lift ask
-    let (newPorts, local) = partition (`identElem` portList) $ _variables context
+    let (newPorts, local) = partition (`identElem` portList) $ _portsFromContext context
     let
          size =
-            evalRange (_parameters context) 32
+            evalRange (_contextParameters context) 32
                 .   sum
                 $   local
                 ^.. traverse
@@ -600,7 +626,7 @@ procedural top config = do
     (mainMod, st) <- Hog.resize num $ runReaderT
         (runStateT (moduleDef (Just $ Identifier top)) context)
         config
-    return . Verilog $ mainMod : st ^. modules
+    return . Verilog $ mainMod : st ^. contextModules
   where
     context =
         Context [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True

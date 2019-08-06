@@ -141,7 +141,7 @@ runSimIc
 runSimIc sim1 synth1 srcInfo bss = do
     dir <- liftSh pwd
     let top      = srcInfo ^. mainModule
-    let inConcat = (RegConcat (Id . fromPort <$> (top ^. modInPorts)))
+    let inConcat = (RegConcat (Id . _portName <$> (top ^. modInPorts)))
     let
         tb = instantiateMod top $ ModDecl
             "testbench"

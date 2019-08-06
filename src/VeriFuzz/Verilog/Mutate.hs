@@ -36,7 +36,6 @@ module VeriFuzz.Verilog.Mutate
     , combineAssigns
     , combineAssigns_
     , declareMod
-    , fromPort
     )
 where
 
@@ -396,6 +395,3 @@ combineAssigns_ comb p ps =
         <$> ps
         ^.. traverse
         .   portName
-
-fromPort :: Port -> Identifier
-fromPort (Port _ _ _ i) = i

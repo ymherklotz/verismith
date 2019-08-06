@@ -291,31 +291,46 @@ defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr)
-    (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1)
+    defProperty
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
     defModItem =
-        ProbModItem 5 -- Assign
-                      1 -- Sequential Always
-                        1 -- Combinational Always
-                          1 -- Instantiation
+        ProbModItem { _probModItemAssign     = 5
+                    , _probModItemSeqAlways  = 1
+                    , _probModItemCombAlways = 0
+                    , _probModItemInst       = 1
+                    }
     defStmnt =
-        ProbStatement 0 -- Blocking assignment
-                        3 -- Non-blocking assignment
-                          1 -- Conditional
-                            0 -- For loop
+        ProbStatement { _probStmntBlock    = 0
+                      , _probStmntNonBlock = 3
+                      , _probStmntCond     = 1
+                      , _probStmntFor      = 0
+                      }
     defExpr =
-        ProbExpr 1 -- Number
-                   5 -- Identifier
-                     5 -- Range selection
-                       5 -- Unary operator
-                         5 -- Binary operator
-                           5 -- Ternary conditional
-                             3 -- Concatenation
-                               0 -- String
-                                 5 -- Signed function
-                                   5 -- Unsigned funtion
+        ProbExpr { _probExprNum         = 1
+                 , _probExprId          = 5
+                 , _probExprRangeSelect = 5
+                 , _probExprUnOp        = 5
+                 , _probExprBinOp       = 5
+                 , _probExprCond        = 5
+                 , _probExprConcat      = 3
+                 , _probExprStr         = 0
+                 , _probExprSigned      = 5
+                 , _probExprUnsigned    = 5
+                 }
+    defProperty =
+        ConfProperty { _propSize           = 20
+                     , _propSeed           = Nothing
+                     , _propStmntDepth     = 3
+                     , _propModDepth       = 2
+                     , _propMaxModules     = 5
+                     , _propSampleMethod   = "random"
+                     , _propSampleSize     = 10
+                     , _propCombine        = False
+                     , _propNonDeterminism = 0
+                     , _propDeterminism    = 1
+                     }
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
