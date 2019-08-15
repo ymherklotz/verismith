@@ -42,6 +42,7 @@ reported and 3 were fixed.
 
 | Type          | Issue                                                      | Confirmed | Fixed |
 |---------------|------------------------------------------------------------|-----------|-------|
+| Mis-synthesis | [Issue 1243](https://github.com/YosysHQ/yosys/issues/1243) | ✓         | ✓     |
 | Mis-synthesis | [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) | ✓         | ✓     |
 | Mis-synthesis | [Issue 997](https://github.com/YosysHQ/yosys/issues/997)   | ✓         | ✓     |
 | Crash         | [Issue 993](https://github.com/YosysHQ/yosys/issues/993)   | ✓         | ✓     |
