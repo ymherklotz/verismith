@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog
+Module      : VeriSmith.Verilog
 Description : Verilog implementation with random generation and mutations.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -12,7 +12,7 @@ Verilog implementation with random generation and mutations.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Verilog
+module VeriSmith.Verilog
     ( SourceInfo(..)
     , Verilog(..)
     , parseVerilog
@@ -100,7 +100,7 @@ module VeriFuzz.Verilog
     )
 where
 
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
-import           VeriFuzz.Verilog.Parser
-import           VeriFuzz.Verilog.Quote
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
+import           VeriSmith.Verilog.Parser
+import           VeriSmith.Verilog.Quote

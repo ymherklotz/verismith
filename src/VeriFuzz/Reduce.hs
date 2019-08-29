@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Reduce
+Module      : VeriSmith.Reduce
 Description : Test case reducer implementation.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -13,7 +13,7 @@ Test case reducer implementation.
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module VeriFuzz.Reduce
+module VeriSmith.Reduce
     ( -- $strategy
       reduceWithScript
     , reduceSynth
@@ -35,26 +35,26 @@ module VeriFuzz.Reduce
     )
 where
 
-import           Control.Lens            hiding ((<.>))
-import           Control.Monad           (void)
-import           Control.Monad.IO.Class  (MonadIO, liftIO)
-import           Data.Foldable           (foldrM)
-import           Data.List               (nub)
-import           Data.List.NonEmpty      (NonEmpty (..))
-import qualified Data.List.NonEmpty      as NonEmpty
-import           Data.Maybe              (mapMaybe)
-import           Data.Text               (Text)
-import           Shelly                  ((<.>))
+import           Control.Lens             hiding ((<.>))
+import           Control.Monad            (void)
+import           Control.Monad.IO.Class   (MonadIO, liftIO)
+import           Data.Foldable            (foldrM)
+import           Data.List                (nub)
+import           Data.List.NonEmpty       (NonEmpty (..))
+import qualified Data.List.NonEmpty       as NonEmpty
+import           Data.Maybe               (mapMaybe)
+import           Data.Text                (Text)
+import           Shelly                   ((<.>))
 import qualified Shelly
-import           Shelly.Lifted           (MonadSh, liftSh)
-import           VeriFuzz.Internal
-import           VeriFuzz.Result
-import           VeriFuzz.Sim
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Verilog
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.Mutate
-import           VeriFuzz.Verilog.Parser
+import           Shelly.Lifted            (MonadSh, liftSh)
+import           VeriSmith.Internal
+import           VeriSmith.Result
+import           VeriSmith.Sim
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Verilog
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.Mutate
+import           VeriSmith.Verilog.Parser
 
 
 -- $strategy

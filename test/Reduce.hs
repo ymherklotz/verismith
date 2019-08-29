@@ -20,8 +20,8 @@ where
 import           Data.List        ((\\))
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           VeriFuzz
-import           VeriFuzz.Reduce
+import           VeriSmith
+import           VeriSmith.Reduce
 
 reduceUnitTests :: TestTree
 reduceUnitTests = testGroup

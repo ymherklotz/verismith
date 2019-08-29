@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Eval
+Module      : VeriSmith.Verilog.Eval
 Description : Evaluation of Verilog expressions and statements.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,18 +10,18 @@ Portability : POSIX
 Evaluation of Verilog expressions and statements.
 -}
 
-module VeriFuzz.Verilog.Eval
+module VeriSmith.Verilog.Eval
     ( evaluateConst
     , resize
     )
 where
 
 import           Data.Bits
-import           Data.Foldable           (fold)
-import           Data.Functor.Foldable   hiding (fold)
-import           Data.Maybe              (listToMaybe)
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.BitVec
+import           Data.Foldable            (fold)
+import           Data.Functor.Foldable    hiding (fold)
+import           Data.Maybe               (listToMaybe)
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.BitVec
 
 type Bindings = [Parameter]
 

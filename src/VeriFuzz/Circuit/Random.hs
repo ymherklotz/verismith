@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Circuit.Random
+Module      : VeriSmith.Circuit.Random
 Description : Random generation for DAG
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Define the random generation for the directed acyclic graph.
 -}
 
-module VeriFuzz.Circuit.Random
+module VeriSmith.Circuit.Random
     ( rDups
     , rDupsCirc
     , randomDAG
@@ -25,7 +25,7 @@ import           Data.List                         (nub)
 import           Hedgehog                          (Gen)
 import qualified Hedgehog.Gen                      as Hog
 import qualified Hedgehog.Range                    as Hog
-import           VeriFuzz.Circuit.Base
+import           VeriSmith.Circuit.Base
 
 dupFolder :: (Eq a, Eq b) => Context a b -> [Context a b] -> [Context a b]
 dupFolder cont ns = unique cont : ns

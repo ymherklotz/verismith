@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Internal
+Module      : VeriSmith.Sim.Internal
 Description : Class of the simulator.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,7 +12,7 @@ Class of the simulator and the synthesize tool.
 
 {-# LANGUAGE DeriveFunctor #-}
 
-module VeriFuzz.Sim.Internal
+module VeriSmith.Sim.Internal
     ( ResultSh
     , resultSh
     , Tool(..)
@@ -54,9 +54,9 @@ import           Prelude               hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted         (MonadSh, liftSh)
 import           System.FilePath.Posix (takeBaseName)
-import           VeriFuzz.Internal
-import           VeriFuzz.Result
-import           VeriFuzz.Verilog.AST
+import           VeriSmith.Internal
+import           VeriSmith.Result
+import           VeriSmith.Verilog.AST
 
 -- | Tool class.
 class Tool a where
@@ -100,7 +100,7 @@ renameSource :: (Synthesiser a) => a -> SourceInfo -> SourceInfo
 renameSource a src =
     src & infoSrc . _Wrapped . traverse . modId . _Wrapped %~ (<> toText a)
 
--- | Type synonym for a 'ResultT' that will be used throughout 'VeriFuzz'. This
+-- | Type synonym for a 'ResultT' that will be used throughout 'VeriSmith'. This
 -- has instances for 'MonadSh' and 'MonadIO' if the 'Monad' it is parametrised
 -- with also has those instances.
 type ResultSh = ResultT Failed Sh
@@ -146,7 +146,7 @@ replaceMods fp t (SourceInfo _ src) =
 rootPath :: Sh FilePath
 rootPath = do
     current <- pwd
-    maybe current fromText <$> get_env "VERIFUZZ_ROOT"
+    maybe current fromText <$> get_env "VERISMITH_ROOT"
 
 timeout :: FilePath -> [Text] -> Sh Text
 timeout = command1 "timeout" ["300"] . toTextIgnore
@@ -170,7 +170,7 @@ logger t = do
     fn          <- pwd
     currentTime <- liftIO getZonedTime
     echo
-        $  "VeriFuzz "
+        $  "VeriSmith "
         <> T.pack (formatTime defaultTimeLocale "%H:%M:%S " currentTime)
         <> bname fn
         <> " - "

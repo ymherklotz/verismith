@@ -14,7 +14,7 @@ def file_len(fname):
 def main(c, n):
     l = []
     for x in range(0, n):
-        subprocess.call(["verifuzz", "generate", "-o", "main.v", "-c", c])
+        subprocess.call(["verismith", "generate", "-o", "main.v", "-c", c])
         l.append(file_len("main.v"))
     os.remove("main.v")
     print("mean: ", statistics.mean(l))

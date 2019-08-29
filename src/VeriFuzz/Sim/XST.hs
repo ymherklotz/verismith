@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.XST
+Module      : VeriSmith.Sim.XST
 Description : XST (ise) simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,22 +12,22 @@ XST (ise) simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Sim.XST
+module VeriSmith.Sim.XST
     ( XST(..)
     , defaultXST
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq           (NFData, rnf, rwhnf)
+import           Data.Text                 (Text, unpack)
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           Text.Shakespeare.Text    (st)
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Template
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           Shelly.Lifted             (liftSh)
+import           Text.Shakespeare.Text     (st)
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Sim.Template
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
 
 data XST = XST { xstBin    :: !(Maybe FilePath)
                , xstDesc   :: {-# UNPACK #-} !Text

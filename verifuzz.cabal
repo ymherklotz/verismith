@@ -1,10 +1,10 @@
-name: verifuzz
+name: verismith
 version: 0.3.1.0
 synopsis: Random verilog generation and simulator testing.
 description:
-  VeriFuzz provides random verilog generation modules
+  VeriSmith provides random verilog generation modules
   implementing functions to test supported simulators.
-homepage: https://github.com/ymherklotz/VeriFuzz#readme
+homepage: https://github.com/ymherklotz/VeriSmith#readme
 license: BSD3
 license-file: LICENSE
 author: Yann Herklotz
@@ -26,41 +26,41 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   build-tools: alex >=3 && <4
-  other-modules: Paths_verifuzz
-  exposed-modules: VeriFuzz
-                 , VeriFuzz.Circuit
-                 , VeriFuzz.Circuit.Base
-                 , VeriFuzz.Circuit.Gen
-                 , VeriFuzz.Circuit.Internal
-                 , VeriFuzz.Circuit.Random
-                 , VeriFuzz.Config
-                 , VeriFuzz.Fuzz
-                 , VeriFuzz.Generate
-                 , VeriFuzz.Internal
-                 , VeriFuzz.Reduce
-                 , VeriFuzz.Report
-                 , VeriFuzz.Result
-                 , VeriFuzz.Sim
-                 , VeriFuzz.Sim.Icarus
-                 , VeriFuzz.Sim.Identity
-                 , VeriFuzz.Sim.Internal
-                 , VeriFuzz.Sim.Quartus
-                 , VeriFuzz.Sim.Template
-                 , VeriFuzz.Sim.Vivado
-                 , VeriFuzz.Sim.XST
-                 , VeriFuzz.Sim.Yosys
-                 , VeriFuzz.Verilog
-                 , VeriFuzz.Verilog.AST
-                 , VeriFuzz.Verilog.BitVec
-                 , VeriFuzz.Verilog.CodeGen
-                 , VeriFuzz.Verilog.Eval
-                 , VeriFuzz.Verilog.Internal
-                 , VeriFuzz.Verilog.Lex
-                 , VeriFuzz.Verilog.Mutate
-                 , VeriFuzz.Verilog.Parser
-                 , VeriFuzz.Verilog.Preprocess
-                 , VeriFuzz.Verilog.Quote
-                 , VeriFuzz.Verilog.Token
+  other-modules: Paths_verismith
+  exposed-modules: VeriSmith
+                 , VeriSmith.Circuit
+                 , VeriSmith.Circuit.Base
+                 , VeriSmith.Circuit.Gen
+                 , VeriSmith.Circuit.Internal
+                 , VeriSmith.Circuit.Random
+                 , VeriSmith.Config
+                 , VeriSmith.Fuzz
+                 , VeriSmith.Generate
+                 , VeriSmith.Internal
+                 , VeriSmith.Reduce
+                 , VeriSmith.Report
+                 , VeriSmith.Result
+                 , VeriSmith.Sim
+                 , VeriSmith.Sim.Icarus
+                 , VeriSmith.Sim.Identity
+                 , VeriSmith.Sim.Internal
+                 , VeriSmith.Sim.Quartus
+                 , VeriSmith.Sim.Template
+                 , VeriSmith.Sim.Vivado
+                 , VeriSmith.Sim.XST
+                 , VeriSmith.Sim.Yosys
+                 , VeriSmith.Verilog
+                 , VeriSmith.Verilog.AST
+                 , VeriSmith.Verilog.BitVec
+                 , VeriSmith.Verilog.CodeGen
+                 , VeriSmith.Verilog.Eval
+                 , VeriSmith.Verilog.Internal
+                 , VeriSmith.Verilog.Lex
+                 , VeriSmith.Verilog.Mutate
+                 , VeriSmith.Verilog.Parser
+                 , VeriSmith.Verilog.Preprocess
+                 , VeriSmith.Verilog.Quote
+                 , VeriSmith.Verilog.Token
   build-depends: base >=4.7 && <5
                -- Cannot upgrade to 1.0 because of missing MonadGen instance for
                -- StateT.
@@ -99,13 +99,13 @@ library
                , unordered-containers >=0.2.10 && <0.3
   default-extensions: OverloadedStrings
 
-executable verifuzz
+executable verismith
   hs-source-dirs: app
   main-is: Main.hs
   default-language: Haskell2010
   ghc-options: -threaded
   build-depends: base >= 4.7 && < 5
-               , verifuzz
+               , verismith
   default-extensions: OverloadedStrings
 
 benchmark benchmark
@@ -114,7 +114,7 @@ benchmark benchmark
   hs-source-dirs: test
   main-is: Benchmark.hs
   build-depends: base >=4 && <5
-               , verifuzz
+               , verismith
                , criterion >=1.5.5 && <1.6
                , lens >=4.16.1 && <4.18
   default-extensions: OverloadedStrings
@@ -129,7 +129,7 @@ test-suite test
                , Reduce
                , Parser
   build-depends: base >=4 && <5
-               , verifuzz
+               , verismith
                , fgl >=5.6 && <5.8
                , tasty >=1.0.1.1 && <1.3
                , tasty-hunit >=0.10 && <0.11
@@ -151,5 +151,5 @@ test-suite test
 --  build-depends: base >=4.7 && <5
 --               , doctest >=0.16 && <0.17
 --               , Glob >=0.9.3 && <0.11
---               , verifuzz
+--               , verismith
 --  default-extensions: OverloadedStrings

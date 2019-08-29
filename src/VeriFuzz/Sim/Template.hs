@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Template
+Module      : VeriSmith.Sim.Template
 Description : Template file for different configuration files
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -12,7 +12,7 @@ Template file for different configuration files.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Sim.Template
+module VeriSmith.Sim.Template
     ( yosysSatConfig
     , yosysSimConfig
     , xstSynthConfig
@@ -22,15 +22,15 @@ module VeriFuzz.Sim.Template
     )
 where
 
-import           Control.Lens             ((^..))
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           Prelude                  hiding (FilePath)
+import           Control.Lens              ((^..))
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Text.Shakespeare.Text    (st)
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           Text.Shakespeare.Text     (st)
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
 
 rename :: Text -> [Text] -> Text
 rename end entries =

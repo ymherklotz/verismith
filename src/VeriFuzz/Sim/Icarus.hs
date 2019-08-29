@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Icarus
+Module      : VeriSmith.Sim.Icarus
 Description : Icarus verilog module.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,42 +10,42 @@ Portability : POSIX
 Icarus verilog module.
 -}
 
-module VeriFuzz.Sim.Icarus
+module VeriSmith.Sim.Icarus
     ( Icarus(..)
     , defaultIcarus
     , runSimIc
     )
 where
 
-import           Control.DeepSeq           (NFData, rnf, rwhnf)
+import           Control.DeepSeq            (NFData, rnf, rwhnf)
 import           Control.Lens
-import           Control.Monad             (void)
-import           Crypto.Hash               (Digest, hash)
-import           Crypto.Hash.Algorithms    (SHA256)
-import           Data.Binary               (encode)
+import           Control.Monad              (void)
+import           Crypto.Hash                (Digest, hash)
+import           Crypto.Hash.Algorithms     (SHA256)
+import           Data.Binary                (encode)
 import           Data.Bits
-import qualified Data.ByteArray            as BA (convert)
-import           Data.ByteString           (ByteString)
-import qualified Data.ByteString           as B
-import           Data.ByteString.Lazy      (toStrict)
-import qualified Data.ByteString.Lazy      as L (ByteString)
-import           Data.Char                 (digitToInt)
-import           Data.Foldable             (fold)
-import           Data.List                 (transpose)
-import           Data.Maybe                (listToMaybe)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
-import           Numeric                   (readInt)
-import           Prelude                   hiding (FilePath)
+import qualified Data.ByteArray             as BA (convert)
+import           Data.ByteString            (ByteString)
+import qualified Data.ByteString            as B
+import           Data.ByteString.Lazy       (toStrict)
+import qualified Data.ByteString.Lazy       as L (ByteString)
+import           Data.Char                  (digitToInt)
+import           Data.Foldable              (fold)
+import           Data.List                  (transpose)
+import           Data.Maybe                 (listToMaybe)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Numeric                    (readInt)
+import           Prelude                    hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted             (liftSh)
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Template
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.BitVec
-import           VeriFuzz.Verilog.CodeGen
-import           VeriFuzz.Verilog.Internal
-import           VeriFuzz.Verilog.Mutate
+import           Shelly.Lifted              (liftSh)
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Sim.Template
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.BitVec
+import           VeriSmith.Verilog.CodeGen
+import           VeriSmith.Verilog.Internal
+import           VeriSmith.Verilog.Mutate
 
 data Icarus = Icarus { icarusPath :: FilePath
                      , vvpPath    :: FilePath

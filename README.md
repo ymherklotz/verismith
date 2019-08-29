@@ -1,8 +1,8 @@
-# VeriFuzz [![Build Status](https://travis-ci.com/ymherklotz/verifuzz.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verifuzz)
+# VeriSmith [![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
 
 Verilog Fuzzer to test the major verilog compilers by generating random, valid
 and deterministic Verilog. There is a
-[presentation](https://yannherklotz.com/docs/presentation.pdf) about VeriFuzz
+[presentation](https://yannherklotz.com/docs/presentation.pdf) about VeriSmith
 and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes over all the
 details of the implementation and results that were found.
 
@@ -110,7 +110,7 @@ the actual project itself.
 
 ## Configuration
 
-VeriFuzz can be configured using a [TOML](https://github.com/toml-lang/toml)
+VeriSmith can be configured using a [TOML](https://github.com/toml-lang/toml)
 file. There are four main sections in the configuration file, an example can be
 seen [here](/examples/config.toml).
 

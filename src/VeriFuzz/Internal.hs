@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Internal
+Module      : VeriSmith.Internal
 Description : Shared high level code used in the other modules internally.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Shared high level code used in the other modules internally.
 -}
 
-module VeriFuzz.Internal
+module VeriSmith.Internal
     ( -- * Useful functions
       safe
     , showT

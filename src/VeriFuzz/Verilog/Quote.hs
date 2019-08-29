@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Quote
+Module      : VeriSmith.Verilog.Quote
 Description : QuasiQuotation for verilog code in Haskell.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -12,7 +12,7 @@ QuasiQuotation for verilog code in Haskell.
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module VeriFuzz.Verilog.Quote
+module VeriSmith.Verilog.Quote
     ( verilog
     )
 where
@@ -22,7 +22,7 @@ import qualified Data.Text                  as T
 import qualified Language.Haskell.TH        as TH
 import           Language.Haskell.TH.Quote
 import           Language.Haskell.TH.Syntax
-import           VeriFuzz.Verilog.Parser
+import           VeriSmith.Verilog.Parser
 
 liftDataWithText :: Data a => a -> Q Exp
 liftDataWithText = dataToExpQ $ fmap liftText . cast

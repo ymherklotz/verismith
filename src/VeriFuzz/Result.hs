@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Result
+Module      : VeriSmith.Result
 Description : Result monadic type.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -9,7 +9,7 @@ Portability : POSIX
 
 Result monadic type. This is nearly equivalent to the transformers 'Error' type,
 but to have more control this is reimplemented with the instances that are
-needed in "VeriFuzz".
+needed in "VeriSmith".
 -}
 
 {-# LANGUAGE FlexibleContexts      #-}
@@ -19,7 +19,7 @@ needed in "VeriFuzz".
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-module VeriFuzz.Result
+module VeriSmith.Result
     ( Result(..)
     , ResultT(..)
     , (<?>)

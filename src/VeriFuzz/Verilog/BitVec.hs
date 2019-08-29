@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.BitVec
+Module      : VeriSmith.Verilog.BitVec
 Description : Unsigned BitVec implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -17,7 +17,7 @@ Unsigned BitVec implementation.
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DeriveTraversable  #-}
 
-module VeriFuzz.Verilog.BitVec
+module VeriSmith.Verilog.BitVec
     ( BitVecF(..)
     , BitVec
     , bitVec

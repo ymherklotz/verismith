@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Mutate
+Module      : VeriSmith.Verilog.Mutate
 Description : Functions to mutate the Verilog AST.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -7,13 +7,13 @@ Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
 
-Functions to mutate the Verilog AST from "VeriFuzz.Verilog.AST" to generate more
+Functions to mutate the Verilog AST from "VeriSmith.Verilog.AST" to generate more
 random patterns, such as nesting wires instead of creating new ones.
 -}
 
 {-# LANGUAGE FlexibleInstances #-}
 
-module VeriFuzz.Verilog.Mutate
+module VeriSmith.Verilog.Mutate
     ( Mutate(..)
     , inPort
     , findAssign
@@ -41,16 +41,16 @@ module VeriFuzz.Verilog.Mutate
 where
 
 import           Control.Lens
-import           Data.Foldable             (fold)
-import           Data.Maybe                (catMaybes, fromMaybe)
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
-import           VeriFuzz.Circuit.Internal
-import           VeriFuzz.Internal
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.BitVec
-import           VeriFuzz.Verilog.CodeGen
-import           VeriFuzz.Verilog.Internal
+import           Data.Foldable              (fold)
+import           Data.Maybe                 (catMaybes, fromMaybe)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           VeriSmith.Circuit.Internal
+import           VeriSmith.Internal
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.BitVec
+import           VeriSmith.Verilog.CodeGen
+import           VeriSmith.Verilog.Internal
 
 class Mutate a where
     mutExpr :: (Expr -> Expr) -> a -> a
@@ -210,7 +210,7 @@ allVars m =
         <> (m ^.. modInPorts . traverse . portName)
 
 -- $setup
--- >>> import VeriFuzz.Verilog.CodeGen
+-- >>> import VeriSmith.Verilog.CodeGen
 -- >>> let m = (ModDecl (Identifier "m") [Port Wire False 5 (Identifier "y")] [Port Wire False 5 "x"] [] [])
 -- >>> let main = (ModDecl "main" [] [] [] [])
 

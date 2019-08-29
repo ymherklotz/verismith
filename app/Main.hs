@@ -1,6 +1,6 @@
 module Main where
 
-import           VeriFuzz
+import           VeriSmith
 
 main :: IO ()
 main = defaultMain

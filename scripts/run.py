@@ -12,7 +12,7 @@ def main():
         if not os.path.exists(directory):
                 os.makedirs(directory)
         while True:
-                subprocess.call(["verifuzz", "fuzz"
+                subprocess.call(["verismith", "fuzz"
                                  , "-o", directory + "/" + name + str(i)
                                  , "-c", config
                                  , "-n", str(iterations)])

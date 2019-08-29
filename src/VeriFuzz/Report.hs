@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes      #-}
 {-|
-Module      : VeriFuzz.Report
+Module      : VeriSmith.Report
 Description : Generate a report from a fuzz run.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -13,7 +13,7 @@ Generate a report from a fuzz run.
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module VeriFuzz.Report
+module VeriSmith.Report
     ( SynthTool(..)
     , SynthStatus(..)
     , SynthResult(..)
@@ -60,11 +60,11 @@ import           Text.Blaze.Html               (Html, (!))
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5              as H
 import qualified Text.Blaze.Html5.Attributes   as A
-import           VeriFuzz.Config
-import           VeriFuzz.Internal
-import           VeriFuzz.Result
-import           VeriFuzz.Sim
-import           VeriFuzz.Sim.Internal
+import           VeriSmith.Config
+import           VeriSmith.Internal
+import           VeriSmith.Result
+import           VeriSmith.Sim
+import           VeriSmith.Sim.Internal
 
 -- | Common type alias for synthesis results
 type UResult = Result Failed ()

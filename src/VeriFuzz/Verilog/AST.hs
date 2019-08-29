@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.AST
+Module      : VeriSmith.Verilog.AST
 Description : Definition of the Verilog AST types.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -22,7 +22,7 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 
-module VeriFuzz.Verilog.AST
+module VeriSmith.Verilog.AST
     ( -- * Top level types
       SourceInfo(..)
     , infoTop
@@ -150,7 +150,7 @@ import           Data.String              (IsString, fromString)
 import           Data.Text                (Text, pack)
 import           Data.Traversable         (sequenceA)
 import           GHC.Generics             (Generic)
-import           VeriFuzz.Verilog.BitVec
+import           VeriSmith.Verilog.BitVec
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,

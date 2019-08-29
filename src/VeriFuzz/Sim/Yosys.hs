@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Yosys
+Module      : VeriSmith.Sim.Yosys
 Description : Yosys simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,7 +12,7 @@ Yosys simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module VeriFuzz.Sim.Yosys
+module VeriSmith.Sim.Yosys
     ( Yosys(..)
     , defaultYosys
     , runEquiv
@@ -20,20 +20,20 @@ module VeriFuzz.Sim.Yosys
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
+import           Control.DeepSeq           (NFData, rnf, rwhnf)
 import           Control.Lens
-import           Control.Monad            (void)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.Monad             (void)
+import           Data.Text                 (Text, unpack)
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           Text.Shakespeare.Text    (st)
-import           VeriFuzz.Result
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Template
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
-import           VeriFuzz.Verilog.Mutate
+import           Shelly.Lifted             (liftSh)
+import           Text.Shakespeare.Text     (st)
+import           VeriSmith.Result
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Sim.Template
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
+import           VeriSmith.Verilog.Mutate
 
 data Yosys = Yosys { yosysBin    :: !(Maybe FilePath)
                    , yosysDesc   :: {-# UNPACK #-} !Text

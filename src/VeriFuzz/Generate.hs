@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Generate
+Module      : VeriSmith.Generate
 Description : Various useful generators.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -13,7 +13,7 @@ Various useful generators.
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
-module VeriFuzz.Generate
+module VeriSmith.Generate
     ( -- * Generation methods
       procedural
     , proceduralIO
@@ -73,13 +73,13 @@ import qualified Data.Text                        as T
 import           Hedgehog                         (Gen)
 import qualified Hedgehog.Gen                     as Hog
 import qualified Hedgehog.Range                   as Hog
-import           VeriFuzz.Config
-import           VeriFuzz.Internal
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.BitVec
-import           VeriFuzz.Verilog.Eval
-import           VeriFuzz.Verilog.Internal
-import           VeriFuzz.Verilog.Mutate
+import           VeriSmith.Config
+import           VeriSmith.Internal
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.BitVec
+import           VeriSmith.Verilog.Eval
+import           VeriSmith.Verilog.Internal
+import           VeriSmith.Verilog.Mutate
 
 data Context = Context { _variables   :: [Port]
                        , _parameters  :: [Parameter]

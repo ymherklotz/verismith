@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.CodeGen
+Module      : VeriSmith.Verilog.CodeGen
 Description : Code generation for Verilog AST.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -8,13 +8,13 @@ Stability   : experimental
 Portability : POSIX
 
 This module generates the code from the Verilog AST defined in
-"VeriFuzz.Verilog.AST".
+"VeriSmith.Verilog.AST".
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
 
-module VeriFuzz.Verilog.CodeGen
+module VeriSmith.Verilog.CodeGen
     ( -- * Code Generation
       GenVerilog(..)
     , Source(..)
@@ -28,9 +28,9 @@ import           Data.Text                 (Text)
 import qualified Data.Text                 as T
 import           Data.Text.Prettyprint.Doc
 import           Numeric                   (showHex)
-import           VeriFuzz.Internal         hiding (comma)
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.BitVec
+import           VeriSmith.Internal        hiding (comma)
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.BitVec
 
 -- | 'Source' class which determines that source code is able to be generated
 -- from the data structure using 'genSource'. This will be stored in 'Text' and

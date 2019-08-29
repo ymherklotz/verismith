@@ -10,18 +10,18 @@ Portability : POSIX
 Generate verilog from circuit.
 -}
 
-module VeriFuzz.Circuit.Gen
+module VeriSmith.Circuit.Gen
     ( generateAST
     )
 where
 
-import           Data.Graph.Inductive      (LNode, Node)
-import qualified Data.Graph.Inductive      as G
-import           Data.Maybe                (catMaybes)
-import           VeriFuzz.Circuit.Base
-import           VeriFuzz.Circuit.Internal
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.Mutate
+import           Data.Graph.Inductive       (LNode, Node)
+import qualified Data.Graph.Inductive       as G
+import           Data.Maybe                 (catMaybes)
+import           VeriSmith.Circuit.Base
+import           VeriSmith.Circuit.Internal
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.Mutate
 
 -- | Converts a 'CNode' to an 'Identifier'.
 frNode :: Node -> Identifier

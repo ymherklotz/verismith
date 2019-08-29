@@ -9,6 +9,6 @@ let
       };
   };
   variant = if doBenchmark then nixpkgs.pkgs.haskell.lib.doBenchmark else nixpkgs.pkgs.lib.id;
-  verifuzz = haskellPackages.callCabal2nix "verifuzz" (./.) {};
+  verismith = haskellPackages.callCabal2nix "verismith" (./.) {};
 in
-  variant verifuzz
+  variant verismith

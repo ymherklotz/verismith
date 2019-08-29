@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Internal
+Module      : VeriSmith.Verilog.Internal
 Description : Defaults and common functions.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Defaults and common functions.
 -}
 
-module VeriFuzz.Verilog.Internal
+module VeriSmith.Verilog.Internal
     ( regDecl
     , wireDecl
     , emptyMod
@@ -29,8 +29,8 @@ module VeriFuzz.Verilog.Internal
 where
 
 import           Control.Lens
-import           Data.Text            (Text)
-import           VeriFuzz.Verilog.AST
+import           Data.Text             (Text)
+import           VeriSmith.Verilog.AST
 
 regDecl :: Identifier -> ModItem
 regDecl i = Decl Nothing (Port Reg False (Range 1 0) i) Nothing

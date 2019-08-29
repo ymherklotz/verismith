@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Token
+Module      : VeriSmith.Verilog.Token
 Description : Tokens for Verilog parsing.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Tokens for Verilog parsing.
 -}
 
-module VeriFuzz.Verilog.Token
+module VeriSmith.Verilog.Token
     ( Token(..)
     , TokenName(..)
     , Position(..)

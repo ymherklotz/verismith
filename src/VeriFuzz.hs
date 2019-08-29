@@ -1,6 +1,6 @@
 {-|
-Module      : VeriFuzz
-Description : VeriFuzz
+Module      : VeriSmith
+Description : VeriSmith
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
 Maintainer  : yann [at] yannherklotz [dot] com
@@ -10,7 +10,7 @@ Portability : POSIX
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-module VeriFuzz
+module VeriSmith
     ( defaultMain
     -- * Types
     , Opts(..)
@@ -27,12 +27,12 @@ module VeriFuzz
     , proceduralSrcIO
     , randomMod
     -- * Extra modules
-    , module VeriFuzz.Verilog
-    , module VeriFuzz.Config
-    , module VeriFuzz.Circuit
-    , module VeriFuzz.Sim
-    , module VeriFuzz.Fuzz
-    , module VeriFuzz.Report
+    , module VeriSmith.Verilog
+    , module VeriSmith.Config
+    , module VeriSmith.Circuit
+    , module VeriSmith.Sim
+    , module VeriSmith.Fuzz
+    , module VeriSmith.Report
     )
 where
 
@@ -58,17 +58,17 @@ import           Prelude                  hiding (FilePath)
 import           Shelly                   hiding (command)
 import           Shelly.Lifted            (liftSh)
 import           System.Random            (randomIO)
-import           VeriFuzz.Circuit
-import           VeriFuzz.Config
-import           VeriFuzz.Fuzz
-import           VeriFuzz.Generate
-import           VeriFuzz.Reduce
-import           VeriFuzz.Report
-import           VeriFuzz.Result
-import           VeriFuzz.Sim
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Verilog
-import           VeriFuzz.Verilog.Parser  (parseSourceInfoFile)
+import           VeriSmith.Circuit
+import           VeriSmith.Config
+import           VeriSmith.Fuzz
+import           VeriSmith.Generate
+import           VeriSmith.Reduce
+import           VeriSmith.Report
+import           VeriSmith.Result
+import           VeriSmith.Sim
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Verilog
+import           VeriSmith.Verilog.Parser (parseSourceInfoFile)
 
 data OptTool = TYosys
           | TXST
@@ -315,7 +315,7 @@ opts = info
     (  fullDesc
     <> progDesc "Fuzz different simulators and synthesisers."
     <> header
-           "VeriFuzz - A hardware simulator and synthesiser Verilog fuzzer."
+           "VeriSmith - A hardware simulator and synthesiser Verilog fuzzer."
     )
 
 getConfig :: Maybe FilePath -> IO Config
@@ -504,7 +504,7 @@ checkEquivalence :: SourceInfo -> Text -> IO Bool
 checkEquivalence src dir = shellyFailDir $ do
     mkdir_p (fromText dir)
     curr <- toTextIgnore <$> pwd
-    setenv "VERIFUZZ_ROOT" curr
+    setenv "VERISMITH_ROOT" curr
     cd (fromText dir)
     catch_sh
         ((runResultT $ runEquiv defaultYosys defaultVivado src) >> return True)
@@ -527,7 +527,7 @@ runEquivalence seed gm t d k i = do
     shellyFailDir $ do
         mkdir_p (fromText d </> fromText n)
         curr <- toTextIgnore <$> pwd
-        setenv "VERIFUZZ_ROOT" curr
+        setenv "VERISMITH_ROOT" curr
         cd (fromText "output" </> fromText n)
         _ <-
             catch_sh

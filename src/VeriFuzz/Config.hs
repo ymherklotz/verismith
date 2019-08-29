@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Config
+Module      : VeriSmith.Config
 Description : Configuration file format and parser.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -12,7 +12,7 @@ TOML Configuration file format and parser.
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module VeriFuzz.Config
+module VeriSmith.Config
     ( -- * TOML Configuration
       -- $conf
       Config(..)
@@ -88,18 +88,18 @@ import qualified Data.Text.IO           as T
 import           Data.Version           (showVersion)
 import           Development.GitRev
 import           Hedgehog.Internal.Seed (Seed)
-import           Paths_verifuzz         (version)
+import           Paths_verismith        (version)
 import           Shelly                 (toTextIgnore)
 import           Toml                   (TomlCodec, (.=))
 import qualified Toml
-import           VeriFuzz.Sim.Quartus
-import           VeriFuzz.Sim.Vivado
-import           VeriFuzz.Sim.XST
-import           VeriFuzz.Sim.Yosys
+import           VeriSmith.Sim.Quartus
+import           VeriSmith.Sim.Vivado
+import           VeriSmith.Sim.XST
+import           VeriSmith.Sim.Yosys
 
 -- $conf
 --
--- VeriFuzz supports a TOML configuration file that can be passed using the @-c@
+-- VeriSmith supports a TOML configuration file that can be passed using the @-c@
 -- flag or using the 'parseConfig' and 'encodeConfig' functions. The
 -- configuration can then be manipulated using the lenses that are also provided
 -- in this module.
@@ -111,7 +111,7 @@ import           VeriFuzz.Sim.Yosys
 -- exact generation. A default value is associated with each key in the
 -- configuration file, which means that only the options that need overriding
 -- can be added to the configuration. The defaults can be observed in
--- 'defaultConfig' or when running @verifuzz config@.
+-- 'defaultConfig' or when running @verismith config@.
 --
 -- == Configuration Sections
 --
@@ -487,7 +487,7 @@ encodeConfigFile f = T.writeFile f . encodeConfig
 
 versionInfo :: String
 versionInfo =
-    "VeriFuzz "
+    "VeriSmith "
         <> showVersion version
         <> " ("
         <> $(gitCommitDate)

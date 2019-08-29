@@ -11,30 +11,23 @@ module Property
     )
 where
 
-import           Data.Either                    ( either
-                                                , isRight
-                                                )
-import qualified Data.Graph.Inductive          as G
-import           Data.Text                      ( Text )
-import           Hedgehog                       ( Gen
-                                                , Property
-                                                , (===)
-                                                )
-import qualified Hedgehog                      as Hog
-import           Hedgehog.Function              ( Arg
-                                                , Vary
-                                                )
-import qualified Hedgehog.Function             as Hog
-import qualified Hedgehog.Gen                  as Hog
-import qualified Hedgehog.Range                as Hog
-import           Parser                         ( parserTests )
+import           Data.Either              (either, isRight)
+import qualified Data.Graph.Inductive     as G
+import           Data.Text                (Text)
+import           Hedgehog                 (Gen, Property, (===))
+import qualified Hedgehog                 as Hog
+import           Hedgehog.Function        (Arg, Vary)
+import qualified Hedgehog.Function        as Hog
+import qualified Hedgehog.Gen             as Hog
+import qualified Hedgehog.Range           as Hog
+import           Parser                   (parserTests)
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Text.Parsec
-import           VeriFuzz
-import           VeriFuzz.Result
-import           VeriFuzz.Verilog.Lex
-import           VeriFuzz.Verilog.Parser
+import           VeriSmith
+import           VeriSmith.Result
+import           VeriSmith.Verilog.Lex
+import           VeriSmith.Verilog.Parser
 
 randomDAG' :: Gen Circuit
 randomDAG' = Hog.resize 30 randomDAG

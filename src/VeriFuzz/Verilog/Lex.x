@@ -1,11 +1,11 @@
 -- -*- haskell -*-
 {
 {-# OPTIONS_GHC -w #-}
-module VeriFuzz.Verilog.Lex
+module VeriSmith.Verilog.Lex
   ( alexScanTokens
   ) where
 
-import VeriFuzz.Verilog.Token
+import VeriSmith.Verilog.Token
 
 }
 

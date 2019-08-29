@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Circuit.Base
+Module      : VeriSmith.Circuit.Base
 Description : Base types for the circuit module.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Base types for the circuit module.
 -}
 
-module VeriFuzz.Circuit.Base
+module VeriSmith.Circuit.Base
     ( Gate(..)
     , Circuit(..)
     , CNode(..)

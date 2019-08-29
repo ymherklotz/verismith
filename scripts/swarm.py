@@ -12,11 +12,11 @@ def main():
         if not os.path.exists(directory):
                 os.makedirs(directory)
         while True:
-                subprocess.call(["verifuzz", "config"
+                subprocess.call(["verismith", "config"
                                  , "-c", config
                                  , "-o", directory + "/config_medium_random.toml"
                                  , "--randomise"])
-                subprocess.call([ "verifuzz", "fuzz"
+                subprocess.call([ "verismith", "fuzz"
                                  , "-o", directory + "/" + name + str(i)
                                  , "-c", directory + "/config_medium_random.toml"
                                  , "-n", str(iterations)])

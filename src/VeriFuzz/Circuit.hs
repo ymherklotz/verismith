@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Circuit
+Module      : VeriSmith.Circuit
 Description : Definition of the circuit graph.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Definition of the circuit graph.
 -}
 
-module VeriFuzz.Circuit
+module VeriSmith.Circuit
     ( -- * Circuit
       Gate(..)
     , Circuit(..)
@@ -26,13 +26,13 @@ module VeriFuzz.Circuit
 where
 
 import           Control.Lens
-import           Hedgehog                (Gen)
-import qualified Hedgehog.Gen            as Hog
-import           VeriFuzz.Circuit.Base
-import           VeriFuzz.Circuit.Gen
-import           VeriFuzz.Circuit.Random
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.Mutate
+import           Hedgehog                 (Gen)
+import qualified Hedgehog.Gen             as Hog
+import           VeriSmith.Circuit.Base
+import           VeriSmith.Circuit.Gen
+import           VeriSmith.Circuit.Random
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.Mutate
 
 fromGraph :: Gen ModDecl
 fromGraph = do

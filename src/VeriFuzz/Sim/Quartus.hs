@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Quartus
+Module      : VeriSmith.Sim.Quartus
 Description : Quartus synthesiser implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,20 +10,20 @@ Portability : POSIX
 Quartus synthesiser implementation.
 -}
 
-module VeriFuzz.Sim.Quartus
+module VeriSmith.Sim.Quartus
     ( Quartus(..)
     , defaultQuartus
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq           (NFData, rnf, rwhnf)
+import           Data.Text                 (Text, unpack)
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           Shelly.Lifted             (liftSh)
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
 
 data Quartus = Quartus { quartusBin    :: !(Maybe FilePath)
                        , quartusDesc   :: {-# UNPACK #-} !Text

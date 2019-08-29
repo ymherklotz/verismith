@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim.Vivado
+Module      : VeriSmith.Sim.Vivado
 Description : Vivado Synthesiser implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,21 +10,21 @@ Portability : POSIX
 Vivado Synthesiser implementation.
 -}
 
-module VeriFuzz.Sim.Vivado
+module VeriSmith.Sim.Vivado
     ( Vivado(..)
     , defaultVivado
     )
 where
 
-import           Control.DeepSeq          (NFData, rnf, rwhnf)
-import           Data.Text                (Text, unpack)
-import           Prelude                  hiding (FilePath)
+import           Control.DeepSeq           (NFData, rnf, rwhnf)
+import           Data.Text                 (Text, unpack)
+import           Prelude                   hiding (FilePath)
 import           Shelly
-import           Shelly.Lifted            (liftSh)
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Template
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           Shelly.Lifted             (liftSh)
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Sim.Template
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
 
 data Vivado = Vivado { vivadoBin    :: !(Maybe FilePath)
                      , vivadoDesc   :: {-# UNPACK #-} !Text

@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Fuzz
+Module      : VeriSmith.Fuzz
 Description : Environment to run the simulator and synthesisers in a matrix.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -14,7 +14,7 @@ Environment to run the simulator and synthesisers in a matrix.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
 
-module VeriFuzz.Fuzz
+module VeriSmith.Fuzz
     ( Fuzz
     , fuzz
     , fuzzInDir
@@ -54,16 +54,16 @@ import           Prelude                          hiding (FilePath)
 import           Shelly                           hiding (get)
 import           Shelly.Lifted                    (MonadSh, liftSh)
 import           System.FilePath.Posix            (takeBaseName)
-import           VeriFuzz.Config
-import           VeriFuzz.Internal
-import           VeriFuzz.Reduce
-import           VeriFuzz.Report
-import           VeriFuzz.Result
-import           VeriFuzz.Sim.Icarus
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Yosys
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.CodeGen
+import           VeriSmith.Config
+import           VeriSmith.Internal
+import           VeriSmith.Reduce
+import           VeriSmith.Report
+import           VeriSmith.Result
+import           VeriSmith.Sim.Icarus
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Sim.Yosys
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.CodeGen
 
 data FuzzEnv = FuzzEnv { getSynthesisers :: ![SynthTool]
                        , getSimulators   :: ![SimTool]

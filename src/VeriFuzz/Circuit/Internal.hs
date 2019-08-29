@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Circuit.Internal
+Module      : VeriSmith.Circuit.Internal
 Description : Internal helpers for generation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Internal helpers for generation.
 -}
 
-module VeriFuzz.Circuit.Internal
+module VeriSmith.Circuit.Internal
     ( fromNode
     , filterGr
     , only

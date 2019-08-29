@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Verilog.Parser
+Module      : VeriSmith.Verilog.Parser
 Description : Minimal Verilog parser to reconstruct the AST.
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -11,7 +11,7 @@ Minimal Verilog parser to reconstruct the AST. This parser does not support the
 whole Verilog syntax, as the AST does not support it either.
 -}
 
-module VeriFuzz.Verilog.Parser
+module VeriSmith.Verilog.Parser
     ( -- * Parser
       parseVerilog
     , parseVerilogFile
@@ -26,25 +26,25 @@ module VeriFuzz.Verilog.Parser
 where
 
 import           Control.Lens
-import           Control.Monad               (void)
-import           Data.Bifunctor              (bimap)
+import           Control.Monad                (void)
+import           Data.Bifunctor               (bimap)
 import           Data.Bits
-import           Data.Functor                (($>))
-import           Data.Functor.Identity       (Identity)
-import           Data.List                   (isInfixOf, isPrefixOf, null)
-import           Data.List.NonEmpty          (NonEmpty (..))
-import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import qualified Data.Text.IO                as T
-import           Text.Parsec                 hiding (satisfy)
+import           Data.Functor                 (($>))
+import           Data.Functor.Identity        (Identity)
+import           Data.List                    (isInfixOf, isPrefixOf, null)
+import           Data.List.NonEmpty           (NonEmpty (..))
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import qualified Data.Text.IO                 as T
+import           Text.Parsec                  hiding (satisfy)
 import           Text.Parsec.Expr
-import           VeriFuzz.Internal
-import           VeriFuzz.Verilog.AST
-import           VeriFuzz.Verilog.BitVec
-import           VeriFuzz.Verilog.Internal
-import           VeriFuzz.Verilog.Lex
-import           VeriFuzz.Verilog.Preprocess
-import           VeriFuzz.Verilog.Token
+import           VeriSmith.Internal
+import           VeriSmith.Verilog.AST
+import           VeriSmith.Verilog.BitVec
+import           VeriSmith.Verilog.Internal
+import           VeriSmith.Verilog.Lex
+import           VeriSmith.Verilog.Preprocess
+import           VeriSmith.Verilog.Token
 
 type Parser = Parsec [Token] ()
 

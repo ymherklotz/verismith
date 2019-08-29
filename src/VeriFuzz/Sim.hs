@@ -1,5 +1,5 @@
 {-|
-Module      : VeriFuzz.Sim
+Module      : VeriSmith.Sim
 Description : Simulator implementations.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Simulator implementations.
 -}
 
-module VeriFuzz.Sim
+module VeriSmith.Sim
     (
     -- * Simulators
     -- ** Icarus
@@ -42,10 +42,10 @@ module VeriFuzz.Sim
     )
 where
 
-import           VeriFuzz.Sim.Icarus
-import           VeriFuzz.Sim.Identity
-import           VeriFuzz.Sim.Internal
-import           VeriFuzz.Sim.Quartus
-import           VeriFuzz.Sim.Vivado
-import           VeriFuzz.Sim.XST
-import           VeriFuzz.Sim.Yosys
+import           VeriSmith.Sim.Icarus
+import           VeriSmith.Sim.Identity
+import           VeriSmith.Sim.Internal
+import           VeriSmith.Sim.Quartus
+import           VeriSmith.Sim.Vivado
+import           VeriSmith.Sim.XST
+import           VeriSmith.Sim.Yosys
