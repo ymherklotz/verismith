@@ -24,10 +24,10 @@ import           Parser                   (parserTests)
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Text.Parsec
-import           VeriSmith
-import           VeriSmith.Result
-import           VeriSmith.Verilog.Lex
-import           VeriSmith.Verilog.Parser
+import           Verismith
+import           Verismith.Result
+import           Verismith.Verilog.Lex
+import           Verismith.Verilog.Parser
 
 randomDAG' :: Gen Circuit
 randomDAG' = Hog.resize 30 randomDAG

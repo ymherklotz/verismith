@@ -9,7 +9,7 @@ import           Parser             (parseUnitTests)
 import           Reduce             (reduceUnitTests)
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           VeriSmith
+import           Verismith
 
 unitTests :: TestTree
 unitTests = testGroup

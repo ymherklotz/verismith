@@ -2,7 +2,7 @@ name: verismith
 version: 0.3.1.0
 synopsis: Random verilog generation and simulator testing.
 description:
-  VeriSmith provides random verilog generation modules
+  Verismith provides random verilog generation modules
   implementing functions to test supported simulators.
 homepage: https://github.com/ymherklotz/verismith#readme
 license: BSD3
@@ -32,40 +32,40 @@ library
   default-language: Haskell2010
   build-tools: alex >=3 && <4
   other-modules: Paths_verismith
-  exposed-modules: VeriSmith
-                 , VeriSmith.Circuit
-                 , VeriSmith.Circuit.Base
-                 , VeriSmith.Circuit.Gen
-                 , VeriSmith.Circuit.Internal
-                 , VeriSmith.Circuit.Random
-                 , VeriSmith.Config
-                 , VeriSmith.Fuzz
-                 , VeriSmith.Generate
-                 , VeriSmith.Internal
-                 , VeriSmith.Reduce
-                 , VeriSmith.Report
-                 , VeriSmith.Result
-                 , VeriSmith.Sim
-                 , VeriSmith.Sim.Icarus
-                 , VeriSmith.Sim.Identity
-                 , VeriSmith.Sim.Internal
-                 , VeriSmith.Sim.Quartus
-                 , VeriSmith.Sim.Template
-                 , VeriSmith.Sim.Vivado
-                 , VeriSmith.Sim.XST
-                 , VeriSmith.Sim.Yosys
-                 , VeriSmith.Verilog
-                 , VeriSmith.Verilog.AST
-                 , VeriSmith.Verilog.BitVec
-                 , VeriSmith.Verilog.CodeGen
-                 , VeriSmith.Verilog.Eval
-                 , VeriSmith.Verilog.Internal
-                 , VeriSmith.Verilog.Lex
-                 , VeriSmith.Verilog.Mutate
-                 , VeriSmith.Verilog.Parser
-                 , VeriSmith.Verilog.Preprocess
-                 , VeriSmith.Verilog.Quote
-                 , VeriSmith.Verilog.Token
+  exposed-modules: Verismith
+                 , Verismith.Circuit
+                 , Verismith.Circuit.Base
+                 , Verismith.Circuit.Gen
+                 , Verismith.Circuit.Internal
+                 , Verismith.Circuit.Random
+                 , Verismith.Config
+                 , Verismith.Fuzz
+                 , Verismith.Generate
+                 , Verismith.Internal
+                 , Verismith.Reduce
+                 , Verismith.Report
+                 , Verismith.Result
+                 , Verismith.Sim
+                 , Verismith.Sim.Icarus
+                 , Verismith.Sim.Identity
+                 , Verismith.Sim.Internal
+                 , Verismith.Sim.Quartus
+                 , Verismith.Sim.Template
+                 , Verismith.Sim.Vivado
+                 , Verismith.Sim.XST
+                 , Verismith.Sim.Yosys
+                 , Verismith.Verilog
+                 , Verismith.Verilog.AST
+                 , Verismith.Verilog.BitVec
+                 , Verismith.Verilog.CodeGen
+                 , Verismith.Verilog.Eval
+                 , Verismith.Verilog.Internal
+                 , Verismith.Verilog.Lex
+                 , Verismith.Verilog.Mutate
+                 , Verismith.Verilog.Parser
+                 , Verismith.Verilog.Preprocess
+                 , Verismith.Verilog.Quote
+                 , Verismith.Verilog.Token
   build-depends: base >=4.7 && <5
                -- Cannot upgrade to 1.0 because of missing MonadGen instance for
                -- StateT.

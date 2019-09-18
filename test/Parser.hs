@@ -25,10 +25,10 @@ import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Test.Tasty.HUnit
 import           Text.Parsec
-import           VeriSmith
-import           VeriSmith.Internal
-import           VeriSmith.Verilog.Lex
-import           VeriSmith.Verilog.Parser
+import           Verismith
+import           Verismith.Internal
+import           Verismith.Verilog.Lex
+import           Verismith.Verilog.Parser
 
 smallConfig :: Config
 smallConfig = defaultConfig & configProperty . propSize .~ 5

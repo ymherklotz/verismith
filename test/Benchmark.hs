@@ -2,7 +2,7 @@ module Main where
 
 import           Control.Lens   ((&), (.~))
 import           Criterion.Main (bench, bgroup, defaultMain, nfAppIO)
-import           VeriSmith      (configProperty, defaultConfig, proceduralIO,
+import           Verismith      (configProperty, defaultConfig, proceduralIO,
                                  propSize, propStmntDepth)
 
 main :: IO ()

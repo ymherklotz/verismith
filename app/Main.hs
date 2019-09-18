@@ -1,6 +1,6 @@
 module Main where
 
-import           VeriSmith
+import           Verismith
 
 main :: IO ()
 main = defaultMain
