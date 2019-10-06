@@ -155,25 +155,26 @@ Current benchmark results to compare against.
 
 ``` text
 benchmarking generation/default
-time                 21.16 ms   (17.34 ms .. 24.27 ms)
-                     0.877 R²   (0.742 R² .. 0.977 R²)
-mean                 20.74 ms   (18.40 ms .. 22.70 ms)
-std dev              4.741 ms   (3.372 ms .. 7.002 ms)
-variance introduced by outliers: 85% (severely inflated)
+time                 65.16 ms   (42.67 ms .. 84.90 ms)
+                     0.837 R²   (0.722 R² .. 0.966 R²)
+mean                 82.87 ms   (71.13 ms .. 105.9 ms)
+std dev              27.59 ms   (15.80 ms .. 42.35 ms)
+variance introduced by outliers: 90% (severely inflated)
 
 benchmarking generation/depth
-time                 155.9 ms   (90.11 ms .. 209.1 ms)
-                     0.855 R²   (0.680 R² .. 0.983 R²)
-mean                 92.37 ms   (67.36 ms .. 118.2 ms)
-std dev              40.56 ms   (33.70 ms .. 49.28 ms)
-variance introduced by outliers: 88% (severely inflated)
+time                 860.8 ms   (2.031 ms .. 1.488 s)
+                     0.900 R²   (0.668 R² .. 1.000 R²)
+mean                 483.9 ms   (254.1 ms .. 647.6 ms)
+std dev              224.4 ms   (100.8 ms .. 283.5 ms)
+variance introduced by outliers: 74% (severely inflated)
 
 benchmarking generation/size
-time                 117.9 ms   (10.21 ms .. 209.1 ms)
-                     0.616 R²   (0.030 R² .. 0.992 R²)
-mean                 160.5 ms   (126.2 ms .. 187.1 ms)
-std dev              45.03 ms   (27.55 ms .. 68.66 ms)
-variance introduced by outliers: 70% (severely inflated)
+time                 541.1 ms   (-749.1 ms .. 1.263 s)
+                     0.568 R²   (0.005 R² .. 1.000 R²)
+mean                 698.8 ms   (498.2 ms .. 897.5 ms)
+std dev              229.8 ms   (195.0 ms .. 239.7 ms)
+variance introduced by outliers: 73% (severely inflated)
+
 ```
 
 ## Acknowledgement
