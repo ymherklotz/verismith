@@ -43,21 +43,9 @@ acyclicGraph = Hog.property $ do
             . getCircuit
             $ g
 
-propertyResultInterrupted :: Property
-propertyResultInterrupted = do
-    mapCompose genResult
-               (Hog.int (Hog.linear 0 100))
-               (Hog.int (Hog.linear 0 100))
-               (Hog.int (Hog.linear 0 100))
-  where
-    genResult :: Gen a -> Gen (Result Text a)
-    genResult a = Hog.choice
-        [Pass <$> a, Fail <$> Hog.text (Hog.linear 1 100) Hog.unicode]
-
 propertyTests :: TestTree
 propertyTests = testGroup
     "Property Tests"
     [ testProperty "acyclic graph generation check" acyclicGraph
-    , testProperty "fmap for Result"                propertyResultInterrupted
     , parserTests
     ]
