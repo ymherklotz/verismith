@@ -454,13 +454,9 @@ sampleSeed s gen =
                           "Hedgehog.Gen.sample: too many discards, could not generate a sample"
                   else do
                       seed <- maybe Hog.random return s
-                      case
-                              runIdentity
-                              . runMaybeT
-                              . Hog.runTree
-                              $ Hog.runGenT 30 seed gen
-                          of
-                              Nothing -> loop (n - 1)
-                              Just x  -> return (seed, Hog.nodeValue x)
+                      case Hog.evalGen 30 seed gen of
+                          Nothing ->
+                              loop (n - 1)
+                          Just x ->
+                              pure (seed, Hog.treeValue x)
           in  loop (100 :: Int)
-

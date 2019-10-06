@@ -16,8 +16,6 @@ import qualified Data.Graph.Inductive     as G
 import           Data.Text                (Text)
 import           Hedgehog                 (Gen, Property, (===))
 import qualified Hedgehog                 as Hog
-import           Hedgehog.Function        (Arg, Vary)
-import qualified Hedgehog.Function        as Hog
 import qualified Hedgehog.Gen             as Hog
 import qualified Hedgehog.Range           as Hog
 import           Parser                   (parserTests)
@@ -44,30 +42,6 @@ acyclicGraph = Hog.property $ do
             . G.scc
             . getCircuit
             $ g
-
-type GenFunctor f a b c =
-    ( Functor f
-    , Show (f a)
-    , Show a, Arg a, Vary a
-    , Show b, Arg b, Vary b
-    , Show c
-    , Eq (f c)
-    , Show (f c)
-    )
-
-mapCompose
-    :: forall f a b c
-     . GenFunctor f a b c
-    => (forall x . Gen x -> Gen (f x))
-    -> Gen a
-    -> Gen b
-    -> Gen c
-    -> Property
-mapCompose genF genA genB genC = Hog.property $ do
-    g  <- Hog.forAllFn $ Hog.fn @a genB
-    f  <- Hog.forAllFn $ Hog.fn @b genC
-    xs <- Hog.forAll $ genF genA
-    fmap (f . g) xs === fmap f (fmap g xs)
 
 propertyResultInterrupted :: Property
 propertyResultInterrupted = do
