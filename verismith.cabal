@@ -17,7 +17,6 @@ extra-source-files: README.md
                   , data/*.v
                   , examples/*.v
                   , examples/config.toml
-                  , nix/*.nix
                   , scripts/*.py
                   , scripts/*.sh
 
