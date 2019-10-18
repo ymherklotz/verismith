@@ -316,7 +316,7 @@ fuzzStatus name (FuzzReport dir s1 s2 s3 sz t1 t2 t3) = H.tr $ do
         . ( H.a
           ! A.href
                 ( H.textValue
-                $ toTextIgnore (dir </> fromText "index" <.> "html")
+                $ toTextIgnore (dir <.> "html")
                 )
           )
         $ H.toHtml name

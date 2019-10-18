@@ -377,11 +377,9 @@ fuzz gen conf = do
                             tsynth
                             tequiv
                             (getTime redResult)
-    liftSh . writefile "index.html" $ printResultReport (bname currdir) report
     return report
   where
     seed      = conf ^. configProperty . propSeed
-    bname     = T.pack . takeBaseName . T.unpack . toTextIgnore
     genMethod = case T.toLower $ conf ^. configProperty . propSampleMethod of
         "hat" -> do
             logT "Using the hat function"
@@ -427,8 +425,12 @@ fuzzInDir
 fuzzInDir k fp src conf = do
     make fp
     res <- pop fp $ fuzz src conf
-    liftSh . when (passedFuzz res && not k) $ rm_rf fp
+    liftSh $ do
+        writefile (fp <.> "html") $ printResultReport (bname fp) res
+        when (passedFuzz res && not k) $ rm_rf fp
     relativeFuzzReport res
+  where
+    bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 fuzzMultiple
     :: MonadFuzz m
