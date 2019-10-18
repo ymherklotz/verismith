@@ -363,12 +363,12 @@ randomise config@(Config a _ c d e) = do
     ce = config ^. configProbability . probExpr
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz o configF _ _ n) = do
+handleOpts (Fuzz o configF _ k n) = do
     config <- getConfig configF
     _      <- runFuzz
         config
         defaultYosys
-        (fuzzMultiple n (Just $ fromText o) (proceduralSrc "top" config))
+        (fuzzMultiple n k (Just $ fromText o) (proceduralSrc "top" config))
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c

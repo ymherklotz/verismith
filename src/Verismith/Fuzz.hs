@@ -402,21 +402,43 @@ relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _ _) = liftSh $ do
     newPath <- relPath dir
     return $ (fuzzDir .~ newPath) fr
 
+filterSynth :: SynthResult -> Bool
+filterSynth (SynthResult _ _ (Pass _) _) = True
+filterSynth _                            = False
+
+filterSim :: SimResult -> Bool
+filterSim (SimResult _ _ (Pass _) _) = True
+filterSim _                          = False
+
+filterSynthStat :: SynthStatus -> Bool
+filterSynthStat (SynthStatus _ (Pass _) _) = True
+filterSynthStat _                          = False
+
+passedFuzz :: FuzzReport -> Bool
+passedFuzz (FuzzReport _ synth sim synthstat _ _ _ _) =
+    (passedSynth + passedSim + passedSynthStat) == 0
+  where
+    passedSynth = length $ filter (not . filterSynth) synth
+    passedSim = length $ filter (not . filterSim) sim
+    passedSynthStat = length $ filter (not . filterSynthStat) synthstat
+
 fuzzInDir
-    :: MonadFuzz m => FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
-fuzzInDir fp src conf = do
+    :: MonadFuzz m => Bool -> FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
+fuzzInDir k fp src conf = do
     make fp
     res <- pop fp $ fuzz src conf
+    liftSh . when (passedFuzz res && not k) $ rm_rf fp
     relativeFuzzReport res
 
 fuzzMultiple
     :: MonadFuzz m
     => Int
+    -> Bool
     -> Maybe FilePath
     -> Gen SourceInfo
     -> Config
     -> Fuzz m [FuzzReport]
-fuzzMultiple n fp src conf = do
+fuzzMultiple n k fp src conf = do
     x <- case fp of
         Nothing -> do
             ct <- liftIO getZonedTime
@@ -436,7 +458,7 @@ fuzzMultiple n fp src conf = do
             results
         return results
   where
-    fuzzDir' n' = fuzzInDir (fromText $ "fuzz_" <> showT n') src conf
+    fuzzDir' n' = fuzzInDir k (fromText $ "fuzz_" <> showT n') src conf
     seed = conf ^. configProperty . propSeed
 
 sampleSeed :: MonadSh m => Maybe Seed -> Gen a -> m (Seed, a)

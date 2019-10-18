@@ -192,9 +192,9 @@ instance Show SynthStatus where
 -- | The complete state that will be used during fuzzing, which contains the
 -- results from all the operations.
 data FuzzReport = FuzzReport { _fuzzDir      :: !FilePath
-                             , _synthResults :: ![SynthResult]
-                             , _simResults   :: ![SimResult]
-                             , _synthStatus  :: ![SynthStatus]
+                             , _synthResults :: ![SynthResult] -- ^ Results of the equivalence check.
+                             , _simResults   :: ![SimResult]   -- ^ Results of the simulation.
+                             , _synthStatus  :: ![SynthStatus] -- ^ Results of the synthesis step.
                              , _fileLines    :: {-# UNPACK #-} !Int
                              , _synthTime    :: !NominalDiffTime
                              , _equivTime    :: !NominalDiffTime
