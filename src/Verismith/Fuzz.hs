@@ -59,9 +59,9 @@ import           Verismith.Internal
 import           Verismith.Reduce
 import           Verismith.Report
 import           Verismith.Result
-import           Verismith.Sim.Icarus
-import           Verismith.Sim.Internal
-import           Verismith.Sim.Yosys
+import           Verismith.Tool.Icarus
+import           Verismith.Tool.Internal
+import           Verismith.Tool.Yosys
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
@@ -194,24 +194,19 @@ equivalence src = do
     equiv a b =
         toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
             . runResultT
-            $ do
-                  make dir
-                  pop dir $ do
-                      liftSh $ do
-                          cp
-                                  (   fromText ".."
-                                  </> fromText (toText a)
-                                  </> synthOutput a
-                                  )
-                              $ synthOutput a
-                          cp
-                                  (   fromText ".."
-                                  </> fromText (toText b)
-                                  </> synthOutput b
-                                  )
-                              $ synthOutput b
-                          writefile "rtl.v" $ genSource src
-                      runEquiv a b src
+            $ do make dir
+                 pop dir $ do
+                     liftSh $ do
+                         cp ( fromText ".."
+                              </> fromText (toText a)
+                              </> synthOutput a
+                            ) $ synthOutput a
+                         cp ( fromText ".."
+                              </> fromText (toText b)
+                              </> synthOutput b
+                            ) $ synthOutput b
+                         writefile "rtl.v" $ genSource src
+                     runEquiv a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()

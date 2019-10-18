@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Vivado
+Module      : Verismith.Tool.Vivado
 Description : Vivado Synthesiser implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Vivado Synthesiser implementation.
 -}
 
-module Verismith.Sim.Vivado
+module Verismith.Tool.Vivado
     ( Vivado(..)
     , defaultVivado
     )
@@ -21,8 +21,8 @@ import           Data.Text                 (Text, unpack)
 import           Prelude                   hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted             (liftSh)
-import           Verismith.Sim.Internal
-import           Verismith.Sim.Template
+import           Verismith.Tool.Internal
+import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 

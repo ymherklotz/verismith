@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Quartus
+Module      : Verismith.Tool.Quartus
 Description : Quartus synthesiser implementation.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Quartus synthesiser implementation.
 -}
 
-module Verismith.Sim.Quartus
+module Verismith.Tool.Quartus
     ( Quartus(..)
     , defaultQuartus
     )
@@ -21,7 +21,7 @@ import           Data.Text                 (Text, unpack)
 import           Prelude                   hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted             (liftSh)
-import           Verismith.Sim.Internal
+import           Verismith.Tool.Internal
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 

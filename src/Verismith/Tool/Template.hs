@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Template
+Module      : Verismith.Tool.Template
 Description : Template file for different configuration files
 Copyright   : (c) 2019, Yann Herklotz
 License     : GPL-3
@@ -12,7 +12,7 @@ Template file for different configuration files.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module Verismith.Sim.Template
+module Verismith.Tool.Template
     ( yosysSatConfig
     , yosysSimConfig
     , xstSynthConfig
@@ -28,7 +28,7 @@ import qualified Data.Text                 as T
 import           Prelude                   hiding (FilePath)
 import           Shelly
 import           Text.Shakespeare.Text     (st)
-import           Verismith.Sim.Internal
+import           Verismith.Tool.Internal
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 

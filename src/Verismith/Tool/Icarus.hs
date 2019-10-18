@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Icarus
+Module      : Verismith.Tool.Icarus
 Description : Icarus verilog module.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Icarus verilog module.
 -}
 
-module Verismith.Sim.Icarus
+module Verismith.Tool.Icarus
     ( Icarus(..)
     , defaultIcarus
     , runSimIc
@@ -39,8 +39,8 @@ import           Numeric                    (readInt)
 import           Prelude                    hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted              (liftSh)
-import           Verismith.Sim.Internal
-import           Verismith.Sim.Template
+import           Verismith.Tool.Internal
+import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.BitVec
 import           Verismith.Verilog.CodeGen

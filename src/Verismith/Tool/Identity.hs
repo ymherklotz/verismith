@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Identity
+Module      : Verismith.Tool.Identity
 Description : The identity simulator and synthesiser.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 The identity simulator and synthesiser.
 -}
 
-module Verismith.Sim.Identity
+module Verismith.Tool.Identity
     ( Identity(..)
     , defaultIdentity
     )
@@ -21,7 +21,7 @@ import           Data.Text                 (Text, unpack)
 import           Prelude                   hiding (FilePath)
 import           Shelly                    (FilePath)
 import           Shelly.Lifted             (writefile)
-import           Verismith.Sim.Internal
+import           Verismith.Tool.Internal
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 

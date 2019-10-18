@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Internal
+Module      : Verismith.Tool.Internal
 Description : Class of the simulator.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,7 +12,7 @@ Class of the simulator and the synthesize tool.
 
 {-# LANGUAGE DeriveFunctor #-}
 
-module Verismith.Sim.Internal
+module Verismith.Tool.Internal
     ( ResultSh
     , resultSh
     , Tool(..)

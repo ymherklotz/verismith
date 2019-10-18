@@ -63,8 +63,8 @@ import qualified Text.Blaze.Html5.Attributes   as A
 import           Verismith.Config
 import           Verismith.Internal
 import           Verismith.Result
-import           Verismith.Sim
-import           Verismith.Sim.Internal
+import           Verismith.Tool
+import           Verismith.Tool.Internal
 
 -- | Common type alias for synthesis results
 type UResult = Result Failed ()

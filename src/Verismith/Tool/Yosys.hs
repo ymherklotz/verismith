@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.Yosys
+Module      : Verismith.Tool.Yosys
 Description : Yosys simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,7 +12,7 @@ Yosys simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module Verismith.Sim.Yosys
+module Verismith.Tool.Yosys
     ( Yosys(..)
     , defaultYosys
     , runEquiv
@@ -29,8 +29,8 @@ import           Shelly
 import           Shelly.Lifted             (liftSh)
 import           Text.Shakespeare.Text     (st)
 import           Verismith.Result
-import           Verismith.Sim.Internal
-import           Verismith.Sim.Template
+import           Verismith.Tool.Internal
+import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 import           Verismith.Verilog.Mutate

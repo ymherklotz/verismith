@@ -53,15 +53,15 @@ library
                  , Verismith.Reduce
                  , Verismith.Report
                  , Verismith.Result
-                 , Verismith.Sim
-                 , Verismith.Sim.Icarus
-                 , Verismith.Sim.Identity
-                 , Verismith.Sim.Internal
-                 , Verismith.Sim.Quartus
-                 , Verismith.Sim.Template
-                 , Verismith.Sim.Vivado
-                 , Verismith.Sim.XST
-                 , Verismith.Sim.Yosys
+                 , Verismith.Tool
+                 , Verismith.Tool.Icarus
+                 , Verismith.Tool.Identity
+                 , Verismith.Tool.Internal
+                 , Verismith.Tool.Quartus
+                 , Verismith.Tool.Template
+                 , Verismith.Tool.Vivado
+                 , Verismith.Tool.XST
+                 , Verismith.Tool.Yosys
                  , Verismith.Verilog
                  , Verismith.Verilog.AST
                  , Verismith.Verilog.BitVec

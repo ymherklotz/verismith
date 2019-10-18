@@ -92,10 +92,10 @@ import           Paths_verismith        (version)
 import           Shelly                 (toTextIgnore)
 import           Toml                   (TomlCodec, (.=))
 import qualified Toml
-import           Verismith.Sim.Quartus
-import           Verismith.Sim.Vivado
-import           Verismith.Sim.XST
-import           Verismith.Sim.Yosys
+import           Verismith.Tool.Quartus
+import           Verismith.Tool.Vivado
+import           Verismith.Tool.XST
+import           Verismith.Tool.Yosys
 
 -- $conf
 --

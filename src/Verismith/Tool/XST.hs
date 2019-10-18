@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim.XST
+Module      : Verismith.Tool.XST
 Description : XST (ise) simulator implementation.
 Copyright   : (c) 2018-2019, Yann Herklotz
 License     : BSD-3
@@ -12,7 +12,7 @@ XST (ise) simulator implementation.
 
 {-# LANGUAGE QuasiQuotes #-}
 
-module Verismith.Sim.XST
+module Verismith.Tool.XST
     ( XST(..)
     , defaultXST
     )
@@ -24,8 +24,8 @@ import           Prelude                   hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted             (liftSh)
 import           Text.Shakespeare.Text     (st)
-import           Verismith.Sim.Internal
-import           Verismith.Sim.Template
+import           Verismith.Tool.Internal
+import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 

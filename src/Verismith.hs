@@ -30,7 +30,7 @@ module Verismith
     , module Verismith.Verilog
     , module Verismith.Config
     , module Verismith.Circuit
-    , module Verismith.Sim
+    , module Verismith.Tool
     , module Verismith.Fuzz
     , module Verismith.Report
     )
@@ -65,8 +65,8 @@ import           Verismith.Generate
 import           Verismith.Reduce
 import           Verismith.Report
 import           Verismith.Result
-import           Verismith.Sim
-import           Verismith.Sim.Internal
+import           Verismith.Tool
+import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.Parser (parseSourceInfoFile)
 

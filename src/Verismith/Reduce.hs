@@ -49,8 +49,8 @@ import qualified Shelly
 import           Shelly.Lifted            (MonadSh, liftSh)
 import           Verismith.Internal
 import           Verismith.Result
-import           Verismith.Sim
-import           Verismith.Sim.Internal
+import           Verismith.Tool
+import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.Mutate

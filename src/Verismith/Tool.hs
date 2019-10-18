@@ -1,5 +1,5 @@
 {-|
-Module      : Verismith.Sim
+Module      : Verismith.Tool
 Description : Simulator implementations.
 Copyright   : (c) 2019, Yann Herklotz Grave
 License     : GPL-3
@@ -10,7 +10,7 @@ Portability : POSIX
 Simulator implementations.
 -}
 
-module Verismith.Sim
+module Verismith.Tool
     (
     -- * Simulators
     -- ** Icarus
@@ -42,10 +42,10 @@ module Verismith.Sim
     )
 where
 
-import           Verismith.Sim.Icarus
-import           Verismith.Sim.Identity
-import           Verismith.Sim.Internal
-import           Verismith.Sim.Quartus
-import           Verismith.Sim.Vivado
-import           Verismith.Sim.XST
-import           Verismith.Sim.Yosys
+import           Verismith.Tool.Icarus
+import           Verismith.Tool.Identity
+import           Verismith.Tool.Internal
+import           Verismith.Tool.Quartus
+import           Verismith.Tool.Vivado
+import           Verismith.Tool.XST
+import           Verismith.Tool.Yosys
