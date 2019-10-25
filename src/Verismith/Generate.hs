@@ -445,6 +445,7 @@ instantiate (ModDecl i outP inP _ _) = do
     context <- lget
     outs    <- replicateM (length outP) (nextPort Wire)
     ins <- take (length inpFixed) <$> Hog.shuffle (context ^. variables)
+    insLit <- replicateM (length inpFixed - length ins) (Number <$> genBitVec)
     mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inpFixed ^.. traverse . portSize
     ident <- makeIdentifier "modinst"
     vs <- view variables <$> lget
