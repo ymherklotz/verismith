@@ -1,7 +1,7 @@
 
 [info]
-  commit = "d32f4cc45bc8c0670fb788b1fcd4c2f2b15fa094"
-  version = "0.3.0.0"
+  commit = "e57b16651684e0f9e9d0a3cd6f81fccd5b8c7cb6"
+  version = "0.4.0.1"
 
 [probability]
   expr.binary = 5
@@ -24,8 +24,10 @@
   statement.nonblocking = 3
 
 [property]
+  determinism = 1
   module.depth = 2
   module.max = 5
+  nondeterminism = 0
   output.combine = false
   sample.method = "random"
   sample.size = 10
