@@ -35,8 +35,7 @@ following:
 
 ## Reported bugs
 
-21 bugs were found in total over the course of a month. 8 of those bugs were
-reported and 3 were fixed.
+9 bugs have been reported and confirmed to be bugs by the vendors, out of which 4 have been fixed.
 
 ### Yosys
 
@@ -57,7 +56,7 @@ reported and 3 were fixed.
 | Mis-synthesis | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | 𐄂     |
 | Mis-synthesis | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | 𐄂     |
 
-## Build the Fuzzer
+## Install the Fuzzer
 
 The fuzzer now supports building with [nix](https://nixos.org/nix/manual/),
 which pulls in all the extra dependencies that are needed to build the
@@ -79,13 +78,26 @@ it may not have all the right versions of the dependencies that are needed.
 Instead, stack could be used and the `stack.yaml` file could contain the
 overrides that are used by nix.
 
-### Build with nix
+### Build from hackage
+
+A stable version of Verismith is available on
+[hackage](https://hackage.haskell.org/package/verismith) and can be installed
+using cabal directly without having to build the project from the repository:
+
+``` shell
+cabal install verismith
+```
+
+It will be placed under the `bin` cabal folder which can be added to your path
+to run Verismith.
+
+### Build with nix from source
 
 Nix build is completely supported, therefore if nix is installed, building the
 project is as simple as
 
 ``` shell
-nix-build release.nix
+nix-build
 ```
 
 If one wants to work in the project with all the right dependencies loaded, one
@@ -95,18 +107,24 @@ can use
 nix-shell
 ```
 
-### Build with cabal and nix
+and use cabal to build and run the program.
+
+### Build with cabal from source
 
 After entering a development environment with `nix-shell`, the project can
-safely be built with `cabal-install`.
+safely be built with `cabal-install`. However, even without `nix`, the project
+can still be built with cabal alone using:
 
 ``` shell
-cabal v2-configure
-cabal v2-build
+cabal configure
+cabal build
 ```
 
-This should not have to download any extra dependencies and just have to build
-the actual project itself.
+Verismith can then be run using:
+
+``` shell
+cabal run verismith
+```
 
 ## Configuration
 
