@@ -1,10 +1,6 @@
 # Verismith [![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
 
-Verilog Fuzzer to test the major verilog compilers by generating random, valid
-and deterministic Verilog. There is a
-[presentation](https://yannherklotz.com/docs/presentation.pdf) about Verismith
-and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes over all the
-details of the implementation and results that were found.
+Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog. There is a [presentation](https://yannherklotz.com/docs/presentation.pdf) about Verismith and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes over all the details of the implementation and results that were found.
 
 It currently supports the following synthesis tools:
 
@@ -19,9 +15,7 @@ and the following simulator:
 
 ## Supported Verilog Constructs
 
-The fuzzer generates combinational and behavioural Verilog to test the various
-tools. The most notable constructs that are supported and generated are the
-following:
+The fuzzer generates combinational and behavioural Verilog to test the various tools. The most notable constructs that are supported and generated are the following:
 
 - module definitions with parameter definitions, inputs and outputs
 - module items, such as instantiations, continuous assignment, always blocks,
@@ -58,9 +52,7 @@ following:
 
 ## Install the Fuzzer
 
-The fuzzer now supports building with [nix](https://nixos.org/nix/manual/),
-which pulls in all the extra dependencies that are needed to build the
-project. The main files and their functions are described below:
+The fuzzer now supports building with [nix](https://nixos.org/nix/manual/), which pulls in all the extra dependencies that are needed to build the project. The main files and their functions are described below:
 
 - `default.nix`: describes the main Haskell package and it's dependencies that
   have to be pulled in.
@@ -71,37 +63,29 @@ project. The main files and their functions are described below:
   dependencies so that everything builds nicely. The exact versions of the
   packages that should be overridden are in [nix](/nix).
 
-It may be possible to build it purely with
-[cabal-install](https://hackage.haskell.org/package/cabal-install), however
-it may not have all the right versions of the dependencies that are needed.
+It may be possible to build it purely with [cabal-install](https://hackage.haskell.org/package/cabal-install), however it may not have all the right versions of the dependencies that are needed.
 
-Instead, stack could be used and the `stack.yaml` file could contain the
-overrides that are used by nix.
+Instead, stack could be used and the `stack.yaml` file could contain the overrides that are used by nix.
 
 ### Build from hackage
 
-A stable version of Verismith is available on
-[hackage](https://hackage.haskell.org/package/verismith) and can be installed
-using cabal directly without having to build the project from the repository:
+A stable version of Verismith is available on [hackage](https://hackage.haskell.org/package/verismith) and can be installed using cabal directly without having to build the project from the repository:
 
 ``` shell
 cabal install verismith
 ```
 
-It will be placed under the `bin` cabal folder which can be added to your path
-to run Verismith.
+It will be placed under the `bin` cabal folder which can be added to your path to run Verismith.
 
 ### Build with nix from source
 
-Nix build is completely supported, therefore if nix is installed, building the
-project is as simple as
+Nix build is completely supported, therefore if nix is installed, building the project is as simple as
 
 ``` shell
 nix-build
 ```
 
-If one wants to work in the project with all the right dependencies loaded, one
-can use
+If one wants to work in the project with all the right dependencies loaded, one can use
 
 ``` shell
 nix-shell
@@ -111,9 +95,7 @@ and use cabal to build and run the program.
 
 ### Build with cabal from source
 
-After entering a development environment with `nix-shell`, the project can
-safely be built with `cabal-install`. However, even without `nix`, the project
-can still be built with cabal alone using:
+After entering a development environment with `nix-shell`, the project can safely be built with `cabal-install`. However, even without `nix`, the project can still be built with cabal alone using:
 
 ``` shell
 cabal configure
@@ -128,44 +110,23 @@ cabal run verismith
 
 ## Configuration
 
-Verismith can be configured using a [TOML](https://github.com/toml-lang/toml)
-file. There are four main sections in the configuration file, an example can be
-seen [here](/examples/config.toml).
+Verismith can be configured using a [TOML](https://github.com/toml-lang/toml) file. There are four main sections in the configuration file, an example can be seen [here](/examples/config.toml).
 
 ### Information section 
 
-Contains information about the command line tool being used, such as the hash of
-the commit it was compiled with and the version of the tool. The tool then
-verifies that these match the current configuration, and will emit a warning if
-they do not. This ensures that if one wants a deterministic run and is therefore
-passing a seed to the generation, that it will always give the same
-result. Different versions might change some aspects of the Verilog generation,
-which would affect how a seed would generate Verilog.
+Contains information about the command line tool being used, such as the hash of the commit it was compiled with and the version of the tool. The tool then verifies that these match the current configuration, and will emit a warning if they do not. This ensures that if one wants a deterministic run and is therefore passing a seed to the generation, that it will always give the same result. Different versions might change some aspects of the Verilog generation, which would affect how a seed would generate Verilog.
 
 ### Probability section 
 
-Provides a way to assign frequency values to each of the nodes in the
-AST. During the state-based generation, each node is chosen randomly based on
-those probabilities. This provides a simple way to drastically change the
-Verilog that is generated, by changing how often a construct is chosen or by not
-generating a construct at all.
+Provides a way to assign frequency values to each of the nodes in the AST. During the state-based generation, each node is chosen randomly based on those probabilities. This provides a simple way to drastically change the Verilog that is generated, by changing how often a construct is chosen or by not generating a construct at all.
 
 ### Property section 
 
-Changes properties of the generated Verilog code, such as the size of the
-output, maximum statement or module depth and sampling method of Verilog
-programs. This section also allows a seed to be specified, which would mean that
-only that particular seed will be used in the fuzz run. This is extremely useful
-when wanting to replay a specific failure and the output is missing.
+Changes properties of the generated Verilog code, such as the size of the output, maximum statement or module depth and sampling method of Verilog programs. This section also allows a seed to be specified, which would mean that only that particular seed will be used in the fuzz run. This is extremely useful when wanting to replay a specific failure and the output is missing.
 
 ### Synthesiser section 
 
-Accepts a list of synthesisers which will be fuzzed. These have to first be
-defined in the code and implement the required interface. They can then be
-configured by having a name assigned to them and the name of the output Verilog
-file. By each having a different name, multiple instances of the same
-synthesiser can be included in a fuzz run. The instances might differ in the
-optimisations that are performed, or in the version of the synthesiser.
+Accepts a list of synthesisers which will be fuzzed. These have to first be defined in the code and implement the required interface. They can then be configured by having a name assigned to them and the name of the output Verilog file. By each having a different name, multiple instances of the same synthesiser can be included in a fuzz run. The instances might differ in the optimisations that are performed, or in the version of the synthesiser.
 
 ## Benchmark Results
 
@@ -197,11 +158,6 @@ variance introduced by outliers: 73% (severely inflated)
 
 ## Acknowledgement
 
-Clifford Wolf's [VlogHammer](http://www.clifford.at/yosys/vloghammer.html) is an
-existing Verilog fuzzer that generates random Verilog to test how expressions
-are handled in synthesis tools and simulators. It was the inspiration for the
-general structure of this fuzzer, which extends the fuzzing to the behavioural
-parts of Verilog.
+Clifford Wolf's [VlogHammer](http://www.clifford.at/yosys/vloghammer.html) is an existing Verilog fuzzer that generates random Verilog to test how expressions are handled in synthesis tools and simulators. It was the inspiration for thegeneral structure of this fuzzer, which extends the fuzzing to the behavioural parts of Verilog.
 
-Tom Hawkins' Verilog parser was used to write the lexer, the parser was then
-rewritten using [Parsec](https://hackage.haskell.org/package/parsec).
+Tom Hawkins' Verilog parser was used to write the lexer, the parser was then rewritten using [Parsec](https://hackage.haskell.org/package/parsec).
