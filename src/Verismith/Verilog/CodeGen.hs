@@ -45,7 +45,7 @@ defMap = maybe semi statement
 
 -- | Convert the 'Verilog' type to 'Text' so that it can be rendered.
 verilogSrc :: Verilog -> Doc a
-verilogSrc (Verilog modules) = vsep . punctuate line $ moduleDecl <$> modules
+verilogSrc (Verilog modules) = vsep . ("// -*- mode: verilog -*-" :) . punctuate line $ moduleDecl <$> modules
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 moduleDecl :: ModDecl -> Doc a
