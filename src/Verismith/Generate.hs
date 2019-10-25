@@ -450,9 +450,10 @@ instantiate (ModDecl i outP inP _ _) = do
     ident <- makeIdentifier "modinst"
     vs <- view variables <$> lget
     Hog.choice
-        [ return . ModInst i ident $ ModConn <$> toE (outs <> clkPort <> ins)
+        [ return . ModInst i ident $ ModConn <$> (toE (outs <> clkPort <> ins) <> insLit)
         , ModInst i ident <$> Hog.shuffle
-            (zipWith ModConnNamed (view portName <$> outP <> clkPort <> inpFixed) (toE $ outs <> clkPort <> ins))
+            (zipWith ModConnNamed (view portName <$> outP <> clkPort <> inpFixed)
+             (toE (outs <> clkPort <> ins) <> insLit))
         ]
     where
         toE ins = Id . view portName <$> ins
