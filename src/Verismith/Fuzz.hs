@@ -15,7 +15,8 @@ Environment to run the simulator and synthesisers in a matrix.
 {-# LANGUAGE TemplateHaskell  #-}
 
 module Verismith.Fuzz
-    ( Fuzz
+    ( Fuzz (..)
+    , FuzzOpts (..)
     , fuzz
     , fuzzInDir
     , fuzzMultiple
@@ -27,33 +28,31 @@ module Verismith.Fuzz
     )
 where
 
-import           Control.DeepSeq                  (force)
-import           Control.Exception.Lifted         (finally)
-import           Control.Lens                     hiding ((<.>))
-import           Control.Monad                    (forM, replicateM)
+import           Control.DeepSeq             (force)
+import           Control.Exception.Lifted    (finally)
+import           Control.Lens                hiding ((<.>))
+import           Control.Monad               (forM, replicateM)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class        (lift)
-import           Control.Monad.Trans.Control      (MonadBaseControl)
-import           Control.Monad.Trans.Maybe        (runMaybeT)
-import           Control.Monad.Trans.Reader       hiding (local)
-import           Control.Monad.Trans.State.Strict
-import qualified Crypto.Random.DRBG               as C
-import           Data.ByteString                  (ByteString)
-import           Data.List                        (nubBy, sort)
-import           Data.Maybe                       (isNothing)
-import           Data.Text                        (Text)
-import qualified Data.Text                        as T
+import           Control.Monad.Reader
+import           Control.Monad.State.Strict
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import qualified Crypto.Random.DRBG          as C
+import           Data.ByteString             (ByteString)
+import           Data.List                   (nubBy, sort)
+import           Data.Maybe                  (fromMaybe, isNothing)
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
 import           Data.Time
-import           Data.Tuple                       (swap)
-import           Hedgehog                         (Gen)
-import qualified Hedgehog.Internal.Gen            as Hog
-import           Hedgehog.Internal.Seed           (Seed)
-import qualified Hedgehog.Internal.Seed           as Hog
-import qualified Hedgehog.Internal.Tree           as Hog
-import           Prelude                          hiding (FilePath)
-import           Shelly                           hiding (get)
-import           Shelly.Lifted                    (MonadSh, liftSh)
-import           System.FilePath.Posix            (takeBaseName)
+import           Data.Tuple                  (swap)
+import           Hedgehog                    (Gen)
+import qualified Hedgehog.Internal.Gen       as Hog
+import           Hedgehog.Internal.Seed      (Seed)
+import qualified Hedgehog.Internal.Seed      as Hog
+import qualified Hedgehog.Internal.Tree      as Hog
+import           Prelude                     hiding (FilePath)
+import           Shelly                      hiding (get)
+import           Shelly.Lifted               (MonadSh, liftSh)
+import           System.FilePath.Posix       (takeBaseName)
 import           Verismith.Config
 import           Verismith.Internal
 import           Verismith.Reduce
@@ -65,11 +64,36 @@ import           Verismith.Tool.Yosys
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
-data FuzzEnv = FuzzEnv { getSynthesisers :: ![SynthTool]
-                       , getSimulators   :: ![SimTool]
-                       , yosysInstance   :: {-# UNPACK #-} !Yosys
+data FuzzOpts = FuzzOpts { _fuzzOptsOutput     :: !(Maybe FilePath)
+                         , _fuzzOptsForced     :: !Bool
+                         , _fuzzOptsKeepAll    :: !Bool
+                         , _fuzzOptsIterations :: {-# UNPACK #-} !Int
+                         , _fuzzOptsNoSim      :: !Bool
+                         , _fuzzOptsNoEquiv    :: !Bool
+                         , _fuzzOptsConfig     :: {-# UNPACK #-} !Config
+                         }
+              deriving (Show, Eq)
+
+$(makeLenses ''FuzzOpts)
+
+defaultFuzzOpts :: FuzzOpts
+defaultFuzzOpts = FuzzOpts { _fuzzOptsOutput = Nothing
+                           , _fuzzOptsForced = False
+                           , _fuzzOptsKeepAll = False
+                           , _fuzzOptsIterations = 1
+                           , _fuzzOptsNoSim = False
+                           , _fuzzOptsNoEquiv = False
+                           , _fuzzOptsConfig = defaultConfig
+                           }
+
+data FuzzEnv = FuzzEnv { _getSynthesisers :: ![SynthTool]
+                       , _getSimulators   :: ![SimTool]
+                       , _yosysInstance   :: {-# UNPACK #-} !Yosys
+                       , _fuzzEnvOpts     :: {-# UNPACK #-} !FuzzOpts
                        }
                deriving (Eq, Show)
+
+$(makeLenses ''FuzzEnv)
 
 data FuzzState = FuzzState { _fuzzSynthResults :: ![SynthResult]
                            , _fuzzSimResults   :: ![SimResult]
@@ -87,23 +111,74 @@ type Fuzz m = StateT FuzzState (ReaderT FuzzEnv m)
 
 type MonadFuzz m = (MonadBaseControl IO m, MonadIO m, MonadSh m)
 
-runFuzz :: MonadIO m => Config -> Yosys -> (Config -> Fuzz Sh a) -> m a
-runFuzz conf yos m = shelly $ runFuzz' conf yos m
+runFuzz :: MonadIO m => FuzzOpts -> Yosys -> Fuzz Sh a -> m a
+runFuzz fo yos m = shelly $ runFuzz' fo yos m
 
-runFuzz' :: Monad m => Config -> Yosys -> (Config -> Fuzz m b) -> m b
-runFuzz' conf yos m = runReaderT
-    (evalStateT (m conf) (FuzzState [] [] []))
-    (FuzzEnv
-        ( force
-        $ defaultIdentitySynth
-        : (descriptionToSynth <$> conf ^. configSynthesisers)
-        )
-        (force $ descriptionToSim <$> conf ^. configSimulators)
-        yos
+runFuzz' :: Monad m => FuzzOpts -> Yosys -> Fuzz m b -> m b
+runFuzz' fo yos m = runReaderT
+    (evalStateT m (FuzzState [] [] []))
+    (FuzzEnv { _getSynthesisers = ( force
+                                   $ defaultIdentitySynth
+                                   : (descriptionToSynth <$> conf ^. configSynthesisers)
+                                 )
+             , _getSimulators = (force $ descriptionToSim <$> conf ^. configSimulators)
+             , _yosysInstance = yos
+             , _fuzzEnvOpts   = fo
+             }
     )
+  where
+    conf = _fuzzOptsConfig fo
+
+askConfig :: Monad m => Fuzz m Config
+askConfig = asks (_fuzzOptsConfig . _fuzzEnvOpts)
+
+askOpts :: Monad m => Fuzz m FuzzOpts
+askOpts = asks _fuzzEnvOpts
+
+genMethod conf seed gen =
+    case T.toLower $ conf ^. configProperty . propSampleMethod of
+        "hat" -> do
+            logT "Using the hat function"
+            sv hatFreqs
+        "mean" -> do
+            logT "Using the mean function"
+            sv meanFreqs
+        "median" -> do
+            logT "Using the median function"
+            sv medianFreqs
+        _ -> do
+            logT "Using first seed"
+            sampleSeed seed gen
+  where
+    sv a = sampleVerilog a (conf ^. configProperty . propSampleSize) seed gen
+
+relativeFuzzReport :: (MonadSh m) => FuzzReport -> m FuzzReport
+relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _ _) = liftSh $ do
+    newPath <- relPath dir
+    return $ (fuzzDir .~ newPath) fr
+
+filterSynth :: SynthResult -> Bool
+filterSynth (SynthResult _ _ (Pass _) _) = True
+filterSynth _                            = False
+
+filterSim :: SimResult -> Bool
+filterSim (SimResult _ _ (Pass _) _) = True
+filterSim _                          = False
+
+filterSynthStat :: SynthStatus -> Bool
+filterSynthStat (SynthStatus _ (Pass _) _) = True
+filterSynthStat _                          = False
+
+passedFuzz :: FuzzReport -> Bool
+passedFuzz (FuzzReport _ synth sim synthstat _ _ _ _) =
+    (passedSynth + passedSim + passedSynthStat) == 0
+  where
+    passedSynth = length $ filter (not . filterSynth) synth
+    passedSim = length $ filter (not . filterSim) sim
+    passedSynthStat = length $ filter (not . filterSynthStat) synthstat
 
 synthesisers :: Monad m => Fuzz m [SynthTool]
-synthesisers = lift $ asks getSynthesisers
+synthesisers = lift $ asks _getSynthesisers
 
 --simulators :: (Monad m) => Fuzz () m [SimTool]
 --simulators = lift $ asks getSimulators
@@ -346,9 +421,11 @@ medianFreqs l = zip hat (return <$> l)
     hat = set_ <$> [1 .. length l]
     set_ n = if n == h then 1 else 0
 
-fuzz :: MonadFuzz m => Gen SourceInfo -> Config -> Fuzz m FuzzReport
-fuzz gen conf = do
-    (seed', src) <- generateSample genMethod
+fuzz :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzReport
+fuzz gen = do
+    conf <- askConfig
+    let seed = conf ^. configProperty . propSeed
+    (seed', src) <- generateSample $ genMethod conf seed gen
     let size = length . lines . T.unpack $ genSource src
     liftSh
         .  writefile "config.toml"
@@ -378,70 +455,28 @@ fuzz gen conf = do
                             tequiv
                             (getTime redResult)
     return report
-  where
-    seed      = conf ^. configProperty . propSeed
-    genMethod = case T.toLower $ conf ^. configProperty . propSampleMethod of
-        "hat" -> do
-            logT "Using the hat function"
-            sv hatFreqs
-        "mean" -> do
-            logT "Using the mean function"
-            sv meanFreqs
-        "median" -> do
-            logT "Using the median function"
-            sv medianFreqs
-        _ -> do
-            logT "Using first seed"
-            sampleSeed seed gen
-    sv a = sampleVerilog a (conf ^. configProperty . propSampleSize) seed gen
 
-relativeFuzzReport :: (MonadSh m) => FuzzReport -> m FuzzReport
-relativeFuzzReport fr@(FuzzReport dir _ _ _ _ _ _ _) = liftSh $ do
-    newPath <- relPath dir
-    return $ (fuzzDir .~ newPath) fr
-
-filterSynth :: SynthResult -> Bool
-filterSynth (SynthResult _ _ (Pass _) _) = True
-filterSynth _                            = False
-
-filterSim :: SimResult -> Bool
-filterSim (SimResult _ _ (Pass _) _) = True
-filterSim _                          = False
-
-filterSynthStat :: SynthStatus -> Bool
-filterSynthStat (SynthStatus _ (Pass _) _) = True
-filterSynthStat _                          = False
-
-passedFuzz :: FuzzReport -> Bool
-passedFuzz (FuzzReport _ synth sim synthstat _ _ _ _) =
-    (passedSynth + passedSim + passedSynthStat) == 0
-  where
-    passedSynth = length $ filter (not . filterSynth) synth
-    passedSim = length $ filter (not . filterSim) sim
-    passedSynthStat = length $ filter (not . filterSynthStat) synthstat
-
-fuzzInDir
-    :: MonadFuzz m => Bool -> FilePath -> Gen SourceInfo -> Config -> Fuzz m FuzzReport
-fuzzInDir k fp src conf = do
+fuzzInDir :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzReport
+fuzzInDir src = do
+    fuzzOpts <- askOpts
+    let fp = fromMaybe "fuzz" $ _fuzzOptsOutput fuzzOpts
     make fp
-    res <- pop fp $ fuzz src conf
+    res <- pop fp $ fuzz src
     liftSh $ do
         writefile (fp <.> "html") $ printResultReport (bname fp) res
-        when (passedFuzz res && not k) $ rm_rf fp
+        when (passedFuzz res && not (_fuzzOptsKeepAll fuzzOpts)) $ rm_rf fp
     relativeFuzzReport res
   where
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 fuzzMultiple
     :: MonadFuzz m
-    => Int
-    -> Bool
-    -> Maybe FilePath
-    -> Gen SourceInfo
-    -> Config
+    => Gen SourceInfo
     -> Fuzz m [FuzzReport]
-fuzzMultiple n k fp src conf = do
-    x <- case fp of
+fuzzMultiple src = do
+    fuzzOpts <- askOpts
+    let seed = (_fuzzOptsConfig fuzzOpts) ^. configProperty . propSeed
+    x <- case _fuzzOptsOutput fuzzOpts of
         Nothing -> do
             ct <- liftIO getZonedTime
             return
@@ -453,21 +488,22 @@ fuzzMultiple n k fp src conf = do
     make x
     pop x $ do
         results <- if isNothing seed
-            then forM [1 .. n] fuzzDir'
+            then forM [1 .. (_fuzzOptsIterations fuzzOpts)] fuzzDir'
             else (: []) <$> fuzzDir' (1 :: Int)
         liftSh . writefile (fromText "index" <.> "html") $ printSummary
             "Fuzz Summary"
             results
         return results
   where
-    fuzzDir' n' = fuzzInDir k (fromText $ "fuzz_" <> showT n') src conf
-    seed = conf ^. configProperty . propSeed
+    fuzzDir' :: (Show a, MonadFuzz m) => a -> Fuzz m FuzzReport
+    fuzzDir' n' = local (fuzzEnvOpts . fuzzOptsOutput .~
+                         (Just . fromText $ "fuzz_" <> showT n'))
+                  $ fuzzInDir src
 
 sampleSeed :: MonadSh m => Maybe Seed -> Gen a -> m (Seed, a)
 sampleSeed s gen =
     liftSh
-        $ let
-              loop n = if n <= 0
+        $ let loop n = if n <= 0
                   then
                       error
                           "Hedgehog.Gen.sample: too many discards, could not generate a sample"

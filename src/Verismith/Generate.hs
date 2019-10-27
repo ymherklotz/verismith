@@ -10,7 +10,8 @@ Portability : POSIX
 Various useful generators.
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module Verismith.Generate
@@ -60,19 +61,18 @@ module Verismith.Generate
     )
 where
 
-import           Control.Lens                     hiding (Context)
-import           Control.Monad                    (replicateM)
-import           Control.Monad.Trans.Class        (lift)
-import           Control.Monad.Trans.Reader       hiding (local)
-import           Control.Monad.Trans.State.Strict
-import           Data.Foldable                    (fold)
-import           Data.Functor.Foldable            (cata)
-import           Data.List                        (foldl', partition)
-import qualified Data.Text                        as T
-import           Hedgehog                         (Gen, GenT, MonadGen)
-import qualified Hedgehog                         as Hog
-import qualified Hedgehog.Gen                     as Hog
-import qualified Hedgehog.Range                   as Hog
+import           Control.Lens               hiding (Context)
+import           Control.Monad              (replicateM)
+import           Control.Monad.Reader
+import           Control.Monad.State.Strict
+import           Data.Foldable              (fold)
+import           Data.Functor.Foldable      (cata)
+import           Data.List                  (foldl', partition)
+import qualified Data.Text                  as T
+import           Hedgehog                   (Gen, GenT, MonadGen)
+import qualified Hedgehog                   as Hog
+import qualified Hedgehog.Gen               as Hog
+import qualified Hedgehog.Range             as Hog
 import           Verismith.Config
 import           Verismith.Internal
 import           Verismith.Verilog.AST
@@ -148,12 +148,6 @@ probability c = c ^. configProbability
 -- | Gets the current probabilities from the 'State'.
 askProbability :: StateGen Probability
 askProbability = asks probability
-
-rask :: StateGen Config
-rask = ask
-
-lget :: StateGen Context
-lget = lift . lift $ get
 
 -- | Generates a random large number, which can also be negative.
 largeNum :: (MonadGen m) => m Int
@@ -314,7 +308,7 @@ someI m f = do
 -- is then increased so that the label is unique.
 makeIdentifier :: T.Text -> StateGen Identifier
 makeIdentifier prefix = do
-    context <- lget
+    context <- get
     let ident = Identifier $ prefix <> showT (context ^. nameCounter)
     nameCounter += 1
     return ident
@@ -332,7 +326,7 @@ getPort' pt i c = case filter portId c of
 -- the generation is currently in the other branch of an if-statement.
 nextPort :: PortType -> StateGen Port
 nextPort pt = do
-    context <- lget
+    context <- get
     ident   <- makeIdentifier . T.toLower $ showT pt
     getPort' pt ident (_variables context)
 
@@ -347,7 +341,7 @@ newPort ident pt = do
 -- | Generates an expression from variables that are currently in scope.
 scopedExpr :: StateGen Expr
 scopedExpr = do
-    context <- lget
+    context <- get
     prob    <- askProbability
     Hog.sized
         . exprWithContext (_probExpr prob) (_parameters context)
@@ -383,12 +377,12 @@ seqBlock = do
 conditional :: StateGen Statement
 conditional = do
     expr  <- scopedExpr
-    nc    <- _nameCounter <$> lget
+    nc    <- _nameCounter <$> get
     tstat <- seqBlock
-    nc'   <- _nameCounter <$> lget
+    nc'   <- _nameCounter <$> get
     nameCounter .= nc
     fstat <- seqBlock
-    nc''  <- _nameCounter <$> lget
+    nc''  <- _nameCounter <$> get
     nameCounter .= max nc' nc''
     return $ CondStmnt expr (Just tstat) (Just fstat)
 
@@ -408,7 +402,7 @@ forLoop = do
 statement :: StateGen Statement
 statement = do
     prob <- askProbability
-    cont <- lget
+    cont <- get
     let defProb i = prob ^. probStmnt . i
     Hog.frequency
         [ (defProb probStmntBlock              , BlockAssign <$> assignment)
@@ -442,13 +436,13 @@ resizePort ps i ra = foldl' func []
 -- representation for the clock.
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
-    context <- lget
+    context <- get
     outs    <- replicateM (length outP) (nextPort Wire)
     ins <- take (length inpFixed) <$> Hog.shuffle (context ^. variables)
     insLit <- replicateM (length inpFixed - length ins) (Number <$> genBitVec)
     mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inpFixed ^.. traverse . portSize
     ident <- makeIdentifier "modinst"
-    vs <- view variables <$> lget
+    vs <- view variables <$> get
     Hog.choice
         [ return . ModInst i ident $ ModConn <$> (toE (outs <> clkPort <> ins) <> insLit)
         , ModInst i ident <$> Hog.shuffle
@@ -462,7 +456,7 @@ instantiate (ModDecl i outP inP _ _) = do
             | n == "clk" = False
             | otherwise = True
         process p r = do
-            params <- view parameters <$> lget
+            params <- view parameters <$> get
             variables %= resizePort params p r
 
 -- | Generates a module instance by also generating a new module if there are
@@ -486,8 +480,8 @@ instantiate (ModDecl i outP inP _ _) = do
 -- a module from a context or generating a new one.
 modInst :: StateGen ModItem
 modInst = do
-    prob    <- rask
-    context <- lget
+    prob    <- ask
+    context <- get
     let maxMods = prob ^. configProperty . propMaxModules
     if length (context ^. modules) < maxMods
         then do
@@ -499,7 +493,7 @@ modInst = do
             parameters .= []
             modDepth -= 1
             chosenMod <- moduleDef Nothing
-            ncont     <- lget
+            ncont     <- get
             let genMods = ncont ^. modules
             modDepth += 1
             parameters .= params
@@ -511,9 +505,9 @@ modInst = do
 -- | Generate a random module item.
 modItem :: StateGen ModItem
 modItem = do
-    conf    <- rask
+    conf    <- ask
     let prob = conf ^. configProbability
-    context <- lget
+    context <- get
     let defProb i = prob ^. probModItem . i
     det <- Hog.frequency [ (conf ^. configProperty . propDeterminism, return True)
                          , (conf ^. configProperty . propNonDeterminism, return False) ]
@@ -535,7 +529,7 @@ moduleName Nothing  = makeIdentifier "module"
 constExpr :: StateGen ConstExpr
 constExpr = do
     prob    <- askProbability
-    context <- lget
+    context <- get
     Hog.sized $ constExprWithContext (context ^. parameters)
                                            (prob ^. probExpr)
 
@@ -576,8 +570,8 @@ moduleDef top = do
     portList <- Hog.list (Hog.linear 4 10) $ nextPort Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
     ps       <- Hog.list (Hog.linear 0 10) parameter
-    context  <- lget
-    config   <- rask
+    context  <- get
+    config   <- ask
     let (newPorts, local) = partition (`identElem` portList) $ _variables context
     let
          size =
