@@ -24,13 +24,14 @@ instance Show OptTool where
   show TXST    = "xst"
   show TIcarus = "icarus"
 
-data Opts = Fuzz { fuzzOutput     :: {-# UNPACK #-} !Text
-                 , fuzzConfigFile :: !(Maybe FilePath)
-                 , fuzzForced     :: !Bool
-                 , fuzzKeepAll    :: !Bool
-                 , fuzzNum        :: {-# UNPACK #-} !Int
-                 , fuzzNoSim      :: !Bool
-                 , fuzzNoEquiv    :: !Bool
+data Opts = Fuzz { fuzzOutput      :: {-# UNPACK #-} !Text
+                 , fuzzConfigFile  :: !(Maybe FilePath)
+                 , fuzzForced      :: !Bool
+                 , fuzzKeepAll     :: !Bool
+                 , fuzzNum         :: {-# UNPACK #-} !Int
+                 , fuzzNoSim       :: !Bool
+                 , fuzzNoEquiv     :: !Bool
+                 , fuzzNoReduction :: !Bool
                  }
           | Generate { generateFilename   :: !(Maybe FilePath)
                      , generateConfigFile :: !(Maybe FilePath)
@@ -85,35 +86,30 @@ fuzzOpts =
                 <> Opt.metavar "DIR"
                 <> Opt.help "Output directory that the fuzz run takes place in."
                 <> Opt.showDefault
-                <> Opt.value "output"
-                )
+                <> Opt.value "output")
         <*> (  Opt.optional
             .  Opt.strOption
             $  Opt.long "config"
             <> Opt.short 'c'
             <> Opt.metavar "FILE"
-            <> Opt.help "Config file for the current fuzz run."
-            )
+            <> Opt.help "Config file for the current fuzz run.")
         <*> (Opt.switch $ Opt.long "force" <> Opt.short 'f' <> Opt.help
-                "Overwrite the specified directory."
-            )
+                "Overwrite the specified directory.")
         <*> (Opt.switch $ Opt.long "keep" <> Opt.short 'k' <> Opt.help
-                "Keep all the directories."
-            )
+                "Keep all the directories.")
         <*> (  Opt.option Opt.auto
             $  Opt.long "num"
             <> Opt.short 'n'
             <> Opt.help "The number of fuzz runs that should be performed."
             <> Opt.showDefault
             <> Opt.value 1
-            <> Opt.metavar "INT"
-            )
+            <> Opt.metavar "INT")
         <*> (Opt.switch $ Opt.long "no-sim" <> Opt.help
-                "Do not run simulation on the output netlist."
-            )
+                "Do not run simulation on the output netlist.")
         <*> (Opt.switch $ Opt.long "no-equiv" <> Opt.help
-                "Do not run an equivalence check on the output netlist."
-            )
+                "Do not run an equivalence check on the output netlist.")
+        <*> (Opt.switch $ Opt.long "no-reduction" <> Opt.help
+                "Do not run reduction on a failed testcase.")
 
 genOpts :: Parser Opts
 genOpts =
