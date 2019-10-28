@@ -64,26 +64,28 @@ import           Verismith.Tool.Yosys
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
-data FuzzOpts = FuzzOpts { _fuzzOptsOutput     :: !(Maybe FilePath)
-                         , _fuzzOptsForced     :: !Bool
-                         , _fuzzOptsKeepAll    :: !Bool
-                         , _fuzzOptsIterations :: {-# UNPACK #-} !Int
-                         , _fuzzOptsNoSim      :: !Bool
-                         , _fuzzOptsNoEquiv    :: !Bool
-                         , _fuzzOptsConfig     :: {-# UNPACK #-} !Config
+data FuzzOpts = FuzzOpts { _fuzzOptsOutput      :: !(Maybe FilePath)
+                         , _fuzzOptsForced      :: !Bool
+                         , _fuzzOptsKeepAll     :: !Bool
+                         , _fuzzOptsIterations  :: {-# UNPACK #-} !Int
+                         , _fuzzOptsNoSim       :: !Bool
+                         , _fuzzOptsNoEquiv     :: !Bool
+                         , _fuzzOptsNoReduction :: !Bool
+                         , _fuzzOptsConfig      :: {-# UNPACK #-} !Config
                          }
               deriving (Show, Eq)
 
 $(makeLenses ''FuzzOpts)
 
 defaultFuzzOpts :: FuzzOpts
-defaultFuzzOpts = FuzzOpts { _fuzzOptsOutput = Nothing
-                           , _fuzzOptsForced = False
-                           , _fuzzOptsKeepAll = False
-                           , _fuzzOptsIterations = 1
-                           , _fuzzOptsNoSim = False
-                           , _fuzzOptsNoEquiv = False
-                           , _fuzzOptsConfig = defaultConfig
+defaultFuzzOpts = FuzzOpts { _fuzzOptsOutput      = Nothing
+                           , _fuzzOptsForced      = False
+                           , _fuzzOptsKeepAll     = False
+                           , _fuzzOptsIterations  = 1
+                           , _fuzzOptsNoSim       = False
+                           , _fuzzOptsNoEquiv     = False
+                           , _fuzzOptsNoReduction = False
+                           , _fuzzOptsConfig      = defaultConfig
                            }
 
 data FuzzEnv = FuzzEnv { _getSynthesisers :: ![SynthTool]
@@ -286,16 +288,15 @@ equivalence src = do
 
 simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
 simulation src = do
-    synth    <- passEquiv
+    synth    <- passedSynthesis
     vals     <- liftIO $ generateByteString 20
     ident    <- liftSh $ equiv vals defaultIdentitySynth
-    resTimes <- liftSh $ mapM (equiv vals) $ conv <$> synth
+    resTimes <- liftSh $ mapM (equiv vals) synth
     liftSh
         .   inspect
         $   (\(_, r) -> bimap show (T.unpack . T.take 10 . showBS) r)
         <$> (ident : resTimes)
   where
-    conv (SynthResult _ a _ _) = a
     equiv b a = toolRun ("simulation for " <> toText a) . runResultT $ do
         make dir
         pop dir $ do
@@ -424,6 +425,7 @@ medianFreqs l = zip hat (return <$> l)
 fuzz :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzReport
 fuzz gen = do
     conf <- askConfig
+    opts <- askOpts
     let seed = conf ^. configProperty . propSeed
     (seed', src) <- generateSample $ genMethod conf seed gen
     let size = length . lines . T.unpack $ genSource src
@@ -435,12 +437,17 @@ fuzz gen = do
         .  propSeed
         ?~ seed'
     (tsynth, _) <- titleRun "Synthesis" $ synthesis src
-    (tequiv, _) <- titleRun "Equivalence Check" $ equivalence src
-    (_     , _) <- titleRun "Simulation" $ simulation src
+    (tequiv, _) <- if (_fuzzOptsNoEquiv opts)
+        then return (0, mempty)
+        else titleRun "Equivalence Check" $ equivalence src
+    (_     , _) <- if (_fuzzOptsNoSim opts)
+        then return (0, mempty)
+        else titleRun "Simulation" $ simulation src
     fails       <- failEquivWithIdentity
     synthFails  <- failedSynthesis
     redResult   <-
-        whenMaybe (not $ null fails && null synthFails)
+        whenMaybe (not (null fails && null synthFails)
+                   && not (_fuzzOptsNoReduction opts))
         . titleRun "Reduction"
         $ reduction src
     state_  <- get
