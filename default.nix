@@ -1,14 +1,14 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghc865", doBenchmark ? false } :
+{ nixpkgs ? null, compiler ? "ghc865", doBenchmark ? false } :
 let
-  haskellPackages = nixpkgs.pkgs.haskellPackages.override {
-    overrides = haskellPackagesNew: haskellPackagesOld: rec {
-        hedgehog-fn = haskellPackagesNew.callPackage ./nix/hedgehog-fn.nix {};
-        tomland = nixpkgs.pkgs.haskell.lib.dontCheck (haskellPackagesNew.callPackage ./nix/tomland.nix {});
-        parser-combinators = haskellPackagesNew.callPackage ./nix/parser-combinators.nix {};
-        tasty-hedgehog = haskellPackagesNew.callPackage ./nix/tasty-hedgehog.nix {};
-      };
+  pinnedPkg = builtins.fetchGit {
+    name = "nixos-unstable-2019-10-06";
+    url = https://github.com/nixos/nixpkgs/;
+    rev = "271fef8a4eb03cd9de0c1fe2f0b7f4a16c2de49a";
   };
-  variant = if doBenchmark then nixpkgs.pkgs.haskell.lib.doBenchmark else nixpkgs.pkgs.lib.id;
-  verifuzz = haskellPackages.callCabal2nix "verifuzz" (./.) {};
+  npkgs = if nixpkgs == null
+          then import pinnedPkg {}
+          else import nixpkgs {};
+  variant = if doBenchmark then npkgs.pkgs.haskell.lib.doBenchmark else npkgs.pkgs.lib.id;
+  verismith = npkgs.pkgs.haskellPackages.callCabal2nix "verismith" (./.) {};
 in
-  variant verifuzz
+variant verismith

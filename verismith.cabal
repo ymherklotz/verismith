@@ -1,0 +1,167 @@
+name: verismith
+version: 0.4.0.1
+synopsis: Random verilog generation and simulator testing.
+description:
+  Verismith provides random verilog generation modules
+  implementing functions to test supported simulators.
+homepage: https://github.com/ymherklotz/verismith#readme
+license: BSD3
+license-file: LICENSE
+author: Yann Herklotz
+maintainer: yann [at] yannherklotz [dot] com
+copyright: 2018-2019 Yann Herklotz
+category: Hardware
+build-type: Custom
+cabal-version: >=1.10
+extra-source-files: README.md
+                  , examples/*.v
+                  , examples/config.toml
+                  , scripts/*.py
+                  , scripts/*.sh
+data-files: data/*.v
+
+source-repository head
+  type:     git
+  location: https://github.com/ymherklotz/verismith
+
+source-repository this
+  type:     git
+  location: https://github.com/ymherklotz/verismith
+  tag:      v0.4.0.1
+
+custom-setup
+  setup-depends:
+    base >= 4 && <5,
+    cabal-doctest >= 1 && <1.1,
+    Cabal >= 1.10 && <2.5
+
+library
+  hs-source-dirs: src
+  default-language: Haskell2010
+  build-tools: alex >=3 && <4
+  other-modules: Paths_verismith
+  exposed-modules: Verismith
+                 , Verismith.Circuit
+                 , Verismith.Circuit.Base
+                 , Verismith.Circuit.Gen
+                 , Verismith.Circuit.Internal
+                 , Verismith.Circuit.Random
+                 , Verismith.Config
+                 , Verismith.Fuzz
+                 , Verismith.Generate
+                 , Verismith.Internal
+                 , Verismith.OptParser
+                 , Verismith.Reduce
+                 , Verismith.Report
+                 , Verismith.Result
+                 , Verismith.Tool
+                 , Verismith.Tool.Icarus
+                 , Verismith.Tool.Identity
+                 , Verismith.Tool.Internal
+                 , Verismith.Tool.Quartus
+                 , Verismith.Tool.Template
+                 , Verismith.Tool.Vivado
+                 , Verismith.Tool.XST
+                 , Verismith.Tool.Yosys
+                 , Verismith.Verilog
+                 , Verismith.Verilog.AST
+                 , Verismith.Verilog.BitVec
+                 , Verismith.Verilog.CodeGen
+                 , Verismith.Verilog.Eval
+                 , Verismith.Verilog.Internal
+                 , Verismith.Verilog.Lex
+                 , Verismith.Verilog.Mutate
+                 , Verismith.Verilog.Parser
+                 , Verismith.Verilog.Preprocess
+                 , Verismith.Verilog.Quote
+                 , Verismith.Verilog.Token
+  build-depends: DRBG >=0.5 && <0.6
+               , array >=0.5 && <0.6
+               , base >=4.7 && <5
+               , binary >= 0.8.5.1 && <0.9
+               , blaze-html >=0.9.0.1 && <0.10
+               , bytestring >=0.10 && <0.11
+               , cryptonite >=0.25 && <0.26
+               , deepseq >= 1.4.3.0 && <1.5
+               , exceptions >=0.10.0 && <0.11
+               , fgl >=5.6 && <5.8
+               , fgl-visualize >=0.1 && <0.2
+               , filepath >=1.4.2 && <1.5
+               , gitrev >= 1.3.1 && <1.4
+               , hedgehog >=1.0 && <1.2
+               , lens >=4.16.1 && <4.18
+               , lifted-base >=0.2.3 && <0.3
+               , memory >=0.14 && <0.15
+               , monad-control >=1.0.2 && <1.1
+               , mtl >=2.2.2 && <2.3
+               , optparse-applicative >=0.14 && <0.15
+               , parsec >=3.1 && <3.2
+               , prettyprinter >=1.2.0.1 && <1.3
+               , random >=1.1 && <1.2
+               , recursion-schemes >=5.0.2 && <5.2
+               , shakespeare >=2 && <2.1
+               , shelly >=1.8.0 && <1.9
+               , statistics >=0.14.0.2 && <0.16
+               , template-haskell >=2.13.0 && <2.15
+               , text >=1.2 && <1.3
+               , time >= 1.8.0.2 && <1.9
+               , tomland >=1.0 && <1.2
+               , transformers >=0.5 && <0.6
+               , transformers-base >=0.4.5 && <0.5
+               , unordered-containers >=0.2.10 && <0.3
+               , vector >=0.12.0.1 && <0.13
+  default-extensions: OverloadedStrings
+
+executable verismith
+  hs-source-dirs: app
+  main-is: Main.hs
+  default-language: Haskell2010
+  ghc-options: -threaded
+  build-depends: base >= 4.7 && < 5
+               , verismith
+  default-extensions: OverloadedStrings
+
+benchmark benchmark
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Benchmark.hs
+  build-depends: base >=4 && <5
+               , verismith
+               , criterion >=1.5.5 && <1.6
+               , lens >=4.16.1 && <4.18
+  default-extensions: OverloadedStrings
+
+test-suite test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Test.hs
+  other-modules: Unit
+               , Property
+               , Reduce
+               , Parser
+  build-depends: base >=4 && <5
+               , verismith
+               , fgl >=5.6 && <5.8
+               , hedgehog >=1.0 && <1.2
+               , lens >=4.16.1 && <4.18
+               , parsec >= 3.1 && < 3.2
+               , shakespeare >=2 && <2.1
+               , tasty >=1.0.1.1 && <1.3
+               , tasty-hedgehog >=1.0 && <1.1
+               , tasty-hunit >=0.10 && <0.11
+               , text >=1.2 && <1.3
+  default-extensions: OverloadedStrings
+
+--test-suite doctest
+--  default-language: Haskell2010
+--  type: exitcode-stdio-1.0
+--  hs-source-dirs: test
+--  main-is: Doctest.hs
+--  other-modules: Build_doctests
+--  build-depends: base >=4.7 && <5
+--               , doctest >=0.16 && <0.17
+--               , Glob >=0.9.3 && <0.11
+--               , verismith
+--  default-extensions: OverloadedStrings

@@ -17,18 +17,18 @@ module Parser
 where
 
 import           Control.Lens
-import           Data.Either             (either, isRight)
-import           Hedgehog                (Gen, Property, (===))
-import qualified Hedgehog                as Hog
-import qualified Hedgehog.Gen            as Hog
+import           Data.Either              (either, isRight)
+import           Hedgehog                 (Gen, Property, (===))
+import qualified Hedgehog                 as Hog
+import qualified Hedgehog.Gen             as Hog
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Test.Tasty.HUnit
 import           Text.Parsec
-import           VeriFuzz
-import           VeriFuzz.Internal
-import           VeriFuzz.Verilog.Lex
-import           VeriFuzz.Verilog.Parser
+import           Verismith
+import           Verismith.Internal
+import           Verismith.Verilog.Lex
+import           Verismith.Verilog.Parser
 
 smallConfig :: Config
 smallConfig = defaultConfig & configProperty . propSize .~ 5

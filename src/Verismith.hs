@@ -1,0 +1,322 @@
+{-|
+Module      : Verismith
+Description : Verismith
+Copyright   : (c) 2018-2019, Yann Herklotz
+License     : BSD-3
+Maintainer  : yann [at] yannherklotz [dot] com
+Stability   : experimental
+Portability : POSIX
+-}
+
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
+module Verismith
+    ( defaultMain
+    -- * Types
+    , Opts(..)
+    , SourceInfo(..)
+    -- * Run functions
+    , runEquivalence
+    , runSimulation
+    , runReduce
+    , draw
+    -- * Verilog generation functions
+    , procedural
+    , proceduralIO
+    , proceduralSrc
+    , proceduralSrcIO
+    , randomMod
+    -- * Extra modules
+    , module Verismith.Verilog
+    , module Verismith.Config
+    , module Verismith.Circuit
+    , module Verismith.Tool
+    , module Verismith.Fuzz
+    , module Verismith.Report
+    )
+where
+
+import           Control.Concurrent
+import           Control.Lens             hiding ((<.>))
+import           Control.Monad.IO.Class   (liftIO)
+import qualified Crypto.Random.DRBG       as C
+import           Data.ByteString          (ByteString)
+import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
+import qualified Data.ByteString.Lazy     as L
+import qualified Data.Graph.Inductive     as G
+import qualified Data.Graph.Inductive.Dot as G
+import           Data.Maybe               (isNothing)
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           Data.Text.Encoding       (decodeUtf8)
+import qualified Data.Text.IO             as T
+import           Hedgehog                 (Gen)
+import qualified Hedgehog.Gen             as Hog
+import           Hedgehog.Internal.Seed   (Seed)
+import           Options.Applicative
+import           Paths_verismith          (getDataDir)
+import           Prelude                  hiding (FilePath)
+import           Shelly                   hiding (command)
+import           Shelly.Lifted            (liftSh)
+import           System.Random            (randomIO)
+import           Verismith.Circuit
+import           Verismith.Config
+import           Verismith.Fuzz
+import           Verismith.Generate
+import           Verismith.OptParser
+import           Verismith.Reduce
+import           Verismith.Report
+import           Verismith.Result
+import           Verismith.Tool
+import           Verismith.Tool.Internal
+import           Verismith.Verilog
+import           Verismith.Verilog.Parser (parseSourceInfoFile)
+
+toFP :: String -> FilePath
+toFP = fromText . T.pack
+
+myForkIO :: IO () -> IO (MVar ())
+myForkIO io = do
+    mvar <- newEmptyMVar
+    _    <- forkFinally io (\_ -> putMVar mvar ())
+    return mvar
+
+getConfig :: Maybe FilePath -> IO Config
+getConfig s =
+    maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
+
+-- | Randomly remove an option by setting it to 0.
+randDelete :: Int -> IO Int
+randDelete i = do
+    r <- randomIO
+    return $ if r then i else 0
+
+randomise :: Config -> IO Config
+randomise config@(Config a _ c d e) = do
+    mia  <- return $ cm ^. probModItemAssign
+    misa <- return $ cm ^. probModItemSeqAlways
+    mica <- return $ cm ^. probModItemCombAlways
+    mii  <- return $ cm ^. probModItemInst
+    ssb  <- return $ cs ^. probStmntBlock
+    ssnb <- return $ cs ^. probStmntNonBlock
+    ssc  <- return $ cs ^. probStmntCond
+    ssf  <- return $ cs ^. probStmntFor
+    en   <- return $ ce ^. probExprNum
+    ei   <- randDelete $ ce ^. probExprId
+    ers  <- randDelete $ ce ^. probExprRangeSelect
+    euo  <- randDelete $ ce ^. probExprUnOp
+    ebo  <- randDelete $ ce ^. probExprBinOp
+    ec   <- randDelete $ ce ^. probExprCond
+    eco  <- randDelete $ ce ^. probExprConcat
+    estr <- randDelete $ ce ^. probExprStr
+    esgn <- randDelete $ ce ^. probExprSigned
+    eus  <- randDelete $ ce ^. probExprUnsigned
+    return $ Config
+        a
+        (Probability (ProbModItem mia misa mica mii)
+                     (ProbStatement ssb ssnb ssc ssf)
+                     (ProbExpr en ei ers euo ebo ec eco estr esgn eus)
+        )
+        c
+        d
+        e
+  where
+    cm = config ^. configProbability . probModItem
+    cs = config ^. configProbability . probStmnt
+    ce = config ^. configProbability . probExpr
+
+handleOpts :: Opts -> IO ()
+handleOpts (Fuzz o configF f k n nosim noequiv noreduction) = do
+    config <- getConfig configF
+    datadir <- getDataDir
+    _      <- runFuzz
+        (FuzzOpts (Just $ fromText o)
+         f k n nosim noequiv noreduction config (toFP datadir))
+        defaultYosys
+        (fuzzMultiple (proceduralSrc "top" config))
+    return ()
+handleOpts (Generate f c) = do
+    config <- getConfig c
+    source <- proceduralIO "top" config
+    maybe (T.putStrLn $ genSource source) (flip T.writeFile $ genSource source)
+        $   T.unpack
+        .   toTextIgnore
+        <$> f
+handleOpts (Parse f) = do
+    verilogSrc <- T.readFile file
+    case parseVerilog (T.pack file) verilogSrc of
+        Left  l -> print l
+        Right v -> print $ GenVerilog v
+    where file = T.unpack . toTextIgnore $ f
+handleOpts (Reduce f t _ ls' False) = do
+    src <- parseSourceInfoFile t (toTextIgnore f)
+    datadir <- getDataDir
+    case descriptionToSynth <$> ls' of
+        a : b : _ -> do
+            putStrLn "Reduce with equivalence check"
+            shelly $ do
+                make dir
+                pop dir $ do
+                    src' <- reduceSynth (toFP datadir) a b src
+                    writefile (fromText ".." </> dir <.> "v") $ genSource src'
+        a : _ -> do
+            putStrLn "Reduce with synthesis failure"
+            shelly $ do
+                make dir
+                pop dir $ do
+                    src' <- reduceSynthesis a src
+                    writefile (fromText ".." </> dir <.> "v") $ genSource src'
+        _ -> do
+            putStrLn "Not reducing because no synthesiser was specified"
+            return ()
+    where dir = fromText "reduce"
+handleOpts (Reduce f t _ ls' True) = do
+    src <- parseSourceInfoFile t (toTextIgnore f)
+    datadir <- getDataDir
+    case descriptionToSynth <$> ls' of
+        a : b : _ -> do
+            putStrLn "Starting equivalence check"
+            res <- shelly . runResultT $ do
+                make dir
+                pop dir $ do
+                    runSynth a src
+                    runSynth b src
+                    runEquiv (toFP datadir) a b src
+            case res of
+                Pass _            -> putStrLn "Equivalence check passed"
+                Fail EquivFail    -> putStrLn "Equivalence check failed"
+                Fail TimeoutError -> putStrLn "Equivalence check timed out"
+                Fail _            -> putStrLn "Equivalence check error"
+            return ()
+        as -> do
+            putStrLn "Synthesis check"
+            _ <- shelly . runResultT $ mapM (flip runSynth src) as
+            return ()
+    where dir = fromText "equiv"
+handleOpts (ConfigOpt c conf r) = do
+    config <- if r then getConfig conf >>= randomise else getConfig conf
+    maybe (T.putStrLn . encodeConfig $ config) (`encodeConfigFile` config)
+        $   T.unpack
+        .   toTextIgnore
+        <$> c
+
+defaultMain :: IO ()
+defaultMain = do
+    optsparsed <- execParser opts
+    handleOpts optsparsed
+
+-- | Generate a specific number of random bytestrings of size 256.
+randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
+randomByteString gen n bytes
+    | n == 0    = ranBytes : bytes
+    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
+    where Right (ranBytes, newGen) = C.genBytes 32 gen
+
+-- | generates the specific number of bytestring with a random seed.
+generateByteString :: Int -> IO [ByteString]
+generateByteString n = do
+    gen <- C.newGenIO :: IO C.CtrDRBG
+    return $ randomByteString gen n []
+
+makeSrcInfo :: ModDecl -> SourceInfo
+makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])
+
+-- | Draw a randomly generated DAG to a dot file and compile it to a png so it
+-- can be seen.
+draw :: IO ()
+draw = do
+    gr <- Hog.sample $ rDups . getCircuit <$> Hog.resize 10 randomDAG
+    let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
+    writeFile "file.dot" dot
+    shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
+
+-- | Function to show a bytestring in a hex format.
+showBS :: ByteString -> Text
+showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
+
+-- | Run a simulation on a random DAG or a random module.
+runSimulation :: IO ()
+runSimulation = do
+  -- gr <- Hog.generate $ rDups <$> Hog.resize 100 (randomDAG :: Gen (G.Gr Gate ()))
+  -- let dot = G.showDot . G.fglToDotString $ G.nemap show (const "") gr
+  -- writeFile "file.dot" dot
+  -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
+  -- let circ =
+  --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
+    rand  <- generateByteString 20
+    rand2 <- Hog.sample (randomMod 10 100)
+    val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
+    case val of
+        Pass a -> T.putStrLn $ showBS a
+        _      -> T.putStrLn "Test failed"
+
+
+-- | Code to be executed on a failure. Also checks if the failure was a timeout,
+-- as the timeout command will return the 124 error code if that was the
+-- case. In that case, the error will be moved to a different directory.
+onFailure :: Text -> RunFailed -> Sh (Result Failed ())
+onFailure t _ = do
+    ex <- lastExitCode
+    case ex of
+        124 -> do
+            logger "Test TIMEOUT"
+            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_timeout")
+            return $ Fail EmptyFail
+        _ -> do
+            logger "Test FAIL"
+            chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
+            return $ Fail EmptyFail
+
+checkEquivalence :: SourceInfo -> Text -> IO Bool
+checkEquivalence src dir = shellyFailDir $ do
+    mkdir_p (fromText dir)
+    curr <- toTextIgnore <$> pwd
+    datadir <- liftIO getDataDir
+    setenv "VERISMITH_ROOT" curr
+    cd (fromText dir)
+    catch_sh
+        ((runResultT $ runEquiv (toFP datadir) defaultYosys defaultVivado src) >> return True)
+        ((\_ -> return False) :: RunFailed -> Sh Bool)
+
+-- | Run a fuzz run and check if all of the simulators passed by checking if the
+-- generated Verilog files are equivalent.
+runEquivalence
+    :: Maybe Seed
+    -> Gen Verilog -- ^ Generator for the Verilog file.
+    -> Text        -- ^ Name of the folder on each thread.
+    -> Text        -- ^ Name of the general folder being used.
+    -> Bool        -- ^ Keep flag.
+    -> Int         -- ^ Used to track the recursion.
+    -> IO ()
+runEquivalence seed gm t d k i = do
+    (_, m) <- shelly $ sampleSeed seed gm
+    let srcInfo = SourceInfo "top" m
+    rand <- generateByteString 20
+    datadir <- getDataDir
+    shellyFailDir $ do
+        mkdir_p (fromText d </> fromText n)
+        curr <- toTextIgnore <$> pwd
+        setenv "VERISMITH_ROOT" curr
+        cd (fromText "output" </> fromText n)
+        _ <-
+            catch_sh
+                    (  runResultT
+                    $  runEquiv (toFP datadir) defaultYosys defaultVivado srcInfo
+                    >> liftSh (logger "Test OK")
+                    )
+                $ onFailure n
+        _ <-
+            catch_sh
+                    (   runResultT
+                    $   runSim (Icarus "iverilog" "vvp") srcInfo rand
+                    >>= (\b -> liftSh $ logger ("RTL Sim: " <> showBS b))
+                    )
+                $ onFailure n
+        cd ".."
+        unless k . rm_rf $ fromText n
+    when (i < 5 && isNothing seed) (runEquivalence seed gm t d k $ i + 1)
+    where n = t <> "_" <> T.pack (show i)
+
+runReduce :: SourceInfo -> IO SourceInfo
+runReduce s =
+    shelly $ reduce (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s
