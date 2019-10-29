@@ -24,119 +24,50 @@ Defines the types to build a Verilog AST.
 
 module Verismith.Verilog.AST
     ( -- * Top level types
-      SourceInfo(..)
-    , infoTop
-    , infoSrc
-    , Verilog(..)
+      SourceInfo(..), Verilog(..), infoTop, infoSrc
     -- * Primitives
     -- ** Identifier
     , Identifier(..)
     -- ** Control
-    , Delay(..)
-    , Event(..)
+    , Delay(..), Event(..)
     -- ** Operators
-    , BinaryOperator(..)
-    , UnaryOperator(..)
+    , BinaryOperator(..), UnaryOperator(..)
     -- ** Task
-    , Task(..)
-    , taskName
-    , taskExpr
+    , Task(..), taskName, taskExpr
     -- ** Left hand side value
-    , LVal(..)
-    , regId
-    , regExprId
-    , regExpr
-    , regSizeId
-    , regSizeRange
-    , regConc
+    , LVal(..), regId, regExprId, regExpr, regSizeId, regSizeRange, regConc
     -- ** Ports
-    , PortDir(..)
-    , PortType(..)
-    , Port(..)
-    , portType
-    , portSigned
-    , portSize
+    , PortDir(..), PortType(..), Port(..), portType, portSigned, portSize
     , portName
     -- * Expression
-    , Expr(..)
-    , ConstExpr(..)
-    , ConstExprF(..)
-    , constToExpr
-    , exprToConst
-    , Range(..)
-    , constNum
-    , constParamId
-    , constConcat
-    , constUnOp
-    , constPrim
-    , constLhs
-    , constBinOp
-    , constRhs
-    , constCond
-    , constTrue
-    , constFalse
-    , constStr
+    , Expr(..), ConstExpr(..), ConstExprF(..), constToExpr, exprToConst
+    , Range(..), constNum, constParamId, constConcat, constUnOp, constPrim
+    , constLhs, constBinOp, constRhs, constCond, constTrue, constFalse, constStr
     -- * Assignment
-    , Assign(..)
-    , assignReg
-    , assignDelay
-    , assignExpr
-    , ContAssign(..)
-    , contAssignNetLVal
-    , contAssignExpr
-    -- ** Parameters
-    , Parameter(..)
-    , paramIdent
-    , paramValue
-    , LocalParam(..)
-    , localParamIdent
-    , localParamValue
+    , Assign(..), assignReg, assignDelay, assignExpr, ContAssign(..)
+    , contAssignNetLVal, contAssignExpr
+    -- * Specify
+    , PolarityOp(..), TerminalDescriptor(..), tdIdent, tdArrayAccessIdent
+    , tdArrayAccessExpr, tdRangeAccessIdent, tdRangeAccessMSB, tdRangeAccessLSB
+    , PathDescription(..), pdParInput, pdPolarity, pdParOutput, pdFullInput
+    , pdFullOutput, PathDelayValue(..), pdvDelayExpressions
+    , TimeCheckEventCtrl(..), ScalarConst(..), TimeCheckCondition(..)
+    , tccExpr, tccScalarConst, TimeCheck(..), tcEventCtrl, tcTerminalDescr
+    , tcTimeCheckCond, SpecifyItem(..), siSpecParamDecl, siPathDeclDescr
+    , siPathDeclVal, siSysTimeIdent, siSysTimeCheck
+    -- * Parameter
+    , ParamAssignment(..), paIdent, paValue
     -- * Statment
-    , Statement(..)
-    , statDelay
-    , statDStat
-    , statEvent
-    , statEStat
-    , statements
-    , stmntBA
-    , stmntNBA
-    , stmntTask
-    , stmntSysTask
-    , stmntCondExpr
-    , stmntCondTrue
-    , stmntCondFalse
-    , forAssign
-    , forExpr
-    , forIncr
-    , forStmnt
+    , Statement(..), statDelay, statDStat, statEvent, statEStat, statements
+    , stmntBA, stmntNBA, stmntTask, stmntSysTask, stmntCondExpr, stmntCondTrue
+    , stmntCondFalse, forAssign, forExpr, forIncr, forStmnt
     -- * Module
-    , ModDecl(..)
-    , modId
-    , modOutPorts
-    , modInPorts
-    , modItems
-    , modParams
-    , ModItem(..)
-    , modContAssign
-    , modInstId
-    , modInstName
-    , modInstConns
-    , _Initial
-    , _Always
-    , paramDecl
-    , localParamDecl
-    , traverseModItem
-    , declDir
-    , declPort
-    , declVal
-    , ModConn(..)
-    , modConnName
-    , modExpr
+    , ModDecl(..), modId, modOutPorts, modInPorts, modItems, modParams
+    , ModItem(..), modContAssign, modInstId, modInstName, modInstConns
+    , _Initial, _Always, traverseModItem, declDir, declPort, declVal
+    , ModConn(..), modConnName, modExpr
     -- * Useful Lenses and Traversals
-    , aModule
-    , getModule
-    , getSourceId
-    , mainModule
+    , aModule, getModule, getSourceId, mainModule
     )
 where
 
@@ -339,6 +270,13 @@ instance IsString ConstExpr where
 instance Plated ConstExpr where
   plate = uniplate
 
+data ConstMinMax = CMMConstant ConstExpr
+                 | CMMMinMax { cmmLeft   :: ConstExpr
+                             , cmmMiddle :: ConstExpr
+                             , cmmRight  :: ConstExpr
+                             }
+                 deriving (Eq, Show, Ord, Data, Generic, NFData)
+
 data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
                  , _taskExpr :: [Expr]
                  } deriving (Eq, Show, Ord, Data, Generic, NFData)
@@ -461,18 +399,93 @@ instance Semigroup Statement where
 instance Monoid Statement where
   mempty = SeqBlock []
 
--- | Parameter that can be assigned in blocks or modules using @parameter@.
-data Parameter = Parameter { _paramIdent :: {-# UNPACK #-} !Identifier
-                           , _paramValue :: ConstExpr
-                           }
+data PolarityOp = POPlus
+                | POMinus
+                deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+data TerminalDescriptor = TDIdentifier { _tdIdent :: {-# UNPACK #-} !Identifier}
+                        | TDArrayAccess { _tdArrayAccessIdent :: {-# UNPACK #-} !Identifier
+                                        , _tdArrayAccessExpr :: ConstExpr
+                                        }
+                        | TDRangeAccess { _tdRangeAccessIdent :: {-# UNPACK #-} !Identifier
+                                        , _tdRangeAccessMSB :: ConstExpr
+                                        , _tdRangeAccessLSB :: ConstExpr
+                                        }
+                        deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''TerminalDescriptor)
+
+data ParamAssignment = ParamAssignment { _paIdent :: {-# UNPACK #-} !Identifier
+                                       , _paValue :: ConstExpr
+                                       }
+                     deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''ParamAssignment)
+
+data PathDescription = ParPathDescr { _pdParInput  :: !TerminalDescriptor
+                                    , _pdPolarity  :: !(Maybe PolarityOp)
+                                    , _pdParOutput :: !TerminalDescriptor
+                                    }
+                     | FullPathDescr { _pdFullInput :: !(NonEmpty TerminalDescriptor)
+                                     , _pdPolarity :: !(Maybe PolarityOp)
+                                     , _pdFullOutput :: !(NonEmpty TerminalDescriptor)
+                                     }
+                     deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''PathDescription)
+
+data PathDelayValue = PathDelayValue { _pdvDelayExpressions :: !(NonEmpty ConstMinMax)
+                                     }
+                    deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''PathDelayValue)
+
+data TimeCheckEventCtrl = TCCNegedge
+                        | TCCPosedge
+                        | TCCEvent !(NonEmpty Identifier)
+                        deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+data ScalarConst = SC1
+                 | SC0
+                 deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+data TimeCheckCondition = TCCExpr { _tccExpr :: Expr }
+                        | TCCNExpr { _tccExpr :: Expr }
+                        | TCCEq { _tccExpr        :: Expr
+                                , _tccScalarConst :: !ScalarConst
+                                }
+                        | TCCEqq { _tccExpr        :: Expr
+                                 , _tccScalarConst :: !ScalarConst
+                                 }
+                        | TCCNEq { _tccExpr        :: Expr
+                                 , _tccScalarConst :: !ScalarConst
+                                 }
+                        | TCCNEqq { _tccExpr        :: Expr
+                                  , _tccScalarConst :: !ScalarConst
+                                  }
+                        deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''TimeCheckCondition)
+
+data TimeCheck = TCEvent { _tcEventCtrl     :: !(Maybe TimeCheckEventCtrl)
+                         , _tcTerminalDescr :: !TerminalDescriptor
+                         , _tcTimeCheckCond :: !TimeCheckCondition
+                         }
                deriving (Eq, Show, Ord, Data, Generic, NFData)
 
--- | Local parameter that can be assigned anywhere using @localparam@. It cannot
--- be changed by initialising the module.
-data LocalParam = LocalParam { _localParamIdent :: {-# UNPACK #-} !Identifier
-                             , _localParamValue :: ConstExpr
-                             }
-                deriving (Eq, Show, Ord, Data, Generic, NFData)
+$(makeLenses ''TimeCheck)
+
+-- | Specify block contents.
+data SpecifyItem = SISpecParamDecl { _siSpecParamDecl :: !(NonEmpty ParamAssignment) }
+                 | SIPathDecl { _siPathDeclDescr :: !PathDescription
+                              , _siPathDeclVal   :: !PathDelayValue
+                              }
+                 | SISystemTimingCheck { _siSysTimeIdent :: {-# UNPACK #-} !Identifier
+                                       , _siSysTimeCheck :: !TimeCheck
+                                       }
+                 deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''SpecifyItem)
 
 -- | Module item which is the body of the module expression.
 data ModItem = ModCA { _modContAssign :: !ContAssign }
@@ -486,8 +499,9 @@ data ModItem = ModCA { _modContAssign :: !ContAssign }
                     , _declPort :: !Port
                     , _declVal  :: Maybe ConstExpr
                     }
-             | ParamDecl { _paramDecl :: NonEmpty Parameter }
-             | LocalParamDecl { _localParamDecl :: NonEmpty LocalParam }
+             | ParamDecl !(NonEmpty ParamAssignment)
+             | LocalParamDecl !(NonEmpty ParamAssignment)
+             | Specify { _modItemSpecify :: ![SpecifyItem] }
              deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
@@ -495,7 +509,7 @@ data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
                        , _modOutPorts :: ![Port]
                        , _modInPorts  :: ![Port]
                        , _modItems    :: ![ModItem]
-                       , _modParams   :: ![Parameter]
+                       , _modParams   :: ![ParamAssignment]
                        }
              deriving (Eq, Show, Ord, Data, Generic, NFData)
 
@@ -535,8 +549,6 @@ $(makeLenses ''Assign)
 $(makeLenses ''ContAssign)
 $(makeLenses ''Statement)
 $(makeLenses ''ModItem)
-$(makeLenses ''Parameter)
-$(makeLenses ''LocalParam)
 $(makeLenses ''ModDecl)
 $(makeLenses ''SourceInfo)
 $(makeWrapped ''Verilog)
