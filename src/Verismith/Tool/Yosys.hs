@@ -102,8 +102,8 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
     where checkFile = fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
 
 runEquiv
-    :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> ResultSh ()
-runEquiv sim1 sim2 srcInfo = do
+    :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo -> ResultSh ()
+runEquiv datadir sim1 sim2 srcInfo = do
     dir <- liftSh pwd
     liftSh $ do
         writefile "top.v"
@@ -114,7 +114,7 @@ runEquiv sim1 sim2 srcInfo = do
             ^. mainModule
         replaceMods (synthOutput sim1) "_1" srcInfo
         replaceMods (synthOutput sim2) "_2" srcInfo
-        writefile "proof.sby" $ sbyConfig sim1 sim2 srcInfo
+        writefile "proof.sby" $ sbyConfig datadir sim1 sim2 srcInfo
     e <- liftSh $ do
         exe dir "symbiyosys" "sby" ["-f", "proof.sby"]
         lastExitCode

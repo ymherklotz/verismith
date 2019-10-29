@@ -72,6 +72,7 @@ data FuzzOpts = FuzzOpts { _fuzzOptsOutput      :: !(Maybe FilePath)
                          , _fuzzOptsNoEquiv     :: !Bool
                          , _fuzzOptsNoReduction :: !Bool
                          , _fuzzOptsConfig      :: {-# UNPACK #-} !Config
+                         , _fuzzDataDir         :: {-# UNPACK #-} !FilePath
                          }
               deriving (Show, Eq)
 
@@ -86,6 +87,7 @@ defaultFuzzOpts = FuzzOpts { _fuzzOptsOutput      = Nothing
                            , _fuzzOptsNoEquiv     = False
                            , _fuzzOptsNoReduction = False
                            , _fuzzOptsConfig      = defaultConfig
+                           , _fuzzDataDir = fromText "."
                            }
 
 data FuzzEnv = FuzzEnv { _getSynthesisers :: ![SynthTool]
@@ -225,9 +227,7 @@ failedSynthesis = fmap toSynth . filter failed . _fuzzSynthStatus <$> get
     toSynth (SynthStatus s _ _) = s
 
 make :: MonadSh m => FilePath -> m ()
-make f = liftSh $ do
-    mkdir_p f
-    cp_r "data" $ f </> fromText "data"
+make f = liftSh $ mkdir_p f
 
 pop :: (MonadBaseControl IO m, MonadSh m) => FilePath -> m a -> m a
 pop f a = do
@@ -255,6 +255,7 @@ toolRun t m = do
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
+    datadir <- fmap _fuzzDataDir askOpts
     synth <- passedSynthesis
 --    let synthComb =
 --            nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
@@ -263,12 +264,12 @@ equivalence src = do
                 .   filter (uncurry (/=))
                 $   (,) defaultIdentitySynth
                 <$> synth
-    resTimes <- liftSh $ mapM (uncurry equiv) synthComb
+    resTimes <- liftSh $ mapM (uncurry (equiv datadir)) synthComb
     fuzzSynthResults .= toSynthResult synthComb resTimes
     liftSh $ inspect resTimes
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equiv a b =
+    equiv datadir a b =
         toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
             . runResultT
             $ do make dir
@@ -283,28 +284,29 @@ equivalence src = do
                               </> synthOutput b
                             ) $ synthOutput b
                          writefile "rtl.v" $ genSource src
-                     runEquiv a b src
+                     runEquiv datadir a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
 simulation src = do
+    datadir <- fmap _fuzzDataDir askOpts
     synth    <- passedSynthesis
     vals     <- liftIO $ generateByteString 20
-    ident    <- liftSh $ equiv vals defaultIdentitySynth
-    resTimes <- liftSh $ mapM (equiv vals) synth
+    ident    <- liftSh $ equiv datadir vals defaultIdentitySynth
+    resTimes <- liftSh $ mapM (equiv datadir vals) synth
     liftSh
         .   inspect
         $   (\(_, r) -> bimap show (T.unpack . T.take 10 . showBS) r)
         <$> (ident : resTimes)
   where
-    equiv b a = toolRun ("simulation for " <> toText a) . runResultT $ do
+    equiv datadir b a = toolRun ("simulation for " <> toText a) . runResultT $ do
         make dir
         pop dir $ do
             liftSh $ do
                 cp (fromText ".." </> fromText (toText a) </> synthOutput a)
                     $ synthOutput a
                 writefile "rtl.v" $ genSource src
-            runSimIc defaultIcarus a src b
+            runSimIc datadir defaultIcarus a src b
         where dir = fromText $ "simulation_" <> toText a
 
 -- | Generate a specific number of random bytestrings of size 256.
@@ -336,16 +338,17 @@ passEquiv = filter withIdentity . _fuzzSynthResults <$> get
 -- | Always reduces with respect to 'Identity'.
 reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
 reduction src = do
+    datadir <- fmap _fuzzDataDir askOpts
     fails      <- failEquivWithIdentity
     synthFails <- failedSynthesis
-    _          <- liftSh $ mapM red fails
+    _          <- liftSh $ mapM (red datadir) fails
     _          <- liftSh $ mapM redSynth synthFails
     return ()
   where
-    red (SynthResult a b _ _) = do
+    red datadir (SynthResult a b _ _) = do
         make dir
         pop dir $ do
-            s <- reduceSynth a b src
+            s <- reduceSynth datadir a b src
             writefile (fromText ".." </> dir <.> "v") $ genSource s
             return s
         where dir = fromText $ "reduce_" <> toText a <> "_" <> toText b

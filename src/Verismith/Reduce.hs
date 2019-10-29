@@ -582,17 +582,18 @@ reduceWithScript top script file = do
 -- | Reduce a 'SourceInfo' using two 'Synthesiser' that are passed to it.
 reduceSynth
     :: (Synthesiser a, Synthesiser b, MonadSh m)
-    => a
+    => Shelly.FilePath
+    -> a
     -> b
     -> SourceInfo
     -> m SourceInfo
-reduceSynth a b = reduce synth
+reduceSynth datadir a b = reduce synth
   where
     synth src' = liftSh $ do
         r <- runResultT $ do
             runSynth a src'
             runSynth b src'
-            runEquiv a b src'
+            runEquiv datadir a b src'
         return $ case r of
             Fail EquivFail -> True
             Fail _         -> False

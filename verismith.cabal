@@ -14,11 +14,11 @@ category: Hardware
 build-type: Custom
 cabal-version: >=1.10
 extra-source-files: README.md
-                  , data/*.v
                   , examples/*.v
                   , examples/config.toml
                   , scripts/*.py
                   , scripts/*.sh
+data-files: data/*.v
 
 source-repository head
   type:     git
@@ -27,7 +27,7 @@ source-repository head
 source-repository this
   type:     git
   location: https://github.com/ymherklotz/verismith
-  tag:      v0.4.0.0
+  tag:      v0.4.0.1
 
 custom-setup
   setup-depends:

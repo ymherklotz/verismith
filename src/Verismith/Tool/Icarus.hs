@@ -133,15 +133,16 @@ fromBytes = B.foldl' f 0 where f a b = a `shiftL` 8 .|. fromIntegral b
 
 runSimIc
     :: (Synthesiser b)
-    => Icarus
+    => FilePath
+    -> Icarus
     -> b
     -> SourceInfo
     -> [ByteString]
     -> ResultSh ByteString
-runSimIc sim1 synth1 srcInfo bss = do
+runSimIc datadir sim1 synth1 srcInfo bss = do
     dir <- liftSh pwd
     let top      = srcInfo ^. mainModule
-    let inConcat = (RegConcat (Id . fromPort <$> (top ^. modInPorts)))
+    let inConcat = (RegConcat . filter filterClk $ (Id . fromPort <$> (top ^. modInPorts)))
     let
         tb = instantiateMod top $ ModDecl
             "testbench"
@@ -170,7 +171,7 @@ runSimIc sim1 synth1 srcInfo bss = do
             ]
             []
 
-    liftSh . writefile "testbench.v" $ icarusTestbench (Verilog [tb]) synth1
+    liftSh . writefile "testbench.v" $ icarusTestbench datadir (Verilog [tb]) synth1
     liftSh $ exe dir "icarus" "iverilog" ["-o", "main", "testbench.v"]
     liftSh
         $   B.take 8
@@ -186,3 +187,5 @@ runSimIc sim1 synth1 srcInfo bss = do
                 )
   where
     exe dir name e = void . errExit False . logCommand dir name . timeout e
+    filterClk (Id "clk") = False
+    filterClk (Id _)     = True

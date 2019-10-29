@@ -89,8 +89,8 @@ write_verilog -force #{outf}
 |]
 
 -- brittany-disable-next-binding
-sbyConfig :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> Text
-sbyConfig sim1 sim2 (SourceInfo top _) = [st|[options]
+sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo -> Text
+sbyConfig datadir sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
 mode prove
 
@@ -115,19 +115,21 @@ top.v
     depList =
       T.intercalate "\n"
         $   toTextIgnore
-        .   (fromText "data" </>)
+        .   (datadir </> fromText "data" </>)
         .   fromText
         <$> deps
     readL = T.intercalate "\n" $ mappend "read -formal " <$> deps
 
-icarusTestbench :: (Synthesiser a) => Verilog -> a -> Text
-icarusTestbench t synth1 = [st|
-`include "data/cells_cmos.v"
-`include "data/cells_cyclone_v.v"
-`include "data/cells_verific.v"
-`include "data/cells_xilinx_7.v"
-`include "data/cells_yosys.v"
+icarusTestbench :: (Synthesiser a) => FilePath -> Verilog -> a -> Text
+icarusTestbench datadir t synth1 = [st|
+`include "#{ddir}/data/cells_cmos.v"
+`include "#{ddir}/data/cells_cyclone_v.v"
+`include "#{ddir}/data/cells_verific.v"
+`include "#{ddir}/data/cells_xilinx_7.v"
+`include "#{ddir}/data/cells_yosys.v"
 `include "#{toTextIgnore $ synthOutput synth1}"
 
 #{genSource t}
 |]
+  where
+    ddir = toTextIgnore datadir

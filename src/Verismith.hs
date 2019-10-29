@@ -54,6 +54,7 @@ import           Hedgehog                 (Gen)
 import qualified Hedgehog.Gen             as Hog
 import           Hedgehog.Internal.Seed   (Seed)
 import           Options.Applicative
+import           Paths_verismith          (getDataDir)
 import           Prelude                  hiding (FilePath)
 import           Shelly                   hiding (command)
 import           Shelly.Lifted            (liftSh)
@@ -70,6 +71,9 @@ import           Verismith.Tool
 import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.Parser (parseSourceInfoFile)
+
+toFP :: String -> FilePath
+toFP = fromText . T.pack
 
 myForkIO :: IO () -> IO (MVar ())
 myForkIO io = do
@@ -124,9 +128,10 @@ randomise config@(Config a _ c d e) = do
 handleOpts :: Opts -> IO ()
 handleOpts (Fuzz o configF f k n nosim noequiv noreduction) = do
     config <- getConfig configF
+    datadir <- getDataDir
     _      <- runFuzz
         (FuzzOpts (Just $ fromText o)
-         f k n nosim noequiv noreduction config)
+         f k n nosim noequiv noreduction config (toFP datadir))
         defaultYosys
         (fuzzMultiple (proceduralSrc "top" config))
     return ()
@@ -145,13 +150,14 @@ handleOpts (Parse f) = do
     where file = T.unpack . toTextIgnore $ f
 handleOpts (Reduce f t _ ls' False) = do
     src <- parseSourceInfoFile t (toTextIgnore f)
+    datadir <- getDataDir
     case descriptionToSynth <$> ls' of
         a : b : _ -> do
             putStrLn "Reduce with equivalence check"
             shelly $ do
                 make dir
                 pop dir $ do
-                    src' <- reduceSynth a b src
+                    src' <- reduceSynth (toFP datadir) a b src
                     writefile (fromText ".." </> dir <.> "v") $ genSource src'
         a : _ -> do
             putStrLn "Reduce with synthesis failure"
@@ -166,6 +172,7 @@ handleOpts (Reduce f t _ ls' False) = do
     where dir = fromText "reduce"
 handleOpts (Reduce f t _ ls' True) = do
     src <- parseSourceInfoFile t (toTextIgnore f)
+    datadir <- getDataDir
     case descriptionToSynth <$> ls' of
         a : b : _ -> do
             putStrLn "Starting equivalence check"
@@ -174,7 +181,7 @@ handleOpts (Reduce f t _ ls' True) = do
                 pop dir $ do
                     runSynth a src
                     runSynth b src
-                    runEquiv a b src
+                    runEquiv (toFP datadir) a b src
             case res of
                 Pass _            -> putStrLn "Equivalence check passed"
                 Fail EquivFail    -> putStrLn "Equivalence check failed"
@@ -264,10 +271,11 @@ checkEquivalence :: SourceInfo -> Text -> IO Bool
 checkEquivalence src dir = shellyFailDir $ do
     mkdir_p (fromText dir)
     curr <- toTextIgnore <$> pwd
+    datadir <- liftIO getDataDir
     setenv "VERISMITH_ROOT" curr
     cd (fromText dir)
     catch_sh
-        ((runResultT $ runEquiv defaultYosys defaultVivado src) >> return True)
+        ((runResultT $ runEquiv (toFP datadir) defaultYosys defaultVivado src) >> return True)
         ((\_ -> return False) :: RunFailed -> Sh Bool)
 
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
@@ -284,6 +292,7 @@ runEquivalence seed gm t d k i = do
     (_, m) <- shelly $ sampleSeed seed gm
     let srcInfo = SourceInfo "top" m
     rand <- generateByteString 20
+    datadir <- getDataDir
     shellyFailDir $ do
         mkdir_p (fromText d </> fromText n)
         curr <- toTextIgnore <$> pwd
@@ -292,7 +301,7 @@ runEquivalence seed gm t d k i = do
         _ <-
             catch_sh
                     (  runResultT
-                    $  runEquiv defaultYosys defaultVivado srcInfo
+                    $  runEquiv (toFP datadir) defaultYosys defaultVivado srcInfo
                     >> liftSh (logger "Test OK")
                     )
                 $ onFailure n
