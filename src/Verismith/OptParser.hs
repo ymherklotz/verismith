@@ -24,14 +24,16 @@ instance Show OptTool where
   show TXST    = "xst"
   show TIcarus = "icarus"
 
-data Opts = Fuzz { fuzzOutput      :: {-# UNPACK #-} !Text
-                 , fuzzConfigFile  :: !(Maybe FilePath)
-                 , fuzzForced      :: !Bool
-                 , fuzzKeepAll     :: !Bool
-                 , fuzzNum         :: {-# UNPACK #-} !Int
-                 , fuzzNoSim       :: !Bool
-                 , fuzzNoEquiv     :: !Bool
-                 , fuzzNoReduction :: !Bool
+data Opts = Fuzz { fuzzOutput          :: {-# UNPACK #-} !Text
+                 , fuzzConfigFile      :: !(Maybe FilePath)
+                 , fuzzForced          :: !Bool
+                 , fuzzKeepAll         :: !Bool
+                 , fuzzNum             :: {-# UNPACK #-} !Int
+                 , fuzzNoSim           :: !Bool
+                 , fuzzNoEquiv         :: !Bool
+                 , fuzzNoReduction     :: !Bool
+                 , fuzzExistingFile    :: !(Maybe FilePath)
+                 , fuzzExistingFileTop :: !Text
                  }
           | Generate { generateFilename   :: !(Maybe FilePath)
                      , generateConfigFile :: !(Maybe FilePath)
@@ -110,6 +112,19 @@ fuzzOpts =
                 "Do not run an equivalence check on the output netlist.")
         <*> (Opt.switch $ Opt.long "no-reduction" <> Opt.help
                 "Do not run reduction on a failed testcase.")
+        <*> (  Opt.optional
+            .  Opt.strOption
+            $  Opt.long "source"
+            <> Opt.short 's'
+            <> Opt.metavar "FILE"
+            <> Opt.help "Name of the top module.")
+        <*> textOption
+                (  Opt.long "source-top"
+                <> Opt.short 't'
+                <> Opt.metavar "TOP"
+                <> Opt.help "Define the top module for the source file."
+                <> Opt.showDefault
+                <> Opt.value "top")
 
 genOpts :: Parser Opts
 genOpts =

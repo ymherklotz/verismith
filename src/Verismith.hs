@@ -85,6 +85,11 @@ getConfig :: Maybe FilePath -> IO Config
 getConfig s =
     maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
 
+getGenerator :: Config -> Text -> Maybe FilePath -> IO (Gen SourceInfo)
+getGenerator config top s =
+    maybe (return $ proceduralSrc top config) (fmap return . parseSourceInfoFile top)
+    $ toTextIgnore <$> s
+
 -- | Randomly remove an option by setting it to 0.
 randDelete :: Int -> IO Int
 randDelete i = do
@@ -126,14 +131,15 @@ randomise config@(Config a _ c d e) = do
     ce = config ^. configProbability . probExpr
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz o configF f k n nosim noequiv noreduction) = do
+handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top) = do
     config <- getConfig configF
+    gen <- getGenerator config top file
     datadir <- getDataDir
     _      <- runFuzz
         (FuzzOpts (Just $ fromText o)
          f k n nosim noequiv noreduction config (toFP datadir))
         defaultYosys
-        (fuzzMultiple (proceduralSrc "top" config))
+        (fuzzMultiple gen)
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c
