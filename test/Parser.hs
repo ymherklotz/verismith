@@ -17,10 +17,10 @@ module Parser
 where
 
 import           Control.Lens
-import           Data.Either              (either, isRight)
-import           Hedgehog                 (Gen, Property, (===))
-import qualified Hedgehog                 as Hog
-import qualified Hedgehog.Gen             as Hog
+import           Data.Either                  (either, isRight)
+import           Hedgehog                     (Gen, Property, (===))
+import qualified Hedgehog                     as Hog
+import qualified Hedgehog.Gen                 as Hog
 import           Test.Tasty
 import           Test.Tasty.Hedgehog
 import           Test.Tasty.HUnit
@@ -29,6 +29,7 @@ import           Verismith
 import           Verismith.Internal
 import           Verismith.Verilog.Lex
 import           Verismith.Verilog.Parser
+import           Verismith.Verilog.Preprocess (uncomment)
 
 smallConfig :: Config
 smallConfig = defaultConfig & configProperty . propSize .~ 5
@@ -38,11 +39,10 @@ randomMod' = Hog.resize 20 (randomMod 3 10)
 
 parserInputMod :: Property
 parserInputMod = Hog.property $ do
-    v <- Hog.forAll randomMod'
+    v <- GenVerilog <$> Hog.forAll randomMod'
     Hog.assert . isRight $ parse parseModDecl
                                  "input_test_mod"
-                                 (alexScanTokens $ str v)
-    where str = show . GenVerilog
+                                 (alexScanTokens . uncomment "test" $ show v)
 
 parserIdempotentMod :: Property
 parserIdempotentMod = Hog.property $ do
@@ -58,11 +58,10 @@ parserIdempotentMod = Hog.property $ do
 
 parserInput :: Property
 parserInput = Hog.property $ do
-    v <- Hog.forAll (procedural "top" smallConfig)
+    v <- Hog.forAll (GenVerilog <$> procedural "top" smallConfig)
     Hog.assert . isRight $ parse parseModDecl
                                  "input_test"
-                                 (alexScanTokens $ str v)
-    where str = show . GenVerilog
+                                 (alexScanTokens . uncomment "test" $ show v)
 
 parserIdempotent :: Property
 parserIdempotent = Hog.property $ do
