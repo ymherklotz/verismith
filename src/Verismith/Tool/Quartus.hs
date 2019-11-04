@@ -22,6 +22,7 @@ import           Prelude                   hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted             (liftSh)
 import           Verismith.Tool.Internal
+import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
@@ -52,17 +53,15 @@ runSynthQuartus :: Quartus -> SourceInfo -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let ex = execute_ SynthFail dir "quartus"
-    liftSh . writefile inpf $ genSource src
-    liftSh . noPrint $ run_
-        "sed"
-        [ "-i"
-        , "s/^module/(* multstyle = \"logic\" *) module/;"
-        , toTextIgnore inpf
-        ]
-    ex (exec "quartus_map")
-       [top, "--source=" <> toTextIgnore inpf, "--family=Cyclone V"]
-    ex (exec "quartus_fit") [top, "--part=5CGXFC7D6F31C6"]
-    ex (exec "quartus_eda") [top, "--simulation", "--tool=vcs"]
+    liftSh $ do
+        writefile inpf $ genSource src
+        noPrint $ run_ "sed" [ "-i"
+                             , "s/^module/(* multstyle = \"logic\" *) module/;"
+                             , toTextIgnore inpf
+                             ]
+        writefile quartusSdc $ "create_clock -period 5 -name clk [get_ports clock]"
+        writefile quartusTcl $ quartusSynthConfig sim quartusSdc top inpf
+    ex (exec "quartus_sh") ["-t", toTextIgnore quartusTcl]
     liftSh $ do
         cp (fromText "simulation/vcs" </> fromText top <.> "vo")
             $ synthOutput sim
@@ -75,3 +74,5 @@ runSynthQuartus sim (SourceInfo top src) = do
   where
     inpf = "rtl.v"
     exec s = maybe (fromText s) (</> fromText s) $ quartusBin sim
+    quartusTcl = fromText top <.> "tcl"
+    quartusSdc = fromText top <.> "sdc"

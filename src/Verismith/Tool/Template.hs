@@ -13,8 +13,10 @@ Template file for different configuration files.
 {-# LANGUAGE QuasiQuotes #-}
 
 module Verismith.Tool.Template
-    ( yosysSatConfig
+    ( yosysSynthConfigStd
+    , yosysSatConfig
     , yosysSimConfig
+    , quartusSynthConfig
     , xstSynthConfig
     , vivadoSynthConfig
     , sbyConfig
@@ -48,7 +50,15 @@ doubleName n = n <> " " <> n
 outputText :: Synthesiser a => a -> Text
 outputText = toTextIgnore . synthOutput
 
--- brittany-disable-next-binding
+yosysSynthConfig :: Synthesiser a => Text -> a -> FilePath -> Text
+yosysSynthConfig t a fp = [st|read_verilog #{toTextIgnore fp}
+#{t}
+write_verilog #{outputText a}
+|]
+
+yosysSynthConfigStd :: Synthesiser a => a -> FilePath -> Text
+yosysSynthConfigStd = yosysSynthConfig "synth"
+
 yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> Text
 yosysSatConfig sim1 sim2 (SourceInfo top src) = [st|read_verilog #{outputText sim1}
 #{rename "_1" mis}
@@ -62,13 +72,32 @@ sat -timeout 20 -show-all -verify-no-timeout -ignore_div_by_zero -prove y_1 y_2 
   where
     mis = src ^.. getSourceId
 
--- brittany-disable-next-binding
 yosysSimConfig :: Text
 yosysSimConfig = [st|read_verilog rtl.v; proc;;
 rename mod mod_rtl
 |]
 
--- brittany-disable-next-binding
+quartusSynthConfig :: Synthesiser a => a -> FilePath -> Text -> FilePath -> Text
+quartusSynthConfig q sdc top fp = [st|load_package flow
+
+project_new #{top}
+
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name SYSTEMVERILOG_FILE #{toTextIgnore fp}
+set_global_assignment -name TOP_LEVEL_ENTITY #{top}
+set_global_assignment -name SDC_FILE #{toTextIgnore sdc}
+set_global_assignment -name INI_VARS "qatm_force_vqm=on;"
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 2
+set_instance_assignment -name VIRTUAL_PIN ON -to *
+
+execute_module -tool map
+execute_module -tool fit
+execute_module -tool sta -args "--mode=implement"
+execute_module -tool eda -args "--simulation --tool=vcs"
+
+project_close
+|]
+
 xstSynthConfig :: Text -> Text
 xstSynthConfig top = [st|run
 -ifn #{top}.prj -ofn #{top} -p artix7 -top #{top}
@@ -77,7 +106,6 @@ xstSynthConfig top = [st|run
 -change_error_to_warning "HDLCompiler:226 HDLCompiler:1832"
 |]
 
--- brittany-disable-next-binding
 vivadoSynthConfig :: Text -> Text -> Text
 vivadoSynthConfig top outf = [st|
 # CRITICAL WARNING: [Synth 8-5821] Potential divide by zero
@@ -88,7 +116,6 @@ synth_design -part xc7k70t -top #{top}
 write_verilog -force #{outf}
 |]
 
--- brittany-disable-next-binding
 sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo -> Text
 sbyConfig datadir sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
