@@ -38,7 +38,10 @@ data Opts = Fuzz { fuzzOutput          :: {-# UNPACK #-} !Text
           | Generate { generateFilename   :: !(Maybe FilePath)
                      , generateConfigFile :: !(Maybe FilePath)
                      }
-          | Parse { parseFilename :: {-# UNPACK #-} !FilePath
+          | Parse { parseFilename            :: {-# UNPACK #-} !FilePath
+                  , parseTop                 :: {-# UNPACK #-} !Text
+                  , parseOutput              :: !(Maybe FilePath)
+                  , parseRemoveConstInConcat :: !Bool
                   }
           | Reduce { reduceFilename        :: {-# UNPACK #-} !FilePath
                    , reduceTop             :: {-# UNPACK #-} !Text
@@ -145,8 +148,24 @@ genOpts =
             )
 
 parseOpts :: Parser Opts
-parseOpts = Parse . fromText . T.pack <$> Opt.strArgument
-    (Opt.metavar "FILE" <> Opt.help "Verilog input file.")
+parseOpts = Parse
+    <$> (fromText . T.pack <$> Opt.strArgument
+            (Opt.metavar "FILE" <> Opt.help "Verilog input file."))
+    <*> textOption ( Opt.short 't'
+                     <> Opt.long "top"
+                     <> Opt.metavar "TOP"
+                     <> Opt.help "Name of top level module."
+                     <> Opt.showDefault
+                     <> Opt.value "top"
+                   )
+    <*> ( Opt.optional
+          . Opt.strOption
+          $ Opt.long "output"
+          <> Opt.short 'o'
+          <> Opt.metavar "FILE"
+          <> Opt.help "Output file to write the parsed file to.")
+    <*> (Opt.switch $ Opt.long "remove-const-in-concat" <> Opt.help
+            "Remove constants in concatenation to simplify the Verilog.")
 
 reduceOpts :: Parser Opts
 reduceOpts =

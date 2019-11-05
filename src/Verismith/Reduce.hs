@@ -31,6 +31,8 @@ module Verismith.Reduce
     , cleanSourceInfo
     , cleanSourceInfoAll
     , removeDecl
+    , removeConstInConcat
+    , takeReplace
     , filterExpr
     )
 where
@@ -155,6 +157,21 @@ filterAssigns _ _ = True
 
 clean :: (Mutate a) => [Identifier] -> a -> a
 clean ids = mutExpr (transform $ filterExpr ids)
+
+takeReplace :: (Monoid a) => Replacement a -> a
+takeReplace (Single a) = a
+takeReplace (Dual a _) = a
+takeReplace None       = mempty
+
+removeConstInConcat :: Replace SourceInfo
+removeConstInConcat = Single . mutExpr replace
+  where
+    replace :: Expr -> Expr
+    replace (Concat expr) = maybe (Number 0) Concat . NonEmpty.nonEmpty
+                            $ NonEmpty.filter notConstant expr
+    replace e             = e
+    notConstant (Number _) = False
+    notConstant _          = True
 
 cleanUndefined :: [Identifier] -> [ModItem] -> [ModItem]
 cleanUndefined ids mis = clean usedWires mis
@@ -547,9 +564,10 @@ reduce
 reduce eval src =
     fmap removeDecl
         $   red "Modules" moduleBot halveModules src
-        >>= redAll "Module Items" modItemBot         halveModItems
+        >>= redAll "Module items" modItemBot         halveModItems
         >>= redAll "Statements"   (const defaultBot) halveStatements
         -- >>= redAll "Expressions"  (const defaultBot) halveExpr
+        >>= red "Remove constants in concat" defaultBot removeConstInConcat
   where
     red s bot a = reduce_ s a bot eval
     red' s bot a t = reduce_ s (a t) (bot t) eval

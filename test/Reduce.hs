@@ -36,7 +36,37 @@ reduceUnitTests = testGroup
     , removeDeclTest
     ]
 
--- brittany-disable-next-binding
+removeConstInConcatTest :: TestTree
+removeConstInConcatTest = testCase "Remove const in concat" $ do
+    GenVerilog (removeDecl srcInfo1) @?= golden1
+  where
+    srcInfo1 = SourceInfo "top" [verilog|
+module top;
+  wire a;
+  reg b;
+
+  assign a = {1'b0, 1'b0, 1'b0, (1'b0), b, (1'b0), (1'b0)};
+
+  always @(posedge clk) begin
+    if (a)
+      b <= 1 + 5 + {1'b0, 1'b1, 5'h20, b, 2'b0};
+  end
+endmodule
+|]
+    golden1 = GenVerilog $ SourceInfo "top" [verilog|
+module top;
+  wire a;
+  reg b;
+
+  assign a = {b};
+
+  always @(posedge clk) begin
+    if (a)
+      b <= 1 + 5 + {b};
+  end
+endmodule
+|]
+
 removeDeclTest :: TestTree
 removeDeclTest = testCase "Remove declarations" $ do
     GenVerilog (removeDecl srcInfo1) @?= golden1
@@ -95,7 +125,6 @@ module top;
 endmodule
 |]
 
--- brittany-disable-next-binding
 cleanAllTest :: TestTree
 cleanAllTest = testCase "Clean all" $ do
     GenVerilog (cleanSourceInfoAll srcInfo1) @?= golden1
@@ -157,7 +186,6 @@ module mod2;
 endmodule
 |]
 
--- brittany-disable-next-binding
 cleanTest :: TestTree
 cleanTest = testCase "Clean expression" $ do
     clean ["wire1", "wire2"] srcInfo1 @?= golden1
@@ -197,7 +225,6 @@ endmodule
 |]
 
 
--- brittany-disable-next-binding
 activeWireTest :: TestTree
 activeWireTest = testCase "Active wires" $ do
     findActiveWires "top" verilog1 \\ ["x", "y", "z", "w"]          @?= []
@@ -271,7 +298,6 @@ module m2(y, z, x);
 endmodule
 |]
 
--- brittany-disable-next-binding
 halveStatementsTest :: TestTree
 halveStatementsTest = testCase "Statements" $ do
     GenVerilog <$> halveStatements "top" srcInfo1 @?= golden1
@@ -336,7 +362,6 @@ module top(clk, y, x);
 endmodule
 |])
 
--- brittany-disable-next-binding
 modItemReduceTest :: TestTree
 modItemReduceTest = testCase "Module items" $ do
     GenVerilog <$> halveModItems "top" srcInfo1 @?= golden1
@@ -372,7 +397,6 @@ module top(y, x);
 endmodule
 |])
 
--- brittany-disable-next-binding
 statementReducerTest :: TestTree
 statementReducerTest = testCase "Statement reducer" $ do
     GenVerilog <$> halveStatements "top" srcInfo1 @?= fmap GenVerilog golden1
@@ -460,7 +484,6 @@ module top(y, x);
 endmodule
 |]
 
--- brittany-disable-next-binding
 moduleReducerTest :: TestTree
 moduleReducerTest = testCase "Module reducer" $ do
     halveModules srcInfo1 @?= golden1

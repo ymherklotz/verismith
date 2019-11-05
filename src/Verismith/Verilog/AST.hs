@@ -524,6 +524,12 @@ data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
                              }
                   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
+instance Semigroup SourceInfo where
+    (SourceInfo t v) <> (SourceInfo _ v2) = SourceInfo t $ v <> v2
+
+instance Monoid SourceInfo where
+    mempty = SourceInfo mempty mempty
+
 $(makeLenses ''Expr)
 $(makeLenses ''ConstExpr)
 $(makeLenses ''Task)
