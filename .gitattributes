@@ -1,2 +1,3 @@
 bugs/*.v linguist-vendored=true
 data/*.v linguist-vendored=true
+*.v linguist-language=Verilog
