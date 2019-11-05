@@ -39,7 +39,6 @@ where
 import           Control.Concurrent
 import           Control.Lens             hiding ((<.>))
 import           Control.Monad.IO.Class   (liftIO)
-import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
 import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
 import qualified Data.ByteString.Lazy     as L
@@ -50,6 +49,7 @@ import           Data.Text                (Text)
 import qualified Data.Text                as T
 import           Data.Text.Encoding       (decodeUtf8)
 import qualified Data.Text.IO             as T
+import           Data.Word                (Word8)
 import           Hedgehog                 (Gen)
 import qualified Hedgehog.Gen             as Hog
 import           Hedgehog.Internal.Seed   (Seed)
@@ -58,7 +58,8 @@ import           Paths_verismith          (getDataDir)
 import           Prelude                  hiding (FilePath)
 import           Shelly                   hiding (command)
 import           Shelly.Lifted            (liftSh)
-import           System.Random            (randomIO)
+import           System.Random            (mkStdGen, newStdGen, randomIO,
+                                           randoms)
 import           Verismith.Circuit
 import           Verismith.Config
 import           Verismith.Fuzz
@@ -218,18 +219,23 @@ defaultMain = do
     optsparsed <- execParser opts
     handleOpts optsparsed
 
--- | Generate a specific number of random bytestrings of size 256.
-randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes
-    | n == 0    = ranBytes : bytes
-    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
-    where Right (ranBytes, newGen) = C.genBytes 32 gen
-
 -- | generates the specific number of bytestring with a random seed.
-generateByteString :: Int -> IO [ByteString]
-generateByteString n = do
-    gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ randomByteString gen n []
+generateByteString' :: Int -> [Word8] -> (ByteString, [Word8])
+generateByteString' size words = (B.pack $ take size words, drop size words)
+
+generateByteString :: (Maybe Int) -> Int -> Int -> IO [ByteString]
+generateByteString mseed size n = do
+    gen <- case mseed of
+        Some seed' -> return $ mkStdGen seed'
+        Nothing    -> newStdGen
+    randlist <- take (size * n) <$> randoms gen
+    return . fmap B.pack $ chunksOf size randlist
+  where
+    chunksOf i xs | i <= 0 = error $ "chunksOf, number must be positive, got " ++ show i
+    chunksOf i xs = repeatedly (splitAt i) xs
+    repeatedly f [] = []
+    repeatedly f as = b : repeatedly f as'
+      where (b, as') = f as
 
 makeSrcInfo :: ModDecl -> SourceInfo
 makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])
@@ -256,7 +262,7 @@ runSimulation = do
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
-    rand  <- generateByteString 20
+    rand  <- generateByteString Nothing 32 20
     rand2 <- Hog.sample (randomMod 10 100)
     val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
     case val of
