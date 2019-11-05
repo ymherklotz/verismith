@@ -36,7 +36,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import qualified Crypto.Random.DRBG          as C
 import           Data.ByteString             (ByteString)
 import           Data.List                   (nubBy, sort)
 import           Data.Maybe                  (fromMaybe, isNothing)
@@ -291,7 +290,7 @@ simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
 simulation src = do
     datadir <- fmap _fuzzDataDir askOpts
     synth    <- passedSynthesis
-    vals     <- liftIO $ generateByteString 20
+    vals     <- liftIO $ generateByteString Nothing 32 20
     ident    <- liftSh $ equiv datadir vals defaultIdentitySynth
     resTimes <- liftSh $ mapM (equiv datadir vals) synth
     liftSh
@@ -309,18 +308,23 @@ simulation src = do
             runSimIc datadir defaultIcarus a src b
         where dir = fromText $ "simulation_" <> toText a
 
--- | Generate a specific number of random bytestrings of size 256.
-randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes
-    | n == 0    = ranBytes : bytes
-    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
-    where Right (ranBytes, newGen) = C.genBytes 32 gen
-
 -- | generates the specific number of bytestring with a random seed.
-generateByteString :: Int -> IO [ByteString]
-generateByteString n = do
-    gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ randomByteString gen n []
+generateByteString' :: Int -> [Word8] -> (ByteString, [Word8])
+generateByteString' size words = (B.pack $ take size words, drop size words)
+
+generateByteString :: (Maybe Int) -> Int -> Int -> IO [ByteString]
+generateByteString mseed size n = do
+    gen <- case mseed of
+        Some seed' -> return $ mkStdGen seed'
+        Nothing    -> newStdGen
+    randlist <- take (size * n) <$> randoms gen
+    return . fmap B.pack $ chunksOf size randlist
+  where
+    chunksOf i xs | i <= 0 = error $ "chunksOf, number must be positive, got " ++ show i
+    chunksOf i xs = repeatedly (splitAt i) xs
+    repeatedly f [] = []
+    repeatedly f as = b : repeatedly f as'
+      where (b, as') = f as
 
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
