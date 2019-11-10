@@ -54,6 +54,7 @@ import           Prelude               hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted         (MonadSh, liftSh)
 import           System.FilePath.Posix (takeBaseName)
+import           Verismith.CounterEg   (CounterEg)
 import           Verismith.Internal
 import           Verismith.Result
 import           Verismith.Verilog.AST
@@ -74,7 +75,7 @@ class Tool a => Simulator a where
                  -> ResultSh ByteString
 
 data Failed = EmptyFail
-            | EquivFail
+            | EquivFail CounterEg
             | EquivError
             | SimFail
             | SynthFail

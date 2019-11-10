@@ -23,11 +23,14 @@ where
 import           Control.DeepSeq           (NFData, rnf, rwhnf)
 import           Control.Lens
 import           Control.Monad             (void)
+import           Data.Either               (fromRight)
 import           Data.Text                 (Text, unpack)
 import           Prelude                   hiding (FilePath)
-import           Shelly
-import           Shelly.Lifted             (liftSh)
+import           Shelly                    (FilePath, (</>))
+import qualified Shelly                    as S
+import           Shelly.Lifted             (liftSh, readfile)
 import           Text.Shakespeare.Text     (st)
+import           Verismith.CounterEg       (parseCounterEg)
 import           Verismith.Result
 import           Verismith.Tool.Internal
 import           Verismith.Tool.Template
@@ -59,13 +62,13 @@ defaultYosys :: Yosys
 defaultYosys = Yosys Nothing "yosys" "syn_yosys.v"
 
 yosysPath :: Yosys -> FilePath
-yosysPath sim = maybe (fromText "yosys") (</> fromText "yosys") $ yosysBin sim
+yosysPath sim = maybe (S.fromText "yosys") (</> S.fromText "yosys") $ yosysBin sim
 
 runSynthYosys :: Yosys -> SourceInfo -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = do
     dir <- liftSh $ do
-        dir' <- pwd
-        writefile inpf $ genSource src
+        dir' <- S.pwd
+        S.writefile inpf $ genSource src
         return dir'
     execute_
         SynthFail
@@ -77,8 +80,8 @@ runSynthYosys sim (SourceInfo _ src) = do
         ]
   where
     inpf = "rtl.v"
-    inp  = toTextIgnore inpf
-    out  = toTextIgnore $ synthOutput sim
+    inp  = S.toTextIgnore inpf
+    out  = S.toTextIgnore $ synthOutput sim
 
 runEquivYosys
     :: (Synthesiser a, Synthesiser b)
@@ -89,24 +92,24 @@ runEquivYosys
     -> ResultSh ()
 runEquivYosys yosys sim1 sim2 srcInfo = do
     liftSh $ do
-        writefile "top.v"
+        S.writefile "top.v"
             .  genSource
             .  initMod
             .  makeTop 2
             $  srcInfo
             ^. mainModule
-        writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
+        S.writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo
     runSynth sim1 srcInfo
     runSynth sim2 srcInfo
-    liftSh $ run_ (yosysPath yosys) [toTextIgnore checkFile]
-    where checkFile = fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
+    liftSh $ S.run_ (yosysPath yosys) [S.toTextIgnore checkFile]
+    where checkFile = S.fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
 
 runEquiv
     :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo -> ResultSh ()
 runEquiv datadir sim1 sim2 srcInfo = do
-    dir <- liftSh pwd
+    dir <- liftSh S.pwd
     liftSh $ do
-        writefile "top.v"
+        S.writefile "top.v"
             .  genSource
             .  initMod
             .  makeTopAssert
@@ -114,14 +117,15 @@ runEquiv datadir sim1 sim2 srcInfo = do
             ^. mainModule
         replaceMods (synthOutput sim1) "_1" srcInfo
         replaceMods (synthOutput sim2) "_2" srcInfo
-        writefile "proof.sby" $ sbyConfig datadir sim1 sim2 srcInfo
+        S.writefile "proof.sby" $ sbyConfig datadir sim1 sim2 srcInfo
     e <- liftSh $ do
         exe dir "symbiyosys" "sby" ["-f", "proof.sby"]
-        lastExitCode
+        S.lastExitCode
     case e of
         0   -> ResultT . return $ Pass ()
-        2   -> ResultT . return $ Fail EquivFail
+        2   -> ResultT $ Fail . EquivFail . fromRight mempty
+                       . parseCounterEg <$> readfile "proof/engine_0/trace.smtc"
         124 -> ResultT . return $ Fail TimeoutError
         _   -> ResultT . return $ Fail EquivError
   where
-    exe dir name e = void . errExit False . logCommand dir name . timeout e
+    exe dir name e = void . S.errExit False . logCommand dir name . timeout e

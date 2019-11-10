@@ -325,8 +325,8 @@ generateByteString n = do
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
   where
-    withIdentity (SynthResult (IdentitySynth _) _ (Fail EquivFail) _) = True
-    withIdentity (SynthResult _ (IdentitySynth _) (Fail EquivFail) _) = True
+    withIdentity (SynthResult (IdentitySynth _) _ (Fail (EquivFail _)) _) = True
+    withIdentity (SynthResult _ (IdentitySynth _) (Fail (EquivFail _)) _) = True
     withIdentity _                                                    = False
 
 passEquiv :: (MonadSh m) => Fuzz m [SynthResult]

@@ -72,6 +72,19 @@ import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.Parser (parseSourceInfoFile)
 
+-- | Generate a specific number of random bytestrings of size 256.
+randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
+randomByteString gen n bytes
+    | n == 0    = ranBytes : bytes
+    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
+    where Right (ranBytes, newGen) = C.genBytes 32 gen
+
+-- | generates the specific number of bytestring with a random seed.
+generateByteString :: Int -> IO [ByteString]
+generateByteString n = do
+    gen <- C.newGenIO :: IO C.CtrDRBG
+    return $ randomByteString gen n []
+
 toFP :: String -> FilePath
 toFP = fromText . T.pack
 
@@ -196,10 +209,10 @@ handleOpts (Reduce f t _ ls' True) = do
                     runSynth b src
                     runEquiv (toFP datadir) a b src
             case res of
-                Pass _            -> putStrLn "Equivalence check passed"
-                Fail EquivFail    -> putStrLn "Equivalence check failed"
-                Fail TimeoutError -> putStrLn "Equivalence check timed out"
-                Fail _            -> putStrLn "Equivalence check error"
+                Pass _             -> putStrLn "Equivalence check passed"
+                Fail (EquivFail _) -> putStrLn "Equivalence check failed"
+                Fail TimeoutError  -> putStrLn "Equivalence check timed out"
+                Fail _             -> putStrLn "Equivalence check error"
             return ()
         as -> do
             putStrLn "Synthesis check"
@@ -217,19 +230,6 @@ defaultMain :: IO ()
 defaultMain = do
     optsparsed <- execParser opts
     handleOpts optsparsed
-
--- | Generate a specific number of random bytestrings of size 256.
-randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes
-    | n == 0    = ranBytes : bytes
-    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
-    where Right (ranBytes, newGen) = C.genBytes 32 gen
-
--- | generates the specific number of bytestring with a random seed.
-generateByteString :: Int -> IO [ByteString]
-generateByteString n = do
-    gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ randomByteString gen n []
 
 makeSrcInfo :: ModDecl -> SourceInfo
 makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])

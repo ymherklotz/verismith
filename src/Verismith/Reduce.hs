@@ -613,9 +613,9 @@ reduceSynth datadir a b = reduce synth
             runSynth b src'
             runEquiv datadir a b src'
         return $ case r of
-            Fail EquivFail -> True
-            Fail _         -> False
-            Pass _         -> False
+            Fail (EquivFail _) -> True
+            Fail _             -> False
+            Pass _             -> False
 
 reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo -> m SourceInfo
 reduceSynthesis a = reduce synth

@@ -236,13 +236,13 @@ descriptionToSynth s =
     error $ "Could not find implementation for synthesiser '" <> show s <> "'"
 
 status :: Result Failed () -> Html
-status (Pass _           ) = H.td ! A.class_ "is-success" $ "Passed"
-status (Fail EmptyFail   ) = H.td ! A.class_ "is-danger" $ "Failed"
-status (Fail EquivFail   ) = H.td ! A.class_ "is-danger" $ "Equivalence failed"
-status (Fail SimFail     ) = H.td ! A.class_ "is-danger" $ "Simulation failed"
-status (Fail SynthFail   ) = H.td ! A.class_ "is-danger" $ "Synthesis failed"
-status (Fail EquivError  ) = H.td ! A.class_ "is-danger" $ "Equivalence error"
-status (Fail TimeoutError) = H.td ! A.class_ "is-warning" $ "Time out"
+status (Pass _           )  = H.td ! A.class_ "is-success" $ "Passed"
+status (Fail EmptyFail   )  = H.td ! A.class_ "is-danger" $ "Failed"
+status (Fail (EquivFail _)) = H.td ! A.class_ "is-danger" $ "Equivalence failed"
+status (Fail SimFail     )  = H.td ! A.class_ "is-danger" $ "Simulation failed"
+status (Fail SynthFail   )  = H.td ! A.class_ "is-danger" $ "Synthesis failed"
+status (Fail EquivError  )  = H.td ! A.class_ "is-danger" $ "Equivalence error"
+status (Fail TimeoutError)  = H.td ! A.class_ "is-warning" $ "Time out"
 
 synthStatusHtml :: SynthStatus -> Html
 synthStatusHtml (SynthStatus synth res diff) = H.tr $ do
