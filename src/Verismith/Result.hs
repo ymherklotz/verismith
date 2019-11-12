@@ -22,6 +22,8 @@ needed in "Verismith".
 module Verismith.Result
     ( Result(..)
     , ResultT(..)
+    , justPass
+    , justFail
     , (<?>)
     , annotate
     )
@@ -41,6 +43,14 @@ import           Shelly.Lifted               (MonadSh, liftSh)
 data Result a b = Fail a
                 | Pass b
                 deriving (Eq, Show)
+
+justPass :: Result a b -> Maybe b
+justPass (Fail _) = Nothing
+justPass (Pass a) = Just a
+
+justFail :: Result a b -> Maybe a
+justFail (Pass _) = Nothing
+justFail (Fail a) = Just a
 
 instance Semigroup (Result a b) where
     Pass _ <> a = a

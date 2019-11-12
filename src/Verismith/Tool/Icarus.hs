@@ -14,6 +14,7 @@ module Verismith.Tool.Icarus
     ( Icarus(..)
     , defaultIcarus
     , runSimIc
+    , runSimIcEC
     )
 where
 
@@ -39,6 +40,8 @@ import           Numeric                    (readInt)
 import           Prelude                    hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted              (liftSh)
+import           Verismith.CounterEg        (CounterEg (..))
+import           Verismith.Result
 import           Verismith.Tool.Internal
 import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
@@ -114,12 +117,12 @@ runSimIcarus sim rinfo bss = do
     let newtb     = instantiateMod m tb
     let modWithTb = Verilog [newtb, m]
     liftSh . writefile "main.v" $ genSource modWithTb
-    annotate SimFail $ runSimWithFile sim "main.v" bss
+    annotate (SimFail mempty) $ runSimWithFile sim "main.v" bss
     where m = rinfo ^. mainModule
 
 runSimIcarusWithFile
     :: Icarus -> FilePath -> [ByteString] -> ResultSh ByteString
-runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
+runSimIcarusWithFile sim f _ = annotate (SimFail mempty) . liftSh $ do
     dir <- pwd
     logCommand_ dir "icarus"
         $ run (icarusPath sim) ["-o", "main", toTextIgnore f]
@@ -131,49 +134,46 @@ runSimIcarusWithFile sim f _ = annotate SimFail . liftSh $ do
 fromBytes :: ByteString -> Integer
 fromBytes = B.foldl' f 0 where f a b = a `shiftL` 8 .|. fromIntegral b
 
-runSimIc
-    :: (Synthesiser b)
-    => FilePath
-    -> Icarus
-    -> b
-    -> SourceInfo
-    -> [ByteString]
-    -> ResultSh ByteString
-runSimIc datadir sim1 synth1 srcInfo bss = do
+tbModule :: [ByteString] -> ModDecl -> Verilog
+tbModule bss top =
+    Verilog [ instantiateMod top $ ModDecl "testbench" [] []
+              [ Initial
+                $  fold [ BlockAssign (Assign "clk" Nothing 0)
+                        , BlockAssign (Assign inConcat Nothing 0)
+                        ]
+                <> fold ((\r -> TimeCtrl 10
+                             (Just $ BlockAssign (Assign inConcat Nothing r)))
+                         . fromInteger . fromBytes <$> bss)
+                <> (SysTaskEnable $ Task "finish" [])
+              , Always . TimeCtrl 5 . Just $ BlockAssign
+                (Assign "clk" Nothing (UnOp UnNot (Id "clk")))
+              , Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable
+                $ Task "strobe" ["%b", Id "y"]
+              ] []
+            ]
+  where
+    inConcat = (RegConcat . filter (/= (Id "clk")) $ (Id . fromPort <$> (top ^. modInPorts)))
+
+counterTestBench :: CounterEg -> ModDecl -> Verilog
+counterTestBench (CounterEg _ states) m = tbModule filtered m
+  where
+    filtered = convert . fold . fmap snd . filter ((/= "clk") . fst) <$> states
+
+runSimIc' :: (Synthesiser b) => ([ByteString] -> ModDecl -> Verilog)
+          -> FilePath
+          -> Icarus
+          -> b
+          -> SourceInfo
+          -> [ByteString]
+          -> Maybe ByteString
+          -> ResultSh ByteString
+runSimIc' fun datadir sim1 synth1 srcInfo bss bs = do
     dir <- liftSh pwd
     let top      = srcInfo ^. mainModule
-    let inConcat = (RegConcat . filter filterClk $ (Id . fromPort <$> (top ^. modInPorts)))
-    let
-        tb = instantiateMod top $ ModDecl
-            "testbench"
-            []
-            []
-            [ Initial
-            $  fold
-                   [ BlockAssign (Assign "clk" Nothing 0)
-                   , BlockAssign (Assign inConcat Nothing 0)
-                   ]
-            <> fold
-                   (   (\r -> TimeCtrl
-                           10
-                           (Just $ BlockAssign (Assign inConcat Nothing r))
-                       )
-                   .   fromInteger
-                   .   fromBytes
-                   <$> bss
-                   )
-            <> (SysTaskEnable $ Task "finish" [])
-            , Always . TimeCtrl 5 . Just $ BlockAssign
-                (Assign "clk" Nothing (UnOp UnNot (Id "clk")))
-            , Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable $ Task
-                "strobe"
-                ["%b", Id "y"]
-            ]
-            []
-
-    liftSh . writefile "testbench.v" $ icarusTestbench datadir (Verilog [tb]) synth1
-    liftSh $ exe dir "icarus" "iverilog" ["-o", "main", "testbench.v"]
-    liftSh
+    let tb = fun bss top
+    liftSh . writefile tbname $ icarusTestbench datadir tb synth1
+    liftSh $ exe dir "icarus" "iverilog" ["-o", exename, toTextIgnore tbname]
+    s <- liftSh
         $   B.take 8
         .   BA.convert
         .   (hash :: ByteString -> Digest SHA256)
@@ -183,9 +183,29 @@ runSimIc datadir sim1 synth1 srcInfo bss = do
                 (runFoldLines (mempty :: ByteString)
                               callback
                               (vvpPath sim1)
-                              ["main"]
-                )
+                              [exename])
+    case (bs, s) of
+        (Nothing, s') -> ResultT . return $ Pass s'
+        (Just bs', s') -> if bs' == s'
+                    then ResultT . return $ Pass s'
+                    else ResultT . return $ Fail (SimFail s')
   where
     exe dir name e = void . errExit False . logCommand dir name . timeout e
-    filterClk (Id "clk") = False
-    filterClk (Id _)     = True
+    tbname = fromText $ toText synth1 <> "_testbench.v"
+    exename = toText synth1 <> "_main"
+
+runSimIc :: (Synthesiser b)
+         => FilePath         -- ^ Data directory.
+         -> Icarus           -- ^ Icarus simulator.
+         -> b                -- ^ Synthesis tool to be tested.
+         -> SourceInfo       -- ^ Original generated program to test.
+         -> [ByteString]     -- ^ Test vectors to be passed as inputs to the generated Verilog.
+         -> Maybe ByteString -- ^ What the correct output should be. If
+                             -- 'Nothing' is passed, then just return 'Pass
+                             -- ByteString' with the answer.
+         -> ResultSh ByteString
+runSimIc = runSimIc' tbModule
+
+runSimIcEC :: (Synthesiser b) => FilePath -> Icarus -> b
+           -> SourceInfo -> CounterEg -> Maybe ByteString -> ResultSh ByteString
+runSimIcEC a b c d e = runSimIc' (const $ counterTestBench e) a b c d []

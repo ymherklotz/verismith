@@ -155,15 +155,15 @@ defaultIcarusSim = IcarusSim defaultIcarus
 
 -- | The results from running a tool through a simulator. It can either fail or
 -- return a result, which is most likely a 'ByteString'.
-data SimResult = SimResult !SynthTool !SimTool !BResult !NominalDiffTime
+data SimResult = SimResult !SynthTool !SimTool ![ByteString] !BResult !NominalDiffTime
                  deriving (Eq)
 
 instance Show SimResult where
-    show (SimResult synth sim r d) = show synth <> ", " <> show sim <> ": " <> show (bimap show (T.unpack . showBS) r) <> " (" <> show d <> ")"
+    show (SimResult synth sim _ r d) = show synth <> ", " <> show sim <> ": " <> show (bimap show (T.unpack . showBS) r) <> " (" <> show d <> ")"
 
 getSimResult :: SimResult -> UResult
-getSimResult (SimResult _ _ (Pass _) _) = Pass ()
-getSimResult (SimResult _ _ (Fail b) _) = Fail b
+getSimResult (SimResult _ _ _ (Pass _) _) = Pass ()
+getSimResult (SimResult _ _ _ (Fail b) _) = Fail b
 
 -- | The results of comparing the synthesised outputs of two files using a
 -- formal equivalence checker. This will either return a failure or an output
@@ -239,7 +239,7 @@ status :: Result Failed () -> Html
 status (Pass _           )  = H.td ! A.class_ "is-success" $ "Passed"
 status (Fail EmptyFail   )  = H.td ! A.class_ "is-danger" $ "Failed"
 status (Fail (EquivFail _)) = H.td ! A.class_ "is-danger" $ "Equivalence failed"
-status (Fail SimFail     )  = H.td ! A.class_ "is-danger" $ "Simulation failed"
+status (Fail (SimFail  _))  = H.td ! A.class_ "is-danger" $ "Simulation failed"
 status (Fail SynthFail   )  = H.td ! A.class_ "is-danger" $ "Synthesis failed"
 status (Fail EquivError  )  = H.td ! A.class_ "is-danger" $ "Equivalence error"
 status (Fail TimeoutError)  = H.td ! A.class_ "is-warning" $ "Time out"

@@ -77,10 +77,18 @@ class Tool a => Simulator a where
 data Failed = EmptyFail
             | EquivFail CounterEg
             | EquivError
-            | SimFail
+            | SimFail ByteString
             | SynthFail
             | TimeoutError
-            deriving (Eq, Show)
+            deriving (Eq)
+
+instance Show Failed where
+    show EmptyFail     = "EmptyFail"
+    show (EquivFail _) = "EquivFail"
+    show EquivError    = "EquivError"
+    show (SimFail bs)  = "SimFail " <> T.unpack (T.take 10 $ showBS bs)
+    show SynthFail     = "SynthFail"
+    show TimeoutError  = "TimeoutError"
 
 instance Semigroup Failed where
     EmptyFail <> a = a

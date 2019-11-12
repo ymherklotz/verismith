@@ -18,6 +18,7 @@ module Verismith.Reduce
       reduceWithScript
     , reduceSynth
     , reduceSynthesis
+    , reduceSimIc
     , reduce
     , reduce_
     , Replacement(..)
@@ -40,6 +41,7 @@ where
 import           Control.Lens             hiding ((<.>))
 import           Control.Monad            (void)
 import           Control.Monad.IO.Class   (MonadIO, liftIO)
+import           Data.ByteString          (ByteString)
 import           Data.Foldable            (foldrM)
 import           Data.List                (nub)
 import           Data.List.NonEmpty       (NonEmpty (..))
@@ -48,10 +50,12 @@ import           Data.Maybe               (mapMaybe)
 import           Data.Text                (Text)
 import           Shelly                   ((<.>))
 import qualified Shelly
-import           Shelly.Lifted            (MonadSh, liftSh)
+import           Shelly.Lifted            (MonadSh, liftSh, rm_rf)
 import           Verismith.Internal
 import           Verismith.Result
 import           Verismith.Tool
+import           Verismith.Tool.Icarus
+import           Verismith.Tool.Identity
 import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.AST
@@ -614,8 +618,7 @@ reduceSynth datadir a b = reduce synth
             runEquiv datadir a b src'
         return $ case r of
             Fail (EquivFail _) -> True
-            Fail _             -> False
-            Pass _             -> False
+            _                  -> False
 
 reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo -> m SourceInfo
 reduceSynthesis a = reduce synth
@@ -624,5 +627,25 @@ reduceSynthesis a = reduce synth
         r <- runResultT $ runSynth a src
         return $ case r of
             Fail SynthFail -> True
-            Fail _         -> False
-            Pass _         -> False
+            _              -> False
+
+runInTmp :: Shelly.Sh a -> Shelly.Sh a
+runInTmp a = Shelly.withTmpDir $ (\f -> do
+    dir <- Shelly.pwd
+    Shelly.cd f
+    r <- a
+    Shelly.cd dir
+    return r)
+
+reduceSimIc :: (Synthesiser a, MonadSh m) => Shelly.FilePath -> [ByteString] -> a -> SourceInfo -> m SourceInfo
+reduceSimIc fp bs a = reduce synth
+  where
+    synth src = liftSh . runInTmp $ do
+        r <- runResultT $ do
+            runSynth a src
+            runSynth defaultIdentity src
+            i <- runSimIc fp defaultIcarus defaultIdentity src bs Nothing
+            runSimIc fp defaultIcarus a src bs $ Just i
+        return $ case r of
+            Fail (SimFail _) -> True
+            _                -> False

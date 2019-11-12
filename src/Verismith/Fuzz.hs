@@ -39,7 +39,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Random.DRBG          as C
 import           Data.ByteString             (ByteString)
 import           Data.List                   (nubBy, sort)
-import           Data.Maybe                  (fromMaybe, isNothing)
+import           Data.Maybe                  (catMaybes, fromMaybe, isNothing)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Time
@@ -54,6 +54,7 @@ import           Shelly                      hiding (get)
 import           Shelly.Lifted               (MonadSh, liftSh)
 import           System.FilePath.Posix       (takeBaseName)
 import           Verismith.Config
+import           Verismith.CounterEg         (CounterEg (..))
 import           Verismith.Internal
 import           Verismith.Reduce
 import           Verismith.Report
@@ -166,8 +167,8 @@ filterSynth (SynthResult _ _ (Pass _) _) = True
 filterSynth _                            = False
 
 filterSim :: SimResult -> Bool
-filterSim (SimResult _ _ (Pass _) _) = True
-filterSim _                          = False
+filterSim (SimResult _ _ _ (Pass _) _) = True
+filterSim _                            = False
 
 filterSynthStat :: SynthStatus -> Bool
 filterSynthStat (SynthStatus _ (Pass _) _) = True
@@ -240,11 +241,18 @@ applyList a b = apply' <$> zip a b where apply' (a', b') = a' b'
 applyLots :: (a -> b -> c -> d -> e) -> [(a, b)] -> [(c, d)] -> [e]
 applyLots func a b = applyList (uncurry . uncurry func <$> a) b
 
-toSynthResult
-    :: [(SynthTool, SynthTool)]
-    -> [(NominalDiffTime, Result Failed ())]
-    -> [SynthResult]
+toSynthResult :: [(SynthTool, SynthTool)]
+              -> [(NominalDiffTime, Result Failed ())]
+              -> [SynthResult]
 toSynthResult a b = applyLots SynthResult a $ fmap swap b
+
+toSimResult :: SimTool
+            -> [ByteString]
+            -> [SynthTool]
+            -> [(NominalDiffTime, Result Failed ByteString)]
+            -> [SimResult]
+toSimResult sima bs as b =
+    applyList (applyList (repeat uncurry) (applyList (applyList (SimResult <$> as) (repeat sima)) (repeat bs))) $ fmap swap b
 
 toolRun :: (MonadIO m, MonadSh m) => Text -> m a -> m (NominalDiffTime, a)
 toolRun t m = do
@@ -291,23 +299,35 @@ simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
 simulation src = do
     datadir <- fmap _fuzzDataDir askOpts
     synth    <- passedSynthesis
+    counterEgs <- failEquivWithIdentityCE
     vals     <- liftIO $ generateByteString 20
-    ident    <- liftSh $ equiv datadir vals defaultIdentitySynth
-    resTimes <- liftSh $ mapM (equiv datadir vals) synth
+    ident    <- liftSh $ sim datadir vals Nothing defaultIdentitySynth
+    resTimes <- liftSh $ mapM (sim datadir vals (justPass $ snd ident)) synth
+    resTimes2 <- liftSh $ mapM (simCounterEg datadir) counterEgs
+    fuzzSimResults .= toSimResult defaultIcarusSim vals synth resTimes
     liftSh
         .   inspect
         $   (\(_, r) -> bimap show (T.unpack . T.take 10 . showBS) r)
         <$> (ident : resTimes)
   where
-    equiv datadir b a = toolRun ("simulation for " <> toText a) . runResultT $ do
+    sim datadir b i a = toolRun ("simulation for " <> toText a) . runResultT $ do
         make dir
         pop dir $ do
             liftSh $ do
                 cp (fromText ".." </> fromText (toText a) </> synthOutput a)
                     $ synthOutput a
                 writefile "rtl.v" $ genSource src
-            runSimIc datadir defaultIcarus a src b
+            runSimIc datadir defaultIcarus a src b i
         where dir = fromText $ "simulation_" <> toText a
+    simCounterEg datadir (a, b) = toolRun ("counter-example simulation for " <> toText a) . runResultT $ do
+        make dir
+        pop dir $ do
+            liftSh $ do
+                cp (fromText ".." </> fromText (toText a) </> synthOutput a) $ synthOutput a
+                writefile "rtl.v" $ genSource src
+            ident <- runSimIcEC datadir defaultIcarus defaultIdentitySynth src b Nothing
+            runSimIcEC datadir defaultIcarus a src b (Just ident)
+      where dir = fromText $ "countereg_sim_" <> toText a
 
 -- | Generate a specific number of random bytestrings of size 256.
 randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
@@ -329,6 +349,19 @@ failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
     withIdentity (SynthResult _ (IdentitySynth _) (Fail (EquivFail _)) _) = True
     withIdentity _                                                    = False
 
+failEquivWithIdentityCE :: (MonadSh m) => Fuzz m [(SynthTool, CounterEg)]
+failEquivWithIdentityCE = catMaybes . fmap withIdentity . _fuzzSynthResults <$> get
+  where
+    withIdentity (SynthResult (IdentitySynth _) s (Fail (EquivFail c)) _) = Just (s, c)
+    withIdentity (SynthResult s (IdentitySynth _) (Fail (EquivFail c)) _) = Just (s, c)
+    withIdentity _                                                        = Nothing
+
+failedSimulations :: (MonadSh m) => Fuzz m [SimResult]
+failedSimulations = filter failedSim . _fuzzSimResults <$> get
+  where
+    failedSim (SimResult _ _ _ (Fail (SimFail _)) _) = True
+    failedSim _                                      = False
+
 passEquiv :: (MonadSh m) => Fuzz m [SynthResult]
 passEquiv = filter withIdentity . _fuzzSynthResults <$> get
   where
@@ -341,8 +374,10 @@ reduction src = do
     datadir <- fmap _fuzzDataDir askOpts
     fails      <- failEquivWithIdentity
     synthFails <- failedSynthesis
+    simFails <- failedSimulations
     _          <- liftSh $ mapM (red datadir) fails
     _          <- liftSh $ mapM redSynth synthFails
+    _ <- liftSh $ mapM (redSim datadir) simFails
     return ()
   where
     red datadir (SynthResult a b _ _) = do
@@ -359,6 +394,13 @@ reduction src = do
             writefile (fromText ".." </> dir <.> "v") $ genSource s
             return s
         where dir = fromText $ "reduce_" <> toText a
+    redSim datadir (SimResult t _ bs _ _) = do
+        make dir
+        pop dir $ do
+            s <- reduceSimIc datadir bs t src
+            writefile (fromText ".." </> dir <.> "v") $ genSource s
+            return s
+      where dir = fromText $ "reduce_sim_" <> toText t
 
 titleRun
     :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)
@@ -447,9 +489,10 @@ fuzz gen = do
         then return (0, mempty)
         else titleRun "Simulation" $ simulation src
     fails       <- failEquivWithIdentity
+    failedSim <- failedSimulations
     synthFails  <- failedSynthesis
     redResult   <-
-        whenMaybe (not (null fails && null synthFails)
+        whenMaybe (not (null failedSim && null fails && null synthFails)
                    && not (_fuzzOptsNoReduction opts))
         . titleRun "Reduction"
         $ reduction src
