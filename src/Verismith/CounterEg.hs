@@ -29,8 +29,8 @@ import qualified Data.Text            as T
 import           Numeric              (readInt)
 import qualified Text.Parsec          as P
 
-data CounterEg = CounterEg { _counterEgInitial :: ![(Text, Int)]
-                           , _counterEgStates  :: ![[(Text, Int)]]
+data CounterEg = CounterEg { _counterEgInitial :: ![(Text, Text)]
+                           , _counterEgStates  :: ![[(Text, Text)]]
                            }
                deriving (Eq, Show)
 
@@ -42,19 +42,19 @@ instance Monoid CounterEg where
 
 type Parser = P.Parsec String ()
 
-fromBytes :: ByteString -> Int
-fromBytes = B.foldl' f 0 where f a b = a `shiftL` 8 .|. fromIntegral b
+-- fromBytes :: ByteString -> Int
+-- fromBytes = B.foldl' f 0 where f a b = a `shiftL` 8 .|. fromIntegral b
 
-convert :: String -> ByteString
-convert =
-    L.toStrict
-        . (encode :: Integer -> L.ByteString)
-        . maybe 0 fst
-        . listToMaybe
-        . readInt 2 (`elem` ("01" :: String)) digitToInt
+-- convert :: String -> ByteString
+-- convert =
+--     L.toStrict
+--         . (encode :: Integer -> L.ByteString)
+--         . maybe 0 fst
+--         . listToMaybe
+--         . readInt 2 (`elem` ("01" :: String)) digitToInt
 
-convertBinary :: String -> Int
-convertBinary = fromBytes . convert
+-- convertBinary :: String -> Int
+-- convertBinary = fromBytes . convert
 
 lexme :: Parser a -> Parser a
 lexme f = do { a <- f; _ <- P.spaces; return a }
@@ -100,8 +100,8 @@ parseCE = lexme $ do
 
 cEtoCounterEg :: [[(String, String)]] -> CounterEg
 cEtoCounterEg [] = mempty
-cEtoCounterEg (i : is) = CounterEg (bimap T.pack convertBinary <$> i)
-                         (fmap (bimap T.pack convertBinary) <$> is)
+cEtoCounterEg (i : is) = CounterEg (bimap T.pack T.pack <$> i)
+                         (fmap (bimap T.pack T.pack) <$> is)
 
 parseCounterEg' :: Parser CounterEg
 parseCounterEg' = lexme $ do
