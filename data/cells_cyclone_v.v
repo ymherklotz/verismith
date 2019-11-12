@@ -220,7 +220,7 @@ module dffeas (d, clk, ena, clrn, prn, aload, asdata, sclr, sload, devclrn, devp
 
    output reg q = 0;
 
-   always @(posedge clk or posedge aload) begin
+   always @(posedge clk) begin
       if (sclr == 1'b1)
         q <= 0;
       else if (aload == 1'b1)
