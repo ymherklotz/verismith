@@ -50,6 +50,12 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 | Mis-synthesis | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | 𐄂     |
 | Mis-synthesis | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | 𐄂     |
 
+### Icarus Verilog
+
+| Type           | Issue                                                           | Confirmed | Fixed |
+|----------------|-----------------------------------------------------------------|-----------|-------|
+| Mis-simulation | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) | ✓         | 𐄂     |
+
 ## Install the Fuzzer
 
 The fuzzer now supports building with [nix](https://nixos.org/nix/manual/), which pulls in all the extra dependencies that are needed to build the project. The main files and their functions are described below:
