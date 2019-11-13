@@ -44,17 +44,17 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 | Type          | Issue                                                                                                                               | Confirmed | Fixed |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------|-------|
-| Crash         | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | 𐄂     |
-| Crash         | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                                    | ✓         | 𐄂     |
-| Mis-synthesis | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789)             | ✓         | 𐄂     |
-| Mis-synthesis | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | 𐄂     |
-| Mis-synthesis | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | 𐄂     |
+| Crash         | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | ✗     |
+| Crash         | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                                    | ✓         | ✗     |
+| Mis-synthesis | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789)             | ✓         | ✗     |
+| Mis-synthesis | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | ✗     |
+| Mis-synthesis | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | ✗     |
 
 ### Icarus Verilog
 
 | Type           | Issue                                                           | Confirmed | Fixed |
 |----------------|-----------------------------------------------------------------|-----------|-------|
-| Mis-simulation | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) | ✓         | 𐄂     |
+| Mis-simulation | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) | ✓         | ✗     |
 
 ## Install the Fuzzer
 
