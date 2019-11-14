@@ -36,6 +36,7 @@ module Verismith.Config
     , fromYosys
     , fromVivado
     , fromQuartus
+    , fromQuartusLight
     , configProbability
     , configProperty
     , configSimulators
@@ -79,20 +80,21 @@ module Verismith.Config
     )
 where
 
-import           Control.Applicative    (Alternative)
-import           Control.Lens           hiding ((.=))
-import           Data.List.NonEmpty     (NonEmpty (..))
-import           Data.Maybe             (fromMaybe)
-import           Data.Text              (Text, pack)
-import qualified Data.Text.IO           as T
-import           Data.Version           (showVersion)
+import           Control.Applicative         (Alternative)
+import           Control.Lens                hiding ((.=))
+import           Data.List.NonEmpty          (NonEmpty (..))
+import           Data.Maybe                  (fromMaybe)
+import           Data.Text                   (Text, pack)
+import qualified Data.Text.IO                as T
+import           Data.Version                (showVersion)
 import           Development.GitRev
-import           Hedgehog.Internal.Seed (Seed)
-import           Paths_verismith        (version)
-import           Shelly                 (toTextIgnore)
-import           Toml                   (TomlCodec, (.=))
+import           Hedgehog.Internal.Seed      (Seed)
+import           Paths_verismith             (version)
+import           Shelly                      (toTextIgnore)
+import           Toml                        (TomlCodec, (.=))
 import qualified Toml
 import           Verismith.Tool.Quartus
+import           Verismith.Tool.QuartusLight
 import           Verismith.Tool.Vivado
 import           Verismith.Tool.XST
 import           Verismith.Tool.Yosys
@@ -283,6 +285,12 @@ fromVivado (Vivado a b c) = SynthDescription "vivado"
 
 fromQuartus :: Quartus -> SynthDescription
 fromQuartus (Quartus a b c) = SynthDescription "quartus"
+                                               (toTextIgnore <$> a)
+                                               (Just b)
+                                               (Just $ toTextIgnore c)
+
+fromQuartusLight :: QuartusLight -> SynthDescription
+fromQuartusLight (QuartusLight a b c) = SynthDescription "quartuslight"
                                                (toTextIgnore <$> a)
                                                (Just b)
                                                (Just $ toTextIgnore c)

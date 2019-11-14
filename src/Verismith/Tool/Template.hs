@@ -16,6 +16,7 @@ module Verismith.Tool.Template
     ( yosysSynthConfigStd
     , yosysSatConfig
     , yosysSimConfig
+    , quartusLightSynthConfig
     , quartusSynthConfig
     , xstSynthConfig
     , vivadoSynthConfig
@@ -77,10 +78,10 @@ yosysSimConfig = [st|read_verilog rtl.v; proc;;
 rename mod mod_rtl
 |]
 
-quartusSynthConfig :: Synthesiser a => a -> FilePath -> Text -> FilePath -> Text
-quartusSynthConfig q sdc top fp = [st|load_package flow
+quartusLightSynthConfig :: Synthesiser a => a -> FilePath -> Text -> FilePath -> Text
+quartusLightSynthConfig q sdc top fp = [st|load_package flow
 
-project_new #{top}
+project_new -overwrite #{top}
 
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name SYSTEMVERILOG_FILE #{toTextIgnore fp}
@@ -93,6 +94,25 @@ set_instance_assignment -name VIRTUAL_PIN ON -to *
 execute_module -tool map
 execute_module -tool fit
 execute_module -tool sta -args "--mode=implement"
+execute_module -tool eda -args "--simulation --tool=vcs"
+
+project_close
+|]
+
+quartusSynthConfig :: Synthesiser a => a -> FilePath -> Text -> FilePath -> Text
+quartusSynthConfig q sdc top fp = [st|load_package flow
+
+project_new -overwrite #{top}
+
+set_global_assignment -name FAMILY "Cyclone 10 GX"
+set_global_assignment -name SYSTEMVERILOG_FILE #{toTextIgnore fp}
+set_global_assignment -name TOP_LEVEL_ENTITY #{top}
+set_global_assignment -name SDC_FILE #{toTextIgnore sdc}
+set_global_assignment -name INI_VARS "qatm_force_vqm=on;"
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 2
+set_instance_assignment -name VIRTUAL_PIN ON -to *
+
+execute_module -tool syn
 execute_module -tool eda -args "--simulation --tool=vcs"
 
 project_close

@@ -4,7 +4,7 @@
 
 ## Affected versions
 
-- Quartus 19.1
+- Quartus Prime Light 19.1
 
 ## Description
 

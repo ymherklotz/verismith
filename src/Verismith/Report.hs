@@ -35,6 +35,7 @@ module Verismith.Report
     , defaultYosysSynth
     , defaultXSTSynth
     , defaultQuartusSynth
+    , defaultQuartusLightSynth
     , defaultIdentitySynth
     , descriptionToSim
     , descriptionToSynth
@@ -76,47 +77,54 @@ data SynthTool = XSTSynth {-# UNPACK #-} !XST
                | VivadoSynth {-# UNPACK #-} !Vivado
                | YosysSynth {-# UNPACK #-} !Yosys
                | QuartusSynth {-# UNPACK #-} !Quartus
+               | QuartusLightSynth {-# UNPACK #-} !QuartusLight
                | IdentitySynth {-# UNPACK #-} !Identity
                deriving (Eq)
 
 instance NFData SynthTool where
-    rnf (XSTSynth a)      = rnf a
-    rnf (VivadoSynth a)   = rnf a
-    rnf (YosysSynth a)    = rnf a
-    rnf (QuartusSynth a)  = rnf a
-    rnf (IdentitySynth a) = rnf a
+    rnf (XSTSynth a)          = rnf a
+    rnf (VivadoSynth a)       = rnf a
+    rnf (YosysSynth a)        = rnf a
+    rnf (QuartusSynth a)      = rnf a
+    rnf (QuartusLightSynth a) = rnf a
+    rnf (IdentitySynth a)     = rnf a
 
 instance Show SynthTool where
-    show (XSTSynth xst)           = show xst
-    show (VivadoSynth vivado)     = show vivado
-    show (YosysSynth yosys)       = show yosys
-    show (QuartusSynth quartus)   = show quartus
-    show (IdentitySynth identity) = show identity
+    show (XSTSynth xst)              = show xst
+    show (VivadoSynth vivado)        = show vivado
+    show (YosysSynth yosys)          = show yosys
+    show (QuartusSynth quartus)      = show quartus
+    show (QuartusLightSynth quartus) = show quartus
+    show (IdentitySynth identity)    = show identity
 
 instance Tool SynthTool where
-    toText (XSTSynth xst)           = toText xst
-    toText (VivadoSynth vivado)     = toText vivado
-    toText (YosysSynth yosys)       = toText yosys
-    toText (QuartusSynth quartus)   = toText quartus
-    toText (IdentitySynth identity) = toText identity
+    toText (XSTSynth xst)              = toText xst
+    toText (VivadoSynth vivado)        = toText vivado
+    toText (YosysSynth yosys)          = toText yosys
+    toText (QuartusSynth quartus)      = toText quartus
+    toText (QuartusLightSynth quartus) = toText quartus
+    toText (IdentitySynth identity)    = toText identity
 
 instance Synthesiser SynthTool where
-    runSynth (XSTSynth xst)           = runSynth xst
-    runSynth (VivadoSynth vivado)     = runSynth vivado
-    runSynth (YosysSynth yosys)       = runSynth yosys
-    runSynth (QuartusSynth quartus)   = runSynth quartus
-    runSynth (IdentitySynth identity) = runSynth identity
+    runSynth (XSTSynth xst)              = runSynth xst
+    runSynth (VivadoSynth vivado)        = runSynth vivado
+    runSynth (YosysSynth yosys)          = runSynth yosys
+    runSynth (QuartusSynth quartus)      = runSynth quartus
+    runSynth (QuartusLightSynth quartus) = runSynth quartus
+    runSynth (IdentitySynth identity)    = runSynth identity
 
-    synthOutput (XSTSynth xst)           = synthOutput xst
-    synthOutput (VivadoSynth vivado)     = synthOutput vivado
-    synthOutput (YosysSynth yosys)       = synthOutput yosys
-    synthOutput (QuartusSynth quartus)   = synthOutput quartus
-    synthOutput (IdentitySynth identity) = synthOutput identity
+    synthOutput (XSTSynth xst)              = synthOutput xst
+    synthOutput (VivadoSynth vivado)        = synthOutput vivado
+    synthOutput (YosysSynth yosys)          = synthOutput yosys
+    synthOutput (QuartusSynth quartus)      = synthOutput quartus
+    synthOutput (QuartusLightSynth quartus) = synthOutput quartus
+    synthOutput (IdentitySynth identity)    = synthOutput identity
 
     setSynthOutput (YosysSynth yosys)     = YosysSynth . setSynthOutput yosys
     setSynthOutput (XSTSynth xst)         = XSTSynth . setSynthOutput xst
     setSynthOutput (VivadoSynth vivado)   = VivadoSynth . setSynthOutput vivado
     setSynthOutput (QuartusSynth quartus) = QuartusSynth . setSynthOutput quartus
+    setSynthOutput (QuartusLightSynth quartus) = QuartusLightSynth . setSynthOutput quartus
     setSynthOutput (IdentitySynth identity) = IdentitySynth . setSynthOutput identity
 
 defaultYosysSynth :: SynthTool
@@ -124,6 +132,9 @@ defaultYosysSynth = YosysSynth defaultYosys
 
 defaultQuartusSynth :: SynthTool
 defaultQuartusSynth = QuartusSynth defaultQuartus
+
+defaultQuartusLightSynth :: SynthTool
+defaultQuartusLightSynth = QuartusLightSynth defaultQuartusLight
 
 defaultVivadoSynth :: SynthTool
 defaultVivadoSynth = VivadoSynth defaultVivado
@@ -226,6 +237,11 @@ descriptionToSynth (SynthDescription "xst" bin desc out) =
 descriptionToSynth (SynthDescription "quartus" bin desc out) =
     QuartusSynth
         . Quartus (fromText <$> bin)
+                  (fromMaybe (quartusDesc defaultQuartus) desc)
+        $ maybe (quartusOutput defaultQuartus) fromText out
+descriptionToSynth (SynthDescription "quartuslight" bin desc out) =
+    QuartusLightSynth
+        . QuartusLight (fromText <$> bin)
                   (fromMaybe (quartusDesc defaultQuartus) desc)
         $ maybe (quartusOutput defaultQuartus) fromText out
 descriptionToSynth (SynthDescription "identity" _ desc out) =

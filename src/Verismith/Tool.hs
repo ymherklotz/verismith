@@ -29,6 +29,9 @@ module Verismith.Tool
     -- ** Quartus
     , Quartus(..)
     , defaultQuartus
+    -- ** Quartus Light
+    , QuartusLight(..)
+    , defaultQuartusLight
     -- ** Identity
     , Identity(..)
     , defaultIdentity
@@ -46,6 +49,7 @@ import           Verismith.Tool.Icarus
 import           Verismith.Tool.Identity
 import           Verismith.Tool.Internal
 import           Verismith.Tool.Quartus
+import           Verismith.Tool.QuartusLight
 import           Verismith.Tool.Vivado
 import           Verismith.Tool.XST
 import           Verismith.Tool.Yosys

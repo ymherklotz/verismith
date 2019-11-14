@@ -60,6 +60,7 @@ library
                  , Verismith.Tool.Identity
                  , Verismith.Tool.Internal
                  , Verismith.Tool.Quartus
+                 , Verismith.Tool.QuartusLight
                  , Verismith.Tool.Template
                  , Verismith.Tool.Vivado
                  , Verismith.Tool.XST
