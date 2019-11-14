@@ -144,7 +144,7 @@ tbModule bss top =
                 <> fold ((\r -> TimeCtrl 10
                              (Just $ BlockAssign (Assign inConcat Nothing r)))
                          . fromInteger . fromBytes <$> bss)
-                <> (SysTaskEnable $ Task "finish" [])
+                <> (TimeCtrl 10 . Just . SysTaskEnable $ Task "finish" [])
               , Always . TimeCtrl 5 . Just $ BlockAssign
                 (Assign "clk" Nothing (UnOp UnNot (Id "clk")))
               , Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable
