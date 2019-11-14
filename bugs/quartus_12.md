@@ -17,3 +17,13 @@ module top(y, wire1);
   assign y = 2'b11 ^ $signed(wire1);
 endmodule
 ```
+
+When Quartus is passed the following design instead, it does output the right result which is `2'b10`.
+
+```verilog
+module top(y, wire1);
+  output [1:0] y;
+  input signed wire1;
+  assign y = 2'b11 ^ wire1;
+endmodule
+```
