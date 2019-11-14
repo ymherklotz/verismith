@@ -1,6 +1,13 @@
 # Vivado 2018.3 synthesis crash
 
-[ [Vivado forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136) ]
+[ Not fixed | [Vivado forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136) ]
+
+## Affected versions
+
+- Vivado 2019.1
+- Vivado 2018.3
+
+## Description
 
 Vivado 2018.3 crashes with the following Verilog code.
 

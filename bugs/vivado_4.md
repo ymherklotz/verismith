@@ -1,10 +1,17 @@
 # Signed with shift in condition synthesis mistmatch
 
-[ [Vivado forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) ]
+[ Not fixed | [Vivado forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) ]
 
-The following code seems to give a mismatch after synthesis. I am using Vivado 2019.1 on my personal Arch Linux machineg and Vivado 2018.2 on CentOS 6.
+## Affected versions
 
-```
+- Vivado 2019.1
+- Vivado 2018.2
+
+## Description
+
+The following code seems to give a mismatch after synthesis. I am using Vivado 2019.1 on my personal Arch Linux machine and Vivado 2018.2 on CentOS 6.
+
+```verilog
 module top  (y, w0);
    output [1:0] y;
    input        w0;

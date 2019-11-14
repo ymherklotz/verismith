@@ -1,8 +1,14 @@
 # Synthesis issue with shift and multiplication
 
-[ [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) ]
+[ Fixed in [`349c472`](https://github.com/YosysHQ/yosys/commit/349c47250a9779bc58634870d2e3facfe95fbff8) | [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) ]
 
-## Steps to reproduce the issue
+## Affected versions
+
+- Yosys 0.8+498
+
+## Description
+
+### Steps to reproduce the issue
 
 Consider the following Verilog code
 
@@ -26,11 +32,11 @@ and the following command
 yosys -p 'read -formal rtl.v; synth; write_verilog -noattr syn_yosys.v'
 ```
 
-## Expected behavior
+### Expected behavior
 
 When passing the input `3'b100`, I would expect the output to give `1'b1`, as `3'b100 * 3'b110 = 3'b000`.
 
-## Actual behavior
+### Actual behavior
 
 The synthesised output is the following, which when given `3'b100` gives `1'b0` as output.
 

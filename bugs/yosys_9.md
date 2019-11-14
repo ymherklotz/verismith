@@ -1,8 +1,14 @@
 # Unexpected behaviour of for loop and if statement
 
-[ [Issue 1243](https://github.com/YosysHQ/yosys/issues/1243) ]
+[ Fixed in [`39f4c10`](https://github.com/YosysHQ/yosys/commit/39f4c1096ac3b5964bfa087c2b7f2e8d5a9c1ef3) | [Issue 1243](https://github.com/YosysHQ/yosys/issues/1243) ]
 
-## Steps to reproduce the issue
+## Affected versions
+
+- Yosys 0.8+618
+
+## Description
+
+### Steps to reproduce the issue
 
 Consider the following piece of code:
 
@@ -41,7 +47,7 @@ yosys -p "read_verilog rtl.v; synth; write_verilog -noattr synth.v"
 
 I have also attached a folder containing a test bench and SymbiYosys script to compare the design to the synthesised net list.
 
-## Expected behaviour
+### Expected behaviour
 
 I would expect this to be implemented by assigning `sel` to `y`. This is actually also the output of a previous version of Yosys (`Yosys 0.8+508 (git sha1 c2ea3746, clang 8.0.0 -fPIC -Os)`)
 
@@ -58,7 +64,7 @@ module top(y, clk, sel);
 endmodule
 ```
 
-## Actual behaviour
+### Actual behaviour
 
 However, with Yosys, `y` is set to a constant 0.
 

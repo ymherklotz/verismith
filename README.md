@@ -29,7 +29,7 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 ## Reported bugs
 
-9 bugs have been reported and confirmed to be bugs by the vendors, out of which 4 have been fixed.
+9 bugs have been reported and confirmed to be bugs by the vendors, out of which 4 have been fixed. 1 bug has also been found in the Icarus Verilog simulator as a side effect of using it to verify equivalence check results.
 
 ### Yosys
 

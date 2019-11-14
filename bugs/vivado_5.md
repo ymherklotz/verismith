@@ -1,12 +1,22 @@
 # Bit selection synthesis mismatch
 
-[ [Vivado forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419) ]
+[ Not fixed | [Vivado forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419) ]
+
+## Affected versions
+
+- Vivado 2019.1
+- Vivado 2018.2
+- Vivado 2017.4
+- Vivado 2016.2
+- Vivado 2016.1
+
+## Description
 
 There seems to be a mismatch between the synthesised net list and the initial design with the following Verilog code. This happens with Vivado 2019.1 on my personal arch linux machine and Vivado 2018.2 on CentoOS 6. I have attached all the necessary files to run it and hopefully reproduce it, together with a testbench that dumps a vcd file.
 
 I have reduced the Verilog as much as possible, and changing anything else makes Vivado synthesise correctly.
 
-```
+```verilog
 module top (y, clk, w0);
    output [1:0] y;
    input clk;

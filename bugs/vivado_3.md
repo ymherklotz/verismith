@@ -1,6 +1,14 @@
 # Unsigned bit extension in if statement
 
-[ [Vivado forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789) ]
+[ Not fixed | [Vivado forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789) ]
+
+## Affected versions
+
+- Vivado 2019.1
+- Vivado 2018.3
+- Vivado 2018.2
+
+## Description
 
 The code below does not seem to behave properly after synthesis with Vivado 2019.1. When the input to the module is `w1 = 2'b01`, then the output should be 0. This is because the unsigned literal `-1'b1` in the if statement is zero extended to 2 bits giving `-2'b01 = 2'b11`.
 
@@ -10,7 +18,7 @@ However, instead of 0, after synthesis with Vivado, the output it 1. This seems 
 
 Assigning `r1` directly to `{-1'b1 == w1}` also works as expected.
 
-```
+```verilog
 module top (y, clk, w1);
    output   y;
    input    clk;

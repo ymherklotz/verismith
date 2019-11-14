@@ -1,6 +1,13 @@
 # Verilog If statement nesting crash
 
-[ [Vivado forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787) ]
+[ Not fixed | [Vivado forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787) ]
+
+## Affected versions
+
+- Vivado 2019.1
+- Vivado 2018.3
+
+## Description
 
 The following Verilog code crashes on Vivado 2019.1 and 2018.3. it has been reduced as much as possible to a minimal example from a larger design, which produces the crash. Removing any registers or removing the empty if-statements gets rid of the crash.
 

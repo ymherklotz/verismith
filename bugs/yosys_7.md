@@ -1,8 +1,14 @@
 # Initial value of register ignored during synthesis
 
-[ [Issue 997](https://github.com/YosysHQ/yosys/issues/997) ]
+[ Fixed in [`33738c1`](https://github.com/YosysHQ/yosys/commit/33738c174560c718723b6c860af002d1a8a91cea) | [Issue 997](https://github.com/YosysHQ/yosys/issues/997) ]
 
-## Steps to reproduce the issue
+## Affected versions
+
+- Yosys 0.8+450
+
+## Description 
+
+### Steps to reproduce the issue
 
 Consider the following verilog code.
 
@@ -35,7 +41,7 @@ the initial value of the register seems to be ignored. Therefore, during simulat
 
 This does not seem to happen with the official 0.8 release of Yosys. In that release, the expected behavior is generated.
 
-## Expected behavior
+### Expected behavior
 
 It is expected that the register is initialised with 0. This was generated using the 0.8 release of Yosys.
 
@@ -56,7 +62,7 @@ module top_1(y, clk, wire4);
 endmodule
 ```
 
-## Actual behavior
+### Actual behavior
 
 However, it actually gets initialised with `1'hx`.
 

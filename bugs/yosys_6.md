@@ -1,6 +1,12 @@
 # Yosys aborts with exception in peephole optimizers pass
 
-[ [Issue 993](https://github.com/YosysHQ/yosys/issues/993) ]
+[ Fixed in [`b37c31e`](https://github.com/YosysHQ/yosys/commit/b37c31e2cb82343e363d39e4b35ebdb82f4f69a3) | [Issue 993](https://github.com/YosysHQ/yosys/issues/993) ]
+
+## Affected versions
+
+- Yosys 0.8+411
+
+## Description
 
 Yosys aborts with a `vector::_M_range_check` exception in the peephole optimizers pass (`PEEPOPT pass`). This happens with the verilog code below, which I have reduced as much as possible into an MCVE.
 
@@ -21,7 +27,7 @@ module top(y, clk, wire1);
 endmodule
 ```
 
-## Steps to reproduce the issue
+### Steps to reproduce the issue
 
 Yosys version that this was tested with: `Yosys 0.8+411 (git sha1 70d0f389, clang 8.0.0 -fPIC -Os)`, which is the current master.
 
@@ -31,7 +37,7 @@ The following command was used to synthesise the design:
 yosys -p 'read -formal rtl.v; synth; write_verilog rtl_yosys.v'
 ```
 
-## Expected behavior
+### Expected behavior
 
 Synthesis without any exceptions.
 
@@ -56,7 +62,7 @@ found and reported 0 problems.
 Dumping module `\top'.
 ```
 
-## Actual behavior
+### Actual behavior
 
 Yosys aborts with a `vector::_M_range_check` exception.
 
