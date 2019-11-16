@@ -1,6 +1,6 @@
 # Expression evaluates to 1'bx instead of expected 1'b0
 
-[ Not fixed | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) ]
+[ Fixed in [`0a4cae2`](https://github.com/steveicarus/iverilog/commit/0a4cae264441ea91965da1040e7a298d729d58cc) | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) ]
 
 ## Affected versions
 
