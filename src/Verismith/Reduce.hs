@@ -641,7 +641,7 @@ runInTmp a = Shelly.withTmpDir $ (\f -> do
     return r)
 
 reduceSimIc :: (Synthesiser a, MonadSh m) => Shelly.FilePath -> [ByteString] -> a -> SourceInfo -> m SourceInfo
-reduceSimIc fp bs a = reduce (fromText $ "reduce_sim_" <> toText a) synth
+reduceSimIc fp bs a = reduce (fromText $ "reduce_sim_" <> toText a <> ".v") synth
   where
     synth src = liftSh . runInTmp $ do
         r <- runResultT $ do
