@@ -68,6 +68,8 @@ import           Control.Monad.State.Strict
 import           Data.Foldable              (fold)
 import           Data.Functor.Foldable      (cata)
 import           Data.List                  (foldl', partition)
+import           Data.Maybe                 (fromMaybe)
+import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Hedgehog                   (Gen, GenT, MonadGen)
 import qualified Hedgehog                   as Hog
@@ -306,7 +308,7 @@ someI m f = do
 
 -- | Make a new name with a prefix and the current nameCounter. The nameCounter
 -- is then increased so that the label is unique.
-makeIdentifier :: T.Text -> StateGen Identifier
+makeIdentifier :: Text -> StateGen Identifier
 makeIdentifier prefix = do
     context <- get
     let ident = Identifier $ prefix <> showT (context ^. nameCounter)
@@ -324,10 +326,10 @@ getPort' pt i c = case filter portId c of
 -- 'newPort'. This is used subsequently in all the functions to create a port,
 -- in case a port with the same name was already created. This could be because
 -- the generation is currently in the other branch of an if-statement.
-nextPort :: PortType -> StateGen Port
-nextPort pt = do
+nextPort :: Maybe Text -> PortType -> StateGen Port
+nextPort i pt = do
     context <- get
-    ident   <- makeIdentifier . T.toLower $ showT pt
+    ident   <- makeIdentifier $ fromMaybe (T.toLower $ showT pt) i
     getPort' pt ident (_variables context)
 
 -- | Creates a new port based on the current name counter and adds it to the
@@ -352,14 +354,14 @@ scopedExpr = do
 contAssign :: StateGen ContAssign
 contAssign = do
     expr <- scopedExpr
-    p    <- nextPort Wire
+    p    <- nextPort Nothing Wire
     return $ ContAssign (p ^. portName) expr
 
 -- | Generate a random assignment and assign it to a random 'Reg'.
 assignment :: StateGen Assign
 assignment = do
     expr <- scopedExpr
-    lval <- lvalFromPort <$> nextPort Reg
+    lval <- lvalFromPort <$> nextPort Nothing Reg
     return $ Assign lval Nothing expr
 
 -- | Generate a random 'Statement' safely, by also increasing the depth counter.
@@ -391,7 +393,7 @@ conditional = do
 forLoop :: StateGen Statement
 forLoop = do
     num <- Hog.int (Hog.linear 0 20)
-    var <- lvalFromPort <$> nextPort Reg
+    var <- lvalFromPort <$> nextPort (Just "forvar") Reg
     ForLoop (Assign var Nothing 0)
             (BinOp (varId var) BinLT $ fromIntegral num)
             (Assign var Nothing $ BinOp (varId var) BinPlus 1)
@@ -437,7 +439,7 @@ resizePort ps i ra = foldl' func []
 instantiate :: ModDecl -> StateGen ModItem
 instantiate (ModDecl i outP inP _ _) = do
     context <- get
-    outs    <- replicateM (length outP) (nextPort Wire)
+    outs    <- replicateM (length outP) (nextPort Nothing Wire)
     ins <- take (length inpFixed) <$> Hog.shuffle (context ^. variables)
     insLit <- replicateM (length inpFixed - length ins) (Number <$> genBitVec)
     mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inpFixed ^.. traverse . portSize
@@ -567,7 +569,7 @@ identElem p = elem (p ^. portName) . toListOf (traverse . portName)
 moduleDef :: Maybe Identifier -> StateGen ModDecl
 moduleDef top = do
     name     <- moduleName top
-    portList <- Hog.list (Hog.linear 4 10) $ nextPort Wire
+    portList <- Hog.list (Hog.linear 4 10) $ nextPort Nothing Wire
     mi       <- Hog.list (Hog.linear 4 100) modItem
     ps       <- Hog.list (Hog.linear 0 10) parameter
     context  <- get
@@ -592,7 +594,7 @@ moduleDef top = do
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
-procedural :: T.Text -> Config -> Gen Verilog
+procedural :: Text -> Config -> Gen Verilog
 procedural top config = do
     (mainMod, st) <- Hog.resize num $ runStateT
         (Hog.distributeT (runReaderT (moduleDef (Just $ Identifier top)) config))
@@ -604,17 +606,17 @@ procedural top config = do
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
--- | Samples the 'Gen' directly to generate random 'Verilog' using the 'T.Text' as
+-- | Samples the 'Gen' directly to generate random 'Verilog' using the 'Text' as
 -- the name of the main module and the configuration 'Config' to influence the
 -- generation.
-proceduralIO :: T.Text -> Config -> IO Verilog
+proceduralIO :: Text -> Config -> IO Verilog
 proceduralIO t = Hog.sample . procedural t
 
--- | Given a 'T.Text' and a 'Config' will generate a 'SourceInfo' which has the
+-- | Given a 'Text' and a 'Config' will generate a 'SourceInfo' which has the
 -- top module set to the right name.
-proceduralSrc :: T.Text -> Config -> Gen SourceInfo
+proceduralSrc :: Text -> Config -> Gen SourceInfo
 proceduralSrc t c = SourceInfo t <$> procedural t c
 
 -- | Sampled and wrapped into a 'SourceInfo' with the given top module name.
-proceduralSrcIO :: T.Text -> Config -> IO SourceInfo
+proceduralSrcIO :: Text -> Config -> IO SourceInfo
 proceduralSrcIO t c = SourceInfo t <$> proceduralIO t c
