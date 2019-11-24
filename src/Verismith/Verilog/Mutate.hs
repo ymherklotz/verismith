@@ -244,7 +244,7 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
             ^.. modItems
             .   traverse
             .   modInstId
-    conns = ModConn . Id <$> allVars m
+    conns = uncurry ModConnNamed . fmap Id <$> zip (allVars m) (allVars m)
 
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
