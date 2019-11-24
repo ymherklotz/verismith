@@ -332,4 +332,4 @@ runEquivalence seed gm t d k i = do
 
 runReduce :: SourceInfo -> IO SourceInfo
 runReduce s =
-    shelly $ reduce (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s
+    shelly $ reduce "reduce.v" (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s
