@@ -115,7 +115,7 @@ instance Mutate Statement where
     mutExpr f (TaskEnable a)     = TaskEnable $ mutExpr f a
     mutExpr f (SysTaskEnable a)  = SysTaskEnable $ mutExpr f a
     mutExpr f (CondStmnt a b c) = CondStmnt (f a) (mutExpr f <$> b) $ mutExpr f <$> c
-    mutExpr f (ForLoop a1 e a2 s) = ForLoop (mutExpr f a1) (f e) (mutExpr f a2) $ mutExpr f s
+    mutExpr f (ForLoop a1 e a2 s) = ForLoop (mutExpr f a1) e (mutExpr f a2) $ mutExpr f s
 
 instance Mutate Parameter where
     mutExpr _ = id
