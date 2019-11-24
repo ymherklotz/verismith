@@ -74,6 +74,7 @@ data FuzzOpts = FuzzOpts { _fuzzOptsOutput      :: !(Maybe FilePath)
                          , _fuzzOptsNoReduction :: !Bool
                          , _fuzzOptsConfig      :: {-# UNPACK #-} !Config
                          , _fuzzDataDir         :: {-# UNPACK #-} !FilePath
+                         , _fuzzOptsCrossCheck  :: !Bool
                          }
               deriving (Show, Eq)
 
@@ -89,6 +90,7 @@ defaultFuzzOpts = FuzzOpts { _fuzzOptsOutput      = Nothing
                            , _fuzzOptsNoReduction = False
                            , _fuzzOptsConfig      = defaultConfig
                            , _fuzzDataDir = fromText "."
+                           , _fuzzOptsCrossCheck = False
                            }
 
 data FuzzEnv = FuzzEnv { _getSynthesisers :: ![SynthTool]
@@ -188,8 +190,8 @@ synthesisers = lift $ asks _getSynthesisers
 --simulators :: (Monad m) => Fuzz () m [SimTool]
 --simulators = lift $ asks getSimulators
 
---combinations :: [a] -> [b] -> [(a, b)]
---combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
+combinations :: [a] -> [b] -> [(a, b)]
+combinations l1 l2 = [ (x, y) | x <- l1, y <- l2 ]
 
 logT :: MonadSh m => Text -> m ()
 logT = liftSh . logger
@@ -252,7 +254,9 @@ toSimResult :: SimTool
             -> [(NominalDiffTime, Result Failed ByteString)]
             -> [SimResult]
 toSimResult sima bs as b =
-    applyList (applyList (repeat uncurry) (applyList (applyList (SimResult <$> as) (repeat sima)) (repeat bs))) $ fmap swap b
+    applyList (applyList (repeat uncurry)
+               (applyList (applyList (SimResult <$> as) (repeat sima)) (repeat bs)))
+    $ fmap swap b
 
 toolRun :: (MonadIO m, MonadSh m) => Text -> m a -> m (NominalDiffTime, a)
 toolRun t m = do
@@ -263,15 +267,13 @@ toolRun t m = do
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
+    doCrossCheck <- fmap _fuzzOptsCrossCheck askOpts
     datadir <- fmap _fuzzDataDir askOpts
     synth <- passedSynthesis
---    let synthComb =
---            nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
     let synthComb =
-            nubBy tupEq
-                .   filter (uncurry (/=))
-                $   (,) defaultIdentitySynth
-                <$> synth
+            if doCrossCheck
+            then nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
+            else nubBy tupEq . filter (uncurry (/=)) $ (,) defaultIdentitySynth <$> synth
     resTimes <- liftSh $ mapM (uncurry (equiv datadir)) synthComb
     fuzzSynthResults .= toSynthResult synthComb resTimes
     liftSh $ inspect resTimes

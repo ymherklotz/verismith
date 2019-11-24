@@ -144,13 +144,13 @@ randomise config@(Config a _ c d e) = do
     ce = config ^. configProbability . probExpr
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top) = do
+handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc) = do
     config <- getConfig configF
     gen <- getGenerator config top file
     datadir <- getDataDir
     _      <- runFuzz
         (FuzzOpts (Just $ fromText o)
-         f k n nosim noequiv noreduction config (toFP datadir))
+         f k n nosim noequiv noreduction config (toFP datadir) cc)
         defaultYosys
         (fuzzMultiple gen)
     return ()

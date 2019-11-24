@@ -34,6 +34,7 @@ data Opts = Fuzz { fuzzOutput          :: {-# UNPACK #-} !Text
                  , fuzzNoReduction     :: !Bool
                  , fuzzExistingFile    :: !(Maybe FilePath)
                  , fuzzExistingFileTop :: !Text
+                 , fuzzCrossCheck      :: !Bool
                  }
           | Generate { generateFilename   :: !(Maybe FilePath)
                      , generateConfigFile :: !(Maybe FilePath)
@@ -128,6 +129,8 @@ fuzzOpts =
                 <> Opt.help "Define the top module for the source file."
                 <> Opt.showDefault
                 <> Opt.value "top")
+        <*> (Opt.switch $ Opt.long "crosscheck" <> Opt.help
+                "Do not only compare against the original design, but also against other netlists.")
 
 genOpts :: Parser Opts
 genOpts =
