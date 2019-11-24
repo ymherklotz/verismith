@@ -54,7 +54,7 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 | Type           | Issue                                                           | Confirmed | Fixed |
 |----------------|-----------------------------------------------------------------|-----------|-------|
-| Mis-simulation | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) | ✓         | ✗     |
+| Mis-simulation | [Issue 283](https://github.com/steveicarus/iverilog/issues/283) | ✓         | ✓     |
 
 ## Install the Fuzzer
 
