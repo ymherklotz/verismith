@@ -262,7 +262,7 @@ toolRun :: (MonadIO m, MonadSh m, Show a) => Text -> m a -> m (NominalDiffTime, 
 toolRun t m = do
     logT $ "Running " <> t
     s <- timeit m
-    logT $ "Finished " <> t <> " (" <> showT s <> ")"
+    logT $ "Finished " <> t <> " " <> showT s
     return s
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
@@ -382,27 +382,9 @@ reduction src = do
     _ <- liftSh $ mapM (redSim datadir) simFails
     return ()
   where
-    red datadir (SynthResult a b _ _) = do
-        make dir
-        pop dir $ do
-            s <- reduceSynth datadir a b src
-            writefile (fromText ".." </> dir <.> "v") $ genSource s
-            return s
-        where dir = fromText $ "reduce_" <> toText a <> "_" <> toText b
-    redSynth a = do
-        make dir
-        pop dir $ do
-            s <- reduceSynthesis a src
-            writefile (fromText ".." </> dir <.> "v") $ genSource s
-            return s
-        where dir = fromText $ "reduce_" <> toText a
-    redSim datadir (SimResult t _ bs _ _) = do
-        make dir
-        pop dir $ do
-            s <- reduceSimIc datadir bs t src
-            writefile (fromText ".." </> dir <.> "v") $ genSource s
-            return s
-      where dir = fromText $ "reduce_sim_" <> toText t
+    red datadir (SynthResult a b _ _) = reduceSynth datadir a b src
+    redSynth a = reduceSynthesis a src
+    redSim datadir (SimResult t _ bs _ _) = reduceSimIc datadir bs t src
 
 titleRun
     :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)

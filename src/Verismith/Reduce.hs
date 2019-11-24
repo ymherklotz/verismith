@@ -48,9 +48,9 @@ import           Data.List.NonEmpty       (NonEmpty (..))
 import qualified Data.List.NonEmpty       as NonEmpty
 import           Data.Maybe               (mapMaybe)
 import           Data.Text                (Text)
-import           Shelly                   ((<.>))
+import           Shelly                   (fromText, (<.>))
 import qualified Shelly
-import           Shelly.Lifted            (MonadSh, liftSh, rm_rf)
+import           Shelly.Lifted            (MonadSh, liftSh, rm_rf, writefile)
 import           Verismith.Internal
 import           Verismith.Result
 import           Verismith.Tool
@@ -517,13 +517,15 @@ defaultBot = const False
 -- | Reduction using custom reduction strategies.
 reduce_
     :: MonadSh m
-    => Text
+    => Shelly.FilePath
+    -> Text
     -> Replace SourceInfo
     -> (SourceInfo -> Bool)
     -> (SourceInfo -> m Bool)
     -> SourceInfo
     -> m SourceInfo
-reduce_ title repl bot eval src = do
+reduce_ out title repl bot eval src = do
+    writefile out $ genSource src
     liftSh
         .  Shelly.echo
         $  "Reducing "
@@ -556,16 +558,17 @@ reduce_ title repl bot eval src = do
             None -> return src
   where
     cond s = s /= src
-    recReduction = reduce_ title repl bot eval
+    recReduction = reduce_ out title repl bot eval
 
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.
 reduce
     :: MonadSh m
-    => (SourceInfo -> m Bool) -- ^ Failed or not.
+    => Shelly.FilePath -- ^ Filepath for temporary file.
+    -> (SourceInfo -> m Bool) -- ^ Failed or not.
     -> SourceInfo              -- ^ Input verilog source to be reduced.
     -> m SourceInfo           -- ^ Reduced output.
-reduce eval src =
+reduce fp eval src =
     fmap removeDecl
         $   red "Modules" moduleBot halveModules src
         >>= redAll "Module items" modItemBot         halveModItems
@@ -573,8 +576,8 @@ reduce eval src =
         -- >>= redAll "Expressions"  (const defaultBot) halveExpr
         >>= red "Remove constants in concat" defaultBot removeConstInConcat
   where
-    red s bot a = reduce_ s a bot eval
-    red' s bot a t = reduce_ s (a t) (bot t) eval
+    red s bot a = reduce_ fp s a bot eval
+    red' s bot a t = reduce_ fp s (a t) (bot t) eval
     redAll s bot halve' src' = foldrM
         (\t -> red' (s <> " (" <> getIdentifier t <> ")") bot halve' t)
         src'
@@ -599,7 +602,7 @@ reduceWithScript
 reduceWithScript top script file = do
     liftSh . Shelly.cp file $ file <.> "original"
     srcInfo <- liftIO . parseSourceInfoFile top $ Shelly.toTextIgnore file
-    void $ reduce (runScript script file) srcInfo
+    void $ reduce (fromText "reduce_script.v") (runScript script file) srcInfo
 
 -- | Reduce a 'SourceInfo' using two 'Synthesiser' that are passed to it.
 reduceSynth
@@ -609,7 +612,7 @@ reduceSynth
     -> b
     -> SourceInfo
     -> m SourceInfo
-reduceSynth datadir a b = reduce synth
+reduceSynth datadir a b = reduce (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") synth
   where
     synth src' = liftSh $ do
         r <- runResultT $ do
@@ -621,7 +624,7 @@ reduceSynth datadir a b = reduce synth
             _                  -> False
 
 reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo -> m SourceInfo
-reduceSynthesis a = reduce synth
+reduceSynthesis a = reduce (fromText $ "reduce_" <> toText a <> ".v") synth
   where
     synth src = liftSh $ do
         r <- runResultT $ runSynth a src
@@ -638,7 +641,7 @@ runInTmp a = Shelly.withTmpDir $ (\f -> do
     return r)
 
 reduceSimIc :: (Synthesiser a, MonadSh m) => Shelly.FilePath -> [ByteString] -> a -> SourceInfo -> m SourceInfo
-reduceSimIc fp bs a = reduce synth
+reduceSimIc fp bs a = reduce (fromText $ "reduce_sim_" <> toText a) synth
   where
     synth src = liftSh . runInTmp $ do
         r <- runResultT $ do
