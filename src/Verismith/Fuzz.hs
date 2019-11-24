@@ -324,7 +324,7 @@ simulation src = do
         pop dir $ do
             liftSh $ do
                 cp (fromText ".." </> fromText (toText a) </> synthOutput a) $ synthOutput a
-                writefile "rtl.v" $ genSource src
+                writefile "syn_identity.v" $ genSource src
             ident <- runSimIcEC datadir defaultIcarus defaultIdentitySynth src b Nothing
             runSimIcEC datadir defaultIcarus a src b (Just ident)
       where dir = fromText $ "countereg_sim_" <> toText a
