@@ -258,12 +258,12 @@ toSimResult sima bs as b =
                (applyList (applyList (SimResult <$> as) (repeat sima)) (repeat bs)))
     $ fmap swap b
 
-toolRun :: (MonadIO m, MonadSh m) => Text -> m a -> m (NominalDiffTime, a)
+toolRun :: (MonadIO m, MonadSh m, Show a) => Text -> m a -> m (NominalDiffTime, a)
 toolRun t m = do
     logT $ "Running " <> t
-    (diff, res) <- timeit m
-    logT $ "Finished " <> t <> " (" <> showT diff <> ")"
-    return (diff, res)
+    s <- timeit m
+    logT $ "Finished " <> t <> " (" <> showT s <> ")"
+    return s
 
 equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
