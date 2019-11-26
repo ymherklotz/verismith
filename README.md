@@ -4,8 +4,8 @@ Verilog Fuzzer to test the major verilog compilers by generating random, valid a
 
 - [Verismith FPGA '20 preprint](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
 - [Verismith thesis](https://yannherklotz.com/docs/verismith/verismith_thesis.pdf)
-- [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf)
-- [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf)
+- [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf): Presented to the Circuits and Systems group at Imperial College on the 01/07/2019.
+- [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf): Presented at the [Microsoft Research PhD Workshop](https://www.microsoft.com/en-us/research/event/phd-workshop-on-next-generation-cloud-infrastructure/) on 25/11/2019.
 
 It currently supports the following synthesis tools:
 
