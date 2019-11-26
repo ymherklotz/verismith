@@ -2,7 +2,7 @@
 
 Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog. The following resources provide more details about the in depth implementation of Verismith:
 
-- [Verismith paper](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
+- [Verismith FPGA '20 preprint](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
 - [Verismith thesis](https://yannherklotz.com/docs/verismith/verismith_thesis.pdf)
 - [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf)
 - [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf)
