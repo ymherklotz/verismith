@@ -1,11 +1,6 @@
 # Verismith [![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
 
-Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog. The following resources provide more details about the in depth implementation of Verismith:
-
-- [Verismith FPGA '20 preprint](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
-- [Verismith thesis](https://yannherklotz.com/docs/verismith/verismith_thesis.pdf)
-- [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf): Presented to the Circuits and Systems group at Imperial College on the 01/07/2019.
-- [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf): Presented at the [Microsoft Research PhD Workshop](https://www.microsoft.com/en-us/research/event/phd-workshop-on-next-generation-cloud-infrastructure/) on 25/11/2019.
+Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog.
 
 It currently supports the following synthesis tools:
 
@@ -166,6 +161,15 @@ std dev              229.8 ms   (195.0 ms .. 239.7 ms)
 variance introduced by outliers: 73% (severely inflated)
 
 ```
+
+## Resources
+
+The following resources provide more details about the in depth implementation of Verismith:
+
+- [Verismith FPGA '20 preprint](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
+- [Verismith thesis](https://yannherklotz.com/docs/verismith/verismith_thesis.pdf)
+- [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf): Presented to the Circuits and Systems group at Imperial College on the 01/07/2019.
+- [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf): Presented at the [Microsoft Research PhD Workshop](https://www.microsoft.com/en-us/research/event/phd-workshop-on-next-generation-cloud-infrastructure/) on 25/11/2019.
 
 ## Acknowledgement
 
