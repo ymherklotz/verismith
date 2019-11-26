@@ -1,6 +1,11 @@
 # Verismith [![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
 
-Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog. There is a [presentation](https://yannherklotz.com/docs/presentation.pdf) about Verismith and a [thesis](https://yannherklotz.com/docs/thesis.pdf) which goes over all the details of the implementation and results that were found.
+Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog. The following resources provide more details about the in depth implementation of Verismith:
+
+- [Verismith paper](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
+- [Verismith thesis](https://yannherklotz.com/docs/verismith/verismith_thesis.pdf)
+- [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf)
+- [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf)
 
 It currently supports the following synthesis tools:
 
