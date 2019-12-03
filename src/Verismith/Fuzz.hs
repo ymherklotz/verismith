@@ -382,9 +382,15 @@ reduction src = do
     _ <- liftSh $ mapM (redSim datadir) simFails
     return ()
   where
-    red datadir (SynthResult a b _ _) = reduceSynth datadir a b src
-    redSynth a = reduceSynthesis a src
-    redSim datadir (SimResult t _ bs _ _) = reduceSimIc datadir bs t src
+    red datadir (SynthResult a b _ _) = do
+        r <- reduceSynth datadir a b src
+        writefile (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") $ genSource r
+    redSynth a = do
+        r <- reduceSynthesis a src
+        writefile (fromText $ "reduce_" <> toText a <> ".v") $ genSource r
+    redSim datadir (SimResult t _ bs _ _) = do
+        r <- reduceSimIc datadir bs t src
+        writefile (fromText $ "reduce_sim_" <> toText t <> ".v") $ genSource r
 
 titleRun
     :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)

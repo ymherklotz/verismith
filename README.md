@@ -42,6 +42,8 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 ### Vivado
 
+
+
 | Type          | Issue                                                                                                                               | Confirmed | Fixed |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------|-------|
 | Crash         | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | ✗     |
