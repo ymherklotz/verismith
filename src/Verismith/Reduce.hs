@@ -607,18 +607,19 @@ reduceWithScript top script file = do
 -- | Reduce a 'SourceInfo' using two 'Synthesiser' that are passed to it.
 reduceSynth
     :: (Synthesiser a, Synthesiser b, MonadSh m)
-    => Shelly.FilePath
+    => Maybe Text
+    -> Shelly.FilePath
     -> a
     -> b
     -> SourceInfo
     -> m SourceInfo
-reduceSynth datadir a b = reduce (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") synth
+reduceSynth mt datadir a b = reduce (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") synth
   where
     synth src' = liftSh $ do
         r <- runResultT $ do
             runSynth a src'
             runSynth b src'
-            runEquiv datadir a b src'
+            runEquiv mt datadir a b src'
         return $ case r of
             Fail (EquivFail _) -> True
             _                  -> False

@@ -75,6 +75,7 @@ data FuzzOpts = FuzzOpts { _fuzzOptsOutput      :: !(Maybe FilePath)
                          , _fuzzOptsConfig      :: {-# UNPACK #-} !Config
                          , _fuzzDataDir         :: {-# UNPACK #-} !FilePath
                          , _fuzzOptsCrossCheck  :: !Bool
+                         , _fuzzOptsChecker     :: !(Maybe Text)
                          }
               deriving (Show, Eq)
 
@@ -91,6 +92,7 @@ defaultFuzzOpts = FuzzOpts { _fuzzOptsOutput      = Nothing
                            , _fuzzOptsConfig      = defaultConfig
                            , _fuzzDataDir = fromText "."
                            , _fuzzOptsCrossCheck = False
+                           , _fuzzOptsChecker = Nothing
                            }
 
 data FuzzEnv = FuzzEnv { _getSynthesisers :: ![SynthTool]
@@ -269,17 +271,18 @@ equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
 equivalence src = do
     doCrossCheck <- fmap _fuzzOptsCrossCheck askOpts
     datadir <- fmap _fuzzDataDir askOpts
+    checker <- fmap _fuzzOptsChecker askOpts
     synth <- passedSynthesis
     let synthComb =
             if doCrossCheck
             then nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
             else nubBy tupEq . filter (uncurry (/=)) $ (,) defaultIdentitySynth <$> synth
-    resTimes <- liftSh $ mapM (uncurry (equiv datadir)) synthComb
+    resTimes <- liftSh $ mapM (uncurry (equiv checker datadir)) synthComb
     fuzzSynthResults .= toSynthResult synthComb resTimes
     liftSh $ inspect resTimes
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equiv datadir a b =
+    equiv checker datadir a b =
         toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
             . runResultT
             $ do make dir
@@ -294,7 +297,7 @@ equivalence src = do
                               </> synthOutput b
                             ) $ synthOutput b
                          writefile "rtl.v" $ genSource src
-                     runEquiv datadir a b src
+                     runEquiv checker datadir a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
@@ -321,7 +324,8 @@ simulation src = do
                 writefile "rtl.v" $ genSource src
             runSimIc datadir defaultIcarus a src b i
         where dir = fromText $ "simulation_" <> toText a
-    simCounterEg datadir (a, b) = toolRun ("counter-example simulation for " <> toText a) . runResultT $ do
+    simCounterEg datadir (a, Nothing) = toolRun ("counter-example simulation for " <> toText a) . return $ Fail EmptyFail
+    simCounterEg datadir (a, Just b) = toolRun ("counter-example simulation for " <> toText a) . runResultT $ do
         make dir
         pop dir $ do
             liftSh $ do
@@ -351,7 +355,7 @@ failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
     withIdentity (SynthResult _ (IdentitySynth _) (Fail (EquivFail _)) _) = True
     withIdentity _                                                    = False
 
-failEquivWithIdentityCE :: (MonadSh m) => Fuzz m [(SynthTool, CounterEg)]
+failEquivWithIdentityCE :: (MonadSh m) => Fuzz m [(SynthTool, Maybe CounterEg)]
 failEquivWithIdentityCE = catMaybes . fmap withIdentity . _fuzzSynthResults <$> get
   where
     withIdentity (SynthResult (IdentitySynth _) s (Fail (EquivFail c)) _) = Just (s, c)
@@ -374,16 +378,17 @@ passEquiv = filter withIdentity . _fuzzSynthResults <$> get
 reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
 reduction src = do
     datadir <- fmap _fuzzDataDir askOpts
+    checker <- fmap _fuzzOptsChecker askOpts
     fails      <- failEquivWithIdentity
     synthFails <- failedSynthesis
     simFails <- failedSimulations
-    _          <- liftSh $ mapM (red datadir) fails
+    _          <- liftSh $ mapM (red checker datadir) fails
     _          <- liftSh $ mapM redSynth synthFails
     _ <- liftSh $ mapM (redSim datadir) simFails
     return ()
   where
-    red datadir (SynthResult a b _ _) = do
-        r <- reduceSynth datadir a b src
+    red checker datadir (SynthResult a b _ _) = do
+        r <- reduceSynth checker datadir a b src
         writefile (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") $ genSource r
     redSynth a = do
         r <- reduceSynthesis a src

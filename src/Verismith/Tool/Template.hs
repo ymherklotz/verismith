@@ -26,6 +26,7 @@ module Verismith.Tool.Template
 where
 
 import           Control.Lens              ((^..))
+import           Data.Maybe                (fromMaybe)
 import           Data.Text                 (Text)
 import qualified Data.Text                 as T
 import           Prelude                   hiding (FilePath)
@@ -136,11 +137,11 @@ synth_design -part xc7k70t -top #{top}
 write_verilog -force #{outf}
 |]
 
-sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo -> Text
-sbyConfig datadir sim1 sim2 (SourceInfo top _) = [st|[options]
+sbyConfig :: (Synthesiser a, Synthesiser b) => Maybe Text -> FilePath -> a -> b -> SourceInfo -> Text
+sbyConfig mt datadir sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
 mode prove
-aigsmt none
+aigsmt #{fromMaybe "none" mt}
 
 [engines]
 abc pdr

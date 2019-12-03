@@ -35,6 +35,7 @@ data Opts = Fuzz { fuzzOutput          :: {-# UNPACK #-} !Text
                  , fuzzExistingFile    :: !(Maybe FilePath)
                  , fuzzExistingFileTop :: !Text
                  , fuzzCrossCheck      :: !Bool
+                 , fuzzChecker         :: !(Maybe Text)
                  }
           | Generate { generateFilename   :: !(Maybe FilePath)
                      , generateConfigFile :: !(Maybe FilePath)
@@ -131,6 +132,10 @@ fuzzOpts =
                 <> Opt.value "top")
         <*> (Opt.switch $ Opt.long "crosscheck" <> Opt.help
                 "Do not only compare against the original design, but also against other netlists.")
+        <*> (Opt.optional . textOption $
+                Opt.long "checker"
+                <> Opt.metavar "CHECKER"
+                <> Opt.help "Define the checker to use.")
 
 genOpts :: Parser Opts
 genOpts =

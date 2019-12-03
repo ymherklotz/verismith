@@ -105,8 +105,8 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
     where checkFile = S.fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
 
 runEquiv
-    :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo -> ResultSh ()
-runEquiv datadir sim1 sim2 srcInfo = do
+    :: (Synthesiser a, Synthesiser b) => Maybe Text -> FilePath -> a -> b -> SourceInfo -> ResultSh ()
+runEquiv mt datadir sim1 sim2 srcInfo = do
     dir <- liftSh S.pwd
     liftSh $ do
         S.writefile "top.v"
@@ -117,14 +117,16 @@ runEquiv datadir sim1 sim2 srcInfo = do
             ^. mainModule
         replaceMods (synthOutput sim1) "_1" srcInfo
         replaceMods (synthOutput sim2) "_2" srcInfo
-        S.writefile "proof.sby" $ sbyConfig datadir sim1 sim2 srcInfo
+        S.writefile "proof.sby" $ sbyConfig mt datadir sim1 sim2 srcInfo
     e <- liftSh $ do
         exe dir "symbiyosys" "sby" ["-f", "proof.sby"]
         S.lastExitCode
     case e of
         0   -> ResultT . return $ Pass ()
-        2   -> ResultT $ Fail . EquivFail . fromRight mempty
-                       . parseCounterEg <$> readfile "proof/engine_0/trace.smtc"
+        2   -> case mt of
+                   Nothing -> ResultT . return . Fail $ EquivFail Nothing
+                   Just _ -> ResultT $ Fail . EquivFail . Just . fromRight mempty
+                             . parseCounterEg <$> readfile "proof/engine_0/trace.smtc"
         124 -> ResultT . return $ Fail TimeoutError
         _   -> ResultT . return $ Fail EquivError
   where

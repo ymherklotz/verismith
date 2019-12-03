@@ -75,7 +75,7 @@ class Tool a => Simulator a where
                  -> ResultSh ByteString
 
 data Failed = EmptyFail
-            | EquivFail CounterEg
+            | EquivFail (Maybe CounterEg)
             | EquivError
             | SimFail ByteString
             | SynthFail

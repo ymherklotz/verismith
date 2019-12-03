@@ -144,13 +144,13 @@ randomise config@(Config a _ c d e) = do
     ce = config ^. configProbability . probExpr
 
 handleOpts :: Opts -> IO ()
-handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc) = do
+handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc checker) = do
     config <- getConfig configF
     gen <- getGenerator config top file
     datadir <- getDataDir
     _      <- runFuzz
         (FuzzOpts (Just $ fromText o)
-         f k n nosim noequiv noreduction config (toFP datadir) cc)
+         f k n nosim noequiv noreduction config (toFP datadir) cc checker)
         defaultYosys
         (fuzzMultiple gen)
     return ()
@@ -183,7 +183,7 @@ handleOpts (Reduce f t _ ls' False) = do
             shelly $ do
                 make dir
                 pop dir $ do
-                    src' <- reduceSynth (toFP datadir) a b src
+                    src' <- reduceSynth Nothing (toFP datadir) a b src
                     writefile (fromText ".." </> dir <.> "v") $ genSource src'
         a : _ -> do
             putStrLn "Reduce with synthesis failure"
@@ -207,7 +207,7 @@ handleOpts (Reduce f t _ ls' True) = do
                 pop dir $ do
                     runSynth a src
                     runSynth b src
-                    runEquiv (toFP datadir) a b src
+                    runEquiv Nothing (toFP datadir) a b src
             case res of
                 Pass _             -> putStrLn "Equivalence check passed"
                 Fail (EquivFail _) -> putStrLn "Equivalence check failed"
@@ -288,7 +288,7 @@ checkEquivalence src dir = shellyFailDir $ do
     setenv "VERISMITH_ROOT" curr
     cd (fromText dir)
     catch_sh
-        ((runResultT $ runEquiv (toFP datadir) defaultYosys defaultVivado src) >> return True)
+        ((runResultT $ runEquiv Nothing (toFP datadir) defaultYosys defaultVivado src) >> return True)
         ((\_ -> return False) :: RunFailed -> Sh Bool)
 
 -- | Run a fuzz run and check if all of the simulators passed by checking if the
@@ -314,7 +314,7 @@ runEquivalence seed gm t d k i = do
         _ <-
             catch_sh
                     (  runResultT
-                    $  runEquiv (toFP datadir) defaultYosys defaultVivado srcInfo
+                    $  runEquiv Nothing (toFP datadir) defaultYosys defaultVivado srcInfo
                     >> liftSh (logger "Test OK")
                     )
                 $ onFailure n
