@@ -140,7 +140,7 @@ sbyConfig :: (Synthesiser a, Synthesiser b) => FilePath -> a -> b -> SourceInfo 
 sbyConfig datadir sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
 mode prove
-aigsmt z3
+aigsmt none
 
 [engines]
 abc pdr
