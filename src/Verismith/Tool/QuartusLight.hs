@@ -59,8 +59,8 @@ runSynthQuartusLight sim (SourceInfo top src) = do
                              , "s/^module/(* multstyle = \"logic\" *) module/;"
                              , toTextIgnore inpf
                              ]
-        writefile quartusSdc $ "create_clock -period 5 -name clk [get_ports clock]"
-        writefile quartusTcl $ quartusSynthConfig sim quartusSdc top inpf
+        writefile quartusSdc "create_clock -period 5 -name clk [get_ports clock]"
+        writefile quartusTcl $ quartusLightSynthConfig sim quartusSdc top inpf
     ex (exec "quartus_sh") ["-t", toTextIgnore quartusTcl]
     liftSh $ do
         cp (fromText "simulation/vcs" </> fromText top <.> "vo")
