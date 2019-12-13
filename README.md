@@ -35,6 +35,7 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 | Type          | Issue                                                      | Confirmed | Fixed |
 |---------------|------------------------------------------------------------|-----------|-------|
+| Mis-synthesis | [Issue 1531](https://github.com/YosysHQ/yosys/issues/1531) | ✓         | ✓     |
 | Mis-synthesis | [Issue 1243](https://github.com/YosysHQ/yosys/issues/1243) | ✓         | ✓     |
 | Mis-synthesis | [Issue 1047](https://github.com/YosysHQ/yosys/issues/1047) | ✓         | ✓     |
 | Mis-synthesis | [Issue 997](https://github.com/YosysHQ/yosys/issues/997)   | ✓         | ✓     |
