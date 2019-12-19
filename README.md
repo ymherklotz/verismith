@@ -82,6 +82,9 @@ Some external packages are required to use Verismith properly:
 - [SymbiYosys](https://github.com/YosysHQ/SymbiYosys)
 - [Icarus Verilog](http://iverilog.icarus.com/)
 - (Optional) [Z3](https://github.com/Z3Prover/z3)
+- (Optional) [Xst](https://www.xilinx.com/support/documentation/sw_manuals/xilinx11/ise_c_using_xst_for_synthesis.htm)
+- (Optional) [Vivado](https://www.xilinx.com/products/design-tools/ise-design-suite.html)
+- (Optional) [Quartus](https://www.intel.com/content/www/us/en/programmable/downloads/download-center.html)
 
 A stable version of Verismith is available on [hackage](https://hackage.haskell.org/package/verismith) and can be installed using cabal directly without having to build the project from the repository:
 
