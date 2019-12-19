@@ -78,10 +78,10 @@ Instead, stack could be used and the `stack.yaml` file could contain the overrid
 
 Some external packages are required to use Verismith properly:
 
-- Yosys
-- SymbiYosys
-- Icarus Verilog
-- (Optional) Z3
+- [Yosys](https://github.com/yosyshq/yosys) with ABC
+- [SymbiYosys](https://github.com/YosysHQ/SymbiYosys)
+- [Icarus Verilog](http://iverilog.icarus.com/)
+- (Optional) [Z3](https://github.com/Z3Prover/z3)
 
 A stable version of Verismith is available on [hackage](https://hackage.haskell.org/package/verismith) and can be installed using cabal directly without having to build the project from the repository:
 
