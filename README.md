@@ -43,8 +43,6 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 ### Vivado
 
-
-
 | Type          | Issue                                                                                                                               | Confirmed | Fixed |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------|-------|
 | Crash         | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | ✗     |
@@ -77,6 +75,13 @@ It may be possible to build it purely with [cabal-install](https://hackage.haske
 Instead, stack could be used and the `stack.yaml` file could contain the overrides that are used by nix.
 
 ### Build from hackage
+
+Some external packages are required to use Verismith properly:
+
+- Yosys
+- SymbiYosys
+- Icarus Verilog
+- (Optional) Z3
 
 A stable version of Verismith is available on [hackage](https://hackage.haskell.org/package/verismith) and can be installed using cabal directly without having to build the project from the repository:
 
