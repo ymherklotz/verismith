@@ -575,6 +575,7 @@ reduce fp eval src =
         >>= redAll "Statements"   (const defaultBot) halveStatements
         -- >>= redAll "Expressions"  (const defaultBot) halveExpr
         >>= red "Remove constants in concat" defaultBot removeConstInConcat
+        >>= red "Cleaning" defaultBot (pure . cleanSourceInfoAll)
   where
     red s bot a = reduce_ fp s a bot eval
     red' s bot a t = reduce_ fp s (a t) (bot t) eval
