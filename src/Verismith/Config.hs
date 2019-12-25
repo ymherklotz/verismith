@@ -140,107 +140,130 @@ import           Verismith.Tool.Yosys
 
 -- | Probability of different expressions nodes.
 data ProbExpr = ProbExpr { _probExprNum         :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generation a number like
+                         -- ^ @expr.number@: probability of generation a number like
                          -- @4'ha@. This should never be set to 0, as it is used
                          -- as a fallback in case there are no viable
                          -- identifiers, such as none being in scope.
                          , _probExprId          :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating an identifier that is in
+                         -- ^ @expr.variable@: probability of generating an identifier that is in
                          -- scope and of the right type.
                          , _probExprRangeSelect :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating a range selection from a port.
+                         -- ^ @expr.rangeselect@: probability of generating a range
+                         -- selection from a port (@reg1[2:0]@).
                          , _probExprUnOp        :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating a unary operator.
+                         -- ^ @expr.unary@: probability of generating a unary operator.
                          , _probExprBinOp       :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generation a binary operator.
+                         -- ^ @expr.binary@: probability of generation a binary operator.
                          , _probExprCond        :: {-# UNPACK #-} !Int
-                         -- ^ probability of generating a conditional ternary
+                         -- ^ @expr.ternary@: probability of generating a conditional ternary
                          -- operator.
                          , _probExprConcat      :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating a concatenation.
+                         -- ^ @expr.concatenation@: probability of generating a concatenation.
                          , _probExprStr         :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating a string. This is not
+                         -- ^ @expr.string@: probability of generating a string. This is not
                          -- fully supported therefore currently cannot be set.
                          , _probExprSigned      :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating a signed function
+                         -- ^ @expr.signed@: probability of generating a signed function
                          -- @$signed(...)@.
                          , _probExprUnsigned    :: {-# UNPACK #-} !Int
-                         -- ^ Probability of generating an unsigned function
+                         -- ^ @expr.unsigned@: probability of generating an unsigned function
                          -- @$unsigned(...)@.
                          }
               deriving (Eq, Show)
 
 -- | Probability of generating different nodes inside a module declaration.
 data ProbModItem = ProbModItem { _probModItemAssign     :: {-# UNPACK #-} !Int
-                               -- ^ Probability of generating an @assign@.
+                               -- ^ @moditem.assign@: probability of generating an @assign@.
                                , _probModItemSeqAlways  :: {-# UNPACK #-} !Int
-                               -- ^ Probability of generating a sequential @always@ block.
+                               -- ^ @moditem.sequential@: probability of generating a sequential @always@ block.
                                , _probModItemCombAlways :: {-# UNPACK #-} !Int
-                               -- ^ Probability of generating an combinational @always@ block.
+                               -- ^ @moditem.combinational@: probability of generating an combinational @always@
+                               -- block. This is currently not implemented.
                                , _probModItemInst       :: {-# UNPACK #-} !Int
-                               -- ^ Probability of generating a module
+                               -- ^ @moditem.instantiation@: probability of generating a module
                                -- instantiation.
                                }
                  deriving (Eq, Show)
 
+-- | Probability of generating different statements.
 data ProbStatement = ProbStatement { _probStmntBlock    :: {-# UNPACK #-} !Int
+                                   -- ^ @statement.blocking@: probability of generating blocking assignments.
                                    , _probStmntNonBlock :: {-# UNPACK #-} !Int
+                                   -- ^ @statement.nonblocking@: probability of generating nonblocking assignments.
                                    , _probStmntCond     :: {-# UNPACK #-} !Int
+                                   -- ^ @statement.conditional@: probability of generating conditional
+                                   -- statements (@if@ statements).
                                    , _probStmntFor      :: {-# UNPACK #-} !Int
+                                   -- ^ @statement.forloop@: probability of generating for loops.
                                    }
                    deriving (Eq, Show)
 
+-- | @[probability]@: combined probabilities.
 data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
+                               -- ^ Probabilities for module items.
                                , _probStmnt   :: {-# UNPACK #-} !ProbStatement
+                               -- ^ Probabilities for statements.
                                , _probExpr    :: {-# UNPACK #-} !ProbExpr
+                               -- ^ Probaiblities for expressions.
                                }
                  deriving (Eq, Show)
 
+-- | @[property]@: properties for the generated Verilog file.
 data ConfProperty = ConfProperty { _propSize           :: {-# UNPACK #-} !Int
-                                 -- ^ The size of the generated Verilog.
+                                 -- ^ @size@: the size of the generated Verilog.
                                  , _propSeed           :: !(Maybe Seed)
-                                 -- ^ A possible seed that could be used to
+                                 -- ^ @seed@: a possible seed that could be used to
                                  -- generate the same Verilog.
                                  , _propStmntDepth     :: {-# UNPACK #-} !Int
-                                 -- ^ The maximum statement depth that should be
+                                 -- ^ @statement.depth@: the maximum statement depth that should be
                                  -- reached.
                                  , _propModDepth       :: {-# UNPACK #-} !Int
-                                 -- ^ The maximium module depth that should be
+                                 -- ^ @module.depth@: the maximium module depth that should be
                                  -- reached.
                                  , _propMaxModules     :: {-# UNPACK #-} !Int
-                                 -- ^ The maximum number of modules that are
+                                 -- ^ @module.max@: the maximum number of modules that are
                                  -- allowed to be created at each level.
                                  , _propSampleMethod   :: !Text
-                                 -- ^ The sampling method that should be used to
+                                 -- ^ @sample.method@: the sampling method that should be used to
                                  -- generate specific distributions of random
                                  -- programs.
                                  , _propSampleSize     :: {-# UNPACK #-} !Int
-                                 -- ^ The number of samples to take for the
+                                 -- ^ @sample.size@: the number of samples to take for the
                                  -- sampling method.
                                  , _propCombine        :: !Bool
-                                 -- ^ If the output should be combined into one
+                                 -- ^ @output.combine@: if the output should be combined into one
                                  -- bit or not.
                                  , _propNonDeterminism :: {-# UNPACK #-} !Int
-                                 -- ^ The frequency at which nondeterminism
-                                 -- should be generated.
+                                 -- ^ @nondeterminism@: the frequency at which nondeterminism
+                                 -- should be generated (currently a work in progress).
                                  , _propDeterminism    :: {-# UNPACK #-} !Int
-                                 -- ^ The frequency at which determinism should
-                                 -- be generated.
+                                 -- ^ @determinism@: the frequency at which determinism should
+                                 -- be generated (currently modules are always deterministic).
                                  }
                   deriving (Eq, Show)
 
 data Info = Info { _infoCommit  :: !Text
+                 -- ^ @commit@: the hash of the commit that was compiled.
                  , _infoVersion :: !Text
+                 -- ^ @version@: the version of Verismith that was compiled.
                  }
           deriving (Eq, Show)
 
+-- | Description of the simulator
 data SimDescription = SimDescription { simName :: {-# UNPACK #-} !Text }
                     deriving (Eq, Show)
 
+-- | @[[synthesiser]]@: description of the synthesis tool. There can be multiple of these sections in a config
+-- file.
 data SynthDescription = SynthDescription { synthName :: {-# UNPACK #-} !Text
+                                         -- ^ @name@: type of the synthesis tool. Can either be @yosys@, @quartus@,
+                                         -- @quartuslight@, @vivado@, @xst@.
                                          , synthBin  :: Maybe Text
+                                         -- ^ @bin@: location of the synthesis tool binary.
                                          , synthDesc :: Maybe Text
+                                         -- ^ @description@: description that should be used for the synthesis tool.
                                          , synthOut  :: Maybe Text
+                                         -- ^ @output@: name of the output Verilog file.
                                          }
                       deriving (Eq, Show)
 
