@@ -4,9 +4,9 @@
 
 The version of Verismith that is assumed to be used is Verismith 0.6.0.2, which is also available on [hackage](https://hackage.haskell.org/package/verismith-0.6.0.2) using:
 
-```shell
+#+begin_src
 cabal install verismith
-```
+#+end_src
 
 ** Finding failures in Yosys 0.8
 

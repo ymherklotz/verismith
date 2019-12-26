@@ -1,23 +1,21 @@
 
 # Table of Contents
 
-1.  [Introduction](#orgdaf6bde)
-2.  [Finding failures in Yosys 0.8](#org964ab8d)
+1.  [Introduction](#org19a28a2)
+2.  [Finding failures in Yosys 0.8](#org7dbedb0)
 
 
 
-<a id="orgdaf6bde"></a>
+<a id="org19a28a2"></a>
 
 # Introduction
 
 The version of Verismith that is assumed to be used is Verismith 0.6.0.2, which is also available on [hackage](<https://hackage.haskell.org/package/verismith-0.6.0.2>) using:
 
-\`\`\`shell
-cabal install verismith
-\`\`\`
+    cabal install verismith
 
 
-<a id="org964ab8d"></a>
+<a id="org7dbedb0"></a>
 
 # Finding failures in Yosys 0.8
 
