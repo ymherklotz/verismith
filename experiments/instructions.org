@@ -20,7 +20,7 @@ The first step is to install Yosys master (which will in this case be installed 
 
 #+begin_src
 git clone https://github.com/yosyshq/yosys && cd yosys
-sed -i 's/^PREFIX ?=.*/PREFIX ?= /opt/yosys/master'
+sed -i 's:^PREFIX ?=.*:PREFIX ?= /opt/yosys/master:' Makefile
 make -j4
 sudo make install
 #+end_src
@@ -30,8 +30,63 @@ Then we want to install Yosys 0.8 (which will be installed to ~/opt/yosys/0.8~):
 #+begin_src 
 git clean -dfx && git reset --hard HEAD
 git checkout yosys-0.8
-sed -i 's/^PREFIX ?=.*/PREFIX ?= /opt/yosys/0.8'
+sed -i 's:^PREFIX ?=.*:PREFIX ?= /opt/yosys/0.8:' Makefile
 make -j4
 sudo make install
 #+end_src
 
+*** Running Verismith
+
+We are then ready to run Verismith using the two Yosys versions that were installed.
+
+Using the following config file:
+
+#+begin_src
+[info]
+  commit = "UNKNOWN"
+  version = "0.6.0.2"
+
+[probability]
+  expr.binary = 5
+  expr.concatenation = 3
+  expr.number = 1
+  expr.rangeselect = 5
+  expr.signed = 5
+  expr.string = 0
+  expr.ternary = 5
+  expr.unary = 5
+  expr.unsigned = 5
+  expr.variable = 5
+  moditem.assign = 5
+  moditem.combinational = 0
+  moditem.instantiation = 1
+  moditem.sequential = 1
+  statement.blocking = 0
+  statement.conditional = 1
+  statement.forloop = 1
+  statement.nonblocking = 5
+
+[property]
+  determinism = 1
+  module.depth = 2
+  module.max = 5
+  nondeterminism = 0
+  output.combine = false
+  sample.method = "hat"
+  sample.size = 10
+  size = 20
+  statement.depth = 3
+  default.yosys = "/opt/yosys/master"
+
+[[synthesiser]]
+  bin = "/opt/yosys/0.8/bin"
+  description = "yosys_0_8"
+  name = "yosys"
+  output = "syn_yosys_0_8.v"
+
+[[synthesiser]]
+  bin = "/opt/yosys/master"
+  description = "yosys_master"
+  name = "yosys"
+  output = "syn_yosys_master.v"
+#+end_src
