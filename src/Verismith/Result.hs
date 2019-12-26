@@ -29,13 +29,15 @@ module Verismith.Result
     )
 where
 
+import           Control.Monad               (liftM)
 import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Control
 import           Data.Bifunctor              (Bifunctor (..))
 import           Shelly                      (RunFailed (..), Sh, catch_sh)
-import           Shelly.Lifted               (MonadSh, liftSh)
+import           Shelly.Lifted               (MonadSh, MonadShControl, ShM,
+                                              liftSh, liftShWith, restoreSh)
 
 -- | Result type which is equivalent to 'Either' or 'Error'. This is
 -- reimplemented so that there is full control over the 'Monad' definition and
@@ -133,6 +135,16 @@ instance MonadBaseControl IO m => MonadBaseControl IO (ResultT a m) where
     restoreM     = defaultRestoreM
     {-# INLINABLE liftBaseWith #-}
     {-# INLINABLE restoreM #-}
+
+instance (MonadShControl m)
+         => MonadShControl (ResultT a m) where
+    newtype ShM (ResultT a m) b = ResultTShM (ShM m (Result a b))
+    liftShWith f =
+        ResultT $ liftM return $ liftShWith $ \runInSh -> f $ \k ->
+            liftM ResultTShM $ runInSh $ runResultT k
+    restoreSh (ResultTShM m) = ResultT . restoreSh $ m
+    {-# INLINE liftShWith #-}
+    {-# INLINE restoreSh #-}
 
 infix 0 <?>
 

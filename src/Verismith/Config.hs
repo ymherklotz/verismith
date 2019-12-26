@@ -72,6 +72,7 @@ module Verismith.Config
     , propCombine
     , propDeterminism
     , propNonDeterminism
+    , propDefaultYosys
     , parseConfigFile
     , parseConfig
     , encodeConfig
@@ -239,6 +240,9 @@ data ConfProperty = ConfProperty { _propSize           :: {-# UNPACK #-} !Int
                                  , _propDeterminism    :: {-# UNPACK #-} !Int
                                  -- ^ @determinism@: the frequency at which determinism should
                                  -- be generated (currently modules are always deterministic).
+                                 , _propDefaultYosys   :: !(Maybe Text)
+                                 -- ^ @default.yosys@: Default location for Yosys, which will be used for
+                                 -- equivalence checking.
                                  }
                   deriving (Eq, Show)
 
@@ -322,7 +326,7 @@ defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr)
-    (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1)
+    (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1 Nothing)
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -447,6 +451,8 @@ propCodec =
         .=  _propNonDeterminism
         <*> defaultValue (defProp propDeterminism) (Toml.int "determinism")
         .=  _propDeterminism
+        <*> Toml.dioptional (Toml.text (twoKey "default" "yosys"))
+        .= _propDefaultYosys
     where defProp i = defaultConfig ^. configProperty . i
 
 simulator :: TomlCodec SimDescription

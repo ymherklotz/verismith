@@ -50,8 +50,8 @@ import           Hedgehog.Internal.Seed      (Seed)
 import qualified Hedgehog.Internal.Seed      as Hog
 import qualified Hedgehog.Internal.Tree      as Hog
 import           Prelude                     hiding (FilePath)
-import           Shelly                      hiding (get)
-import           Shelly.Lifted               (MonadSh, liftSh)
+import           Shelly                      hiding (get, sub)
+import           Shelly.Lifted               (MonadSh, liftSh, sub)
 import           System.FilePath.Posix       (takeBaseName)
 import           Verismith.Config
 import           Verismith.CounterEg         (CounterEg (..))
@@ -273,16 +273,17 @@ equivalence src = do
     datadir <- fmap _fuzzDataDir askOpts
     checker <- fmap _fuzzOptsChecker askOpts
     synth <- passedSynthesis
+    conf <- fmap _fuzzOptsConfig askOpts
     let synthComb =
             if doCrossCheck
             then nubBy tupEq . filter (uncurry (/=)) $ combinations synth synth
             else nubBy tupEq . filter (uncurry (/=)) $ (,) defaultIdentitySynth <$> synth
-    resTimes <- liftSh $ mapM (uncurry (equiv checker datadir)) synthComb
+    resTimes <- liftSh $ mapM (uncurry (equiv (conf ^. configProperty . propDefaultYosys) checker datadir)) synthComb
     fuzzSynthResults .= toSynthResult synthComb resTimes
     liftSh $ inspect resTimes
   where
     tupEq (a, b) (a', b') = (a == a' && b == b') || (a == b' && b == a')
-    equiv checker datadir a b =
+    equiv yosysloc checker datadir a b =
         toolRun ("equivalence check for " <> toText a <> " and " <> toText b)
             . runResultT
             $ do make dir
@@ -297,7 +298,9 @@ equivalence src = do
                               </> synthOutput b
                             ) $ synthOutput b
                          writefile "rtl.v" $ genSource src
-                     runEquiv checker datadir a b src
+                     sub $ do
+                         maybe (return ()) (liftSh . prependToPath . fromText) yosysloc
+                         runEquiv checker datadir a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
 simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
