@@ -12,7 +12,9 @@ cabal install verismith
 
 Yosys 0.8 was found to fail about 30% of the time, which means that it should be quite simple to find errors in it. However, different versions of Yosys can be tested this way as well and should also result in failures, such as Yosys 0.9 or Yosys commit hashes 3333e00 or 70d0f38.
 
-However, to find failures in Yosys 0.8, a newer version of Yosys has to be used for the equivalence check. For this we can use Yosys master. An alternative for this is to use a simulator with a testbench, which is also supported by Verismith using Icarus Verilog.
+However, to find failures in Yosys 0.8, a newer version of Yosys has to be used for the equivalence check. For this we can use Yosys master. An alternative for this is to use a simulator with a test bench, which is also supported by Verismith using Icarus Verilog.
+
+*Note*: The most common error in Yosys 0.8 is regarding for loops, which are not dealt that well with the reducer at the moment.
 
 *** Installing Yosys master
 
@@ -39,7 +41,7 @@ sudo make install
 
 We are then ready to run Verismith using the two Yosys versions that were installed.
 
-Using the following config file:
+Using the following config file saved in ~config.toml~:
 
 #+begin_src
 [info]
@@ -76,7 +78,7 @@ Using the following config file:
   sample.size = 10
   size = 20
   statement.depth = 3
-  default.yosys = "/opt/yosys/master"
+  default.yosys = "/opt/yosys/master/bin"
 
 [[synthesiser]]
   bin = "/opt/yosys/0.8/bin"
@@ -85,8 +87,84 @@ Using the following config file:
   output = "syn_yosys_0_8.v"
 
 [[synthesiser]]
-  bin = "/opt/yosys/master"
+  bin = "/opt/yosys/master/bin"
   description = "yosys_master"
   name = "yosys"
   output = "syn_yosys_master.v"
 #+end_src
+
+To run Verismith for 10 iterations, which should find a bug, we can run the following:
+
+#+begin_src
+verismith fuzz -c config.toml -n 10 -o yosys_output
+#+end_src
+
+Failures can then either be seen on the output, or a summary can be seen in the browser using the following:
+
+#+begin_src 
+firefox yosys_output/index.html
+#+end_src
+
+*** Using a pre-existing seed
+
+If a failure still cannot be found in Yosys 0.8 using the previous, it should be possible using the following config file, which will generate Verilog based on a seed that was found to produce an error in Yosys 0.8:
+
+#+begin_src
+
+[info]
+  commit = "UNKNOWN"
+  version = "0.6.0.2"
+
+[probability]
+  expr.binary = 5
+  expr.concatenation = 3
+  expr.number = 1
+  expr.rangeselect = 5
+  expr.signed = 5
+  expr.string = 0
+  expr.ternary = 5
+  expr.unary = 5
+  expr.unsigned = 5
+  expr.variable = 5
+  moditem.assign = 5
+  moditem.combinational = 1
+  moditem.instantiation = 1
+  moditem.sequential = 1
+  statement.blocking = 0
+  statement.conditional = 1
+  statement.forloop = 1
+  statement.nonblocking = 5
+
+[property]
+  default.yosys = "/opt/yosys/master/bin"
+  determinism = 1
+  module.depth = 2
+  module.max = 5
+  nondeterminism = 0
+  output.combine = false
+  sample.method = "hat"
+  sample.size = 10
+  seed = "Seed 17999570691447884947 12099254006121016321"
+  size = 20
+  statement.depth = 3
+
+[[synthesiser]]
+  bin = "/opt/yosys/0.8/bin"
+  description = "yosys_0_8"
+  name = "yosys"
+  output = "syn_yosys_0_8.v"
+
+[[synthesiser]]
+  bin = "/opt/yosys/master/bin"
+  description = "yosys_master"
+  name = "yosys"
+  output = "syn_yosys_master.v"
+#+end_src
+
+Just save the config file in ~config.toml~ and run the following:
+
+#+begin_src 
+verismith fuzz -c config.toml -o yosys_one
+#+end_src
+
+Which should find a bug and reduce it to around 200 loc out of 1000.

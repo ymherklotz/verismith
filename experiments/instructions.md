@@ -1,14 +1,15 @@
 
 # Table of Contents
 
-1.  [Introduction](#org23031ec)
-2.  [Finding failures in Yosys 0.8](#org081925a)
-    1.  [Installing Yosys master](#orgb118ae3)
-    2.  [Running Verismith](#org8276594)
+1.  [Introduction](#orgfa2e714)
+2.  [Finding failures in Yosys 0.8](#org6a59bc9)
+    1.  [Installing Yosys master](#org546cb88)
+    2.  [Running Verismith](#orgc7f7b1f)
+    3.  [Using a pre-existing seed](#orgeb22097)
 
 
 
-<a id="org23031ec"></a>
+<a id="orgfa2e714"></a>
 
 # Introduction
 
@@ -17,16 +18,18 @@ The version of Verismith that is assumed to be used is Verismith 0.6.0.2, which 
     cabal install verismith
 
 
-<a id="org081925a"></a>
+<a id="org6a59bc9"></a>
 
 # Finding failures in Yosys 0.8
 
 Yosys 0.8 was found to fail about 30% of the time, which means that it should be quite simple to find errors in it. However, different versions of Yosys can be tested this way as well and should also result in failures, such as Yosys 0.9 or Yosys commit hashes 3333e00 or 70d0f38.
 
-However, to find failures in Yosys 0.8, a newer version of Yosys has to be used for the equivalence check. For this we can use Yosys master. An alternative for this is to use a simulator with a testbench, which is also supported by Verismith using Icarus Verilog.
+However, to find failures in Yosys 0.8, a newer version of Yosys has to be used for the equivalence check. For this we can use Yosys master. An alternative for this is to use a simulator with a test bench, which is also supported by Verismith using Icarus Verilog.
+
+**Note**: The most common error in Yosys 0.8 is regarding for loops, which are not dealt that well with the reducer at the moment.
 
 
-<a id="orgb118ae3"></a>
+<a id="org546cb88"></a>
 
 ## Installing Yosys master
 
@@ -46,13 +49,13 @@ Then we want to install Yosys 0.8 (which will be installed to `/opt/yosys/0.8`):
     sudo make install
 
 
-<a id="org8276594"></a>
+<a id="orgc7f7b1f"></a>
 
 ## Running Verismith
 
 We are then ready to run Verismith using the two Yosys versions that were installed.
 
-Using the following config file:
+Using the following config file saved in `config.toml`:
 
     [info]
       commit = "UNKNOWN"
@@ -88,7 +91,7 @@ Using the following config file:
       sample.size = 10
       size = 20
       statement.depth = 3
-      default.yosys = "/opt/yosys/master"
+      default.yosys = "/opt/yosys/master/bin"
     
     [[synthesiser]]
       bin = "/opt/yosys/0.8/bin"
@@ -97,8 +100,79 @@ Using the following config file:
       output = "syn_yosys_0_8.v"
     
     [[synthesiser]]
-      bin = "/opt/yosys/master"
+      bin = "/opt/yosys/master/bin"
       description = "yosys_master"
       name = "yosys"
       output = "syn_yosys_master.v"
+
+To run Verismith for 10 iterations, which should find a bug, we can run the following:
+
+    verismith fuzz -c config.toml -n 10 -o yosys_output
+
+Failures can then either be seen on the output, or a summary can be seen in the browser using the following:
+
+    firefox yosys_output/index.html
+
+
+<a id="orgeb22097"></a>
+
+## Using a pre-existing seed
+
+If a failure still cannot be found in Yosys 0.8 using the previous, it should be possible using the following config file, which will generate Verilog based on a seed that was found to produce an error in Yosys 0.8:
+
+    
+    [info]
+      commit = "UNKNOWN"
+      version = "0.6.0.2"
+    
+    [probability]
+      expr.binary = 5
+      expr.concatenation = 3
+      expr.number = 1
+      expr.rangeselect = 5
+      expr.signed = 5
+      expr.string = 0
+      expr.ternary = 5
+      expr.unary = 5
+      expr.unsigned = 5
+      expr.variable = 5
+      moditem.assign = 5
+      moditem.combinational = 1
+      moditem.instantiation = 1
+      moditem.sequential = 1
+      statement.blocking = 0
+      statement.conditional = 1
+      statement.forloop = 1
+      statement.nonblocking = 5
+    
+    [property]
+      default.yosys = "/opt/yosys/master/bin"
+      determinism = 1
+      module.depth = 2
+      module.max = 5
+      nondeterminism = 0
+      output.combine = false
+      sample.method = "hat"
+      sample.size = 10
+      seed = "Seed 17999570691447884947 12099254006121016321"
+      size = 20
+      statement.depth = 3
+    
+    [[synthesiser]]
+      bin = "/opt/yosys/0.8/bin"
+      description = "yosys_0_8"
+      name = "yosys"
+      output = "syn_yosys_0_8.v"
+    
+    [[synthesiser]]
+      bin = "/opt/yosys/master/bin"
+      description = "yosys_master"
+      name = "yosys"
+      output = "syn_yosys_master.v"
+
+Just save the config file in `config.toml` and run the following:
+
+    verismith fuzz -c config.toml -o yosys_one
+
+Which should find a bug and reduce it to around 200 loc out of 1000.
 
