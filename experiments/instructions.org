@@ -13,3 +13,25 @@ cabal install verismith
 Yosys 0.8 was found to fail about 30% of the time, which means that it should be quite simple to find errors in it. However, different versions of Yosys can be tested this way as well and should also result in failures, such as Yosys 0.9 or Yosys commit hashes 3333e00 or 70d0f38.
 
 However, to find failures in Yosys 0.8, a newer version of Yosys has to be used for the equivalence check. For this we can use Yosys master. An alternative for this is to use a simulator with a testbench, which is also supported by Verismith using Icarus Verilog.
+
+*** Installing Yosys master
+
+The first step is to install Yosys master (which will in this case be installed to ~/opt/yosys/master~):
+
+#+begin_src
+git clone https://github.com/yosyshq/yosys && cd yosys
+sed -i 's/^PREFIX ?=.*/PREFIX ?= /opt/yosys/master'
+make -j4
+sudo make install
+#+end_src
+
+Then we want to install Yosys 0.8 (which will be installed to ~/opt/yosys/0.8~):
+
+#+begin_src 
+git clean -dfx && git reset --hard HEAD
+git checkout yosys-0.8
+sed -i 's/^PREFIX ?=.*/PREFIX ?= /opt/yosys/0.8'
+make -j4
+sudo make install
+#+end_src
+
