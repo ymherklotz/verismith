@@ -1,5 +1,5 @@
 name: verismith
-version: 0.6.0.1
+version: 0.6.0.2
 synopsis: Random verilog generation and simulator testing.
 description:
   Verismith provides random verilog generation modules
@@ -27,7 +27,7 @@ source-repository head
 source-repository this
   type:     git
   location: https://github.com/ymherklotz/verismith
-  tag:      v0.6.0.1
+  tag:      v0.6.0.2
 
 custom-setup
   setup-depends:
