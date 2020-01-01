@@ -168,3 +168,130 @@ verismith fuzz -c config.toml -o yosys_one
 #+end_src
 
 Which should find a bug and reduce it to around 200 loc out of 1000.
+** Better example of reduction and interesting failure
+
+This bug was found in a development version of Yosys (commit hash 3333e002) and was [reported and fixed in Yosys](https://github.com/YosysHQ/yosys/issues/997). In addition to that, a crash can also be reproduced which was also [reported and fixed in Yosys](https://github.com/YosysHQ/yosys/issues/993).
+
+*** Build Yosys 3333e002
+
+First, we need to build Yosys 3333e002, in addition to the version of Yosys master [[*Installing Yosys master][built earlier]].
+
+#+begin_src
+git clean -dfx && git reset --hard HEAD
+git checkout 3333e002 -b test
+sed -i 's:^PREFIX ?=.*:PREFIX ?= /opt/yosys/3333e002:' Makefile
+make -j4
+sudo make install
+#+end_src
+
+*** Running Verismith for mis-synthesis
+
+Save the following config file in ~config.toml~:
+
+#+begin_src
+[info]
+  commit = "UNKNOWN"
+  version = "0.6.0.2"
+
+[probability]
+  expr.binary = 5
+  expr.concatenation = 3
+  expr.number = 1
+  expr.rangeselect = 5
+  expr.signed = 5
+  expr.string = 0
+  expr.ternary = 5
+  expr.unary = 5
+  expr.unsigned = 5
+  expr.variable = 5
+  moditem.assign = 5
+  moditem.combinational = 1
+  moditem.instantiation = 1
+  moditem.sequential = 1
+  statement.blocking = 0
+  statement.conditional = 1
+  statement.forloop = 0
+  statement.nonblocking = 3
+
+[property]
+  default.yosys = "/opt/yosys/master/bin"
+  determinism = 1
+  module.depth = 2
+  module.max = 5
+  nondeterminism = 0
+  output.combine = false
+  sample.method = "random"
+  sample.size = 10
+  seed = "Seed 6762640716476645086 15760899726111280279"
+  size = 20
+  statement.depth = 3
+
+[[synthesiser]]
+  bin = "/opt/yosys/3333e002/bin"
+  description = "yosys"
+  name = "yosys"
+  output = "syn_yosys.v"
+#+end_src
+
+Then run Verismith with the following:
+
+#+begin_src 
+verismith fuzz -c config.toml -o output_ms
+#+end_src
+
+*** Running Verismith for crash
+
+*Note*: Verismith is not that great at reducing crashes, as is explained in our paper.
+
+Save the following config file in ~config.toml~:
+
+#+begin_src
+[info]
+  commit = "UNKNOWN"
+  version = "0.6.0.2"
+
+[probability]
+  expr.binary = 5
+  expr.concatenation = 3
+  expr.number = 1
+  expr.rangeselect = 5
+  expr.signed = 5
+  expr.string = 0
+  expr.ternary = 5
+  expr.unary = 5
+  expr.unsigned = 5
+  expr.variable = 5
+  moditem.assign = 5
+  moditem.combinational = 1
+  moditem.instantiation = 1
+  moditem.sequential = 1
+  statement.blocking = 0
+  statement.conditional = 1
+  statement.forloop = 0
+  statement.nonblocking = 3
+
+[property]
+  default.yosys = "/opt/yosys/master/bin"
+  determinism = 1
+  module.depth = 2
+  module.max = 5
+  nondeterminism = 0
+  output.combine = false
+  sample.method = "random"
+  sample.size = 10
+  seed = "Seed 10125302424574354942 828176532243040297"
+  size = 20
+  statement.depth = 3
+
+[[synthesiser]]
+  bin = "/opt/yosys/3333e002/bin"
+  description = "yosys"
+  name = "yosys"
+  output = "syn_yosys.v"
+#+end_src
+
+Then run Verismith with the following:
+
+#+begin_src 
+verismith fuzz -c config.toml -o output_c
+#+end_src
