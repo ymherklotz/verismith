@@ -243,7 +243,7 @@ The result should be that the equivalence check fails and a reduced testcase sho
 
 Contrary to what is expected, the simulation runs will pass. This is because the bug occurs in the initial values that are assigned to the variables. These are set to 0 in the design, but mistakenly set to x in the synthesised design. The testbench does not check for those values and the error is therefore not found by the testbench.
 
-To fix this manually, one can add a ~$strobe("%b", y);~ on line 22 in 
+To fix this manually, one can add a ~$strobe("%b", y);~ on line 22 in the yosys testbench:
 
 #+begin_src bash
 cd output_ms/fuzz_1/simulation_yosys

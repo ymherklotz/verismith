@@ -1,19 +1,19 @@
 
 # Table of Contents
 
-1.  [Introduction](#orge1df3bc)
-2.  [Finding failures in Yosys 0.8](#orgc68ec26)
-    1.  [Installing Yosys master](#org67c7ee8)
-    2.  [Running Verismith](#org4bea20e)
-    3.  [Using a pre-existing seed](#org3c3ca35)
-3.  [Better example of reduction and interesting failure](#orgdaa382c)
-    1.  [Build Yosys 3333e002](#org83f41ec)
-    2.  [Running Verismith for mis-synthesis](#org13ba29f)
-    3.  [Running Verismith for crash](#org049a99a)
+1.  [Introduction](#org1b61a13)
+2.  [Finding failures in Yosys 0.8](#org822a3f3)
+    1.  [Installing Yosys master](#org1796c08)
+    2.  [Running Verismith](#org4bcde97)
+    3.  [Using a pre-existing seed](#org5ee7571)
+3.  [Better example of reduction and interesting failure](#orgbd91ba7)
+    1.  [Build Yosys 3333e002](#org866de1a)
+    2.  [Running Verismith for mis-synthesis](#orgb24b2ef)
+    3.  [Running Verismith for crash](#org51a0c9d)
 
 
 
-<a id="orge1df3bc"></a>
+<a id="org1b61a13"></a>
 
 # Introduction
 
@@ -22,7 +22,7 @@ The version of Verismith that is assumed to be used is Verismith 0.6.0.2, which 
     cabal install verismith
 
 
-<a id="orgc68ec26"></a>
+<a id="org822a3f3"></a>
 
 # Finding failures in Yosys 0.8
 
@@ -33,7 +33,7 @@ However, to find failures in Yosys 0.8, a newer version of Yosys has to be used 
 **Note**: The most common error in Yosys 0.8 is regarding for loops, which are not dealt that well with the reducer at the moment.
 
 
-<a id="org67c7ee8"></a>
+<a id="org1796c08"></a>
 
 ## Installing Yosys master
 
@@ -53,7 +53,7 @@ Then we want to install Yosys 0.8 (which will be installed to `/opt/yosys/0.8`):
     sudo make install
 
 
-<a id="org4bea20e"></a>
+<a id="org4bcde97"></a>
 
 ## Running Verismith
 
@@ -118,7 +118,7 @@ Failures can then either be seen on the output, or a summary can be seen in the 
     firefox yosys_output/index.html
 
 
-<a id="org3c3ca35"></a>
+<a id="org5ee7571"></a>
 
 ## Using a pre-existing seed
 
@@ -181,18 +181,18 @@ Just save the config file in `config.toml` and run the following:
 Which should find a bug and reduce it to around 200 loc out of 1000.
 
 
-<a id="orgdaa382c"></a>
+<a id="orgbd91ba7"></a>
 
 # Better example of reduction and interesting failure
 
 This bug was found in a development version of Yosys (commit hash 3333e002) and was [reported and fixed in Yosys](<https://github.com/YosysHQ/yosys/issues/997>). In addition to that, a crash can also be reproduced which was also [reported and fixed in Yosys](<https://github.com/YosysHQ/yosys/issues/993>).
 
 
-<a id="org83f41ec"></a>
+<a id="org866de1a"></a>
 
 ## Build Yosys 3333e002
 
-First, we need to build Yosys 3333e002, in addition to the version of Yosys master [built earlier](#org67c7ee8).
+First, we need to build Yosys 3333e002, in addition to the version of Yosys master [built earlier](#org1796c08).
 
     git clean -dfx && git reset --hard HEAD
     git checkout 3333e002 -b test
@@ -201,7 +201,7 @@ First, we need to build Yosys 3333e002, in addition to the version of Yosys mast
     sudo make install
 
 
-<a id="org13ba29f"></a>
+<a id="orgb24b2ef"></a>
 
 ## Running Verismith for mis-synthesis
 
@@ -258,7 +258,7 @@ The result should be that the equivalence check fails and a reduced testcase sho
 
 Contrary to what is expected, the simulation runs will pass. This is because the bug occurs in the initial values that are assigned to the variables. These are set to 0 in the design, but mistakenly set to x in the synthesised design. The testbench does not check for those values and the error is therefore not found by the testbench.
 
-To fix this manually, one can add a `$strobe("%b", y);` on line 22 in 
+To fix this manually, one can add a `$strobe("%b", y);` on line 22 in the yosys testbench:
 
     cd output_ms/fuzz_1/simulation_yosys
     sed -i '21 a      $strobe("%b", y);' yosys_testbench.v
@@ -269,7 +269,7 @@ To fix this manually, one can add a `$strobe("%b", y);` on line 22 in
 which should show some `x` in the output which should not be there.
 
 
-<a id="org049a99a"></a>
+<a id="org51a0c9d"></a>
 
 ## Running Verismith for crash
 
