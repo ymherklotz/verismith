@@ -247,7 +247,7 @@ To fix this manually, one can add a ~$strobe("%b", y);~ on line 22 in the yosys 
 
 #+begin_src bash
 cd output_ms/fuzz_1/simulation_yosys
-sed -i '21 a      $strobe("%b", y);' yosys_testbench.v
+sed -i '21 a $strobe("%b", y);' yosys_testbench.v
 iverilog -o yosys_main yosys_testbench.v
 # ./yosys_main | grep 'x'
 ./yosys_main

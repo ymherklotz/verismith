@@ -1,19 +1,19 @@
 
 # Table of Contents
 
-1.  [Introduction](#org1b61a13)
-2.  [Finding failures in Yosys 0.8](#org822a3f3)
-    1.  [Installing Yosys master](#org1796c08)
-    2.  [Running Verismith](#org4bcde97)
-    3.  [Using a pre-existing seed](#org5ee7571)
-3.  [Better example of reduction and interesting failure](#orgbd91ba7)
-    1.  [Build Yosys 3333e002](#org866de1a)
-    2.  [Running Verismith for mis-synthesis](#orgb24b2ef)
-    3.  [Running Verismith for crash](#org51a0c9d)
+1.  [Introduction](#orgd3cb150)
+2.  [Finding failures in Yosys 0.8](#org959cf8d)
+    1.  [Installing Yosys master](#org6a1d355)
+    2.  [Running Verismith](#org84e63d1)
+    3.  [Using a pre-existing seed](#orgcabdc0f)
+3.  [Better example of reduction and interesting failure](#orgf84fef3)
+    1.  [Build Yosys 3333e002](#org97f1e94)
+    2.  [Running Verismith for mis-synthesis](#org1b17784)
+    3.  [Running Verismith for crash](#org39c5d99)
 
 
 
-<a id="org1b61a13"></a>
+<a id="orgd3cb150"></a>
 
 # Introduction
 
@@ -22,7 +22,7 @@ The version of Verismith that is assumed to be used is Verismith 0.6.0.2, which 
     cabal install verismith
 
 
-<a id="org822a3f3"></a>
+<a id="org959cf8d"></a>
 
 # Finding failures in Yosys 0.8
 
@@ -33,7 +33,7 @@ However, to find failures in Yosys 0.8, a newer version of Yosys has to be used 
 **Note**: The most common error in Yosys 0.8 is regarding for loops, which are not dealt that well with the reducer at the moment.
 
 
-<a id="org1796c08"></a>
+<a id="org6a1d355"></a>
 
 ## Installing Yosys master
 
@@ -53,7 +53,7 @@ Then we want to install Yosys 0.8 (which will be installed to `/opt/yosys/0.8`):
     sudo make install
 
 
-<a id="org4bcde97"></a>
+<a id="org84e63d1"></a>
 
 ## Running Verismith
 
@@ -118,7 +118,7 @@ Failures can then either be seen on the output, or a summary can be seen in the 
     firefox yosys_output/index.html
 
 
-<a id="org5ee7571"></a>
+<a id="orgcabdc0f"></a>
 
 ## Using a pre-existing seed
 
@@ -181,18 +181,18 @@ Just save the config file in `config.toml` and run the following:
 Which should find a bug and reduce it to around 200 loc out of 1000.
 
 
-<a id="orgbd91ba7"></a>
+<a id="orgf84fef3"></a>
 
 # Better example of reduction and interesting failure
 
 This bug was found in a development version of Yosys (commit hash 3333e002) and was [reported and fixed in Yosys](<https://github.com/YosysHQ/yosys/issues/997>). In addition to that, a crash can also be reproduced which was also [reported and fixed in Yosys](<https://github.com/YosysHQ/yosys/issues/993>).
 
 
-<a id="org866de1a"></a>
+<a id="org97f1e94"></a>
 
 ## Build Yosys 3333e002
 
-First, we need to build Yosys 3333e002, in addition to the version of Yosys master [built earlier](#org1796c08).
+First, we need to build Yosys 3333e002, in addition to the version of Yosys master [built earlier](#org6a1d355).
 
     git clean -dfx && git reset --hard HEAD
     git checkout 3333e002 -b test
@@ -201,7 +201,7 @@ First, we need to build Yosys 3333e002, in addition to the version of Yosys mast
     sudo make install
 
 
-<a id="orgb24b2ef"></a>
+<a id="org1b17784"></a>
 
 ## Running Verismith for mis-synthesis
 
@@ -261,7 +261,7 @@ Contrary to what is expected, the simulation runs will pass. This is because the
 To fix this manually, one can add a `$strobe("%b", y);` on line 22 in the yosys testbench:
 
     cd output_ms/fuzz_1/simulation_yosys
-    sed -i '21 a      $strobe("%b", y);' yosys_testbench.v
+    sed -i '21 a $strobe("%b", y);' yosys_testbench.v
     iverilog -o yosys_main yosys_testbench.v
     # ./yosys_main | grep 'x'
     ./yosys_main
@@ -269,7 +269,7 @@ To fix this manually, one can add a `$strobe("%b", y);` on line 22 in the yosys 
 which should show some `x` in the output which should not be there.
 
 
-<a id="org51a0c9d"></a>
+<a id="org39c5d99"></a>
 
 ## Running Verismith for crash
 
