@@ -2,7 +2,7 @@
 Module      : Verismith.Circuit.Internal
 Description : Internal helpers for generation.
 Copyright   : (c) 2018-2019, Yann Herklotz
-License     : BSD-3
+License     : GPLv3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

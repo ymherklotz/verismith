@@ -2,7 +2,7 @@
 Module      : Verismith.Tool.Template
 Description : Template file for different configuration files
 Copyright   : (c) 2019, Yann Herklotz
-License     : GPL-3
+License     : GPLv3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

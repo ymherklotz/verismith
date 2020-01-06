@@ -2,7 +2,7 @@
 Module      : Verismith.Circuit.Base
 Description : Base types for the circuit module.
 Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
+License     : GPLv3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

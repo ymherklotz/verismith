@@ -3,7 +3,7 @@
 Module      : Verismith.Report
 Description : Generate a report from a fuzz run.
 Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
+License     : GPLv3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

@@ -2,7 +2,7 @@
 Module      : Verilog.Circuit.Gen
 Description : Generate verilog from circuit.
 Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
+License     : GPLv3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

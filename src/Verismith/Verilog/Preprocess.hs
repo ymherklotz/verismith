@@ -2,7 +2,7 @@
 Module      : Verismith.Verilog.Preprocess
 Description : Simple preprocessor for `define and comments.
 Copyright   : (c) 2011-2015 Tom Hawkins, 2019 Yann Herklotz
-License     : GPL-3
+License     : GPLv3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
