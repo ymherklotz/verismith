@@ -2,7 +2,7 @@
 Module      : Verismith.Circuit.Random
 Description : Random generation for DAG
 Copyright   : (c) 2018-2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

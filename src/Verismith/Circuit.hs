@@ -2,7 +2,7 @@
 Module      : Verismith.Circuit
 Description : Definition of the circuit graph.
 Copyright   : (c) 2018-2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

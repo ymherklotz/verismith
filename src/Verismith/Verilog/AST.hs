@@ -2,7 +2,7 @@
 Module      : Verismith.Verilog.AST
 Description : Definition of the Verilog AST types.
 Copyright   : (c) 2018-2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Poratbility : POSIX

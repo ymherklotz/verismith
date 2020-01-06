@@ -2,7 +2,7 @@
 Module      : Verismith.Result
 Description : Result monadic type.
 Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

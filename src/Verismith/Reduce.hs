@@ -2,7 +2,7 @@
 Module      : Verismith.Reduce
 Description : Test case reducer implementation.
 Copyright   : (c) 2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

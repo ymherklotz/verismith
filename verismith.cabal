@@ -5,7 +5,7 @@ description:
   Verismith provides random verilog generation modules
   implementing functions to test supported simulators.
 homepage: https://github.com/ymherklotz/verismith#readme
-license: GPLv3
+license: GPL-3
 license-file: LICENSE
 author: Yann Herklotz
 maintainer: yann [at] yannherklotz [dot] com

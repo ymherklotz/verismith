@@ -2,7 +2,7 @@
 Module      : Verismith.Verilog.Quote
 Description : QuasiQuotation for verilog code in Haskell.
 Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

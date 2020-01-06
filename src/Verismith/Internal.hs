@@ -2,7 +2,7 @@
 Module      : Verismith.Internal
 Description : Shared high level code used in the other modules internally.
 Copyright   : (c) 2018-2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

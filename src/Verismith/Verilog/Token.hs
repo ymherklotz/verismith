@@ -2,7 +2,7 @@
 Module      : Verismith.Verilog.Token
 Description : Tokens for Verilog parsing.
 Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

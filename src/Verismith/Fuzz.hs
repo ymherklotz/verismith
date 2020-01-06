@@ -2,7 +2,7 @@
 Module      : Verismith.Fuzz
 Description : Environment to run the simulator and synthesisers in a matrix.
 Copyright   : (c) 2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX

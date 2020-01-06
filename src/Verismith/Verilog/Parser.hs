@@ -2,7 +2,7 @@
 Module      : Verismith.Verilog.Parser
 Description : Minimal Verilog parser to reconstruct the AST.
 Copyright   : (c) 2019, Yann Herklotz
-License     : GPLv3
+License     : GPL-3
 Maintainer  : yann [at] yannherklotz [dot] com
 Stability   : experimental
 Portability : POSIX
