@@ -45,11 +45,11 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 | Type          | Issue                                                                                                                               | Confirmed | Fixed |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------|-------|
-| Crash         | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | ✗     |
-| Crash         | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                                    | ✓         | ✗     |
-| Mis-synthesis | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789)             | ✓         | ✗     |
-| Mis-synthesis | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | ✗     |
-| Mis-synthesis | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | ✗     |
+| Crash         | [Forum 981787](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Verilog-If-statement-nesting-crash/td-p/981787)                 | ✓         | ✓     |
+| Crash         | [Forum 981136](https://forums.xilinx.com/t5/Synthesis/Vivado-2018-3-synthesis-crash/td-p/981136)                                    | ✓         | ✓     |
+| Mis-synthesis | [Forum 981789](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Unsigned-bit-extension-in-if-statement/td-p/981789)             | ✓         | ✓     |
+| Mis-synthesis | [Forum 982518](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Signed-with-shift-in-condition-synthesis-mistmatch/td-p/982518) | ✓         | ✓     |
+| Mis-synthesis | [Forum 982419](https://forums.xilinx.com/t5/Synthesis/Vivado-2019-1-Bit-selection-synthesis-mismatch/td-p/982419)                   | ✓         | ✓     |
 
 ### Icarus Verilog
 
@@ -179,10 +179,30 @@ variance introduced by outliers: 73% (severely inflated)
 
 The following resources provide more details about the in depth implementation of Verismith:
 
-- [Verismith FPGA '20 preprint](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
+- [Verismith FPGA '20](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
 - [Verismith thesis](https://yannherklotz.com/docs/verismith/verismith_thesis.pdf)
 - [Verismith slides](https://yannherklotz.com/docs/verismith/verismith_slides.pdf): Presented to the Circuits and Systems group at Imperial College on the 01/07/2019.
 - [Verismith poster](https://yannherklotz.com/docs/verismith/verismith_poster.pdf): Presented at the [Microsoft Research PhD Workshop](https://www.microsoft.com/en-us/research/event/phd-workshop-on-next-generation-cloud-infrastructure/) on 25/11/2019.
+
+## Publication
+
+If you use Verismith in your research, please cite our [FPGA '20 paper](https://yannherklotz.com/docs/verismith/verismith_paper.pdf)
+
+``` text
+@inproceedings{herklotz_verismith_fpga2020,
+  author = {Yann Herklotz and John Wickerson},
+  title = {Finding and Understanding Bugs in {FPGA} Synthesis Tools},
+  year = 2020,
+  booktitle = {ACM/SIGDA Int. Symp. on Field-Programmable Gate Arrays},
+  doi = {10.1145/3373087.3375310},
+  isbn = {978-1-4503-7099-8/20/02},
+  keywords = {automated testing, compiler defect, compiler testing, random program generation, random testing},
+  location = {Seaside, CA, USA},
+  numpages = 11,
+  publisher = {ACM},
+  series = {FPGA '20},
+}
+```
 
 ## Acknowledgement
 
