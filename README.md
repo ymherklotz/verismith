@@ -29,7 +29,7 @@ The fuzzer generates combinational and behavioural Verilog to test the various t
 
 ## Reported bugs
 
-9 bugs have been reported and confirmed to be bugs by the vendors, out of which 4 have been fixed. 1 bug has also been found in the Icarus Verilog simulator as a side effect of using it to verify equivalence check results.
+11 bugs have been reported and confirmed to be bugs by the vendors, out of which 4 have been fixed. 1 bug has also been found in the Icarus Verilog simulator as a side effect of using it to verify equivalence check results.
 
 ### Yosys
 
@@ -203,6 +203,10 @@ If you use Verismith in your research, please cite our [FPGA '20 paper](https://
   series = {FPGA '20},
 }
 ```
+
+## License
+
+Verismith is not free software. This non-commercial release can only be used for evaluation, research, educational and personal purposes. A commercial version of Verismith, without this restriction and with professional support, can be purchased from Imperial College London. See the file [LICENSE](/LICENSE) for more information.
 
 ## Acknowledgement
 
