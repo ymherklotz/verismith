@@ -45,7 +45,7 @@ defMap = maybe semi statement
 
 -- | Convert the 'Verilog' type to 'Text' so that it can be rendered.
 verilogSrc :: Verilog -> Doc a
-verilogSrc (Verilog modules) = vsep . ("// -*- mode: verilog -*-" :) . punctuate line $ moduleDecl <$> modules
+verilogSrc (Verilog modules) = vsep . punctuate line $ moduleDecl <$> modules
 
 -- | Generate the 'ModDecl' for a module and convert it to 'Text'.
 moduleDecl :: ModDecl -> Doc a
@@ -84,24 +84,25 @@ localParam (LocalParam name val) =
 identifier :: Identifier -> Doc a
 identifier (Identifier i) = pretty i
 
--- | Conversts 'Port' to 'Text' for the module list, which means it only
+-- | Converts 'Port' to 'Text' for the module list, which means it only
 -- generates a list of identifiers.
 modPort :: Port -> Doc a
 modPort (Port _ _ _ i) = identifier i
 
+addOpt :: Bool -> Doc a -> [Doc a] -> [Doc a]
+addOpt b a = if b then (a :) else id
+
+addMay :: Maybe (Doc a) -> [Doc a] -> [Doc a]
+addMay Nothing = id
+addMay (Just a) = (a :)
+
 -- | Generate the 'Port' description.
 port :: Port -> Doc a
-port (Port tp sgn r name) = hsep [t, sign, range r, identifier name]
-  where
-    t    = pType tp
-    sign = signed sgn
+port (Port tp sgn r name) =
+    hsep $ pType tp : addOpt sgn "signed" [range r, identifier name]
 
 range :: Range -> Doc a
 range (Range msb lsb) = brackets $ hcat [constExpr msb, colon, constExpr lsb]
-
-signed :: Bool -> Doc a
-signed True = "signed"
-signed _    = mempty
 
 -- | Convert the 'PortDir' type to 'Text'.
 portDir :: PortDir -> Doc a
@@ -112,18 +113,16 @@ portDir PortInOut = "inout"
 -- | Generate a 'ModItem'.
 moduleItem :: ModItem -> Doc a
 moduleItem (ModCA ca           ) = contAssign ca
-moduleItem (ModInst i name conn) = hsep
+moduleItem (ModInst i name conn) = (<> semi) $ hsep
     [ identifier i
     , identifier name
     , parens . hsep $ punctuate comma (mConn <$> conn)
-    , semi
     ]
 moduleItem (Initial stat  ) = nest 2 $ vsep ["initial", statement stat]
 moduleItem (Always  stat  ) = nest 2 $ vsep ["always", statement stat]
-moduleItem (Decl dir p ini) = hsep
-    [maybe mempty makePort dir, port p, maybe mempty makeIni ini, semi]
+moduleItem (Decl dir p ini) = (<> semi) . hsep .
+    addMay (portDir <$> dir) . (port p :) $ addMay (makeIni <$> ini) []
   where
-    makePort = portDir
     makeIni  = ("=" <+>) . constExpr
 moduleItem (ParamDecl      p) = hcat [paramList p, semi]
 moduleItem (LocalParamDecl p) = hcat [localParamList p, semi]
@@ -135,7 +134,7 @@ mConn (ModConnNamed n c) = hcat [dot, identifier n, parens $ expr c]
 -- | Generate continuous assignment
 contAssign :: ContAssign -> Doc a
 contAssign (ContAssign val e) =
-    hsep ["assign", identifier val, "=", align $ expr e, semi]
+    (<> semi) $ hsep ["assign", identifier val, "=", align $ expr e]
 
 -- | Generate 'Expr' to 'Text'.
 expr :: Expr -> Doc a
@@ -264,6 +263,11 @@ statement (TaskEnable     t) = hcat [task t, semi]
 statement (SysTaskEnable  t) = hcat ["$", task t, semi]
 statement (CondStmnt e t Nothing) =
     vsep [hsep ["if", parens $ expr e], indent 2 $ defMap t]
+statement (StmntCase t e ls d) =
+    vcat [hcat [caseType t, parens $ expr e],
+          vcat $ casePair <$> ls,
+          indent 2 $ vsep ["default:", indent 2 $ defMap d],
+          "endcase"]
 statement (CondStmnt e t f) = vsep
     [ hsep ["if", parens $ expr e]
     , indent 2 $ defMap t
