@@ -242,7 +242,16 @@ pType Reg  = "reg"
 
 genAssign :: Text -> Assign -> Doc a
 genAssign op (Assign r d e) =
-    hsep [lVal r, pretty op, maybe mempty delay d, expr e]
+    hsep . (lVal r : ) . (pretty op :) $ addMay (delay <$> d) [expr e]
+
+caseType :: CaseType -> Doc a
+caseType CaseStandard = "case"
+caseType CaseX = "casex"
+caseType CaseZ = "casez"
+
+casePair :: CasePair -> Doc a
+casePair (CasePair e s) =
+    vsep [hsep [expr e, colon], indent 2 $ statement s]
 
 statement :: Statement -> Doc a
 statement (TimeCtrl  d stat) = hsep [delay d, defMap stat]

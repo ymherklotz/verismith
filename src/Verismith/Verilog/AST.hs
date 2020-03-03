@@ -92,6 +92,8 @@ module Verismith.Verilog.AST
     , localParamIdent
     , localParamValue
     -- * Statment
+    , CaseType(..)
+    , CasePair(..)
     , Statement(..)
     , statDelay
     , statDStat
@@ -105,6 +107,10 @@ module Verismith.Verilog.AST
     , stmntCondExpr
     , stmntCondTrue
     , stmntCondFalse
+    , stmntCaseType
+    , stmntCaseExpr
+    , stmntCasePair
+    , stmntCaseDefault
     , forAssign
     , forExpr
     , forIncr
@@ -339,6 +345,7 @@ instance IsString ConstExpr where
 instance Plated ConstExpr where
   plate = uniplate
 
+-- | Task call, which is similar to function calls.
 data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
                  , _taskExpr :: [Expr]
                  } deriving (Eq, Show, Ord, Data, Generic, NFData)
@@ -422,9 +429,26 @@ data Assign = Assign { _assignReg   :: !LVal
                      , _assignExpr  :: !Expr
                      } deriving (Eq, Show, Ord, Data, Generic, NFData)
 
+-- | Type for continuous assignment.
+--
+-- @
+-- assign x = 2'b1;
+-- @
 data ContAssign = ContAssign { _contAssignNetLVal :: {-# UNPACK #-} !Identifier
                              , _contAssignExpr    :: !Expr
                              } deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+-- | Case pair which contains an expression followed by a statement which will
+-- get executed if the expression matches the expression in the case statement.
+data CasePair = CasePair { _casePairExpr :: !Expr
+                         , _casePairStmnt :: !Statement
+                         } deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+-- | Type of case statement, which determines how it is interpreted.
+data CaseType = CaseStandard
+              | CaseX
+              | CaseZ
+              deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Statements in Verilog.
 data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
@@ -441,6 +465,11 @@ data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
            | CondStmnt { _stmntCondExpr  :: Expr
                        , _stmntCondTrue  :: Maybe Statement
                        , _stmntCondFalse :: Maybe Statement
+                       }
+           | StmntCase { _stmntCaseType :: !CaseType
+                       , _stmntCaseExpr :: !Expr
+                       , _stmntCasePair :: ![CasePair]
+                       , _stmntCaseDefault :: !(Maybe Statement)
                        }
            | ForLoop { _forAssign :: !Assign
                      , _forExpr   :: Expr
@@ -519,6 +548,8 @@ instance Semigroup Verilog where
 instance Monoid Verilog where
     mempty = Verilog mempty
 
+-- | Top level type which contains all the source code and associated
+-- information.
 data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
                              , _infoSrc :: !Verilog
                              }
