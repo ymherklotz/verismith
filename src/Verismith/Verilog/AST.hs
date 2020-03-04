@@ -19,14 +19,13 @@ Defines the types to build a Verilog AST.
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 
 module Verismith.Verilog.AST
     ( -- * Top level types
-      SourceInfo(..)
-    , infoTop
-    , infoSrc
+      SourceInfo(..), infoTop, infoSrc
     , Verilog(..)
     -- * Primitives
     -- ** Identifier
@@ -38,111 +37,39 @@ module Verismith.Verilog.AST
     , BinaryOperator(..)
     , UnaryOperator(..)
     -- ** Task
-    , Task(..)
-    , taskName
-    , taskExpr
+    , Task(..), taskName, taskExpr
     -- ** Left hand side value
-    , LVal(..)
-    , regId
-    , regExprId
-    , regExpr
-    , regSizeId
-    , regSizeRange
-    , regConc
+    , LVal(..), regId, regExprId, regExpr, regSizeId, regSizeRange, regConc
     -- ** Ports
     , PortDir(..)
     , PortType(..)
-    , Port(..)
-    , portType
-    , portSigned
-    , portSize
-    , portName
+    , Port(..), portType, portSigned, portSize, portName
     -- * Expression
     , Expr(..)
     , ConstExpr(..)
-    , ConstExprF(..)
-    , constToExpr
-    , exprToConst
-    , Range(..)
-    , constNum
-    , constParamId
-    , constConcat
-    , constUnOp
-    , constPrim
-    , constLhs
-    , constBinOp
-    , constRhs
-    , constCond
-    , constTrue
-    , constFalse
-    , constStr
+    , ConstExprF(..), constToExpr, exprToConst
+    , Range(..), constNum, constParamId, constConcat, constUnOp, constPrim, constLhs
+    , constBinOp, constRhs, constCond, constTrue, constFalse, constStr
     -- * Assignment
-    , Assign(..)
-    , assignReg
-    , assignDelay
-    , assignExpr
-    , ContAssign(..)
-    , contAssignNetLVal
-    , contAssignExpr
+    , Assign(..), assignReg, assignDelay, assignExpr
+    , ContAssign(..), contAssignNetLVal, contAssignExpr
     -- ** Parameters
-    , Parameter(..)
-    , paramIdent
-    , paramValue
-    , LocalParam(..)
-    , localParamIdent
-    , localParamValue
+    , Parameter(..), paramIdent, paramValue
+    , LocalParam(..), localParamIdent, localParamValue
     -- * Statment
     , CaseType(..)
     , CasePair(..)
-    , Statement(..)
-    , statDelay
-    , statDStat
-    , statEvent
-    , statEStat
-    , statements
-    , stmntBA
-    , stmntNBA
-    , stmntTask
-    , stmntSysTask
-    , stmntCondExpr
-    , stmntCondTrue
-    , stmntCondFalse
-    , stmntCaseType
-    , stmntCaseExpr
-    , stmntCasePair
-    , stmntCaseDefault
-    , forAssign
-    , forExpr
-    , forIncr
-    , forStmnt
+    , Statement(..), statDelay, statDStat, statEvent, statEStat, statements, stmntBA
+    , stmntNBA, stmntTask, stmntSysTask, stmntCondExpr, stmntCondTrue, stmntCondFalse
+    , stmntCaseType, stmntCaseExpr, stmntCasePair, stmntCaseDefault, forAssign, forExpr
+    , forIncr, forStmnt
     -- * Module
-    , ModDecl(..)
-    , modId
-    , modOutPorts
-    , modInPorts
-    , modItems
-    , modParams
-    , ModItem(..)
-    , modContAssign
-    , modInstId
-    , modInstName
-    , modInstConns
-    , _Initial
-    , _Always
-    , paramDecl
-    , localParamDecl
-    , traverseModItem
-    , declDir
-    , declPort
-    , declVal
-    , ModConn(..)
-    , modConnName
-    , modExpr
+    , ModDecl(..), modId, modOutPorts, modInPorts, modItems, modParams
+    , ModItem(..), modContAssign, modInstId, modInstName, modInstConns, _Initial, _Always
+    , paramDecl, localParamDecl, traverseModItem, declDir, declPort, declVal, ModConn(..)
+    , modConnName, modExpr
     -- * Useful Lenses and Traversals
-    , aModule
-    , getModule
-    , getSourceId
-    , mainModule
+    , aModule, getModule, getSourceId, mainModule
     )
 where
 
@@ -155,8 +82,24 @@ import           Data.List.NonEmpty       (NonEmpty (..), (<|))
 import           Data.String              (IsString, fromString)
 import           Data.Text                (Text, pack)
 import           Data.Traversable         (sequenceA)
+import           Data.Void                (Void)
 import           GHC.Generics             (Generic)
 import           Verismith.Verilog.BitVec
+
+-- | Attributes which can be set to various nodes in the AST.
+--
+-- @
+-- (* synthesis *)
+-- @
+data Attribute = AttrAssign Identifier ConstExpr
+    | AttrName Identifier
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+-- | Annotations which can be added to the AST. These are supported in all the
+-- nodes of the AST and a custom type can be declared for them.
+data Annotation a = Ann a
+    | AnnAttrs [Attribute]
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -188,75 +131,72 @@ instance Num Delay where
 
 -- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
 data Event = EId {-# UNPACK #-} !Identifier
-           | EExpr !Expr
-           | EAll
-           | EPosEdge {-# UNPACK #-} !Identifier
-           | ENegEdge {-# UNPACK #-} !Identifier
-           | EOr !Event !Event
-           | EComb !Event !Event
-           deriving (Eq, Show, Ord, Data, Generic, NFData)
+    | EExpr !Expr
+    | EAll
+    | EPosEdge {-# UNPACK #-} !Identifier
+    | ENegEdge {-# UNPACK #-} !Identifier
+    | EOr !Event !Event
+    | EComb !Event !Event
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Plated Event where
     plate = uniplate
 
 -- | Binary operators that are currently supported in the verilog generation.
-data BinaryOperator = BinPlus    -- ^ @+@
-                    | BinMinus   -- ^ @-@
-                    | BinTimes   -- ^ @*@
-                    | BinDiv     -- ^ @/@
-                    | BinMod     -- ^ @%@
-                    | BinEq      -- ^ @==@
-                    | BinNEq     -- ^ @!=@
-                    | BinCEq     -- ^ @===@
-                    | BinCNEq    -- ^ @!==@
-                    | BinLAnd    -- ^ @&&@
-                    | BinLOr     -- ^ @||@
-                    | BinLT      -- ^ @<@
-                    | BinLEq     -- ^ @<=@
-                    | BinGT      -- ^ @>@
-                    | BinGEq     -- ^ @>=@
-                    | BinAnd     -- ^ @&@
-                    | BinOr      -- ^ @|@
-                    | BinXor     -- ^ @^@
-                    | BinXNor    -- ^ @^~@
-                    | BinXNorInv -- ^ @~^@
-                    | BinPower   -- ^ @**@
-                    | BinLSL     -- ^ @<<@
-                    | BinLSR     -- ^ @>>@
-                    | BinASL     -- ^ @<<<@
-                    | BinASR     -- ^ @>>>@
-                    deriving (Eq, Show, Ord, Data, Generic, NFData)
+data BinaryOperator = BinPlus
+    | BinMinus
+    | BinTimes
+    | BinDiv
+    | BinMod
+    | BinEq
+    | BinNEq
+    | BinCEq
+    | BinCNEq
+    | BinLAnd
+    | BinLOr
+    | BinLT
+    | BinLEq
+    | BinGT
+    | BinGEq
+    | BinAnd
+    | BinOr
+    | BinXor
+    | BinXNor
+    | BinXNorInv
+    | BinPower
+    | BinLSL
+    | BinLSR
+    | BinASL
+    | BinASR
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Unary operators that are currently supported by the generator.
-data UnaryOperator = UnPlus    -- ^ @+@
-                   | UnMinus   -- ^ @-@
-                   | UnLNot    -- ^ @!@
-                   | UnNot     -- ^ @~@
-                   | UnAnd     -- ^ @&@
-                   | UnNand    -- ^ @~&@
-                   | UnOr      -- ^ @|@
-                   | UnNor     -- ^ @~|@
-                   | UnXor     -- ^ @^@
-                   | UnNxor    -- ^ @~^@
-                   | UnNxorInv -- ^ @^~@
-                   deriving (Eq, Show, Ord, Data, Generic, NFData)
+data UnaryOperator = UnPlus
+    | UnMinus
+    | UnLNot
+    | UnNot
+    | UnAnd
+    | UnNand
+    | UnOr
+    | UnNor
+    | UnXor
+    | UnNxor
+    | UnNxorInv
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Verilog expression, which can either be a primary expression, unary
 -- expression, binary operator expression or a conditional expression.
 data Expr = Number {-# UNPACK #-} !BitVec
-          -- ^ Number implementation containing the size and the value itself
-          | Id {-# UNPACK #-} !Identifier
-          | VecSelect {-# UNPACK #-} !Identifier !Expr
-          | RangeSelect {-# UNPACK #-} !Identifier !Range
-          -- ^ Symbols
-          | Concat !(NonEmpty Expr)
-          -- ^ Bit-wise concatenation of expressions represented by braces.
-          | UnOp !UnaryOperator !Expr
-          | BinOp !Expr !BinaryOperator !Expr
-          | Cond !Expr !Expr !Expr
-          | Appl !Identifier !Expr
-          | Str {-# UNPACK #-} !Text
-          deriving (Eq, Show, Ord, Data, Generic, NFData)
+    | Id {-# UNPACK #-} !Identifier
+    | VecSelect {-# UNPACK #-} !Identifier !Expr
+    | RangeSelect {-# UNPACK #-} !Identifier !Range
+    | Concat !(NonEmpty Expr)
+    | UnOp !UnaryOperator !Expr
+    | BinOp !Expr !BinaryOperator !Expr
+    | Cond !Expr !Expr !Expr
+    | Appl !Identifier !Expr
+    | Str {-# UNPACK #-} !Text
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Num Expr where
   a + b = BinOp a BinPlus b
@@ -283,22 +223,33 @@ instance Plated Expr where
   plate = uniplate
 
 -- | Constant expression, which are known before simulation at compile time.
-data ConstExpr = ConstNum { _constNum :: {-# UNPACK #-} !BitVec }
-               | ParamId { _constParamId :: {-# UNPACK #-} !Identifier }
-               | ConstConcat { _constConcat :: !(NonEmpty ConstExpr) }
-               | ConstUnOp { _constUnOp :: !UnaryOperator
-                           , _constPrim :: !ConstExpr
-                           }
-               | ConstBinOp { _constLhs   :: !ConstExpr
-                            , _constBinOp :: !BinaryOperator
-                            , _constRhs   :: !ConstExpr
-                            }
-               | ConstCond { _constCond  :: !ConstExpr
-                           , _constTrue  :: !ConstExpr
-                           , _constFalse :: !ConstExpr
-                           }
-               | ConstStr { _constStr :: {-# UNPACK #-} !Text }
-               deriving (Eq, Show, Ord, Data, Generic, NFData)
+data ConstExpr = ConstNum
+    { _constNum :: {-# UNPACK #-} !BitVec
+    }
+    | ParamId
+    { _constParamId :: {-# UNPACK #-} !Identifier
+    }
+    | ConstConcat
+    { _constConcat :: !(NonEmpty ConstExpr)
+    }
+    | ConstUnOp
+    { _constUnOp :: !UnaryOperator
+    , _constPrim :: !ConstExpr
+    }
+    | ConstBinOp
+    { _constLhs   :: !ConstExpr
+    , _constBinOp :: !BinaryOperator
+    , _constRhs   :: !ConstExpr
+    }
+    | ConstCond
+    { _constCond  :: !ConstExpr
+    , _constTrue  :: !ConstExpr
+    , _constFalse :: !ConstExpr
+    }
+    | ConstStr
+    { _constStr :: {-# UNPACK #-} !Text
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 constToExpr :: ConstExpr -> Expr
 constToExpr (ConstNum    a   ) = Number a
@@ -346,9 +297,11 @@ instance Plated ConstExpr where
   plate = uniplate
 
 -- | Task call, which is similar to function calls.
-data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
-                 , _taskExpr :: [Expr]
-                 } deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Task = Task
+    { _taskName :: {-# UNPACK #-} !Identifier
+    , _taskExpr :: [Expr]
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Type that represents the left hand side of an assignment, which can be a
 -- concatenation such as in:
@@ -356,38 +309,45 @@ data Task = Task { _taskName :: {-# UNPACK #-} !Identifier
 -- @
 -- {a, b, c} = 32'h94238;
 -- @
-data LVal = RegId { _regId :: {-# UNPACK #-} !Identifier }
-          | RegExpr { _regExprId :: {-# UNPACK #-} !Identifier
-                    , _regExpr   :: !Expr
-                    }
-          | RegSize { _regSizeId    :: {-# UNPACK #-} !Identifier
-                    , _regSizeRange :: {-# UNPACK #-} !Range
-                    }
-          | RegConcat { _regConc :: [Expr] }
-          deriving (Eq, Show, Ord, Data, Generic, NFData)
+data LVal = RegId
+    { _regId :: {-# UNPACK #-} !Identifier
+    }
+    | RegExpr
+    { _regExprId :: {-# UNPACK #-} !Identifier
+    , _regExpr   :: !Expr
+    }
+    | RegSize
+    { _regSizeId    :: {-# UNPACK #-} !Identifier
+    , _regSizeRange :: {-# UNPACK #-} !Range
+    }
+    | RegConcat
+    { _regConc :: [Expr]
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance IsString LVal where
   fromString = RegId . fromString
 
 -- | Different port direction that are supported in Verilog.
-data PortDir = PortIn    -- ^ Input direction for port (@input@).
-             | PortOut   -- ^ Output direction for port (@output@).
-             | PortInOut -- ^ Inout direction for port (@inout@).
-             deriving (Eq, Show, Ord, Data, Generic, NFData)
+data PortDir = PortIn
+    | PortOut
+    | PortInOut
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Currently, only @wire@ and @reg@ are supported, as the other net types are
 -- not that common and not a priority.
 data PortType = Wire
-              | Reg
-              deriving (Eq, Show, Ord, Data, Generic, NFData)
+    | Reg
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Range that can be associated with any port or left hand side. Contains the
 -- msb and lsb bits as 'ConstExpr'. This means that they can be generated using
 -- parameters, which can in turn be changed at synthesis time.
-data Range = Range { rangeMSB :: !ConstExpr
-                   , rangeLSB :: !ConstExpr
-                   }
-             deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Range = Range
+    { rangeMSB :: !ConstExpr
+    , rangeLSB :: !ConstExpr
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Num Range where
     (Range s1 a) + (Range s2 b) = Range (s1 + s2) $ a + b
@@ -406,11 +366,13 @@ instance Num Range where
 --
 -- This is now implemented inside 'ModDecl' itself, which uses a list of output
 -- and input ports.
-data Port = Port { _portType   :: !PortType
-                 , _portSigned :: !Bool
-                 , _portSize   :: {-# UNPACK #-} !Range
-                 , _portName   :: {-# UNPACK #-} !Identifier
-                 } deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Port = Port
+    { _portType   :: !PortType
+    , _portSigned :: !Bool
+    , _portSize   :: {-# UNPACK #-} !Range
+    , _portName   :: {-# UNPACK #-} !Identifier
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | This is currently a type because direct module declaration should also be
 -- added:
@@ -418,147 +380,201 @@ data Port = Port { _portType   :: !PortType
 -- @
 -- mod a(.y(y1), .x1(x11), .x2(x22));
 -- @
-data ModConn = ModConn { _modExpr :: !Expr }
-             | ModConnNamed { _modConnName :: {-# UNPACK #-} !Identifier
-                            , _modExpr     :: !Expr
-                            }
-             deriving (Eq, Show, Ord, Data, Generic, NFData)
+data ModConn = ModConn
+    { _modExpr :: !Expr
+    }
+    | ModConnNamed
+    { _modConnName :: {-# UNPACK #-} !Identifier
+    , _modExpr     :: !Expr
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
-data Assign = Assign { _assignReg   :: !LVal
-                     , _assignDelay :: !(Maybe Delay)
-                     , _assignExpr  :: !Expr
-                     } deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Assign = Assign
+    { _assignReg   :: !LVal
+    , _assignDelay :: !(Maybe Delay)
+    , _assignExpr  :: !Expr
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Type for continuous assignment.
 --
 -- @
 -- assign x = 2'b1;
 -- @
-data ContAssign = ContAssign { _contAssignNetLVal :: {-# UNPACK #-} !Identifier
-                             , _contAssignExpr    :: !Expr
-                             } deriving (Eq, Show, Ord, Data, Generic, NFData)
+data ContAssign = ContAssign
+    { _contAssignNetLVal :: {-# UNPACK #-} !Identifier
+    , _contAssignExpr    :: !Expr
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Case pair which contains an expression followed by a statement which will
 -- get executed if the expression matches the expression in the case statement.
-data CasePair = CasePair { _casePairExpr :: !Expr
-                         , _casePairStmnt :: !Statement
-                         } deriving (Eq, Show, Ord, Data, Generic, NFData)
+data CasePair a = CasePair
+    { _casePairExpr  :: !Expr
+    , _casePairStmnt :: !(Statement a)
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+traverseStmntCasePair :: Functor f =>
+    (Statement a1 -> f (Statement a2)) -> CasePair a1 -> f (CasePair a2)
+traverseStmntCasePair f (CasePair a s) = CasePair a <$> f s
 
 -- | Type of case statement, which determines how it is interpreted.
 data CaseType = CaseStandard
-              | CaseX
-              | CaseZ
-              deriving (Eq, Show, Ord, Data, Generic, NFData)
+    | CaseX
+    | CaseZ
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Statements in Verilog.
-data Statement = TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
-                          , _statDStat :: Maybe Statement
-                          }                                -- ^ Time control (@#NUM@)
-           | EventCtrl { _statEvent :: !Event
-                       , _statEStat :: Maybe Statement
-                       }
-           | SeqBlock { _statements   :: [Statement] }     -- ^ Sequential block (@begin ... end@)
-           | BlockAssign { _stmntBA      :: !Assign }     -- ^ blocking assignment (@=@)
-           | NonBlockAssign { _stmntNBA     :: !Assign }     -- ^ Non blocking assignment (@<=@)
-           | TaskEnable { _stmntTask    :: !Task }
-           | SysTaskEnable { _stmntSysTask :: !Task }
-           | CondStmnt { _stmntCondExpr  :: Expr
-                       , _stmntCondTrue  :: Maybe Statement
-                       , _stmntCondFalse :: Maybe Statement
-                       }
-           | StmntCase { _stmntCaseType :: !CaseType
-                       , _stmntCaseExpr :: !Expr
-                       , _stmntCasePair :: ![CasePair]
-                       , _stmntCaseDefault :: !(Maybe Statement)
-                       }
-           | ForLoop { _forAssign :: !Assign
-                     , _forExpr   :: Expr
-                     , _forIncr   :: !Assign
-                     , _forStmnt  :: Statement
-                     } -- ^ Loop bounds shall be statically computable for a for loop.
-           deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Statement a = TimeCtrl
+    { _statDelay :: {-# UNPACK #-} !Delay
+    , _statDStat :: Maybe (Statement a)
+    -- ^ Time control (@#NUM@)
+    }
+    | EventCtrl
+    { _statEvent :: !Event
+    , _statEStat :: Maybe (Statement a)
+    }
+    | SeqBlock
+    { _statements :: [Statement a] -- ^ Sequential block (@begin ... end@)
+    -- ^ blocking assignment (@=@)
+    }
+    | BlockAssign
+    { _stmntBA :: !Assign -- ^ blocking assignment (@=@)
+    -- ^ Non blocking assignment (@<=@)
+    }
+    | NonBlockAssign
+    { _stmntNBA :: !Assign -- ^ Non blocking assignment (@<=@)
+    }
+    | TaskEnable
+    { _stmntTask :: !Task
+    }
+    | SysTaskEnable
+    { _stmntSysTask :: !Task
+    }
+    | CondStmnt
+    { _stmntCondExpr  :: Expr
+    , _stmntCondTrue  :: Maybe (Statement a)
+    , _stmntCondFalse :: Maybe (Statement a)
+    }
+    | StmntCase
+    { _stmntCaseType    :: !CaseType
+    , _stmntCaseExpr    :: !Expr
+    , _stmntCasePair    :: ![CasePair a]
+    , _stmntCaseDefault :: !(Maybe (Statement a))
+    }
+    | ForLoop
+    { _forAssign :: !Assign
+    , _forExpr   :: Expr
+    , _forIncr   :: !Assign
+    , _forStmnt  :: Statement a
+    -- ^ Loop bounds shall be statically computable for a for loop.
+    }
+    | StmntAnn a (Statement a)
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
-instance Plated Statement where
-    plate = uniplate
+instance Plated (Statement a) where
+    plate f (TimeCtrl d s)  = TimeCtrl d <$> traverse f s
+    plate f (EventCtrl d s) = EventCtrl d <$> traverse f s
+    plate f (SeqBlock s)    = SeqBlock <$> traverse f s
+    plate f (CondStmnt e s1 s2) = CondStmnt e <$> traverse f s1 <*> traverse f s2
+    plate f (StmntCase a b c d) =
+        StmntCase a b <$> traverse (traverseStmntCasePair f) c
+                      <*> traverse f d
+    plate f (ForLoop a b c d) = ForLoop a b c <$> f d
+    plate f a               = pure a
 
-instance Semigroup Statement where
+instance Semigroup (Statement a) where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
   (SeqBlock a) <> b = SeqBlock $ a <> [b]
   a <> (SeqBlock b) = SeqBlock $ a : b
   a <> b = SeqBlock [a, b]
 
-instance Monoid Statement where
+instance Monoid (Statement a) where
   mempty = SeqBlock []
 
 -- | Parameter that can be assigned in blocks or modules using @parameter@.
-data Parameter = Parameter { _paramIdent :: {-# UNPACK #-} !Identifier
-                           , _paramValue :: ConstExpr
-                           }
-               deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Parameter = Parameter
+    { _paramIdent :: {-# UNPACK #-} !Identifier
+    , _paramValue :: ConstExpr
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Local parameter that can be assigned anywhere using @localparam@. It cannot
 -- be changed by initialising the module.
-data LocalParam = LocalParam { _localParamIdent :: {-# UNPACK #-} !Identifier
-                             , _localParamValue :: ConstExpr
-                             }
-                deriving (Eq, Show, Ord, Data, Generic, NFData)
+data LocalParam = LocalParam
+    { _localParamIdent :: {-# UNPACK #-} !Identifier
+    , _localParamValue :: ConstExpr
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Module item which is the body of the module expression.
-data ModItem = ModCA { _modContAssign :: !ContAssign }
-             | ModInst { _modInstId    :: {-# UNPACK #-} !Identifier
-                       , _modInstName  :: {-# UNPACK #-} !Identifier
-                       , _modInstConns :: [ModConn]
-                       }
-             | Initial !Statement
-             | Always !Statement
-             | Decl { _declDir  :: !(Maybe PortDir)
-                    , _declPort :: !Port
-                    , _declVal  :: Maybe ConstExpr
-                    }
-             | ParamDecl { _paramDecl :: NonEmpty Parameter }
-             | LocalParamDecl { _localParamDecl :: NonEmpty LocalParam }
-             deriving (Eq, Show, Ord, Data, Generic, NFData)
+data ModItem a = ModCA
+    { _modContAssign :: !ContAssign
+    }
+    | ModInst
+    { _modInstId    :: {-# UNPACK #-} !Identifier
+    , _modInstName  :: {-# UNPACK #-} !Identifier
+    , _modInstConns :: [ModConn]
+    }
+    | Initial !(Statement a)
+    | Always !(Statement a)
+    | Decl
+    { _declDir  :: !(Maybe PortDir)
+    , _declPort :: !Port
+    , _declVal  :: Maybe ConstExpr
+    }
+    | ParamDecl
+    { _paramDecl :: NonEmpty Parameter
+    }
+    | LocalParamDecl
+    { _localParamDecl :: NonEmpty LocalParam
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
-data ModDecl = ModDecl { _modId       :: {-# UNPACK #-} !Identifier
-                       , _modOutPorts :: ![Port]
-                       , _modInPorts  :: ![Port]
-                       , _modItems    :: ![ModItem]
-                       , _modParams   :: ![Parameter]
-                       }
-             deriving (Eq, Show, Ord, Data, Generic, NFData)
+data ModDecl a = ModDecl
+    { _modId       :: {-# UNPACK #-} !Identifier
+    , _modOutPorts :: ![Port]
+    , _modInPorts  :: ![Port]
+    , _modItems    :: ![ModItem a]
+    , _modParams   :: ![Parameter]
+    }
+    | ModDeclAnn (Annotation a) (ModDecl a)
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e       ) = ModConn <$> f e
 traverseModConn f (ModConnNamed a e) = ModConnNamed a <$> f e
 
-traverseModItem :: (Applicative f) => (Expr -> f Expr) -> ModItem -> f ModItem
+traverseModItem :: (Applicative f) => (Expr -> f Expr) -> ModItem a -> f (ModItem a)
 traverseModItem f (ModCA (ContAssign a e)) = ModCA . ContAssign a <$> f e
 traverseModItem f (ModInst a b e) =
     ModInst a b <$> sequenceA (traverseModConn f <$> e)
 traverseModItem _ e = pure e
 
 -- | The complete sourcetext for the Verilog module.
-newtype Verilog = Verilog { getVerilog :: [ModDecl] }
+newtype Verilog a = Verilog { getVerilog :: [ModDecl a] }
                    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
-instance Semigroup Verilog where
+instance Semigroup (Verilog a) where
     Verilog a <> Verilog b = Verilog $ a <> b
 
-instance Monoid Verilog where
+instance Monoid (Verilog a) where
     mempty = Verilog mempty
 
 -- | Top level type which contains all the source code and associated
 -- information.
-data SourceInfo = SourceInfo { _infoTop :: {-# UNPACK #-} !Text
-                             , _infoSrc :: !Verilog
-                             }
-                  deriving (Eq, Show, Ord, Data, Generic, NFData)
+data SourceInfo a = SourceInfo
+    { _infoTop :: {-# UNPACK #-} !Text
+    , _infoSrc :: !(Verilog a)
+    }
+    deriving (Eq, Show, Ord, Data, Generic, NFData)
 
-instance Semigroup SourceInfo where
+instance Semigroup (SourceInfo a) where
     (SourceInfo t v) <> (SourceInfo _ v2) = SourceInfo t $ v <> v2
 
-instance Monoid SourceInfo where
+instance Monoid (SourceInfo a) where
     mempty = SourceInfo mempty mempty
 
 $(makeLenses ''Expr)
@@ -585,17 +601,17 @@ $(makeBaseFunctor ''Event)
 $(makeBaseFunctor ''Expr)
 $(makeBaseFunctor ''ConstExpr)
 
-getModule :: Traversal' Verilog ModDecl
+getModule :: Traversal' (Verilog a) (ModDecl a)
 getModule = _Wrapped . traverse
 {-# INLINE getModule #-}
 
-getSourceId :: Traversal' Verilog Text
+getSourceId :: Traversal' (Verilog a) Text
 getSourceId = getModule . modId . _Wrapped
 {-# INLINE getSourceId #-}
 
 -- | May need to change this to Traversal to be safe. For now it will fail when
 -- the main has not been properly set with.
-aModule :: Identifier -> Lens' SourceInfo ModDecl
+aModule :: Identifier -> Lens' (SourceInfo a) (ModDecl a)
 aModule t = lens get_ set_
   where
     set_ (SourceInfo top main) v =
@@ -609,7 +625,7 @@ aModule t = lens get_ set_
 
 -- | May need to change this to Traversal to be safe. For now it will fail when
 -- the main has not been properly set with.
-mainModule :: Lens' SourceInfo ModDecl
+mainModule :: Lens' (SourceInfo a) (ModDecl a)
 mainModule = lens get_ set_
   where
     set_ (SourceInfo top main) v =
