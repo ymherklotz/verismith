@@ -1,9 +1,9 @@
 { nixpkgs ? null, compiler ? "ghc865", doBenchmark ? false } :
 let
   pinnedPkg = builtins.fetchGit {
-    name = "nixos-unstable-2019-10-06";
+    name = "nixos-unstable-2020-03-06";
     url = https://github.com/nixos/nixpkgs/;
-    rev = "271fef8a4eb03cd9de0c1fe2f0b7f4a16c2de49a";
+    rev = "93ba4ecd58602d3f69f74f9d45d60a8f949544e2";
   };
   npkgs = if nixpkgs == null
           then import pinnedPkg {}
