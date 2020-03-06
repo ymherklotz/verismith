@@ -2,3 +2,14 @@ language: nix  # automatically runs nix-build
 
 git:
   depth: 3     # not 1 to build commits in the queue
+
+jobs:
+  include:
+  - name: "Cabal build"
+    env: NIX=0
+  - name: "Nix build"
+    env: NIX=1
+
+before_script: nix-env -i cabal ghc
+
+script: ./scripts/build.sh
