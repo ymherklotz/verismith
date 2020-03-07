@@ -10,6 +10,6 @@ jobs:
   - name: "Nix build"
     env: NIX=1
 
-before_script: nix-env -i cabal-install ghc
+before_script: if [[ $NIX -eq 0 ]]; then nix-env -i cabal-install ghc; fi
 
 script: ./scripts/build.sh

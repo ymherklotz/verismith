@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [[ -z $NIX ]]; then
   if [[ $NIX -eq 0 ]]; then
