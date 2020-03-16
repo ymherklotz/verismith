@@ -71,7 +71,7 @@ instance NFData Icarus where
 defaultIcarus :: Icarus
 defaultIcarus = Icarus "iverilog" "vvp"
 
-addDisplay :: [Statement] -> [Statement]
+addDisplay :: [Statement ann] -> [Statement ann]
 addDisplay s = concat $ transpose
     [ s
     , replicate l $ TimeCtrl 1 Nothing
@@ -79,7 +79,7 @@ addDisplay s = concat $ transpose
     ]
     where l = length s
 
-assignFunc :: [Port] -> ByteString -> Statement
+assignFunc :: [Port] -> ByteString -> Statement ann
 assignFunc inp bs =
     NonBlockAssign
         . Assign conc Nothing
@@ -103,7 +103,7 @@ mask = T.replace "x" "0"
 callback :: ByteString -> Text -> ByteString
 callback b t = b <> convert (mask t)
 
-runSimIcarus :: Icarus -> SourceInfo -> [ByteString] -> ResultSh ByteString
+runSimIcarus :: Icarus -> (SourceInfo ann) -> [ByteString] -> ResultSh ByteString
 runSimIcarus sim rinfo bss = do
     let tb = ModDecl
             "main"
@@ -134,7 +134,7 @@ runSimIcarusWithFile sim f _ = annotate (SimFail mempty) . liftSh $ do
 fromBytes :: ByteString -> Integer
 fromBytes = B.foldl' f 0 where f a b = a `shiftL` 8 .|. fromIntegral b
 
-tbModule :: [ByteString] -> ModDecl -> Verilog
+tbModule :: [ByteString] -> (ModDecl ann) -> (Verilog ann)
 tbModule bss top =
     Verilog [ instantiateMod top $ ModDecl "testbench" [] []
               [ Initial
@@ -154,16 +154,16 @@ tbModule bss top =
   where
     inConcat = (RegConcat . filter (/= (Id "clk")) $ (Id . fromPort <$> (top ^. modInPorts)))
 
-counterTestBench :: CounterEg -> ModDecl -> Verilog
+counterTestBench :: CounterEg -> (ModDecl ann) -> (Verilog ann)
 counterTestBench (CounterEg _ states) m = tbModule filtered m
   where
     filtered = convert . fold . fmap snd . filter ((/= "clk") . fst) <$> states
 
-runSimIc' :: (Synthesiser b) => ([ByteString] -> ModDecl -> Verilog)
+runSimIc' :: (Synthesiser b) => ([ByteString] -> (ModDecl ann) -> (Verilog ann))
           -> FilePath
           -> Icarus
           -> b
-          -> SourceInfo
+          -> (SourceInfo ann)
           -> [ByteString]
           -> Maybe ByteString
           -> ResultSh ByteString
@@ -198,7 +198,7 @@ runSimIc :: (Synthesiser b)
          => FilePath         -- ^ Data directory.
          -> Icarus           -- ^ Icarus simulator.
          -> b                -- ^ Synthesis tool to be tested.
-         -> SourceInfo       -- ^ Original generated program to test.
+         -> (SourceInfo ann)       -- ^ Original generated program to test.
          -> [ByteString]     -- ^ Test vectors to be passed as inputs to the generated Verilog.
          -> Maybe ByteString -- ^ What the correct output should be. If
                              -- 'Nothing' is passed, then just return 'Pass
@@ -207,5 +207,5 @@ runSimIc :: (Synthesiser b)
 runSimIc = runSimIc' tbModule
 
 runSimIcEC :: (Synthesiser b) => FilePath -> Icarus -> b
-           -> SourceInfo -> CounterEg -> Maybe ByteString -> ResultSh ByteString
+           -> (SourceInfo ann) -> CounterEg -> Maybe ByteString -> ResultSh ByteString
 runSimIcEC a b c d e = runSimIc' (const $ counterTestBench e) a b c d []

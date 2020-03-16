@@ -66,7 +66,7 @@ class Tool a where
 -- | Simulation type class.
 class Tool a => Simulator a where
   runSim :: a             -- ^ Simulator instance
-         -> SourceInfo       -- ^ Run information
+         -> SourceInfo ann       -- ^ Run information
          -> [ByteString]  -- ^ Inputs to simulate
          -> ResultSh ByteString -- ^ Returns the value of the hash at the output of the testbench.
   runSimWithFile :: a
@@ -100,12 +100,12 @@ instance Monoid Failed where
 -- | Synthesiser type class.
 class Tool a => Synthesiser a where
     runSynth :: a        -- ^ Synthesiser tool instance
-             -> SourceInfo  -- ^ Run information
+             -> SourceInfo ann  -- ^ Run information
              -> ResultSh ()    -- ^ does not return any values
     synthOutput :: a -> FilePath
     setSynthOutput :: a -> FilePath -> a
 
-renameSource :: (Synthesiser a) => a -> SourceInfo -> SourceInfo
+renameSource :: (Synthesiser a) => a -> SourceInfo ann -> SourceInfo ann
 renameSource a src =
     src & infoSrc . _Wrapped . traverse . modId . _Wrapped %~ (<> toText a)
 
@@ -129,7 +129,7 @@ checkPresent fp t = do
 
 -- | Checks what modules are present in the synthesised output, as some modules
 -- may have been inlined. This could be improved if the parser worked properly.
-checkPresentModules :: FilePath -> SourceInfo -> Sh [Text]
+checkPresentModules :: FilePath -> SourceInfo ann -> Sh [Text]
 checkPresentModules fp (SourceInfo _ src) = do
     vals <- forM (src ^.. _Wrapped . traverse . modId . _Wrapped)
         $ checkPresent fp
@@ -146,7 +146,7 @@ replace fp t1 t2 = do
 -- course, so instead this just searches and replaces all the module names. This
 -- should find all the instantiations and definitions. This could again be made
 -- much simpler if the parser works.
-replaceMods :: FilePath -> Text -> SourceInfo -> Sh ()
+replaceMods :: FilePath -> Text -> SourceInfo ann -> Sh ()
 replaceMods fp t (SourceInfo _ src) =
     void
         . forM (src ^.. _Wrapped . traverse . modId . _Wrapped)

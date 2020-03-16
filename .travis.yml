@@ -1,19 +1,21 @@
-language: nix  # automatically runs nix-build
-
+language: nix
 git:
-  depth: 3     # not 1 to build commits in the queue
-
+  depth: 3
 jobs:
   include:
-  - name: "Cabal build"
+  - name: Cabal build
     env: NIX=0
-  - name: "Nix build"
+  - name: Nix build
     env: NIX=1
-
 cache:
   directories:
-  - $HOME/.cabal
-
+  - "$HOME/.cabal"
+deploy:
+  provider: hackage
+  username: ymherklotz
+  password:
+    secure: qzJICih8GysNUBsVvtdJ8UE1HeUGWPVPpu5OkgYzPC2zJSUPWuq+OJ1xecUTomKSOzvCcaDuGyKj9hDZmHX0euPOBLYFna1wLV9q9RIOL7dKJjX7UKAfLgrUgffzHOIkvENKcG9/z2cHnyaJ1niVVzEYsUpoMnkPxveNiT4AfrFQc7ib3JaxW81+vCHW1E/BVvyBEy5etzu1QE/UYLcSzjLSHCm7QYQ/r/78ubhNwTIDW684AQZpqlUEE+3oRLJ2aPlR2N4nKvTJX6DbokNdXJnWV+kqSfjCo00z3dGPUmXMCXag/UctIg0rN72qi6leeswTdKo00C+0CL6kDjB+kStCsAsfj9AiTLZw65lL2XkKUU9iYLqAEyBQU/RAGJs/1aUMMWHw9GQOK5uGgJMrAXR5gh8FsRIn6PUDzBTZg0XtIwKkm/OF6DSrnWWv8qWvlZYyMNk2bQP0LHqsPX/aRHNY9CSryOkdBUj9MpfkJNT2SfXjQBYACWe/Nxsg2ikJQuFsFwwxGtMRB3WAZBK9XPjEWmlYjvCEaXYCug1rArQ8VSTMNSFPCz2/LEHq7cDrRve1QospooPBdo5qWN7Y4OxUnKeseQ6lS2dWfDOp3klduERSFcrDtzHfxleuK6U30D5AWTBwIEk6DwYmdpplbjxurINfXYxsrD7lmquc7Xs=
+  on:
+    tags: true
 before_script: if [[ $NIX -eq 0 ]]; then nix-env -i cabal-install ghc; fi
-
-script: ./scripts/build.sh
+script: "./scripts/build.sh"

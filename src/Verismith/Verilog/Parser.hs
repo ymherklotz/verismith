@@ -283,7 +283,7 @@ strId = satisfy' matchId
 identifier :: Parser Identifier
 identifier = Identifier . T.pack <$> strId
 
-parseNetDecl :: Maybe PortDir -> Parser ModItem
+parseNetDecl :: Maybe PortDir -> Parser (ModItem ann)
 parseNetDecl pd = do
     t     <- option Wire type_
     sign  <- option False (tok KWSigned $> True)
@@ -303,10 +303,10 @@ parsePortDir =
         <|> tok KWInout
         $>  PortInOut
 
-parseDecl :: Parser ModItem
+parseDecl :: Parser (ModItem ann)
 parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
 
-parseConditional :: Parser Statement
+parseConditional :: Parser (Statement ann)
 parseConditional = do
     expr  <- tok' KWIf *> parens parseExpr
     true  <- maybeEmptyStatement
@@ -336,7 +336,7 @@ parseAssign t = do
     expr  <- parseExpr
     return $ Assign lval delay expr
 
-parseLoop :: Parser Statement
+parseLoop :: Parser (Statement ann)
 parseLoop = do
     a    <- tok' KWFor *> tok' SymParenL *> parseAssign SymEq
     expr <- tok' SymSemi *> parseExpr
@@ -373,37 +373,37 @@ parseEvent' =
         <|> try (fmap EId identifier)
         <|> try (fmap EExpr parseExpr)
 
-parseEventCtrl :: Parser Statement
+parseEventCtrl :: Parser (Statement ann)
 parseEventCtrl = do
     event     <- parseEvent
     statement <- option Nothing maybeEmptyStatement
     return $ EventCtrl event statement
 
-parseDelayCtrl :: Parser Statement
+parseDelayCtrl :: Parser (Statement ann)
 parseDelayCtrl = do
     delay     <- parseDelay
     statement <- option Nothing maybeEmptyStatement
     return $ TimeCtrl delay statement
 
-parseBlocking :: Parser Statement
+parseBlocking :: Parser (Statement ann)
 parseBlocking = do
     a <- parseAssign SymEq
     tok' SymSemi
     return $ BlockAssign a
 
-parseNonBlocking :: Parser Statement
+parseNonBlocking :: Parser (Statement ann)
 parseNonBlocking = do
     a <- parseAssign SymLtEq
     tok' SymSemi
     return $ NonBlockAssign a
 
-parseSeq :: Parser Statement
+parseSeq :: Parser (Statement ann)
 parseSeq = do
     seq' <- tok' KWBegin *> many parseStatement
     tok' KWEnd
     return $ SeqBlock seq'
 
-parseStatement :: Parser Statement
+parseStatement :: Parser (Statement ann)
 parseStatement =
     parseSeq
         <|> parseConditional
@@ -413,14 +413,14 @@ parseStatement =
         <|> try parseBlocking
         <|> parseNonBlocking
 
-maybeEmptyStatement :: Parser (Maybe Statement)
+maybeEmptyStatement :: Parser (Maybe (Statement ann))
 maybeEmptyStatement =
     (tok' SymSemi >> return Nothing) <|> (Just <$> parseStatement)
 
-parseAlways :: Parser ModItem
+parseAlways :: Parser (ModItem ann)
 parseAlways = tok' KWAlways *> (Always <$> parseStatement)
 
-parseInitial :: Parser ModItem
+parseInitial :: Parser (ModItem ann)
 parseInitial = tok' KWInitial *> (Initial <$> parseStatement)
 
 namedModConn :: Parser ModConn
@@ -432,7 +432,7 @@ namedModConn = do
 parseModConn :: Parser ModConn
 parseModConn = try (fmap ModConn parseExpr) <|> namedModConn
 
-parseModInst :: Parser ModItem
+parseModInst :: Parser (ModItem ann)
 parseModInst = do
     m        <- identifier
     name     <- identifier
@@ -440,7 +440,7 @@ parseModInst = do
     tok' SymSemi
     return $ ModInst m name modconns
 
-parseModItem :: Parser ModItem
+parseModItem :: Parser (ModItem ann)
 parseModItem =
     try (ModCA <$> parseContAssign)
         <|> try parseDecl
@@ -451,11 +451,11 @@ parseModItem =
 parseModList :: Parser [Identifier]
 parseModList = list <|> return [] where list = parens $ commaSep identifier
 
-filterDecl :: PortDir -> ModItem -> Bool
+filterDecl :: PortDir -> (ModItem ann) -> Bool
 filterDecl p (Decl (Just p') _ _) = p == p'
 filterDecl _ _                    = False
 
-modPorts :: PortDir -> [ModItem] -> [Port]
+modPorts :: PortDir -> [ModItem ann] -> [Port]
 modPorts p mis = filter (filterDecl p) mis ^.. traverse . declPort
 
 parseParam :: Parser Parameter
@@ -467,7 +467,7 @@ parseParam = do
 parseParams :: Parser [Parameter]
 parseParams = tok' SymPound *> parens (commaSep parseParam)
 
-parseModDecl :: Parser ModDecl
+parseModDecl :: Parser (ModDecl ann)
 parseModDecl = do
     name      <- tok KWModule *> identifier
     paramList <- option [] $ try parseParams
@@ -483,7 +483,7 @@ parseModDecl = do
 
 -- | Parses a 'String' into 'Verilog' by skipping any beginning whitespace
 -- and then parsing multiple Verilog source.
-parseVerilogSrc :: Parser Verilog
+parseVerilogSrc :: Parser (Verilog ann)
 parseVerilogSrc = Verilog <$> many parseModDecl
 
 -- | Parse a 'String' containing verilog code. The parser currently only supports
@@ -491,7 +491,7 @@ parseVerilogSrc = Verilog <$> many parseModDecl
 parseVerilog
     :: Text -- ^ Name of parsed object.
     -> Text -- ^ Content to be parsed.
-    -> Either Text Verilog -- ^ Returns 'String' with error
+    -> Either Text (Verilog ann) -- ^ Returns 'String' with error
                                          -- message if parse fails.
 parseVerilog s =
     bimap showT id
@@ -500,12 +500,12 @@ parseVerilog s =
         . preprocess [] (T.unpack s)
         . T.unpack
 
-parseVerilogFile :: Text -> IO Verilog
+parseVerilogFile :: Text -> IO (Verilog ann)
 parseVerilogFile file = do
     src <- T.readFile $ T.unpack file
     case parseVerilog file src of
         Left  s -> error $ T.unpack s
         Right r -> return r
 
-parseSourceInfoFile :: Text -> Text -> IO SourceInfo
+parseSourceInfoFile :: Text -> Text -> IO (SourceInfo ann)
 parseSourceInfoFile top = fmap (SourceInfo top) . parseVerilogFile

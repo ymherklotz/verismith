@@ -205,7 +205,7 @@ timeit a = do
     end    <- liftIO getCurrentTime
     return (diffUTCTime end start, result)
 
-synthesis :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
+synthesis :: (MonadBaseControl IO m, MonadSh m) => (SourceInfo ann) -> Fuzz m ()
 synthesis src = do
     synth    <- synthesisers
     resTimes <- liftSh $ mapM exec synth
@@ -267,7 +267,7 @@ toolRun t m = do
     logT $ "Finished " <> t <> " " <> showT s
     return s
 
-equivalence :: (MonadBaseControl IO m, MonadSh m) => SourceInfo -> Fuzz m ()
+equivalence :: (MonadBaseControl IO m, MonadSh m) => (SourceInfo ann) -> Fuzz m ()
 equivalence src = do
     doCrossCheck <- fmap _fuzzOptsCrossCheck askOpts
     datadir <- fmap _fuzzDataDir askOpts
@@ -303,7 +303,7 @@ equivalence src = do
                          runEquiv checker datadir a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-simulation :: (MonadIO m, MonadSh m) => SourceInfo -> Fuzz m ()
+simulation :: (MonadIO m, MonadSh m) => (SourceInfo ann) -> Fuzz m ()
 simulation src = do
     datadir <- fmap _fuzzDataDir askOpts
     synth    <- passedSynthesis
@@ -378,7 +378,7 @@ passEquiv = filter withIdentity . _fuzzSynthResults <$> get
     withIdentity _                            = False
 
 -- | Always reduces with respect to 'Identity'.
-reduction :: (MonadSh m) => SourceInfo -> Fuzz m ()
+reduction :: (MonadSh m) => (SourceInfo ann) -> Fuzz m ()
 reduction src = do
     datadir <- fmap _fuzzDataDir askOpts
     checker <- fmap _fuzzOptsChecker askOpts
@@ -416,8 +416,8 @@ getTime = maybe 0 fst
 
 generateSample
     :: (MonadIO m, MonadSh m)
-    => Fuzz m (Seed, SourceInfo)
-    -> Fuzz m (Seed, SourceInfo)
+    => Fuzz m (Seed, (SourceInfo ann))
+    -> Fuzz m (Seed, (SourceInfo ann))
 generateSample f = do
     logT "Sampling Verilog from generator"
     (t, v@(s, _)) <- timeit f
@@ -465,7 +465,7 @@ medianFreqs l = zip hat (return <$> l)
     hat = set_ <$> [1 .. length l]
     set_ n = if n == h then 1 else 0
 
-fuzz :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzReport
+fuzz :: MonadFuzz m => Gen (SourceInfo ann) -> Fuzz m FuzzReport
 fuzz gen = do
     conf <- askConfig
     opts <- askOpts
@@ -507,7 +507,7 @@ fuzz gen = do
                             (getTime redResult)
     return report
 
-fuzzInDir :: MonadFuzz m => Gen SourceInfo -> Fuzz m FuzzReport
+fuzzInDir :: MonadFuzz m => Gen (SourceInfo ann) -> Fuzz m FuzzReport
 fuzzInDir src = do
     fuzzOpts <- askOpts
     let fp = fromMaybe "fuzz" $ _fuzzOptsOutput fuzzOpts
@@ -522,7 +522,7 @@ fuzzInDir src = do
 
 fuzzMultiple
     :: MonadFuzz m
-    => Gen SourceInfo
+    => Gen (SourceInfo ann)
     -> Fuzz m [FuzzReport]
 fuzzMultiple src = do
     fuzzOpts <- askOpts

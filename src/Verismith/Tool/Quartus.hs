@@ -49,7 +49,7 @@ instance NFData Quartus where
 defaultQuartus :: Quartus
 defaultQuartus = Quartus Nothing "quartus" "syn_quartus.v"
 
-runSynthQuartus :: Quartus -> SourceInfo -> ResultSh ()
+runSynthQuartus :: Quartus -> (SourceInfo ann) -> ResultSh ()
 runSynthQuartus sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let ex = execute_ SynthFail dir "quartus"

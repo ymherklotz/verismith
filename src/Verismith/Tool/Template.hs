@@ -61,7 +61,7 @@ write_verilog #{outputText a}
 yosysSynthConfigStd :: Synthesiser a => a -> FilePath -> Text
 yosysSynthConfigStd = yosysSynthConfig "synth"
 
-yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> b -> SourceInfo -> Text
+yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> b -> (SourceInfo ann) -> Text
 yosysSatConfig sim1 sim2 (SourceInfo top src) = [st|read_verilog #{outputText sim1}
 #{rename "_1" mis}
 read_verilog syn_#{outputText sim2}.v
@@ -137,7 +137,7 @@ synth_design -part xc7k70t -top #{top}
 write_verilog -force #{outf}
 |]
 
-sbyConfig :: (Synthesiser a, Synthesiser b) => Maybe Text -> FilePath -> a -> b -> SourceInfo -> Text
+sbyConfig :: (Synthesiser a, Synthesiser b) => Maybe Text -> FilePath -> a -> b -> (SourceInfo ann) -> Text
 sbyConfig mt datadir sim1 sim2 (SourceInfo top _) = [st|[options]
 multiclock on
 mode prove
@@ -169,7 +169,7 @@ top.v
         <$> deps
     readL = T.intercalate "\n" $ mappend "read -formal " <$> deps
 
-icarusTestbench :: (Synthesiser a) => FilePath -> Verilog -> a -> Text
+icarusTestbench :: (Synthesiser a) => FilePath -> (Verilog ann) -> a -> Text
 icarusTestbench datadir t synth1 = [st|
 `include "#{ddir}/data/cells_cmos.v"
 `include "#{ddir}/data/cells_cyclone_v.v"

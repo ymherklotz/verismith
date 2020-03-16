@@ -53,20 +53,20 @@ genAssignExpr g (n : ns) = BinOp wire oper <$> genAssignExpr g ns
 -- | Generate the continuous assignment AST for a particular node. If it does
 -- not have any nodes that link to it then return 'Nothing', as that means that
 -- the assignment will just be empty.
-genContAssignAST :: Circuit -> LNode Gate -> Maybe ModItem
+genContAssignAST :: Circuit -> LNode Gate -> Maybe (ModItem ann)
 genContAssignAST c (n, g) = ModCA . ContAssign name <$> genAssignExpr g nodes
   where
     gr    = getCircuit c
     nodes = G.pre gr n
     name  = frNode n
 
-genAssignAST :: Circuit -> [ModItem]
+genAssignAST :: Circuit -> [ModItem ann]
 genAssignAST c = catMaybes $ genContAssignAST c <$> nodes
   where
     gr    = getCircuit c
     nodes = G.labNodes gr
 
-genModuleDeclAST :: Circuit -> ModDecl
+genModuleDeclAST :: Circuit -> (ModDecl ann)
 genModuleDeclAST c = ModDecl i output ports (combineAssigns yPort a) []
   where
     i      = Identifier "gen_module"
@@ -75,5 +75,5 @@ genModuleDeclAST c = ModDecl i output ports (combineAssigns yPort a) []
     a      = genAssignAST c
     yPort  = Port Wire False 90 "y"
 
-generateAST :: Circuit -> Verilog
+generateAST :: Circuit -> (Verilog ann)
 generateAST c = Verilog [genModuleDeclAST c]
