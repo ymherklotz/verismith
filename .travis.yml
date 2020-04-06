@@ -1,4 +1,9 @@
-language: nix  # automatically runs nix-build
-
+language: nix
 git:
-  depth: 3     # not 1 to build commits in the queue
+  depth: 3
+env:
+  global:
+    secure: zTrO2QlvK3URxxh8XzCIJnywQmNAHswmPa3sUt9XCQPn+vmE9y+Ggw1ZMCv33rau1++fcAjZASoynLDQLsDSWWPxr6JoG/MADtzZhKfCBPztRTs+TyWpFFn3jsn4dpqWpWFSlfoYrW04Av6DZ+QLVNP65q1gaDuKQ2Gu3MDBQ2n/G3YB2PhusjoYBWwfx28kcfknnQ1AIEvgfQYb2BF9F3/LeIBxgl4kD9GmYyTtiMiPew+DPZkHPXUYgNd77zrb/tquQ53d8baHWwi8MLAisdfVOOnOEbTYZq4+QQUTGNjU0lAzIWjxKtvPHYAHycvXOTYQz3sxHRT2YCeVQ3fdHRrZ1NGVq15MFgCJOV/VCdcBGYxaXqv0dmEScIU8tT67GcUy1G+83KE5Du5W090wvNf4NshWAuq/QVZdYI+4vg3N3VLUJyiGQk3rIMvhrvuyi8yqBY4yZRRhwVGD9pzlubhPo4hj2PwgP3B++9UFMTgq2jL0SsONQJaIno8zcV7Gbcp52QHTJxgd/5sXMYom510QBazjYTkOCtMbbe9xofA9WCZw1W7KQ/VGa9+xusAgDWrvBgSpcIkQEKH81O16hiQE2CTzZ6PcAe40dLbu1y5P2K5DDQWmVy3lERNVEj54s8I5iXScsicbRaxIWP6piGnk73PBOXDk5rvE+NhHDHo=
+script:
+  - nix-env -iA cachix -f https://cachix.org/api/v1/install
+  - nix-build | if [[ ! -z $CACHIX_SIGNING_KEY ]]; then cachix push verismith; fi
