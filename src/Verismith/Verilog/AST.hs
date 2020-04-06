@@ -364,7 +364,7 @@ instance Num Range where
 -- cumbersome than useful, as a lot of ports can be declared without input and
 -- output port.
 --
--- This is now implemented inside 'ModDecl' itself, which uses a list of output
+-- This is now implemented inside '(ModDecl ann)' itself, which uses a list of output
 -- and input ports.
 data Port = Port
     { _portType   :: !PortType
@@ -547,7 +547,7 @@ traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e       ) = ModConn <$> f e
 traverseModConn f (ModConnNamed a e) = ModConnNamed a <$> f e
 
-traverseModItem :: (Applicative f) => (Expr -> f Expr) -> ModItem a -> f (ModItem a)
+traverseModItem :: (Applicative f) => (Expr -> f Expr) -> (ModItem ann) -> f (ModItem ann)
 traverseModItem f (ModCA (ContAssign a e)) = ModCA . ContAssign a <$> f e
 traverseModItem f (ModInst a b e) =
     ModInst a b <$> sequenceA (traverseModConn f <$> e)

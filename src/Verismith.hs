@@ -98,7 +98,7 @@ getConfig :: Maybe FilePath -> IO Config
 getConfig s =
     maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
 
-getGenerator :: Config -> Text -> Maybe FilePath -> IO (Gen SourceInfo)
+getGenerator :: Config -> Text -> Maybe FilePath -> IO (Gen (SourceInfo ann))
 getGenerator config top s =
     maybe (return $ proceduralSrc top config) (fmap return . parseSourceInfoFile top)
     $ toTextIgnore <$> s
@@ -231,7 +231,7 @@ defaultMain = do
     optsparsed <- execParser opts
     handleOpts optsparsed
 
-makeSrcInfo :: ModDecl -> SourceInfo
+makeSrcInfo :: (ModDecl ann) -> (SourceInfo ann)
 makeSrcInfo m = SourceInfo (getIdentifier $ m ^. modId) (Verilog [m])
 
 -- | Draw a randomly generated DAG to a dot file and compile it to a png so it
@@ -280,7 +280,7 @@ onFailure t _ = do
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
             return $ Fail EmptyFail
 
-checkEquivalence :: SourceInfo -> Text -> IO Bool
+checkEquivalence :: (SourceInfo ann) -> Text -> IO Bool
 checkEquivalence src dir = shellyFailDir $ do
     mkdir_p (fromText dir)
     curr <- toTextIgnore <$> pwd
@@ -330,6 +330,6 @@ runEquivalence seed gm t d k i = do
     when (i < 5 && isNothing seed) (runEquivalence seed gm t d k $ i + 1)
     where n = t <> "_" <> T.pack (show i)
 
-runReduce :: SourceInfo -> IO SourceInfo
+runReduce :: (SourceInfo ann) -> IO (SourceInfo ann)
 runReduce s =
     shelly $ reduce "reduce.v" (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s

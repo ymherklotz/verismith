@@ -34,7 +34,7 @@ import           Verismith.Circuit.Random
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.Mutate
 
-fromGraph :: Gen ModDecl
+fromGraph :: Gen (ModDecl ann)
 fromGraph = do
     gr <- rDupsCirc <$> Hog.resize 100 randomDAG
     return

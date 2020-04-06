@@ -34,7 +34,7 @@ import           Verismith.Verilog.Preprocess (uncomment)
 smallConfig :: Config
 smallConfig = defaultConfig & configProperty . propSize .~ 5
 
-randomMod' :: Gen ModDecl
+randomMod' :: Gen (ModDecl ann)
 randomMod' = Hog.resize 20 (randomMod 3 10)
 
 parserInputMod :: Property

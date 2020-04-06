@@ -52,7 +52,7 @@ instance NFData XST where
 defaultXST :: XST
 defaultXST = XST Nothing "xst" "syn_xst.v"
 
-runSynthXST :: XST -> SourceInfo -> ResultSh ()
+runSynthXST :: XST -> (SourceInfo ann) -> ResultSh ()
 runSynthXST sim (SourceInfo top src) = do
     dir <- liftSh pwd
     let exec n = execute_

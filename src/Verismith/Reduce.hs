@@ -133,7 +133,7 @@ halveNonEmpty l = case NonEmpty.splitAt (length l `div` 2) l of
 -- | When given a Lens and a function that works on a lower replacement, it will
 -- go down, apply the replacement, and return a replacement of the original
 -- module.
-combine :: Lens' a b -> Replace b -> Replace a
+combine :: Functor f => ((b -> f b) -> a -> f a) -> Replace b -> Replace a
 combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 
 -- | Deletes Id 'Expr' if they are not part of the current scope, and replaces
@@ -148,13 +148,13 @@ filterExpr _ e = e
 
 -- | Checks if a declaration is part of the current scope. If not, it returns
 -- 'False', otherwise 'True', as it should be kept.
---filterDecl :: [Identifier] -> ModItem -> Bool
+--filterDecl :: [Identifier] -> (ModItem ann) -> Bool
 --filterDecl ids (Decl Nothing (Port _ _ _ i) _) = i `elem` ids
 --filterDecl _   _                               = True
 
 -- | Checks if a continuous assignment is in the current scope, if not, it
 -- returns 'False'.
-filterAssigns :: [Port] -> ModItem -> Bool
+filterAssigns :: [Port] -> (ModItem ann) -> Bool
 filterAssigns out (ModCA (ContAssign i _)) =
     elem i $ out ^.. traverse . portName
 filterAssigns _ _ = True
@@ -167,7 +167,7 @@ takeReplace (Single a) = a
 takeReplace (Dual a _) = a
 takeReplace None       = mempty
 
-removeConstInConcat :: Replace SourceInfo
+removeConstInConcat :: Replace (SourceInfo ann)
 removeConstInConcat = Single . mutExpr replace
   where
     replace :: Expr -> Expr
@@ -177,18 +177,18 @@ removeConstInConcat = Single . mutExpr replace
     notConstant (Number _) = False
     notConstant _          = True
 
-cleanUndefined :: [Identifier] -> [ModItem] -> [ModItem]
+cleanUndefined :: [Identifier] -> [ModItem ann] -> [ModItem ann]
 cleanUndefined ids mis = clean usedWires mis
   where
     usedWires = mis ^.. traverse . modContAssign . contAssignNetLVal <> ids
 
-halveModAssign :: Replace ModDecl
+halveModAssign :: Replace (ModDecl ann)
 halveModAssign m = cleanMod m $ modify <$> assigns (m ^. modItems)
   where
     assigns = halve . filter (filterAssigns $ m ^. modOutPorts)
     modify l = m & modItems .~ l
 
-cleanMod :: ModDecl -> Replacement ModDecl -> Replacement ModDecl
+cleanMod :: (ModDecl ann) -> Replacement (ModDecl ann) -> Replacement (ModDecl ann)
 cleanMod m newm = modify . change <$> newm
   where
     mis = m ^. modItems
@@ -208,12 +208,12 @@ halveIndExpr (UnOp _ e      ) = Single e
 halveIndExpr (Appl _ e      ) = Single e
 halveIndExpr e                = Single e
 
-halveModExpr :: Replace ModItem
+halveModExpr :: Replace (ModItem ann)
 halveModExpr (ModCA ca) = ModCA <$> combine contAssignExpr halveIndExpr ca
 halveModExpr a          = Single a
 
 -- | Remove all the undefined mod instances.
-cleanModInst :: SourceInfo -> SourceInfo
+cleanModInst :: (SourceInfo ann) -> (SourceInfo ann)
 cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
   where
     validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
@@ -221,32 +221,32 @@ cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
 
 -- | Clean all the undefined module instances in a specific module using a
 -- context.
-cleanModInst' :: [Identifier] -> ModDecl -> ModDecl
+cleanModInst' :: [Identifier] -> (ModDecl ann) -> (ModDecl ann)
 cleanModInst' ids m = m & modItems .~ newModItem
     where newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
 
 -- | Check if a mod instance is in the current context.
-validModInst :: [Identifier] -> ModItem -> Bool
+validModInst :: [Identifier] -> (ModItem ann) -> Bool
 validModInst ids (ModInst i _ _) = i `elem` ids
 validModInst _   _               = True
 
--- | Adds a 'ModDecl' to a 'SourceInfo'.
-addMod :: ModDecl -> SourceInfo -> SourceInfo
+-- | Adds a '(ModDecl ann)' to a '(SourceInfo ann)'.
+addMod :: (ModDecl ann) -> (SourceInfo ann) -> (SourceInfo ann)
 addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
 
 -- | Split a module declaration in half by trying to remove assign
 -- statements. This is only done in the main module of the source.
-halveAssigns :: Replace SourceInfo
+halveAssigns :: Replace (SourceInfo ann)
 halveAssigns = combine mainModule halveModAssign
 
 -- | Checks if a module item is needed in the module declaration.
-relevantModItem :: ModDecl -> ModItem -> Bool
+relevantModItem :: (ModDecl ann) -> (ModItem ann) -> Bool
 relevantModItem (ModDecl _ out _ _ _) (ModCA (ContAssign i _)) =
     i `elem` fmap _portName out
 relevantModItem _ Decl{} = True
 relevantModItem _ _      = False
 
-isAssign :: Statement -> Bool
+isAssign :: (Statement ann) -> Bool
 isAssign (BlockAssign    _) = True
 isAssign (NonBlockAssign _) = True
 isAssign _                  = False
@@ -289,10 +289,10 @@ portToId (Port _ _ _ i) = i
 paramToId :: Parameter -> Identifier
 paramToId (Parameter i _) = i
 
-isModule :: Identifier -> ModDecl -> Bool
+isModule :: Identifier -> (ModDecl ann) -> Bool
 isModule i (ModDecl n _ _ _ _) = i == n
 
-modInstActive :: [ModDecl] -> ModItem -> [Identifier]
+modInstActive :: [(ModDecl ann)] -> (ModItem ann) -> [Identifier]
 modInstActive decl (ModInst n _ i) = case m of
     Nothing -> []
     Just m' -> concat $ calcActive m' <$> zip i [0 ..]
@@ -305,7 +305,7 @@ modInstActive decl (ModInst n _ i) = case m of
         | otherwise                  = []
 modInstActive _ _ = []
 
-fixModInst :: SourceInfo -> ModItem -> ModItem
+fixModInst :: (SourceInfo ann) -> (ModItem ann) -> (ModItem ann)
 fixModInst (SourceInfo _ (Verilog decl)) (ModInst n g i) = case m of
     Nothing -> error "Moditem not found"
     Just m' -> ModInst n g . mapMaybe (fixModInst' m') $ zip i [0 ..]
@@ -319,7 +319,7 @@ fixModInst (SourceInfo _ (Verilog decl)) (ModInst n g i) = case m of
         | otherwise                           = Nothing
 fixModInst _ a = a
 
-findActiveWires :: Identifier -> SourceInfo -> [Identifier]
+findActiveWires :: Identifier -> (SourceInfo ann) -> [Identifier]
 findActiveWires t src =
     nub
         $  assignWires
@@ -343,19 +343,19 @@ findActiveWires t src =
     m@(ModDecl _ o i _ p) = src ^. aModule t
 
 -- | Clean a specific module. Have to be carful that the module is in the
--- 'SourceInfo', otherwise it will crash.
-cleanSourceInfo :: Identifier -> SourceInfo -> SourceInfo
+-- '(SourceInfo ann)', otherwise it will crash.
+cleanSourceInfo :: Identifier -> (SourceInfo ann) -> (SourceInfo ann)
 cleanSourceInfo t src = src & aModule t %~ clean (findActiveWires t src)
 
-cleanSourceInfoAll :: SourceInfo -> SourceInfo
+cleanSourceInfoAll :: (SourceInfo ann) -> (SourceInfo ann)
 cleanSourceInfoAll src = foldr cleanSourceInfo src allMods
     where allMods = src ^.. infoSrc . _Wrapped . traverse . modId
 
 -- | Returns true if the text matches the name of a module.
-matchesModName :: Identifier -> ModDecl -> Bool
+matchesModName :: Identifier -> (ModDecl ann) -> Bool
 matchesModName top (ModDecl i _ _ _ _) = top == i
 
-halveStatement :: Replace Statement
+halveStatement :: Replace (Statement ann)
 halveStatement (SeqBlock [s]) = halveStatement s
 halveStatement (SeqBlock s) = SeqBlock <$> halve s
 halveStatement (CondStmnt _ (Just s1) (Just s2)) = Dual s1 s2
@@ -365,14 +365,14 @@ halveStatement (EventCtrl e (Just s)) = EventCtrl e . Just <$> halveStatement s
 halveStatement (TimeCtrl e (Just s)) = TimeCtrl e . Just <$> halveStatement s
 halveStatement a = Single a
 
-halveAlways :: Replace ModItem
+halveAlways :: Replace (ModItem ann)
 halveAlways (Always s) = Always <$> halveStatement s
 halveAlways a          = Single a
 
 -- | Removes half the modules randomly, until it reaches a minimal amount of
 -- modules. This is done by doing a binary search on the list of modules and
 -- removing the instantiations from the main module body.
-halveModules :: Replace SourceInfo
+halveModules :: Replace (SourceInfo ann)
 halveModules srcInfo@(SourceInfo top _) =
     cleanSourceInfoAll
         .   cleanModInst
@@ -382,14 +382,14 @@ halveModules srcInfo@(SourceInfo top _) =
     repl = halve . filter (not . matchesModName (Identifier top))
     main = srcInfo ^. mainModule
 
-moduleBot :: SourceInfo -> Bool
+moduleBot :: (SourceInfo ann) -> Bool
 moduleBot (SourceInfo _ (Verilog [] )) = True
 moduleBot (SourceInfo _ (Verilog [_])) = True
 moduleBot (SourceInfo _ (Verilog _  )) = False
 
 -- | Reducer for module items. It does a binary search on all the module items,
 -- except assignments to outputs and input-output declarations.
-halveModItems :: Identifier -> Replace SourceInfo
+halveModItems :: Identifier -> Replace (SourceInfo ann)
 halveModItems t srcInfo = cleanSourceInfo t . addRelevant <$> src
   where
     repl        = halve . filter (not . relevantModItem main)
@@ -398,7 +398,7 @@ halveModItems t srcInfo = cleanSourceInfo t . addRelevant <$> src
     src         = combine (aModule t . modItems) repl srcInfo
     addRelevant = aModule t . modItems %~ (relevant ++)
 
-modItemBot :: Identifier -> SourceInfo -> Bool
+modItemBot :: Identifier -> (SourceInfo ann) -> Bool
 modItemBot t srcInfo | length modItemsNoDecl > 2 = False
                      | otherwise                 = True
   where
@@ -407,18 +407,15 @@ modItemBot t srcInfo | length modItemsNoDecl > 2 = False
     noDecl Decl{} = False
     noDecl _      = True
 
-halveStatements :: Identifier -> Replace SourceInfo
+halveStatements :: Identifier -> Replace (SourceInfo ann)
 halveStatements t m =
     cleanSourceInfo t <$> combine (aModule t . modItems) halves m
     where halves = traverse halveAlways
 
 -- | Reduce expressions by splitting them in half and keeping the half that
 -- succeeds.
-halveExpr :: Identifier -> Replace SourceInfo
-halveExpr t = combine contexpr $ traverse halveModExpr
-  where
-    contexpr :: Lens' SourceInfo [ModItem]
-    contexpr = aModule t . modItems
+halveExpr :: Identifier -> Replace (SourceInfo ann)
+halveExpr t = combine (aModule t . modItems) $ traverse halveModExpr
 
 toIds :: [Expr] -> [Identifier]
 toIds = nub . mapMaybe exprId . concatMap universe
@@ -429,7 +426,7 @@ toIdsConst = toIds . fmap constToExpr
 toIdsEvent :: [Event] -> [Identifier]
 toIdsEvent = nub . mapMaybe eventId . concatMap universe
 
-allStatIds' :: Statement -> [Identifier]
+allStatIds' :: (Statement ann) -> [Identifier]
 allStatIds' s = nub $ assignIds <> otherExpr <> eventProcessedIds
   where
     assignIds =
@@ -441,13 +438,13 @@ allStatIds' s = nub $ assignIds <> otherExpr <> eventProcessedIds
     otherExpr         = toIds $ (s ^.. forExpr) <> (s ^.. stmntCondExpr)
     eventProcessedIds = toIdsEvent $ s ^.. statEvent
 
-allStatIds :: Statement -> [Identifier]
+allStatIds :: (Statement ann) -> [Identifier]
 allStatIds s = nub . concat $ allStatIds' <$> universe s
 
 fromRange :: Range -> [ConstExpr]
 fromRange r = [rangeMSB r, rangeLSB r]
 
-allExprIds :: ModDecl -> [Identifier]
+allExprIds :: (ModDecl ann) -> [Identifier]
 allExprIds m =
     nub
         $  contAssignIds
@@ -486,7 +483,7 @@ allExprIds m =
                .   localParamValue
                )
 
-isUsedDecl :: [Identifier] -> ModItem -> Bool
+isUsedDecl :: [Identifier] -> (ModItem ann) -> Bool
 isUsedDecl ids (Decl _ (Port _ _ _ i) _) = i `elem` ids
 isUsedDecl _   _                         = True
 
@@ -496,7 +493,7 @@ isUsedParam ids (Parameter i _) = i `elem` ids
 isUsedPort :: [Identifier] -> Port -> Bool
 isUsedPort ids (Port _ _ _ i) = i `elem` ids
 
-removeDecl :: SourceInfo -> SourceInfo
+removeDecl :: (SourceInfo ann) -> (SourceInfo ann)
 removeDecl src = foldr fix removed allMods
   where
     removeDecl' t src' =
@@ -511,19 +508,19 @@ removeDecl src = foldr fix removed allMods
     fix t a = a & aModule t . modItems %~ fmap (fixModInst a)
     removed = foldr removeDecl' src allMods
 
-defaultBot :: SourceInfo -> Bool
+defaultBot :: (SourceInfo ann) -> Bool
 defaultBot = const False
 
 -- | Reduction using custom reduction strategies.
 reduce_
-    :: MonadSh m
+    :: (MonadSh m, Eq ann)
     => Shelly.FilePath
     -> Text
-    -> Replace SourceInfo
-    -> (SourceInfo -> Bool)
-    -> (SourceInfo -> m Bool)
-    -> SourceInfo
-    -> m SourceInfo
+    -> Replace (SourceInfo ann)
+    -> ((SourceInfo ann) -> Bool)
+    -> ((SourceInfo ann) -> m Bool)
+    -> (SourceInfo ann)
+    -> m (SourceInfo ann)
 reduce_ out title repl bot eval src = do
     writefile out $ genSource src
     liftSh
@@ -563,11 +560,11 @@ reduce_ out title repl bot eval src = do
 -- | Reduce an input to a minimal representation. It follows the reduction
 -- strategy mentioned above.
 reduce
-    :: MonadSh m
+    :: (MonadSh m, Eq ann)
     => Shelly.FilePath -- ^ Filepath for temporary file.
-    -> (SourceInfo -> m Bool) -- ^ Failed or not.
-    -> SourceInfo              -- ^ Input verilog source to be reduced.
-    -> m SourceInfo           -- ^ Reduced output.
+    -> ((SourceInfo ann) -> m Bool) -- ^ Failed or not.
+    -> (SourceInfo ann)              -- ^ Input verilog source to be reduced.
+    -> m (SourceInfo ann)           -- ^ Reduced output.
 reduce fp eval src =
     fmap removeDecl
         $   red "Modules" moduleBot halveModules src
@@ -585,7 +582,7 @@ reduce fp eval src =
         (src' ^.. infoSrc . _Wrapped . traverse . modId)
 
 runScript
-    :: MonadSh m => Shelly.FilePath -> Shelly.FilePath -> SourceInfo -> m Bool
+    :: (MonadSh m, Eq ann) => Shelly.FilePath -> Shelly.FilePath -> (SourceInfo ann) -> m Bool
 runScript fp file src = do
     e <- liftSh $ do
         Shelly.writefile file $ genSource src
@@ -602,18 +599,18 @@ reduceWithScript
     -> m ()
 reduceWithScript top script file = do
     liftSh . Shelly.cp file $ file <.> "original"
-    srcInfo <- liftIO . parseSourceInfoFile top $ Shelly.toTextIgnore file
+    (srcInfo :: SourceInfo ()) <- liftIO . parseSourceInfoFile top $ Shelly.toTextIgnore file
     void $ reduce (fromText "reduce_script.v") (runScript script file) srcInfo
 
--- | Reduce a 'SourceInfo' using two 'Synthesiser' that are passed to it.
+-- | Reduce a '(SourceInfo ann)' using two 'Synthesiser' that are passed to it.
 reduceSynth
-    :: (Synthesiser a, Synthesiser b, MonadSh m)
+    :: (Synthesiser a, Synthesiser b, MonadSh m, Eq ann)
     => Maybe Text
     -> Shelly.FilePath
     -> a
     -> b
-    -> SourceInfo
-    -> m SourceInfo
+    -> (SourceInfo ann)
+    -> m (SourceInfo ann)
 reduceSynth mt datadir a b = reduce (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") synth
   where
     synth src' = liftSh $ do
@@ -625,7 +622,7 @@ reduceSynth mt datadir a b = reduce (fromText $ "reduce_" <> toText a <> "_" <> 
             Fail (EquivFail _) -> True
             _                  -> False
 
-reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo -> m SourceInfo
+reduceSynthesis :: (Synthesiser a, MonadSh m, Eq ann) => a -> (SourceInfo ann) -> m (SourceInfo ann)
 reduceSynthesis a = reduce (fromText $ "reduce_" <> toText a <> ".v") synth
   where
     synth src = liftSh $ do
@@ -642,7 +639,7 @@ runInTmp a = Shelly.withTmpDir $ (\f -> do
     Shelly.cd dir
     return r)
 
-reduceSimIc :: (Synthesiser a, MonadSh m) => Shelly.FilePath -> [ByteString] -> a -> SourceInfo -> m SourceInfo
+reduceSimIc :: (Synthesiser a, MonadSh m, Eq ann) => Shelly.FilePath -> [ByteString] -> a -> (SourceInfo ann) -> m (SourceInfo ann)
 reduceSimIc fp bs a = reduce (fromText $ "reduce_sim_" <> toText a <> ".v") synth
   where
     synth src = liftSh . runInTmp $ do

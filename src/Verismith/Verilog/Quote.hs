@@ -23,6 +23,7 @@ import qualified Language.Haskell.TH        as TH
 import           Language.Haskell.TH.Quote
 import           Language.Haskell.TH.Syntax
 import           Verismith.Verilog.Parser
+import Verismith.Verilog.AST (Verilog)
 
 liftDataWithText :: Data a => a -> Q Exp
 liftDataWithText = dataToExpQ $ fmap liftText . cast
@@ -47,4 +48,4 @@ quoteVerilog s = do
     v <- case parseVerilog pos (T.pack s) of
         Right e -> return e
         Left  e -> fail $ show e
-    liftDataWithText v
+    liftDataWithText (v :: Verilog ())

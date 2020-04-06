@@ -106,7 +106,7 @@ instance Mutate Assign where
 instance Mutate ContAssign where
     mutExpr f (ContAssign a e) = ContAssign a $ f e
 
-instance Mutate Statement where
+instance Mutate (Statement ann) where
     mutExpr f (TimeCtrl d s)     = TimeCtrl d $ mutExpr f <$> s
     mutExpr f (EventCtrl e s)    = EventCtrl e $ mutExpr f <$> s
     mutExpr f (SeqBlock s)       = SeqBlock $ mutExpr f <$> s
@@ -123,7 +123,7 @@ instance Mutate Parameter where
 instance Mutate LocalParam where
     mutExpr _ = id
 
-instance Mutate ModItem where
+instance Mutate (ModItem ann) where
     mutExpr f (ModCA (ContAssign a e)) = ModCA . ContAssign a $ f e
     mutExpr f (ModInst a b conns)      = ModInst a b $ mutExpr f conns
     mutExpr f (Initial s)              = Initial $ mutExpr f s
@@ -132,13 +132,13 @@ instance Mutate ModItem where
     mutExpr _ p@ParamDecl{}            = p
     mutExpr _ l@LocalParamDecl{}       = l
 
-instance Mutate ModDecl where
+instance Mutate (ModDecl ann) where
     mutExpr f (ModDecl a b c d e) = ModDecl (mutExpr f a) (mutExpr f b) (mutExpr f c) (mutExpr f d) (mutExpr f e)
 
-instance Mutate Verilog where
+instance Mutate (Verilog ann) where
     mutExpr f (Verilog a) = Verilog $ mutExpr f a
 
-instance Mutate SourceInfo where
+instance Mutate (SourceInfo ann) where
     mutExpr f (SourceInfo a b) = SourceInfo a $ mutExpr f b
 
 instance Mutate a => Mutate [a] where
@@ -150,8 +150,8 @@ instance Mutate a => Mutate (Maybe a) where
 instance Mutate a => Mutate (GenVerilog a) where
     mutExpr f (GenVerilog a) = GenVerilog $ mutExpr f a
 
--- | Return if the 'Identifier' is in a 'ModDecl'.
-inPort :: Identifier -> ModDecl -> Bool
+-- | Return if the 'Identifier' is in a '(ModDecl ann)'.
+inPort :: Identifier -> (ModDecl ann) -> Bool
 inPort i m = inInput
   where
     inInput =
@@ -159,7 +159,7 @@ inPort i m = inInput
 
 -- | Find the last assignment of a specific wire/reg to an expression, and
 -- returns that expression.
-findAssign :: Identifier -> [ModItem] -> Maybe Expr
+findAssign :: Identifier -> [ModItem ann] -> Maybe Expr
 findAssign i items = safe last . catMaybes $ isAssign <$> items
   where
     isAssign (ModCA (ContAssign val expr)) | val == i  = Just expr
@@ -184,7 +184,7 @@ replace = (transform .) . idTrans
 -- This could be improved by instead of only using the last assignment to the
 -- wire that one finds, to use the assignment to the wire before the current
 -- expression. This would require a different approach though.
-nestId :: Identifier -> ModDecl -> ModDecl
+nestId :: Identifier -> (ModDecl ann) -> (ModDecl ann)
 nestId i m
     | not $ inPort i m
     = let expr = fromMaybe def . findAssign i $ m ^. modItems
@@ -196,15 +196,15 @@ nestId i m
     def = Id i
 
 -- | Replaces an identifier by a expression in all the module declaration.
-nestSource :: Identifier -> Verilog -> Verilog
+nestSource :: Identifier -> (Verilog ann) -> (Verilog ann)
 nestSource i src = src & getModule %~ nestId i
 
 -- | Nest variables in the format @w[0-9]*@ up to a certain number.
-nestUpTo :: Int -> Verilog -> Verilog
+nestUpTo :: Int -> (Verilog ann) -> (Verilog ann)
 nestUpTo i src =
     foldl (flip nestSource) src $ Identifier . fromNode <$> [1 .. i]
 
-allVars :: ModDecl -> [Identifier]
+allVars :: (ModDecl ann) -> [Identifier]
 allVars m =
     (m ^.. modOutPorts . traverse . portName)
         <> (m ^.. modInPorts . traverse . portName)
@@ -226,7 +226,7 @@ allVars m =
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
-instantiateMod :: ModDecl -> ModDecl -> ModDecl
+instantiateMod :: (ModDecl ann) -> (ModDecl ann) -> (ModDecl ann)
 instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
   where
     out = Decl Nothing <$> m ^. modOutPorts <*> pure Nothing
@@ -252,7 +252,7 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
 -- >>> GenVerilog $ instantiateMod_ m
 -- m m(y, x);
 -- <BLANKLINE>
-instantiateMod_ :: ModDecl -> ModItem
+instantiateMod_ :: (ModDecl ann) -> (ModItem ann)
 instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
   where
     conns =
@@ -267,7 +267,7 @@ instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
 -- >>> GenVerilog $ instantiateModSpec_ "_" m
 -- m m(.y(y), .x(x));
 -- <BLANKLINE>
-instantiateModSpec_ :: Text -> ModDecl -> ModItem
+instantiateModSpec_ :: Text -> (ModDecl ann) -> (ModItem ann)
 instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
   where
     conns   = zipWith ModConnNamed ids (Id <$> instIds)
@@ -288,7 +288,7 @@ filterChar t ids =
 -- endmodule
 -- <BLANKLINE>
 -- <BLANKLINE>
-initMod :: ModDecl -> ModDecl
+initMod :: (ModDecl ann) -> (ModDecl ann)
 initMod m = m & modItems %~ ((out ++ inp) ++)
   where
     out = Decl (Just PortOut) <$> (m ^. modOutPorts) <*> pure Nothing
@@ -301,7 +301,7 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 
 -- | Make top level module for equivalence verification. Also takes in how many
 -- modules to instantiate.
-makeTop :: Int -> ModDecl -> ModDecl
+makeTop :: Int -> (ModDecl ann) -> (ModDecl ann)
 makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt []
   where
     ys    = yPort . flip makeIdFrom "y" <$> [1 .. i]
@@ -311,7 +311,7 @@ makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt []
 
 -- | Make a top module with an assert that requires @y_1@ to always be equal to
 -- @y_2@, which can then be proven using a formal verification tool.
-makeTopAssert :: ModDecl -> ModDecl
+makeTopAssert :: (ModDecl ann) -> (ModDecl ann)
 makeTopAssert = (modItems %~ (++ [assert])) . makeTop 2
   where
     assert = Always . EventCtrl e . Just $ SeqBlock
@@ -320,7 +320,7 @@ makeTopAssert = (modItems %~ (++ [assert])) . makeTop 2
 
 -- | Provide declarations for all the ports that are passed to it. If they are
 -- registers, it should assign them to 0.
-declareMod :: [Port] -> ModDecl -> ModDecl
+declareMod :: [Port] -> (ModDecl ann) -> (ModDecl ann)
 declareMod ports = initMod . (modItems %~ (fmap decl ports ++))
   where
     decl p@(Port Reg _ _ _) = Decl Nothing p (Just 0)
@@ -374,7 +374,7 @@ removeId i = transform trans
                      | otherwise         = Id ident
     trans e = e
 
-combineAssigns :: Port -> [ModItem] -> [ModItem]
+combineAssigns :: Port -> [ModItem ann] -> [ModItem ann]
 combineAssigns p a =
     a
         <> [ ModCA
@@ -386,7 +386,7 @@ combineAssigns p a =
            ]
     where assigns = a ^.. traverse . modContAssign . contAssignNetLVal
 
-combineAssigns_ :: Bool -> Port -> [Port] -> ModItem
+combineAssigns_ :: Bool -> Port -> [Port] -> (ModItem ann)
 combineAssigns_ comb p ps =
     ModCA
         .   ContAssign (p ^. portName)

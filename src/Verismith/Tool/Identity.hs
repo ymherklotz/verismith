@@ -44,7 +44,7 @@ instance Synthesiser Identity where
 instance NFData Identity where
     rnf = rwhnf
 
-runSynthIdentity :: Identity -> SourceInfo -> ResultSh ()
+runSynthIdentity :: Identity -> (SourceInfo ann) -> ResultSh ()
 runSynthIdentity (Identity _ out) = writefile out . genSource
 
 defaultIdentity :: Identity
