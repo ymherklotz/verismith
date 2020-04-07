@@ -23,7 +23,6 @@ import           Data.Text                 (Text, unpack)
 import           Prelude                   hiding (FilePath)
 import           Shelly
 import           Shelly.Lifted             (liftSh)
-import           Text.Shakespeare.Text     (st)
 import           Verismith.Tool.Internal
 import           Verismith.Tool.Template
 import           Verismith.Verilog.AST
@@ -62,7 +61,7 @@ runSynthXST sim (SourceInfo top src) = do
             (maybe (fromText n) (</> fromText n) $ xstBin sim)
     liftSh $ do
         writefile xstFile $ xstSynthConfig top
-        writefile prjFile [st|verilog work "rtl.v"|]
+        writefile prjFile "verilog work \"rtl.v\""
         writefile "rtl.v" $ genSource src
     exec "xst" ["-ifn", toTextIgnore xstFile]
     exec

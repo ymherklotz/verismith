@@ -29,7 +29,6 @@ import           Prelude                   hiding (FilePath)
 import           Shelly                    (FilePath, (</>))
 import qualified Shelly                    as S
 import           Shelly.Lifted             (liftSh, readfile)
-import           Text.Shakespeare.Text     (st)
 import           Verismith.CounterEg       (parseCounterEg)
 import           Verismith.Result
 import           Verismith.Tool.Internal
@@ -102,7 +101,7 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
     runSynth sim1 srcInfo
     runSynth sim2 srcInfo
     liftSh $ S.run_ (yosysPath yosys) [S.toTextIgnore checkFile]
-    where checkFile = S.fromText [st|test.#{toText sim1}.#{toText sim2}.ys|]
+    where checkFile = S.fromText $ "test." <> toText sim1 <> "." <> toText sim2 <> ".ys"
 
 runEquiv
     :: (Synthesiser a, Synthesiser b) => Maybe Text -> FilePath -> a -> b -> (SourceInfo ann) -> ResultSh ()
