@@ -22,6 +22,10 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Verismith
 import           Verismith.Reduce
+import Data.Text (Text)
+
+sourceInfo :: Text -> Verilog () -> SourceInfo ()
+sourceInfo = SourceInfo
 
 reduceUnitTests :: TestTree
 reduceUnitTests = testGroup
@@ -40,7 +44,7 @@ removeConstInConcatTest :: TestTree
 removeConstInConcatTest = testCase "Remove const in concat" $ do
     GenVerilog (removeDecl srcInfo1) @?= golden1
   where
-    srcInfo1 = SourceInfo "top" [verilog|
+    srcInfo1 = sourceInfo "top" [verilog|
 module top;
   wire a;
   reg b;
@@ -53,7 +57,7 @@ module top;
   end
 endmodule
 |]
-    golden1 = GenVerilog $ SourceInfo "top" [verilog|
+    golden1 = GenVerilog $ sourceInfo "top" [verilog|
 module top;
   wire a;
   reg b;
@@ -71,7 +75,7 @@ removeDeclTest :: TestTree
 removeDeclTest = testCase "Remove declarations" $ do
     GenVerilog (removeDecl srcInfo1) @?= golden1
     where
-        srcInfo1 = SourceInfo "top" [verilog|
+        srcInfo1 = sourceInfo "top" [verilog|
 module top;
   wire a;
   wire b;
@@ -99,7 +103,7 @@ module top;
   assign b = g;
 endmodule
 |]
-        golden1 = GenVerilog $ SourceInfo "top" [verilog|
+        golden1 = GenVerilog $ sourceInfo "top" [verilog|
 module top;
   wire a;
   wire b;
@@ -125,11 +129,10 @@ module top;
 endmodule
 |]
 
-cleanAllTest :: TestTree
 cleanAllTest = testCase "Clean all" $ do
     GenVerilog (cleanSourceInfoAll srcInfo1) @?= golden1
     where
-        srcInfo1 = SourceInfo "top" [verilog|
+        srcInfo1 = sourceInfo "top" [verilog|
 module top;
   wire a;
   wire b;
@@ -157,7 +160,7 @@ module mod2;
   assign b = c + d;
 endmodule
 |]
-        golden1 = GenVerilog $ SourceInfo "top" [verilog|
+        golden1 = GenVerilog $ sourceInfo "top" [verilog|
 module top;
   wire a;
   wire b;
@@ -191,7 +194,7 @@ cleanTest = testCase "Clean expression" $ do
     clean ["wire1", "wire2"] srcInfo1 @?= golden1
     clean ["wire1", "wire3"] srcInfo2 @?= golden2
     where
-        srcInfo1 = GenVerilog . SourceInfo "top" $ [verilog|
+        srcInfo1 = GenVerilog . sourceInfo "top" $ [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -199,7 +202,7 @@ module top;
   assign wire1 = wire2[wire3];
 endmodule
 |]
-        golden1 = GenVerilog . SourceInfo "top" $ [verilog|
+        golden1 = GenVerilog . sourceInfo "top" $ [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -207,7 +210,7 @@ module top;
   assign wire1 = wire2[1'b0];
 endmodule
 |]
-        srcInfo2 = GenVerilog . SourceInfo "top" $ [verilog|
+        srcInfo2 = GenVerilog . sourceInfo "top" $ [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -215,7 +218,7 @@ module top;
   assign wire1 = wire2[wire3:wire1];
 endmodule
 |]
-        golden2 = GenVerilog . SourceInfo "top" $ [verilog|
+        golden2 = GenVerilog . sourceInfo "top" $ [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -232,7 +235,7 @@ activeWireTest = testCase "Active wires" $ do
     findActiveWires "top" verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
     findActiveWires "top" verilog4 \\ ["x", "y", "w", "a", "b"]     @?= []
     where
-        verilog1 = SourceInfo "top" [verilog|
+        verilog1 = sourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -243,7 +246,7 @@ module top(y, x);
   assign y = w + z;
 endmodule
 |]
-        verilog2 = SourceInfo "top" [verilog|
+        verilog2 = sourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -252,7 +255,7 @@ module top(y, x);
   assign z = 0;
 endmodule
 |]
-        verilog3 = SourceInfo "top" [verilog|
+        verilog3 = sourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -273,7 +276,7 @@ module top(clk, y, x);
   assign y = {r1, r2, r3};
 endmodule
 |]
-        verilog4 = SourceInfo "top" [verilog|
+        verilog4 = sourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -302,7 +305,7 @@ halveStatementsTest :: TestTree
 halveStatementsTest = testCase "Statements" $ do
     GenVerilog <$> halveStatements "top" srcInfo1 @?= golden1
     where
-        srcInfo1 = SourceInfo "top" [verilog|
+        srcInfo1 = sourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -324,7 +327,7 @@ module top(clk, y, x);
   assign y = {r1, r2, r3};
 endmodule
 |]
-        golden1 = GenVerilog <$> Dual (SourceInfo "top" [verilog|
+        golden1 = GenVerilog <$> Dual (sourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -341,7 +344,7 @@ module top(clk, y, x);
   end
   assign y = {r1, 1'b0, 1'b0};
 endmodule
-|]) (SourceInfo "top" [verilog|
+|]) (sourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -366,7 +369,7 @@ modItemReduceTest :: TestTree
 modItemReduceTest = testCase "Module items" $ do
     GenVerilog <$> halveModItems "top" srcInfo1 @?= golden1
     where
-        srcInfo1 = SourceInfo "top" [verilog|
+        srcInfo1 = sourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -377,7 +380,7 @@ module top(y, x);
   assign y = w;
 endmodule
 |]
-        golden1 = GenVerilog <$> Dual (SourceInfo "top" [verilog|
+        golden1 = GenVerilog <$> Dual (sourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -386,7 +389,7 @@ module top(y, x);
   assign y = 1'b0;
   assign z = x;
 endmodule
-|]) (SourceInfo "top" [verilog|
+|]) (sourceInfo "top" [verilog|
 module top(y, x);
   input x;
   output y;
@@ -402,7 +405,7 @@ statementReducerTest = testCase "Statement reducer" $ do
     GenVerilog <$> halveStatements "top" srcInfo1 @?= fmap GenVerilog golden1
     GenVerilog <$> halveStatements "top" srcInfo2 @?= fmap GenVerilog golden2
     where
-        srcInfo1 = SourceInfo "top" [verilog|
+        srcInfo1 = sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -422,7 +425,7 @@ module top(y, x);
   end
 endmodule
 |]
-        golden1 = Dual (SourceInfo "top" [verilog|
+        golden1 = Dual (sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -437,7 +440,7 @@ module top(y, x);
     b <= 2;
   end
 endmodule
-|]) $ SourceInfo "top" [verilog|
+|]) $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -453,7 +456,7 @@ module top(y, x);
   end
 endmodule
 |]
-        srcInfo2 = SourceInfo "top" [verilog|
+        srcInfo2 = sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -466,7 +469,7 @@ module top(y, x);
   end
 endmodule
 |]
-        golden2 = Dual (SourceInfo "top" [verilog|
+        golden2 = Dual (sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -474,7 +477,7 @@ module top(y, x);
   always @(posedge clk)
       y <= 2;
 endmodule
-|]) $ SourceInfo "top" [verilog|
+|]) $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -489,7 +492,7 @@ moduleReducerTest = testCase "Module reducer" $ do
     halveModules srcInfo1 @?= golden1
     halveModules srcInfo2 @?= golden2
     where
-        srcInfo1 = SourceInfo "top" [verilog|
+        srcInfo1 = sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -501,13 +504,13 @@ module m(y, x);
   input wire [4:0] x;
 endmodule
 |]
-        golden1 = Single $ SourceInfo "top" [verilog|
+        golden1 = Single $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
 endmodule
 |]
-        srcInfo2 = SourceInfo "top" [verilog|
+        srcInfo2 = sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -525,7 +528,7 @@ module m2(y, x);
   input wire [4:0] x;
 endmodule
 |]
-        golden2 = Dual (SourceInfo "top" [verilog|
+        golden2 = Dual (sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -536,7 +539,7 @@ module m(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
 endmodule
-|]) $ SourceInfo "top" [verilog|
+|]) $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;

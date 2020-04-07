@@ -39,14 +39,14 @@ randomMod' = Hog.resize 20 (randomMod 3 10)
 
 parserInputMod :: Property
 parserInputMod = Hog.property $ do
-    v <- GenVerilog <$> Hog.forAll randomMod'
+    v <- GenVerilog <$> Hog.forAll randomMod' :: Hog.PropertyT IO (GenVerilog (ModDecl ()))
     Hog.assert . isRight $ parse parseModDecl
                                  "input_test_mod"
                                  (alexScanTokens . uncomment "test" $ show v)
 
 parserIdempotentMod :: Property
 parserIdempotentMod = Hog.property $ do
-    v <- Hog.forAll randomMod'
+    v <- Hog.forAll randomMod' :: Hog.PropertyT IO (ModDecl ())
     let sv = vshow v
     p sv === (p . p) sv
   where
@@ -65,7 +65,7 @@ parserInput = Hog.property $ do
 
 parserIdempotent :: Property
 parserIdempotent = Hog.property $ do
-    v <- Hog.forAll (procedural "top" smallConfig)
+    v <- Hog.forAll (procedural "top" smallConfig) :: Hog.PropertyT IO (Verilog ())
     let sv = vshow v
     p sv === (p . p) sv
   where
@@ -123,7 +123,9 @@ parseAlwaysUnit = testGroup
     , test "Empty with event @(posedge clk)" "always @(posedge clk) begin end"
         $ Always (EventCtrl (EPosEdge "clk") (Just (SeqBlock [])))
     ]
-    where test = testParse parseModItem
+    where
+      test :: String -> String -> ModItem () -> TestTree
+      test = testParse parseModItem
 
 parseUnitTests :: TestTree
 parseUnitTests = testGroup "Parser unit" [parseEventUnit, parseAlwaysUnit]
