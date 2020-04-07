@@ -52,11 +52,9 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Lazy                (toStrict)
 import           Data.Time
-import           Data.Vector                   (fromList)
 import           Prelude                       hiding (FilePath)
 import           Shelly                        (FilePath, fromText,
                                                 toTextIgnore, (<.>), (</>))
-import           Statistics.Sample             (meanVariance)
 import           Text.Blaze.Html               (Html, (!))
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5              as H
@@ -318,13 +316,21 @@ resultStatus :: Result a b -> Html
 resultStatus (Pass _) = H.td ! A.class_ "is-success" $ "Passed"
 resultStatus (Fail _) = H.td ! A.class_ "is-danger" $ "Failed"
 
+meanVariance :: [Double] -> (Double, Double)
+meanVariance l = (mean, variance)
+  where
+    mean = sum l / len
+    variance = sum (squ . subtract mean <$> l) / (len - 1.0)
+    squ x = x * x
+    len = fromIntegral $ length l
+
 fuzzStats
     :: (Real a1, Traversable t)
     => ((a1 -> Const (Endo [a1]) a1) -> a2 -> Const (Endo [a1]) a2)
     -> t a2
     -> (Double, Double)
 fuzzStats sel fr = meanVariance converted
-    where converted = fromList . fmap realToFrac $ fr ^.. traverse . sel
+    where converted = fmap realToFrac $ fr ^.. traverse . sel
 
 fuzzStatus :: Text -> FuzzReport -> Html
 fuzzStatus name (FuzzReport dir s1 s2 s3 sz t1 t2 t3) = H.tr $ do
