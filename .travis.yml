@@ -7,12 +7,6 @@ env:
 script:
   - nix-env -iA cachix -f https://cachix.org/api/v1/install
   - nix-build | if [[ ! -z $CACHIX_SIGNING_KEY ]]; then cachix push verismith; fi
-jobs:
-  include:
-  - name: Cabal build
-    env: NIX=0
-  - name: Nix build
-    env: NIX=1
 cache:
   directories:
   - "$HOME/.cabal"
