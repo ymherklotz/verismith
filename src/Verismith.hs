@@ -98,7 +98,7 @@ getConfig :: Maybe FilePath -> IO Config
 getConfig s =
     maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
 
-getGenerator :: Config -> Text -> Maybe FilePath -> IO (Gen (SourceInfo ann))
+getGenerator :: Config -> Text -> Maybe FilePath -> IO (Gen (SourceInfo ()))
 getGenerator config top s =
     maybe (return $ proceduralSrc top config) (fmap return . parseSourceInfoFile top)
     $ toTextIgnore <$> s
@@ -183,7 +183,7 @@ handleOpts (Reduce f t _ ls' False) = do
             shelly $ do
                 make dir
                 pop dir $ do
-                    src' <- reduceSynth Nothing (toFP datadir) a b src
+                    src' <- reduceSynth Nothing (toFP datadir) a b src :: Sh (SourceInfo ())
                     writefile (fromText ".." </> dir <.> "v") $ genSource src'
         a : _ -> do
             putStrLn "Reduce with synthesis failure"
@@ -295,7 +295,7 @@ checkEquivalence src dir = shellyFailDir $ do
 -- generated Verilog files are equivalent.
 runEquivalence
     :: Maybe Seed
-    -> Gen Verilog -- ^ Generator for the Verilog file.
+    -> Gen (Verilog ()) -- ^ Generator for the Verilog file.
     -> Text        -- ^ Name of the folder on each thread.
     -> Text        -- ^ Name of the general folder being used.
     -> Bool        -- ^ Keep flag.
@@ -330,6 +330,6 @@ runEquivalence seed gm t d k i = do
     when (i < 5 && isNothing seed) (runEquivalence seed gm t d k $ i + 1)
     where n = t <> "_" <> T.pack (show i)
 
-runReduce :: (SourceInfo ann) -> IO (SourceInfo ann)
+runReduce :: (SourceInfo ()) -> IO (SourceInfo ())
 runReduce s =
     shelly $ reduce "reduce.v" (\s' -> not <$> liftIO (checkEquivalence s' "reduce")) s

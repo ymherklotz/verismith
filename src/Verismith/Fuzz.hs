@@ -73,7 +73,7 @@ data FuzzOpts = FuzzOpts { _fuzzOptsOutput      :: !(Maybe FilePath)
                          , _fuzzOptsNoEquiv     :: !Bool
                          , _fuzzOptsNoReduction :: !Bool
                          , _fuzzOptsConfig      :: {-# UNPACK #-} !Config
-                         , _fuzzDataDir         :: {-# UNPACK #-} !FilePath
+                         , _fuzzDataDir         :: !FilePath
                          , _fuzzOptsCrossCheck  :: !Bool
                          , _fuzzOptsChecker     :: !(Maybe Text)
                          }
@@ -378,7 +378,7 @@ passEquiv = filter withIdentity . _fuzzSynthResults <$> get
     withIdentity _                            = False
 
 -- | Always reduces with respect to 'Identity'.
-reduction :: (MonadSh m) => (SourceInfo ann) -> Fuzz m ()
+reduction :: (MonadSh m, Eq ann) => (SourceInfo ann) -> Fuzz m ()
 reduction src = do
     datadir <- fmap _fuzzDataDir askOpts
     checker <- fmap _fuzzOptsChecker askOpts
@@ -465,7 +465,7 @@ medianFreqs l = zip hat (return <$> l)
     hat = set_ <$> [1 .. length l]
     set_ n = if n == h then 1 else 0
 
-fuzz :: MonadFuzz m => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzz :: (MonadFuzz m, Ord ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
 fuzz gen = do
     conf <- askConfig
     opts <- askOpts
@@ -507,7 +507,7 @@ fuzz gen = do
                             (getTime redResult)
     return report
 
-fuzzInDir :: MonadFuzz m => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzzInDir :: (MonadFuzz m, Ord ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
 fuzzInDir src = do
     fuzzOpts <- askOpts
     let fp = fromMaybe "fuzz" $ _fuzzOptsOutput fuzzOpts
@@ -521,7 +521,7 @@ fuzzInDir src = do
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 fuzzMultiple
-    :: MonadFuzz m
+    :: (MonadFuzz m, Ord ann)
     => Gen (SourceInfo ann)
     -> Fuzz m [FuzzReport]
 fuzzMultiple src = do

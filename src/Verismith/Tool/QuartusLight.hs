@@ -27,8 +27,8 @@ import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
 data QuartusLight = QuartusLight { quartusLightBin    :: !(Maybe FilePath)
-                                 , quartusLightDesc   :: {-# UNPACK #-} !Text
-                                 , quartusLightOutput :: {-# UNPACK #-} !FilePath
+                                 , quartusLightDesc   :: !Text
+                                 , quartusLightOutput :: !FilePath
                                  }
                   deriving (Eq)
 

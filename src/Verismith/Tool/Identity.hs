@@ -25,8 +25,8 @@ import           Verismith.Tool.Internal
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
-data Identity = Identity { identityDesc   :: {-# UNPACK #-} !Text
-                         , identityOutput :: {-# UNPACK #-} !FilePath
+data Identity = Identity { identityDesc   :: !Text
+                         , identityOutput :: !FilePath
                          }
               deriving (Eq)
 

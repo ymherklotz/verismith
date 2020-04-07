@@ -24,7 +24,7 @@ instance Show OptTool where
   show TXST    = "xst"
   show TIcarus = "icarus"
 
-data Opts = Fuzz { fuzzOutput          :: {-# UNPACK #-} !Text
+data Opts = Fuzz { fuzzOutput          :: Text
                  , fuzzConfigFile      :: !(Maybe FilePath)
                  , fuzzForced          :: !Bool
                  , fuzzKeepAll         :: !Bool
@@ -40,13 +40,13 @@ data Opts = Fuzz { fuzzOutput          :: {-# UNPACK #-} !Text
           | Generate { generateFilename   :: !(Maybe FilePath)
                      , generateConfigFile :: !(Maybe FilePath)
                      }
-          | Parse { parseFilename            :: {-# UNPACK #-} !FilePath
-                  , parseTop                 :: {-# UNPACK #-} !Text
+          | Parse { parseFilename            :: !FilePath
+                  , parseTop                 :: !Text
                   , parseOutput              :: !(Maybe FilePath)
                   , parseRemoveConstInConcat :: !Bool
                   }
-          | Reduce { reduceFilename        :: {-# UNPACK #-} !FilePath
-                   , reduceTop             :: {-# UNPACK #-} !Text
+          | Reduce { reduceFilename        :: !FilePath
+                   , reduceTop             :: !Text
                    , reduceScript          :: !(Maybe FilePath)
                    , reduceSynthesiserDesc :: ![SynthDescription]
                    , reduceRerun           :: !Bool

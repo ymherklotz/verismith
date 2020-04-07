@@ -30,8 +30,8 @@ import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
 data XST = XST { xstBin    :: !(Maybe FilePath)
-               , xstDesc   :: {-# UNPACK #-} !Text
-               , xstOutput :: {-# UNPACK #-} !FilePath
+               , xstDesc   :: !Text
+               , xstOutput :: !FilePath
                }
          deriving (Eq)
 

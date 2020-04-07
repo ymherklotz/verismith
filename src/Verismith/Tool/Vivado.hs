@@ -27,8 +27,8 @@ import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
 
 data Vivado = Vivado { vivadoBin    :: !(Maybe FilePath)
-                     , vivadoDesc   :: {-# UNPACK #-} !Text
-                     , vivadoOutput :: {-# UNPACK #-} !FilePath
+                     , vivadoDesc   :: !Text
+                     , vivadoOutput :: !FilePath
                      }
                deriving (Eq)
 

@@ -133,8 +133,14 @@ halveNonEmpty l = case NonEmpty.splitAt (length l `div` 2) l of
 -- | When given a Lens and a function that works on a lower replacement, it will
 -- go down, apply the replacement, and return a replacement of the original
 -- module.
-combine :: Functor f => ((b -> f b) -> a -> f a) -> Replace b -> Replace a
+combine :: (Monoid b) => Traversal' a b -> Replace b -> Replace a
 combine l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
+
+-- | When given a Lens and a function that works on a lower replacement, it will
+-- go down, apply the replacement, and return a replacement of the original
+-- module.
+combineL :: Lens' a b -> Replace b -> Replace a
+combineL l f i = modify <$> f (i ^. l) where modify res = i & l .~ res
 
 -- | Deletes Id 'Expr' if they are not part of the current scope, and replaces
 -- these by 0.
@@ -237,7 +243,7 @@ addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
 -- | Split a module declaration in half by trying to remove assign
 -- statements. This is only done in the main module of the source.
 halveAssigns :: Replace (SourceInfo ann)
-halveAssigns = combine mainModule halveModAssign
+halveAssigns = combineL mainModule halveModAssign
 
 -- | Checks if a module item is needed in the module declaration.
 relevantModItem :: (ModDecl ann) -> (ModItem ann) -> Bool
@@ -409,8 +415,7 @@ modItemBot t srcInfo | length modItemsNoDecl > 2 = False
 
 halveStatements :: Identifier -> Replace (SourceInfo ann)
 halveStatements t m =
-    cleanSourceInfo t <$> combine (aModule t . modItems) halves m
-    where halves = traverse halveAlways
+    cleanSourceInfo t <$> combine (aModule t . modItems) (traverse halveAlways) m
 
 -- | Reduce expressions by splitting them in half and keeping the half that
 -- succeeds.
@@ -639,7 +644,8 @@ runInTmp a = Shelly.withTmpDir $ (\f -> do
     Shelly.cd dir
     return r)
 
-reduceSimIc :: (Synthesiser a, MonadSh m, Eq ann) => Shelly.FilePath -> [ByteString] -> a -> (SourceInfo ann) -> m (SourceInfo ann)
+reduceSimIc :: (Synthesiser a, MonadSh m, Eq ann) => Shelly.FilePath -> [ByteString]
+  -> a -> (SourceInfo ann) -> m (SourceInfo ann)
 reduceSimIc fp bs a = reduce (fromText $ "reduce_sim_" <> toText a <> ".v") synth
   where
     synth src = liftSh . runInTmp $ do

@@ -618,9 +618,11 @@ aModule t = lens get_ set_
         SourceInfo top (main & getModule %~ update (getIdentifier t) v)
     update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
                                                     | otherwise = m
+    update top v (ModDeclAnn _ m) = update top v m
     get_ (SourceInfo _ main) =
         head . filter (f $ getIdentifier t) $ main ^.. getModule
     f top (ModDecl (Identifier i) _ _ _ _) = i == top
+    f top (ModDeclAnn _ m) = f top m
 
 
 -- | May need to change this to Traversal to be safe. For now it will fail when
@@ -632,5 +634,7 @@ mainModule = lens get_ set_
         SourceInfo top (main & getModule %~ update top v)
     update top v m@(ModDecl (Identifier i) _ _ _ _) | i == top  = v
                                                     | otherwise = m
+    update top v (ModDeclAnn _ m) = update top v m
     get_ (SourceInfo top main) = head . filter (f top) $ main ^.. getModule
     f top (ModDecl (Identifier i) _ _ _ _) = i == top
+    f top (ModDeclAnn _ m) = f top m

@@ -39,8 +39,8 @@ import           Verismith.Verilog.CodeGen
 import           Verismith.Verilog.Mutate
 
 data Yosys = Yosys { yosysBin    :: !(Maybe FilePath)
-                   , yosysDesc   :: {-# UNPACK #-} !Text
-                   , yosysOutput :: {-# UNPACK #-} !FilePath
+                   , yosysDesc   :: !Text
+                   , yosysOutput :: !FilePath
                    }
               deriving (Eq)
 
