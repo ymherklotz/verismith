@@ -36,7 +36,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import qualified Crypto.Random.DRBG          as C
 import           Data.ByteString             (ByteString)
 import           Data.List                   (nubBy, sort)
 import           Data.Maybe                  (catMaybes, fromMaybe, isNothing)
@@ -64,6 +63,7 @@ import           Verismith.Tool.Internal
 import           Verismith.Tool.Yosys
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.CodeGen
+import Verismith.Utils (generateByteString)
 
 data FuzzOpts = FuzzOpts { _fuzzOptsOutput      :: !(Maybe FilePath)
                          , _fuzzOptsForced      :: !Bool
@@ -308,7 +308,7 @@ simulation src = do
     datadir <- fmap _fuzzDataDir askOpts
     synth    <- passedSynthesis
     counterEgs <- failEquivWithIdentityCE
-    vals     <- liftIO $ generateByteString 20
+    vals     <- liftIO $ generateByteString Nothing 32 20
     ident    <- liftSh $ sim datadir vals Nothing defaultIdentitySynth
     resTimes <- liftSh $ mapM (sim datadir vals (justPass $ snd ident)) synth
     resTimes2 <- liftSh $ mapM (simCounterEg datadir) counterEgs
@@ -337,19 +337,6 @@ simulation src = do
             ident <- runSimIcEC datadir defaultIcarus defaultIdentitySynth src b Nothing
             runSimIcEC datadir defaultIcarus a src b (Just ident)
       where dir = fromText $ "countereg_sim_" <> toText a
-
--- | Generate a specific number of random bytestrings of size 256.
-randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes
-    | n == 0    = ranBytes : bytes
-    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
-    where Right (ranBytes, newGen) = C.genBytes 32 gen
-
--- | generates the specific number of bytestring with a random seed.
-generateByteString :: Int -> IO [ByteString]
-generateByteString n = do
-    gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ randomByteString gen n []
 
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get

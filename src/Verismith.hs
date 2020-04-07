@@ -39,7 +39,6 @@ where
 import           Control.Concurrent
 import           Control.Lens             hiding ((<.>))
 import           Control.Monad.IO.Class   (liftIO)
-import qualified Crypto.Random.DRBG       as C
 import           Data.ByteString          (ByteString)
 import           Data.ByteString.Builder  (byteStringHex, toLazyByteString)
 import qualified Data.ByteString.Lazy     as L
@@ -71,19 +70,7 @@ import           Verismith.Tool
 import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.Parser (parseSourceInfoFile)
-
--- | Generate a specific number of random bytestrings of size 256.
-randomByteString :: C.CtrDRBG -> Int -> [ByteString] -> [ByteString]
-randomByteString gen n bytes
-    | n == 0    = ranBytes : bytes
-    | otherwise = randomByteString newGen (n - 1) $ ranBytes : bytes
-    where Right (ranBytes, newGen) = C.genBytes 32 gen
-
--- | generates the specific number of bytestring with a random seed.
-generateByteString :: Int -> IO [ByteString]
-generateByteString n = do
-    gen <- C.newGenIO :: IO C.CtrDRBG
-    return $ randomByteString gen n []
+import Verismith.Utils (generateByteString)
 
 toFP :: String -> FilePath
 toFP = fromText . T.pack
@@ -256,7 +243,7 @@ runSimulation = do
   -- shelly $ run_ "dot" ["-Tpng", "-o", "file.png", "file.dot"]
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
-    rand  <- generateByteString 20
+    rand  <- generateByteString Nothing 32 20
     rand2 <- Hog.sample (randomMod 10 100)
     val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
     case val of
@@ -304,7 +291,7 @@ runEquivalence
 runEquivalence seed gm t d k i = do
     (_, m) <- shelly $ sampleSeed seed gm
     let srcInfo = SourceInfo "top" m
-    rand <- generateByteString 20
+    rand <- generateByteString Nothing 32 20
     datadir <- getDataDir
     shellyFailDir $ do
         mkdir_p (fromText d </> fromText n)
