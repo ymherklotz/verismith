@@ -25,6 +25,8 @@ module Verismith.Config
     , ProbModItem(..)
     -- *** Statement
     , ProbStatement(..)
+    -- *** Module
+    , ProbMod (..)
     -- ** ConfProperty
     , ConfProperty(..)
     -- ** Simulator Description
@@ -42,6 +44,9 @@ module Verismith.Config
     , configSimulators
     , configSynthesisers
     , probModItem
+    , probMod
+    , probModDropOutput
+    , probModKeepOutput
     , probStmnt
     , probExpr
     , probExprNum
@@ -199,6 +204,14 @@ data ProbStatement = ProbStatement { _probStmntBlock    :: {-# UNPACK #-} !Int
                                    }
                    deriving (Eq, Show)
 
+-- | Probability of generating various properties of a module.
+data ProbMod = ProbMod { _probModDropOutput :: {-# UNPACK #-} !Int
+                       -- ^ "@module.drop_output@: frequency of a wire or register being dropped from the output."
+                       , _probModKeepOutput :: {-# UNPACK #-} !Int
+                       -- ^ "@module.keep_output@: frequency of a wire or register being kept in the output."
+                       }
+             deriving (Eq, Show)
+
 -- | @[probability]@: combined probabilities.
 data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                -- ^ Probabilities for module items.
@@ -206,6 +219,7 @@ data Probability = Probability { _probModItem :: {-# UNPACK #-} !ProbModItem
                                -- ^ Probabilities for statements.
                                , _probExpr    :: {-# UNPACK #-} !ProbExpr
                                -- ^ Probaiblities for expressions.
+                               , _probMod :: {-# UNPACK #-} !ProbMod
                                }
                  deriving (Eq, Show)
 
@@ -282,6 +296,7 @@ data Config = Config { _configInfo         :: Info
 $(makeLenses ''ProbExpr)
 $(makeLenses ''ProbModItem)
 $(makeLenses ''ProbStatement)
+$(makeLenses ''ProbMod)
 $(makeLenses ''Probability)
 $(makeLenses ''ConfProperty)
 $(makeLenses ''Info)
@@ -325,32 +340,35 @@ fromQuartusLight (QuartusLight a b c) = SynthDescription "quartuslight"
 defaultConfig :: Config
 defaultConfig = Config
     (Info (pack $(gitHash)) (pack $ showVersion version))
-    (Probability defModItem defStmnt defExpr)
+    (Probability defModItem defStmnt defExpr defMod)
     (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1 Nothing)
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
+    defMod =
+      ProbMod 0 -- Drop Output
+              1 -- Keep Output
     defModItem =
         ProbModItem 5 -- Assign
-                      1 -- Sequential Always
-                        1 -- Combinational Always
-                          1 -- Instantiation
+                    1 -- Sequential Always
+                    1 -- Combinational Always
+                    1 -- Instantiation
     defStmnt =
         ProbStatement 0 -- Blocking assignment
-                        3 -- Non-blocking assignment
-                          1 -- Conditional
-                            0 -- For loop
+                      3 -- Non-blocking assignment
+                      1 -- Conditional
+                      0 -- For loop
     defExpr =
         ProbExpr 1 -- Number
-                   5 -- Identifier
-                     5 -- Range selection
-                       5 -- Unary operator
-                         5 -- Binary operator
-                           5 -- Ternary conditional
-                             3 -- Concatenation
-                               0 -- String
-                                 5 -- Signed function
-                                   5 -- Unsigned funtion
+                 5 -- Identifier
+                 5 -- Range selection
+                 5 -- Unary operator
+                 5 -- Binary operator
+                 5 -- Ternary conditional
+                 3 -- Concatenation
+                 0 -- String
+                 5 -- Signed function
+                 5 -- Unsigned funtion
 
 twoKey :: Toml.Piece -> Toml.Piece -> Toml.Key
 twoKey a b = Toml.Key (a :| [b])
@@ -415,6 +433,16 @@ modItemCodec =
     defProb i = defaultConfig ^. configProbability . probModItem . i
     intM = int "moditem"
 
+modCodec :: TomlCodec ProbMod
+modCodec =
+  ProbMod <$> defaultValue (defProb probModDropOutput) (intM "drop_output")
+          .=  _probModDropOutput
+          <*> defaultValue (defProb probModKeepOutput) (intM "keep_output")
+          .=  _probModKeepOutput
+  where
+    defProb i = defaultConfig ^. configProbability . probMod . i
+    intM = int "module"
+
 probCodec :: TomlCodec Probability
 probCodec =
     Probability
@@ -424,6 +452,8 @@ probCodec =
         .=  _probStmnt
         <*> defaultValue (defProb probExpr) exprCodec
         .=  _probExpr
+        <*> defaultValue (defProb probMod) modCodec
+        .= _probMod
     where defProb i = defaultConfig ^. configProbability . i
 
 propCodec :: TomlCodec ConfProperty

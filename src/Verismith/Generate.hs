@@ -562,6 +562,26 @@ calcRange ps i (Range l r) = eval l - eval r + 1
 identElem :: Port -> [Port] -> Bool
 identElem p = elem (p ^. portName) . toListOf (traverse . portName)
 
+-- | Select items from a list with a specific frequency, returning the new list
+-- that contains the selected items. If 0 is passed to both the select and
+-- not-select parameter, the function will act like the idententy, returning the
+-- original list inside the 'Gen' monad.
+--
+-- The reason for doing this at the output of a module reduces the number of
+-- wires that are exposed at the output and therefore allows the synthesis tool
+-- to perform more optimisations that it could otherwise not perform. The
+-- synthesis tool is quite strict with optimisations if all the wires and
+-- registers are exposed.
+selectwfreq :: (MonadGen m) => Int -> Int -> [a] -> m [a]
+selectwfreq _ _ [] = return []
+selectwfreq s n a@(l:ls)
+  | s > 0 && n > 0 =
+      Hog.frequency
+      [ (s, (l:) <$> selectwfreq s n ls)
+      , (n, selectwfreq s n ls)
+      ]
+  | otherwise = return a
+
 -- | Generates a module definition randomly. It always has one output port which
 -- is set to @y@. The size of @y@ is the total combination of all the locally
 -- defined wires, so that it correctly reflects the internal state of the
@@ -582,11 +602,13 @@ moduleDef top = do
                 $   local
                 ^.. traverse
                 .   portSize
-    let combine = config ^. configProperty . propCombine
+    let (ProbMod n s) = config ^. configProbability . probMod
+    newlocal <- selectwfreq s n local
     let clock   = Port Wire False 1 "clk"
+    let combine = config ^. configProperty . propCombine
     let yport =
             if combine then Port Wire False 1 "y" else Port Wire False size "y"
-    let comb = combineAssigns_ combine yport local
+    let comb = combineAssigns_ combine yport newlocal
     return
         . declareMod local
         . ModDecl name [yport] (clock : newPorts) (comb : mi)

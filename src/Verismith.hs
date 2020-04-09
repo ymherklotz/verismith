@@ -107,6 +107,8 @@ randomise config@(Config a _ c d e) = do
     ssc  <- return $ cs ^. probStmntCond
     ssf  <- return $ cs ^. probStmntFor
     en   <- return $ ce ^. probExprNum
+    keep_out <- return $ cmo ^. probModDropOutput
+    drop_out <- randDelete $ cmo ^. probModDropOutput
     ei   <- randDelete $ ce ^. probExprId
     ers  <- randDelete $ ce ^. probExprRangeSelect
     euo  <- randDelete $ ce ^. probExprUnOp
@@ -121,6 +123,7 @@ randomise config@(Config a _ c d e) = do
         (Probability (ProbModItem mia misa mica mii)
                      (ProbStatement ssb ssnb ssc ssf)
                      (ProbExpr en ei ers euo ebo ec eco estr esgn eus)
+                     (ProbMod drop_out keep_out)
         )
         c
         d
@@ -129,6 +132,7 @@ randomise config@(Config a _ c d e) = do
     cm = config ^. configProbability . probModItem
     cs = config ^. configProbability . probStmnt
     ce = config ^. configProbability . probExpr
+    cmo = config ^. configProbability . probMod
 
 handleOpts :: Opts -> IO ()
 handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc checker) = do
