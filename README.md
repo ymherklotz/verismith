@@ -88,7 +88,7 @@ Some external packages are required to use Verismith properly:
 
 A stable version of Verismith is available on [hackage](https://hackage.haskell.org/package/verismith) and can be installed using cabal directly without having to build the project from the repository:
 
-**Note**: Only **GHC 8.6.5-8.8.2 ** are currently supported.
+**Note**: Only **GHC 8.6.5-8.8.2** are currently supported.
 
 ``` shell
 cabal install verismith
@@ -206,7 +206,27 @@ If you use Verismith in your research, please cite our [FPGA '20 paper](https://
 
 ## License
 
-Verismith is not free software. This non-commercial release can only be used for evaluation, research, educational and personal purposes. A commercial version of Verismith, without this restriction and with professional support, can be purchased from Imperial College London. See the file [LICENSE](/LICENSE) for more information.
+This open source version of Verismith is licensed under the GPLv3 license, which can be seen in the [LICENSE](/LICENSE) file.
+
+A **closed source** version of Verismith is also available without the restrictions of the GPLv3 license following a software with a software usage agreement from Imperial College London.
+
+``` text
+Verismith: Verilog hardware synthesis tool fuzzer
+Copyright (C) 2019-2020  Yann Herklotz <yann@yannherklotz.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+```
 
 ## Acknowledgement
 
