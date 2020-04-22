@@ -1,15 +1,3 @@
-Verismith can be used under two licenses, either the GPLv3 license or a
-commercial license from Imperial College London.
-
-For commercial use you need a Software Usage Agreement from Imperial
-College London. Otherwise the software is released under the GPLv3
-license shown below.
-
-For more information about the commercial version of Verismith, please
-contact James Nightingale <j.nightingale15 [at] imperial.ac.uk>.
-
-------------------------------------------------------------------------
-
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
@@ -643,8 +631,8 @@ to attach them to the start of each source file to most effectively
 state the exclusion of warranty; and each file should have at least
 the "copyright" line and a pointer to where the full notice is found.
 
-    Verismith: Verilog fuzzer for logic synthesis tools.
-    Copyright (C) 2018-2020 Yann Herklotz <yann@yannherklotz.com>
+    Verismith: Verilog hardware synthesis tool fuzzer
+    Copyright (C) 2019-2020  Yann Herklotz <yann@yannherklotz.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -664,7 +652,7 @@ Also add information on how to contact you by electronic and paper mail.
   If the program does terminal interaction, make it output a short
 notice like this when it starts in an interactive mode:
 
-    Verismith Copyright (C) 2018-2020 Yann Herklotz
+    Verismith  Copyright (C) 2019-2020  Yann Herklotz <yann@yannherklotz.com>
     This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
     This is free software, and you are welcome to redistribute it
     under certain conditions; type `show c' for details.
