@@ -7,10 +7,10 @@ cabal.project.local
 result
 
 # Folders
-.stack-work
-.shelly
-failed
-output*
-.ghc*
-dist*
-.direnv
+.stack-work/
+.shelly/
+failed/
+output*/
+.ghc*/
+dist-*/
+.direnv/
