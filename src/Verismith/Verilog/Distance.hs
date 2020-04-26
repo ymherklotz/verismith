@@ -15,6 +15,11 @@ ignored, as these are not that interesting.
 
 module Verismith.Verilog.Distance where
 
+import Verismith.Verilog.AST
+import Verismith.Verilog.Eval
+import Data.Functor.Foldable (cata)
+import Data.Text (Text, unpack)
+
 data Pair a b = Pair a b
   deriving Show
 
@@ -23,6 +28,14 @@ instance Eq b => Eq (Pair a b) where
 
 instance Ord b => Ord (Pair a b) where
   Pair _ a <= Pair _ b = a <= b
+
+eqDistance :: Eq a => a -> a -> Int
+eqDistance a b = if a == b then 0 else 1
+{-# INLINE eqDistance #-}
+
+emptyDistance :: a -> a -> Int
+emptyDistance _ _ = 0
+{-# INLINE emptyDistance #-}
 
 class Distance a where
   distance :: a -> a -> Int
@@ -71,21 +84,6 @@ instance Distance a => Distance [a] where
   dempty [] = 0
   dempty (a:b) = minimum [dempty a, dempty b]
 
-lDistance :: ( Eq a ) => [a] -> [a] -> Int
-lDistance [] t = length t   -- If s is empty the distance is the number of characters in t
-lDistance s [] = length s   -- If t is empty the distance is the number of characters in s
-lDistance (a:s') (b:t') =
-  if
-    a == b
-  then
-    lDistance s' t'         -- If the first characters are the same they can be ignored
-  else
-    1 + minimum             -- Otherwise try all three possible actions and select the best one
-      [ lDistance (a:s') t' -- Character is inserted (b inserted)
-      , lDistance s' (b:t') -- Character is deleted  (a deleted)
-      , lDistance s' t'     -- Character is replaced (a replaced with b)
-      ]
-
 instance Distance a => Distance (Maybe a) where
   distance Nothing a = dempty a
   distance a Nothing = dempty a
@@ -98,4 +96,72 @@ instance Distance a => Distance (Maybe a) where
   dempty (Just a) = dempty a
 
 instance Distance Char where
-  distance a b = if a == b then 0 else 1
+  distance = eqDistance
+
+instance Distance Bool where
+  distance = eqDistance
+
+instance Distance Integer where
+  distance = eqDistance
+
+instance Distance Text where
+  distance t1 t2 = distance (unpack t1) (unpack t2)
+
+instance Distance Identifier where
+  distance = eqDistance
+
+eval :: ConstExpr -> Integer
+eval c = toInteger (cata (evaluateConst []) c)
+
+instance Distance ConstExpr where
+  distance c1 c2 = distance (eval c1) $ eval c2
+  udistance c1 c2 = udistance (eval c1) $ eval c2
+
+instance Distance Parameter where
+  distance _ _ = 0
+
+instance Distance PortType where
+  distance = eqDistance
+
+instance Distance PortDir where
+  distance = eqDistance
+
+instance Distance (ModItem a) where
+  distance (ModCA _) (ModCA _) = 0
+  distance (ModInst _ _ _) (ModInst _ _ _) = 0
+  distance (Initial _) (Initial _) = 0
+  distance (Always _) (Always _) = 0
+  distance (Decl _ _ _) (Decl _ _ _) = 0
+  distance (ParamDecl _) (ParamDecl _) = 0
+  distance (LocalParamDecl _) (LocalParamDecl _) = 0
+  distance _ _ = 1
+
+instance Distance Range where
+  distance (Range a1 b1) (Range a2 b2) =
+    distance a1 a2 + distance b1 b2
+  udistance (Range a1 b1) (Range a2 b2) =
+    udistance a1 a2 + udistance b1 b2
+
+instance Distance Port where
+  distance (Port t1 s1 r1 _) (Port t2 s2 r2 _) =
+    distance t1 t2 + distance s1 s2 + distance r1 r2
+  udistance (Port t1 s1 r1 _) (Port t2 s2 r2 _) =
+    udistance t1 t2 + udistance s1 s2 + udistance r1 r2
+  dempty (Port t1 s1 r1 _) = dempty t1 + dempty s1 + dempty r1
+
+instance Distance (ModDecl a) where
+  distance (ModDecl _ min1 mout1 mis1 mp1) (ModDecl _ min2 mout2 mis2 mp2) =
+    distance min1 min2 + distance mout1 mout2 + distance mis1 mis2 + distance mp1 mp2
+  udistance (ModDecl _ min1 mout1 mis1 mp1) (ModDecl _ min2 mout2 mis2 mp2) =
+    udistance min1 min2 + udistance mout1 mout2 + udistance mis1 mis2 + udistance mp1 mp2
+  dempty (ModDecl _ min mout mis mp) = dempty min + dempty mout + dempty mis + dempty mp
+
+instance Distance (Verilog a) where
+  distance (Verilog m1) (Verilog m2) = distance m1 m2
+  udistance (Verilog m1) (Verilog m2) = udistance m1 m2
+  dempty (Verilog m) = dempty m
+
+instance Distance (SourceInfo a) where
+  distance (SourceInfo _ v1) (SourceInfo _ v2) = distance v1 v2
+  udistance (SourceInfo _ v1) (SourceInfo _ v2) = udistance v1 v2
+  dempty (SourceInfo _ v) = dempty v
