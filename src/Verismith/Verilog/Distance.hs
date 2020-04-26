@@ -126,11 +126,25 @@ instance Distance PortType where
 instance Distance PortDir where
   distance = eqDistance
 
+instance Distance (Statement a) where
+  distance (TimeCtrl _ s1) s2 = 1 + distance s1 (Just s2)
+  distance (EventCtrl _ s1) s2 = 1 + distance s1 (Just s2)
+  distance (SeqBlock s1) (SeqBlock s2) = distance s1 s2
+  distance (CondStmnt _ st1 sf1) (CondStmnt _ st2 sf2) = distance st1 st2 + distance sf1 sf2
+  distance (ForLoop _ _ _ s1) (ForLoop _ _ _ s2) = distance s1 s2
+  distance (StmntAnn _ s1) s2 = distance s1 s2
+  distance (BlockAssign _) (BlockAssign _) = 0
+  distance (NonBlockAssign _) (NonBlockAssign _) = 0
+  distance (TaskEnable _) (TaskEnable _) = 0
+  distance (SysTaskEnable _) (SysTaskEnable _) = 0
+  distance (StmntCase _ _ _ _) (StmntCase _ _ _ _) = 0
+  distance _ _ = 1
+
 instance Distance (ModItem a) where
   distance (ModCA _) (ModCA _) = 0
   distance (ModInst _ _ _) (ModInst _ _ _) = 0
   distance (Initial _) (Initial _) = 0
-  distance (Always _) (Always _) = 0
+  distance (Always s1) (Always s2) = distance s1 s2
   distance (Decl _ _ _) (Decl _ _ _) = 0
   distance (ParamDecl _) (ParamDecl _) = 0
   distance (LocalParamDecl _) (LocalParamDecl _) = 0

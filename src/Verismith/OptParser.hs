@@ -55,6 +55,9 @@ data Opts = Fuzz { fuzzOutput          :: Text
                       , configOptConfigFile  :: !(Maybe FilePath)
                       , configOptDoRandomise :: !Bool
                       }
+          | DistanceOpt { distanceOptVerilogA :: !FilePath
+                        , distanceOptVerilogB :: !FilePath
+                        }
 
 textOption :: Mod OptionFields String -> Parser Text
 textOption = fmap T.pack . Opt.strOption
@@ -234,61 +237,63 @@ configOpts =
                    "Randomise the given default config, or the default config by randomly switchin on and off options."
             )
 
+distanceOpts :: Parser Opts
+distanceOpts =
+  DistanceOpt
+  <$> (fromText . T.pack <$> Opt.strArgument
+        (Opt.metavar "FILE" <> Opt.help "First verilog file."))
+  <*> (fromText . T.pack <$> Opt.strArgument
+        (Opt.metavar "FILE" <> Opt.help "Second verilog file."))
+
 argparse :: Parser Opts
 argparse =
     Opt.hsubparser
-            (  Opt.command
-                    "fuzz"
-                    (Opt.info
-                        fuzzOpts
-                        (Opt.progDesc
-                            "Run fuzzing on the specified simulators and synthesisers."
-                        )
-                    )
-            <> Opt.metavar "fuzz"
-            )
+            (Opt.command
+              "fuzz"
+              (Opt.info
+                fuzzOpts
+                (Opt.progDesc
+                  "Run fuzzing on the specified simulators and synthesisers."))
+              <> Opt.metavar "fuzz")
         <|> Opt.hsubparser
-                (  Opt.command
-                        "generate"
-                        (Opt.info
-                            genOpts
-                            (Opt.progDesc "Generate a random Verilog program.")
-                        )
-                <> Opt.metavar "generate"
-                )
+                (Opt.command
+                  "generate"
+                  (Opt.info
+                    genOpts
+                    (Opt.progDesc "Generate a random Verilog program."))
+                  <> Opt.metavar "generate")
         <|> Opt.hsubparser
-                (  Opt.command
+                (Opt.command
                         "parse"
                         (Opt.info
-                            parseOpts
-                            (Opt.progDesc
-                                "Parse a verilog file and output a pretty printed version."
-                            )
-                        )
-                <> Opt.metavar "parse"
-                )
+                          parseOpts
+                          (Opt.progDesc
+                            "Parse a verilog file and output a pretty printed version."))
+                  <> Opt.metavar "parse")
         <|> Opt.hsubparser
-                (  Opt.command
-                        "reduce"
-                        (Opt.info
-                            reduceOpts
-                            (Opt.progDesc
-                                "Reduce a Verilog file by rerunning the fuzzer on the file."
-                            )
-                        )
-                <> Opt.metavar "reduce"
-                )
+                (Opt.command
+                 "reduce"
+                  (Opt.info
+                    reduceOpts
+                    (Opt.progDesc
+                      "Reduce a Verilog file by rerunning the fuzzer on the file."))
+                  <> Opt.metavar "reduce")
         <|> Opt.hsubparser
-                (  Opt.command
-                        "config"
-                        (Opt.info
-                            configOpts
-                            (Opt.progDesc
-                                "Print the current configuration of the fuzzer."
-                            )
-                        )
-                <> Opt.metavar "config"
-                )
+                (Opt.command
+                  "config"
+                  (Opt.info
+                    configOpts
+                    (Opt.progDesc
+                      "Print the current configuration of the fuzzer."))
+                  <> Opt.metavar "config")
+         <|> Opt.hsubparser
+                (Opt.command
+                  "distance"
+                  (Opt.info
+                    distanceOpts
+                    (Opt.progDesc
+                      "Calculate the distance between two different pieces of Verilog."))
+                  <> Opt.metavar "distance")
 
 version :: Parser (a -> a)
 version = Opt.infoOption versionInfo $ mconcat
@@ -297,8 +302,7 @@ version = Opt.infoOption versionInfo $ mconcat
 opts :: ParserInfo Opts
 opts = Opt.info
     (argparse <**> Opt.helper <**> version)
-    (  Opt.fullDesc
+    (Opt.fullDesc
     <> Opt.progDesc "Fuzz different simulators and synthesisers."
     <> Opt.header
-           "Verismith - A hardware simulator and synthesiser Verilog fuzzer."
-    )
+           "Verismith - A hardware simulator and synthesiser Verilog fuzzer.")

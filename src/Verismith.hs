@@ -70,6 +70,7 @@ import           Verismith.Tool
 import           Verismith.Tool.Internal
 import           Verismith.Verilog
 import           Verismith.Verilog.Parser (parseSourceInfoFile)
+import Verismith.Verilog.Distance
 import Verismith.Utils (generateByteString)
 
 toFP :: String -> FilePath
@@ -216,6 +217,11 @@ handleOpts (ConfigOpt c conf r) = do
         $   T.unpack
         .   toTextIgnore
         <$> c
+handleOpts (DistanceOpt v1 v2) = do
+  src1 <- parseSourceInfoFile (T.pack v1) (toTextIgnore v1)
+  src2 <- parseSourceInfoFile (T.pack v2) (toTextIgnore v2)
+  let d = distance src1 src2
+  putStrLn ("Distance: " <> show d)
 
 defaultMain :: IO ()
 defaultMain = do
