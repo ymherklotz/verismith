@@ -12,5 +12,5 @@ result
 failed/
 output*/
 .ghc*/
-dist-*/
+dist*/
 .direnv/
