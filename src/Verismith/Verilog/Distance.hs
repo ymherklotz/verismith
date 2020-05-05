@@ -82,7 +82,7 @@ instance Distance a => Distance [a] where
                           ]
 
   dempty [] = 0
-  dempty (a:b) = minimum [dempty a, dempty b]
+  dempty (a:b) = maximum [dempty a, dempty b]
 
 instance Distance a => Distance (Maybe a) where
   distance Nothing a = dempty a
@@ -127,8 +127,8 @@ instance Distance PortDir where
   distance = eqDistance
 
 instance Distance (Statement a) where
-  distance (TimeCtrl _ s1) s2 = 1 + distance s1 (Just s2)
-  distance (EventCtrl _ s1) s2 = 1 + distance s1 (Just s2)
+  distance (TimeCtrl _ s1) (TimeCtrl _ s2) = distance s1 s2
+  distance (EventCtrl _ s1) (EventCtrl _ s2) = distance s1 s2
   distance (SeqBlock s1) (SeqBlock s2) = distance s1 s2
   distance (CondStmnt _ st1 sf1) (CondStmnt _ st2 sf2) = distance st1 st2 + distance sf1 sf2
   distance (ForLoop _ _ _ s1) (ForLoop _ _ _ s2) = distance s1 s2
@@ -161,21 +161,21 @@ instance Distance Port where
     distance t1 t2 + distance s1 s2 + distance r1 r2
   udistance (Port t1 s1 r1 _) (Port t2 s2 r2 _) =
     udistance t1 t2 + udistance s1 s2 + udistance r1 r2
-  dempty (Port t1 s1 r1 _) = dempty t1 + dempty s1 + dempty r1
+  dempty (Port t1 s1 r1 _) = 1 + dempty t1 + dempty s1 + dempty r1
 
 instance Distance (ModDecl a) where
   distance (ModDecl _ min1 mout1 mis1 mp1) (ModDecl _ min2 mout2 mis2 mp2) =
     distance min1 min2 + distance mout1 mout2 + distance mis1 mis2 + distance mp1 mp2
   udistance (ModDecl _ min1 mout1 mis1 mp1) (ModDecl _ min2 mout2 mis2 mp2) =
     udistance min1 min2 + udistance mout1 mout2 + udistance mis1 mis2 + udistance mp1 mp2
-  dempty (ModDecl _ min mout mis mp) = dempty min + dempty mout + dempty mis + dempty mp
+  dempty (ModDecl _ min mout mis mp) = 1 + dempty min + dempty mout + dempty mis + dempty mp
 
 instance Distance (Verilog a) where
   distance (Verilog m1) (Verilog m2) = distance m1 m2
   udistance (Verilog m1) (Verilog m2) = udistance m1 m2
-  dempty (Verilog m) = dempty m
+  dempty (Verilog m) = 1 + dempty m
 
 instance Distance (SourceInfo a) where
   distance (SourceInfo _ v1) (SourceInfo _ v2) = distance v1 v2
   udistance (SourceInfo _ v1) (SourceInfo _ v2) = udistance v1 v2
-  dempty (SourceInfo _ v) = dempty v
+  dempty (SourceInfo _ v) = 1 + dempty v
