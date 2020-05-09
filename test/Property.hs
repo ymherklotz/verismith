@@ -26,6 +26,7 @@ import           Verismith
 import           Verismith.Result
 import           Verismith.Verilog.Lex
 import           Verismith.Verilog.Parser
+import Distance (distanceTests)
 
 randomDAG' :: Gen Circuit
 randomDAG' = Hog.resize 30 randomDAG
@@ -48,4 +49,5 @@ propertyTests = testGroup
     "Property Tests"
     [ testProperty "acyclic graph generation check" acyclicGraph
     , parserTests
+    , distanceTests
     ]

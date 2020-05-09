@@ -64,6 +64,7 @@ library
                  , Verismith.Verilog.AST
                  , Verismith.Verilog.BitVec
                  , Verismith.Verilog.CodeGen
+                 , Verismith.Verilog.Distance
                  , Verismith.Verilog.Eval
                  , Verismith.Verilog.Internal
                  , Verismith.Verilog.Lex
@@ -133,6 +134,7 @@ test-suite test
                , Property
                , Reduce
                , Parser
+               , Distance
   build-depends: base >=4 && <5
                , verismith
                , fgl >=5.6 && <5.8
