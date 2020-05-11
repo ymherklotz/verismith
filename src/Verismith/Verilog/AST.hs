@@ -70,6 +70,7 @@ module Verismith.Verilog.AST
     , modConnName, modExpr
     -- * Useful Lenses and Traversals
     , aModule, getModule, getSourceId, mainModule
+    , Annotations(..)
     )
 where
 
@@ -85,6 +86,11 @@ import           Data.Traversable         (sequenceA)
 import           Data.Void                (Void)
 import           GHC.Generics             (Generic)
 import           Verismith.Verilog.BitVec
+
+class Functor m => Annotations m where
+  removeAnn :: m a -> m a
+  clearAnn :: m a -> m ()
+  clearAnn = fmap (\_ -> ()) . removeAnn
 
 -- | Attributes which can be set to various nodes in the AST.
 --
@@ -415,6 +421,12 @@ data CasePair a = CasePair
     }
     deriving (Eq, Show, Ord, Data, Generic, NFData)
 
+instance Functor CasePair where
+  fmap f (CasePair e s) = CasePair e $ fmap f s
+
+instance Annotations CasePair where
+  removeAnn (CasePair e s) = CasePair e $ removeAnn s
+
 traverseStmntCasePair :: Functor f =>
     (Statement a1 -> f (Statement a2)) -> CasePair a1 -> f (CasePair a2)
 traverseStmntCasePair f (CasePair a s) = CasePair a <$> f s
@@ -426,52 +438,40 @@ data CaseType = CaseStandard
     deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Statements in Verilog.
-data Statement a = TimeCtrl
-    { _statDelay :: {-# UNPACK #-} !Delay
-    , _statDStat :: Maybe (Statement a)
-    -- ^ Time control (@#NUM@)
-    }
-    | EventCtrl
-    { _statEvent :: !Event
-    , _statEStat :: Maybe (Statement a)
-    }
-    | SeqBlock
-    { _statements :: [Statement a] -- ^ Sequential block (@begin ... end@)
-    -- ^ blocking assignment (@=@)
-    }
-    | BlockAssign
-    { _stmntBA :: !Assign -- ^ blocking assignment (@=@)
-    -- ^ Non blocking assignment (@<=@)
-    }
-    | NonBlockAssign
-    { _stmntNBA :: !Assign -- ^ Non blocking assignment (@<=@)
-    }
-    | TaskEnable
-    { _stmntTask :: !Task
-    }
-    | SysTaskEnable
-    { _stmntSysTask :: !Task
-    }
-    | CondStmnt
-    { _stmntCondExpr  :: Expr
-    , _stmntCondTrue  :: Maybe (Statement a)
-    , _stmntCondFalse :: Maybe (Statement a)
-    }
-    | StmntCase
-    { _stmntCaseType    :: !CaseType
-    , _stmntCaseExpr    :: !Expr
-    , _stmntCasePair    :: ![CasePair a]
-    , _stmntCaseDefault :: !(Maybe (Statement a))
-    }
-    | ForLoop
-    { _forAssign :: !Assign
-    , _forExpr   :: Expr
-    , _forIncr   :: !Assign
-    , _forStmnt  :: Statement a
-    -- ^ Loop bounds shall be statically computable for a for loop.
-    }
-    | StmntAnn a (Statement a)
-    deriving (Eq, Show, Ord, Data, Generic, NFData)
+data Statement a =
+  TimeCtrl { _statDelay :: {-# UNPACK #-} !Delay
+           , _statDStat :: Maybe (Statement a)
+                           -- ^ Time control (@#NUM@)
+           }
+  | EventCtrl { _statEvent :: !Event
+              , _statEStat :: Maybe (Statement a)
+              }
+  | SeqBlock { _statements :: [Statement a] -- ^ Sequential block (@begin ... end@)
+                              -- ^ blocking assignment (@=@)
+             }
+  | BlockAssign { _stmntBA :: !Assign -- ^ blocking assignment (@=@)
+                           -- ^ Non blocking assignment (@<=@)
+                }
+  | NonBlockAssign { _stmntNBA :: !Assign }  -- ^ Non blocking assignment (@<=@)
+  | TaskEnable { _stmntTask :: !Task }
+  | SysTaskEnable { _stmntSysTask :: !Task }
+  | CondStmnt { _stmntCondExpr  :: Expr
+              , _stmntCondTrue  :: Maybe (Statement a)
+              , _stmntCondFalse :: Maybe (Statement a)
+              }
+  | StmntCase { _stmntCaseType    :: !CaseType
+              , _stmntCaseExpr    :: !Expr
+              , _stmntCasePair    :: ![CasePair a]
+              , _stmntCaseDefault :: !(Maybe (Statement a))
+              }
+  | ForLoop { _forAssign :: !Assign
+            , _forExpr   :: Expr
+            , _forIncr   :: !Assign
+            , _forStmnt  :: Statement a
+            -- ^ Loop bounds shall be statically computable for a for loop.
+            }
+  | StmntAnn a (Statement a)
+  deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Plated (Statement a) where
     plate f (TimeCtrl d s)  = TimeCtrl d <$> traverse f s
@@ -493,6 +493,29 @@ instance Semigroup (Statement a) where
 instance Monoid (Statement a) where
   mempty = SeqBlock []
 
+instance Functor Statement where
+  fmap f (TimeCtrl e s) = TimeCtrl e $ fmap f <$> s
+  fmap f (EventCtrl e s) = EventCtrl e $ fmap f <$> s
+  fmap f (SeqBlock s) = SeqBlock $ fmap f <$> s
+  fmap f (CondStmnt c ms1 ms2) = CondStmnt c (fmap f <$> ms1) $ fmap f <$> ms2
+  fmap f (StmntCase ct ce cp cdef) = StmntCase ct ce (fmap f <$> cp) $ fmap f <$> cdef
+  fmap f (ForLoop a b c s) = ForLoop a b c $ fmap f s
+  fmap f (StmntAnn a s) = StmntAnn (f a) $ fmap f s
+  fmap f (BlockAssign a) = BlockAssign a
+  fmap f (NonBlockAssign a) = NonBlockAssign a
+  fmap f (TaskEnable t) = TaskEnable t
+  fmap f (SysTaskEnable s) = SysTaskEnable s
+
+instance Annotations Statement where
+  removeAnn (StmntAnn _ s) = removeAnn s
+  removeAnn (TimeCtrl e s) = TimeCtrl e $ fmap removeAnn s
+  removeAnn (EventCtrl e s) = EventCtrl e $ fmap removeAnn s
+  removeAnn (SeqBlock s) = SeqBlock $ fmap removeAnn s
+  removeAnn (CondStmnt c ms1 ms2) = CondStmnt c (fmap removeAnn ms1) $ fmap removeAnn ms2
+  removeAnn (StmntCase ct ce cp cdef) = StmntCase ct ce (fmap removeAnn cp) $ fmap removeAnn cdef
+  removeAnn (ForLoop a b c s) = ForLoop a b c $ removeAnn s
+  removeAnn s = s
+
 -- | Parameter that can be assigned in blocks or modules using @parameter@.
 data Parameter = Parameter
     { _paramIdent :: {-# UNPACK #-} !Identifier
@@ -509,28 +532,37 @@ data LocalParam = LocalParam
     deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Module item which is the body of the module expression.
-data ModItem a = ModCA
-    { _modContAssign :: !ContAssign
-    }
-    | ModInst
-    { _modInstId    :: {-# UNPACK #-} !Identifier
-    , _modInstName  :: {-# UNPACK #-} !Identifier
-    , _modInstConns :: [ModConn]
-    }
-    | Initial !(Statement a)
-    | Always !(Statement a)
-    | Decl
-    { _declDir  :: !(Maybe PortDir)
-    , _declPort :: !Port
-    , _declVal  :: Maybe ConstExpr
-    }
-    | ParamDecl
-    { _paramDecl :: NonEmpty Parameter
-    }
-    | LocalParamDecl
-    { _localParamDecl :: NonEmpty LocalParam
-    }
-    deriving (Eq, Show, Ord, Data, Generic, NFData)
+data ModItem a = ModCA { _modContAssign :: !ContAssign }
+               | ModInst { _modInstId    :: {-# UNPACK #-} !Identifier
+                         , _modInstName  :: {-# UNPACK #-} !Identifier
+                         , _modInstConns :: [ModConn]
+                         }
+               | Initial !(Statement a)
+               | Always !(Statement a)
+               | Decl { _declDir  :: !(Maybe PortDir)
+                      , _declPort :: !Port
+                      , _declVal  :: Maybe ConstExpr
+                      }
+               | ParamDecl { _paramDecl :: NonEmpty Parameter }
+               | LocalParamDecl { _localParamDecl :: NonEmpty LocalParam }
+               | ModItemAnn a (ModItem a)
+               deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+instance Functor ModItem where
+  fmap f (ModItemAnn a mi) = ModItemAnn (f a) $ fmap f mi
+  fmap f (Initial s) = Initial $ fmap f s
+  fmap f (Always s) = Always $ fmap f s
+  fmap f (ModCA c) = ModCA c
+  fmap f (ModInst a b c) = ModInst a b c
+  fmap f (Decl a b c) = Decl a b c
+  fmap f (ParamDecl p) = ParamDecl p
+  fmap f (LocalParamDecl l) = LocalParamDecl l
+
+instance Annotations ModItem where
+  removeAnn (ModItemAnn _ mi) = removeAnn mi
+  removeAnn (Initial s) = Initial $ removeAnn s
+  removeAnn (Always s) = Always $ removeAnn s
+  removeAnn mi = mi
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl a = ModDecl
@@ -540,8 +572,14 @@ data ModDecl a = ModDecl
     , _modItems    :: ![ModItem a]
     , _modParams   :: ![Parameter]
     }
-    | ModDeclAnn (Annotation a) (ModDecl a)
+    | ModDeclAnn a (ModDecl a)
     deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+instance Functor ModDecl where
+  fmap f (ModDecl i out inp mis params) = ModDecl i out inp (fmap f <$> mis) params
+
+instance Annotations ModDecl where
+  removeAnn (ModDecl i out inp mis params) = ModDecl i out inp (fmap removeAnn mis) params
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e       ) = ModConn <$> f e
@@ -563,6 +601,12 @@ instance Semigroup (Verilog a) where
 instance Monoid (Verilog a) where
     mempty = Verilog mempty
 
+instance Functor Verilog where
+  fmap f (Verilog v) = Verilog $ fmap f <$> v
+
+instance Annotations Verilog where
+  removeAnn (Verilog v) = Verilog $ fmap removeAnn v
+
 -- | Top level type which contains all the source code and associated
 -- information.
 data SourceInfo a = SourceInfo
@@ -576,6 +620,12 @@ instance Semigroup (SourceInfo a) where
 
 instance Monoid (SourceInfo a) where
     mempty = SourceInfo mempty mempty
+
+instance Functor SourceInfo where
+  fmap f (SourceInfo t v) = SourceInfo t $ fmap f v
+
+instance Annotations SourceInfo where
+  removeAnn (SourceInfo t v) = SourceInfo t $ removeAnn v
 
 $(makeLenses ''Expr)
 $(makeLenses ''ConstExpr)
