@@ -172,7 +172,7 @@ sbyConfig mt datadir sim1 sim2 (SourceInfo top _) = T.unlines
         <$> deps
     readL = T.intercalate "\n" $ mappend "read -formal " <$> deps
 
-icarusTestbench :: (Synthesiser a) => FilePath -> (Verilog ann) -> a -> Text
+icarusTestbench :: (Synthesiser a, Show ann) => FilePath -> (Verilog ann) -> a -> Text
 icarusTestbench datadir t synth1 = T.unlines
   [ "`include \"" <> ddir <> "/data/cells_cmos.v\""
   , "`include \"" <> ddir <> "/data/cells_cyclone_v.v\""

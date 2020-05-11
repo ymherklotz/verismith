@@ -63,7 +63,7 @@ defaultYosys = Yosys Nothing "yosys" "syn_yosys.v"
 yosysPath :: Yosys -> FilePath
 yosysPath sim = maybe (S.fromText "yosys") (</> S.fromText "yosys") $ yosysBin sim
 
-runSynthYosys :: Yosys -> (SourceInfo ann) -> ResultSh ()
+runSynthYosys :: Show ann => Yosys -> (SourceInfo ann) -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = do
     dir <- liftSh $ do
         dir' <- S.pwd
@@ -83,7 +83,7 @@ runSynthYosys sim (SourceInfo _ src) = do
     out  = S.toTextIgnore $ synthOutput sim
 
 runEquivYosys
-    :: (Synthesiser a, Synthesiser b)
+    :: (Synthesiser a, Synthesiser b, Show ann)
     => Yosys
     -> a
     -> b
@@ -103,8 +103,8 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
     liftSh $ S.run_ (yosysPath yosys) [S.toTextIgnore checkFile]
     where checkFile = S.fromText $ "test." <> toText sim1 <> "." <> toText sim2 <> ".ys"
 
-runEquiv
-    :: (Synthesiser a, Synthesiser b) => Maybe Text -> FilePath -> a -> b -> (SourceInfo ann) -> ResultSh ()
+runEquiv :: (Synthesiser a, Synthesiser b, Show ann)
+         => Maybe Text -> FilePath -> a -> b -> (SourceInfo ann) -> ResultSh ()
 runEquiv mt datadir sim1 sim2 srcInfo = do
     dir <- liftSh S.pwd
     liftSh $ do

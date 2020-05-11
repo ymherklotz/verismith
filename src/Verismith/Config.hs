@@ -538,7 +538,7 @@ parseConfigFile = Toml.decodeFile configCodec
 
 parseConfig :: Text -> Config
 parseConfig t = case Toml.decode configCodec t of
-    Right c                      -> c
+    Right c-> c
     Left Toml.TrivialError -> error "Trivial error while parsing Toml config"
     Left  (Toml.KeyNotFound   k) -> error $ "Key " ++ show k ++ " not found"
     Left  (Toml.TableNotFound k) -> error $ "Table " ++ show k ++ " not found"

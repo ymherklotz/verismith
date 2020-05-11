@@ -65,9 +65,10 @@ class Tool a where
 
 -- | Simulation type class.
 class Tool a => Simulator a where
-  runSim :: a             -- ^ Simulator instance
-         -> SourceInfo ann       -- ^ Run information
-         -> [ByteString]  -- ^ Inputs to simulate
+  runSim :: Show ann
+         => a                   -- ^ Simulator instance
+         -> SourceInfo ann      -- ^ Run information
+         -> [ByteString]        -- ^ Inputs to simulate
          -> ResultSh ByteString -- ^ Returns the value of the hash at the output of the testbench.
   runSimWithFile :: a
                  -> FilePath
@@ -99,7 +100,8 @@ instance Monoid Failed where
 
 -- | Synthesiser type class.
 class Tool a => Synthesiser a where
-    runSynth :: a        -- ^ Synthesiser tool instance
+    runSynth :: Show ann
+             => a        -- ^ Synthesiser tool instance
              -> SourceInfo ann  -- ^ Run information
              -> ResultSh ()    -- ^ does not return any values
     synthOutput :: a -> FilePath

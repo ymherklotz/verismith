@@ -40,15 +40,15 @@ class Source a where
 
 -- | Map a 'Maybe (Statement ann)' to 'Text'. If it is 'Just statement', the generated
 -- statements are returned. If it is 'Nothing', then @;\n@ is returned.
-defMap :: Maybe (Statement ann) -> Doc a
+defMap :: Show ann => Maybe (Statement ann) -> Doc a
 defMap = maybe semi statement
 
 -- | Convert the 'Verilog ann' type to 'Text' so that it can be rendered.
-verilogSrc :: (Verilog ann) -> Doc a
+verilogSrc :: Show ann => (Verilog ann) -> Doc a
 verilogSrc (Verilog modules) = vsep . punctuate line $ moduleDecl <$> modules
 
 -- | Generate the 'ModDecl ann' for a module and convert it to 'Text'.
-moduleDecl :: ModDecl ann -> Doc a
+moduleDecl :: Show ann => ModDecl ann -> Doc a
 moduleDecl (ModDecl i outP inP items ps) = vsep
     [ sep ["module" <+> identifier i, params ps, ports <> semi]
     , indent 2 modI
@@ -62,6 +62,7 @@ moduleDecl (ModDecl i outP inP items ps) = vsep
     outIn = outP ++ inP
     params []        = ""
     params (p : pps) = hcat ["#", paramList (p :| pps)]
+moduleDecl (ModDeclAnn a m) = sep [hsep ["/*", pretty $ show a, "*/"], moduleDecl m]
 
 -- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
 paramList :: NonEmpty Parameter -> Doc a
@@ -111,8 +112,8 @@ portDir PortOut   = "output"
 portDir PortInOut = "inout"
 
 -- | Generate a '(ModItem ann)'.
-moduleItem :: (ModItem ann) -> Doc a
-moduleItem (ModCA ca           ) = contAssign ca
+moduleItem :: Show ann => ModItem ann -> Doc a
+moduleItem (ModCA ca) = contAssign ca
 moduleItem (ModInst i name conn) = (<> semi) $ hsep
     [ identifier i
     , identifier name
@@ -126,6 +127,7 @@ moduleItem (Decl dir p ini) = (<> semi) . hsep .
     makeIni  = ("=" <+>) . constExpr
 moduleItem (ParamDecl      p) = hcat [paramList p, semi]
 moduleItem (LocalParamDecl p) = hcat [localParamList p, semi]
+moduleItem (ModItemAnn a mi) = sep [hsep ["/*", pretty $ show a, "*/"], moduleItem mi]
 
 mConn :: ModConn -> Doc a
 mConn (ModConn c       ) = expr c
@@ -248,11 +250,11 @@ caseType CaseStandard = "case"
 caseType CaseX = "casex"
 caseType CaseZ = "casez"
 
-casePair :: (CasePair ann) -> Doc a
+casePair :: Show ann => (CasePair ann) -> Doc a
 casePair (CasePair e s) =
     vsep [hsep [expr e, colon], indent 2 $ statement s]
 
-statement :: Statement ann -> Doc a
+statement :: Show ann => Statement ann -> Doc a
 statement (TimeCtrl  d stat) = hsep [delay d, defMap stat]
 statement (EventCtrl e stat) = hsep [event e, defMap stat]
 statement (SeqBlock s) =
@@ -283,6 +285,7 @@ statement (ForLoop a e incr stmnt) = vsep
         ]
     , indent 2 $ statement stmnt
     ]
+statement (StmntAnn a s) = sep [hsep ["/*", pretty $ show a, "*/"], statement s]
 
 task :: Task -> Doc a
 task (Task i e)
@@ -302,7 +305,7 @@ instance Source Identifier where
 instance Source Task where
     genSource = showT . task
 
-instance Source (Statement ann) where
+instance Show ann => Source (Statement ann) where
     genSource = showT . statement
 
 instance Source PortType where
@@ -329,7 +332,7 @@ instance Source Expr where
 instance Source ContAssign where
     genSource = showT . contAssign
 
-instance Source (ModItem ann) where
+instance Show ann => Source (ModItem ann) where
     genSource = showT . moduleItem
 
 instance Source PortDir where
@@ -338,13 +341,13 @@ instance Source PortDir where
 instance Source Port where
     genSource = showT . port
 
-instance Source (ModDecl ann) where
+instance Show ann => Source (ModDecl ann) where
     genSource = showT . moduleDecl
 
-instance Source (Verilog ann) where
+instance Show ann => Source (Verilog ann) where
     genSource = showT . verilogSrc
 
-instance Source (SourceInfo ann) where
+instance Show ann => Source (SourceInfo ann) where
     genSource (SourceInfo _ src) = genSource src
 
 newtype GenVerilog a = GenVerilog { unGenVerilog :: a }

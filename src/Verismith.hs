@@ -147,7 +147,7 @@ handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc checker) 
     return ()
 handleOpts (Generate f c) = do
     config <- getConfig c
-    source <- proceduralIO "top" config
+    source <- proceduralIO "top" config :: IO (Verilog ())
     maybe (T.putStrLn $ genSource source) (flip T.writeFile $ genSource source)
         $   T.unpack
         .   toTextIgnore
@@ -188,7 +188,7 @@ handleOpts (Reduce f t _ ls' False) = do
             return ()
     where dir = fromText "reduce"
 handleOpts (Reduce f t _ ls' True) = do
-    src <- parseSourceInfoFile t (toTextIgnore f)
+    src <- parseSourceInfoFile t (toTextIgnore f) :: IO (SourceInfo ())
     datadir <- getDataDir
     case descriptionToSynth <$> ls' of
         a : b : _ -> do
@@ -248,7 +248,7 @@ runSimulation = do
   -- let circ =
   --       head $ (nestUpTo 30 . generateAST $ Circuit gr) ^.. getVerilog . traverse . getDescription
     rand  <- generateByteString Nothing 32 20
-    rand2 <- Hog.sample (randomMod 10 100)
+    rand2 <- Hog.sample (randomMod 10 100) :: IO (ModDecl ())
     val   <- shelly . runResultT $ runSim defaultIcarus (makeSrcInfo rand2) rand
     case val of
         Pass a -> T.putStrLn $ showBS a
@@ -271,7 +271,7 @@ onFailure t _ = do
             chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
             return $ Fail EmptyFail
 
-checkEquivalence :: (SourceInfo ann) -> Text -> IO Bool
+checkEquivalence :: Show ann => SourceInfo ann -> Text -> IO Bool
 checkEquivalence src dir = shellyFailDir $ do
     mkdir_p (fromText dir)
     curr <- toTextIgnore <$> pwd

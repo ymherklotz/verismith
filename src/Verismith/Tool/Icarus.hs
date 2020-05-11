@@ -103,7 +103,7 @@ mask = T.replace "x" "0"
 callback :: ByteString -> Text -> ByteString
 callback b t = b <> convert (mask t)
 
-runSimIcarus :: Icarus -> (SourceInfo ann) -> [ByteString] -> ResultSh ByteString
+runSimIcarus :: Show ann => Icarus -> (SourceInfo ann) -> [ByteString] -> ResultSh ByteString
 runSimIcarus sim rinfo bss = do
     let tb = ModDecl
             "main"
@@ -159,7 +159,8 @@ counterTestBench (CounterEg _ states) m = tbModule filtered m
   where
     filtered = convert . fold . fmap snd . filter ((/= "clk") . fst) <$> states
 
-runSimIc' :: (Synthesiser b) => ([ByteString] -> (ModDecl ann) -> (Verilog ann))
+runSimIc' :: (Synthesiser b, Show ann)
+          => ([ByteString] -> (ModDecl ann) -> (Verilog ann))
           -> FilePath
           -> Icarus
           -> b
@@ -194,7 +195,7 @@ runSimIc' fun datadir sim1 synth1 srcInfo bss bs = do
     tbname = fromText $ toText synth1 <> "_testbench.v"
     exename = toText synth1 <> "_main"
 
-runSimIc :: (Synthesiser b)
+runSimIc :: (Synthesiser b, Show ann)
          => FilePath         -- ^ Data directory.
          -> Icarus           -- ^ Icarus simulator.
          -> b                -- ^ Synthesis tool to be tested.
@@ -206,6 +207,6 @@ runSimIc :: (Synthesiser b)
          -> ResultSh ByteString
 runSimIc = runSimIc' tbModule
 
-runSimIcEC :: (Synthesiser b) => FilePath -> Icarus -> b
+runSimIcEC :: (Synthesiser b, Show ann) => FilePath -> Icarus -> b
            -> (SourceInfo ann) -> CounterEg -> Maybe ByteString -> ResultSh ByteString
 runSimIcEC a b c d e = runSimIc' (const $ counterTestBench e) a b c d []

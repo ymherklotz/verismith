@@ -49,7 +49,7 @@ instance NFData Vivado where
 defaultVivado :: Vivado
 defaultVivado = Vivado Nothing "vivado" "syn_vivado.v"
 
-runSynthVivado :: Vivado -> (SourceInfo ann) -> ResultSh ()
+runSynthVivado :: Show ann => Vivado -> (SourceInfo ann) -> ResultSh ()
 runSynthVivado sim (SourceInfo top src) = do
     dir <- liftSh pwd
     liftSh $ do

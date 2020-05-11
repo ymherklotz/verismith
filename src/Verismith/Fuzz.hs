@@ -205,7 +205,7 @@ timeit a = do
     end    <- liftIO getCurrentTime
     return (diffUTCTime end start, result)
 
-synthesis :: (MonadBaseControl IO m, MonadSh m) => (SourceInfo ann) -> Fuzz m ()
+synthesis :: (MonadBaseControl IO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
 synthesis src = do
     synth    <- synthesisers
     resTimes <- liftSh $ mapM exec synth
@@ -267,7 +267,7 @@ toolRun t m = do
     logT $ "Finished " <> t <> " " <> showT s
     return s
 
-equivalence :: (MonadBaseControl IO m, MonadSh m) => (SourceInfo ann) -> Fuzz m ()
+equivalence :: (MonadBaseControl IO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
 equivalence src = do
     doCrossCheck <- fmap _fuzzOptsCrossCheck askOpts
     datadir <- fmap _fuzzDataDir askOpts
@@ -303,7 +303,7 @@ equivalence src = do
                          runEquiv checker datadir a b src
         where dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-simulation :: (MonadIO m, MonadSh m) => (SourceInfo ann) -> Fuzz m ()
+simulation :: (MonadIO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
 simulation src = do
     datadir <- fmap _fuzzDataDir askOpts
     synth    <- passedSynthesis
@@ -365,8 +365,8 @@ passEquiv = filter withIdentity . _fuzzSynthResults <$> get
     withIdentity _                            = False
 
 -- | Always reduces with respect to 'Identity'.
-reduction :: (MonadSh m, Eq ann) => (SourceInfo ann) -> Fuzz m ()
-reduction src = do
+reduction :: (MonadSh m) => SourceInfo ann -> Fuzz m ()
+reduction rsrc = do
     datadir <- fmap _fuzzDataDir askOpts
     checker <- fmap _fuzzOptsChecker askOpts
     fails      <- failEquivWithIdentity
@@ -386,6 +386,7 @@ reduction src = do
     redSim datadir (SimResult t _ bs _ _) = do
         r <- reduceSimIc datadir bs t src
         writefile (fromText $ "reduce_sim_" <> toText t <> ".v") $ genSource r
+    src = clearAnn rsrc
 
 titleRun
     :: (MonadIO m, MonadSh m) => Text -> Fuzz m a -> Fuzz m (NominalDiffTime, a)
@@ -402,7 +403,7 @@ getTime :: (Num n) => Maybe (n, a) -> n
 getTime = maybe 0 fst
 
 generateSample
-    :: (MonadIO m, MonadSh m)
+    :: (MonadIO m, MonadSh m, Show ann)
     => Fuzz m (Seed, (SourceInfo ann))
     -> Fuzz m (Seed, (SourceInfo ann))
 generateSample f = do
@@ -452,7 +453,7 @@ medianFreqs l = zip hat (return <$> l)
     hat = set_ <$> [1 .. length l]
     set_ n = if n == h then 1 else 0
 
-fuzz :: (MonadFuzz m, Ord ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzz :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
 fuzz gen = do
     conf <- askConfig
     opts <- askOpts
@@ -494,7 +495,7 @@ fuzz gen = do
                             (getTime redResult)
     return report
 
-fuzzInDir :: (MonadFuzz m, Ord ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzzInDir :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
 fuzzInDir src = do
     fuzzOpts <- askOpts
     let fp = fromMaybe "fuzz" $ _fuzzOptsOutput fuzzOpts
@@ -508,7 +509,7 @@ fuzzInDir src = do
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
 fuzzMultiple
-    :: (MonadFuzz m, Ord ann)
+    :: (MonadFuzz m, Ord ann, Show ann)
     => Gen (SourceInfo ann)
     -> Fuzz m [FuzzReport]
 fuzzMultiple src = do
