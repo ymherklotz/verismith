@@ -106,6 +106,9 @@ instance Mutate Assign where
 instance Mutate ContAssign where
     mutExpr f (ContAssign a e) = ContAssign a $ f e
 
+instance Mutate (CasePair ann) where
+  mutExpr f (CasePair e s) = CasePair (f e) $ mutExpr f s
+
 instance Mutate (Statement ann) where
     mutExpr f (TimeCtrl d s)     = TimeCtrl d $ mutExpr f <$> s
     mutExpr f (EventCtrl e s)    = EventCtrl e $ mutExpr f <$> s
@@ -116,6 +119,8 @@ instance Mutate (Statement ann) where
     mutExpr f (SysTaskEnable a)  = SysTaskEnable $ mutExpr f a
     mutExpr f (CondStmnt a b c) = CondStmnt (f a) (mutExpr f <$> b) $ mutExpr f <$> c
     mutExpr f (ForLoop a1 e a2 s) = ForLoop a1 e a2 $ mutExpr f s
+    mutExpr f (StmntAnn a s) = StmntAnn a $ mutExpr f s
+    mutExpr f (StmntCase t e cp cd) = StmntCase t (f e) (mutExpr f cp) $ mutExpr f cd
 
 instance Mutate Parameter where
     mutExpr _ = id
@@ -128,12 +133,15 @@ instance Mutate (ModItem ann) where
     mutExpr f (ModInst a b conns)      = ModInst a b $ mutExpr f conns
     mutExpr f (Initial s)              = Initial $ mutExpr f s
     mutExpr f (Always s)               = Always $ mutExpr f s
+    mutExpr f (ModItemAnn a s)         = ModItemAnn a $ mutExpr f s
     mutExpr _ d@Decl{}                 = d
     mutExpr _ p@ParamDecl{}            = p
     mutExpr _ l@LocalParamDecl{}       = l
 
 instance Mutate (ModDecl ann) where
-    mutExpr f (ModDecl a b c d e) = ModDecl (mutExpr f a) (mutExpr f b) (mutExpr f c) (mutExpr f d) (mutExpr f e)
+    mutExpr f (ModDecl a b c d e) =
+      ModDecl (mutExpr f a) (mutExpr f b) (mutExpr f c) (mutExpr f d) (mutExpr f e)
+    mutExpr f (ModDeclAnn a m) = ModDeclAnn a $ mutExpr f m
 
 instance Mutate (Verilog ann) where
     mutExpr f (Verilog a) = Verilog $ mutExpr f a

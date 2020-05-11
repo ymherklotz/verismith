@@ -24,7 +24,7 @@ import           Verismith
 import           Verismith.Reduce
 import Data.Text (Text)
 
-sourceInfo :: Text -> Verilog () -> SourceInfo ()
+sourceInfo :: Text -> Verilog ReduceAnn -> SourceInfo ReduceAnn
 sourceInfo = SourceInfo
 
 reduceUnitTests :: TestTree
@@ -303,7 +303,7 @@ endmodule
 
 halveStatementsTest :: TestTree
 halveStatementsTest = testCase "Statements" $ do
-    GenVerilog <$> halveStatements "top" srcInfo1 @?= golden1
+    GenVerilog <$> halveStatements "top" (tagAlways "top" srcInfo1) @?= golden1
     where
         srcInfo1 = sourceInfo "top" [verilog|
 module top(clk, y, x);
@@ -327,7 +327,7 @@ module top(clk, y, x);
   assign y = {r1, r2, r3};
 endmodule
 |]
-        golden1 = GenVerilog <$> Dual (sourceInfo "top" [verilog|
+        golden1 = GenVerilog <$> Dual (tagAlways "top" $ sourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -336,15 +336,17 @@ module top(clk, y, x);
   reg r2;
   reg r3;
   always @(posedge clk) begin
-    r1 <= 1'b0;
+    r1 <= r3;
   end
 
   always @(posedge clk) begin
-    r1 <= 1'b0;
+    r1 <= r2;
+    r2 <= r3;
+    r3 <= r1;
   end
-  assign y = {r1, 1'b0, 1'b0};
+  assign y = {r1, r2, r3};
 endmodule
-|]) (sourceInfo "top" [verilog|
+|]) (tagAlways "top" $ sourceInfo "top" [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -353,15 +355,16 @@ module top(clk, y, x);
   reg r2;
   reg r3;
   always @(posedge clk) begin
-    r2 <= 1'b0;
+    r2 <= r1;
     r3 <= r2;
   end
 
   always @(posedge clk) begin
+    r1 <= r2;
     r2 <= r3;
-    r3 <= 1'b0;
+    r3 <= r1;
   end
-  assign y = {1'b0, r2, r3};
+  assign y = {r1, r2, r3};
 endmodule
 |])
 
@@ -405,7 +408,7 @@ statementReducerTest = testCase "Statement reducer" $ do
     GenVerilog <$> halveStatements "top" srcInfo1 @?= fmap GenVerilog golden1
     GenVerilog <$> halveStatements "top" srcInfo2 @?= fmap GenVerilog golden2
     where
-        srcInfo1 = sourceInfo "top" [verilog|
+        srcInfo1 = tagAlways "top" $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -425,7 +428,7 @@ module top(y, x);
   end
 endmodule
 |]
-        golden1 = Dual (sourceInfo "top" [verilog|
+        golden1 = Dual (tagAlways "top" $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -438,9 +441,11 @@ module top(y, x);
   always @(posedge clk) begin
     a <= 1;
     b <= 2;
+    c <= 3;
+    d <= 4;
   end
 endmodule
-|]) $ sourceInfo "top" [verilog|
+|]) . tagAlways "top" $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -451,12 +456,14 @@ module top(y, x);
   end
 
   always @(posedge clk) begin
+    a <= 1;
+    b <= 2;
     c <= 3;
     d <= 4;
   end
 endmodule
 |]
-        srcInfo2 = sourceInfo "top" [verilog|
+        srcInfo2 = tagAlways "top" $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -469,7 +476,7 @@ module top(y, x);
   end
 endmodule
 |]
-        golden2 = Dual (sourceInfo "top" [verilog|
+        golden2 = Dual (tagAlways "top" $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -477,7 +484,7 @@ module top(y, x);
   always @(posedge clk)
       y <= 2;
 endmodule
-|]) $ sourceInfo "top" [verilog|
+|]) . tagAlways "top" $ sourceInfo "top" [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;

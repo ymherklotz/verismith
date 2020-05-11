@@ -35,6 +35,9 @@ module Verismith.Reduce
     , removeConstInConcat
     , takeReplace
     , filterExpr
+    , ReduceAnn(..)
+    , tagAlways
+    , untagAlways
     )
 where
 
@@ -61,6 +64,7 @@ import           Verismith.Verilog
 import           Verismith.Verilog.AST
 import           Verismith.Verilog.Mutate
 import           Verismith.Verilog.Parser
+import Verismith.Verilog.CodeGen
 
 
 -- $strategy

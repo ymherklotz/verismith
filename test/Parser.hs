@@ -58,7 +58,7 @@ parserIdempotentMod = Hog.property $ do
 
 parserInput :: Property
 parserInput = Hog.property $ do
-    v <- Hog.forAll (GenVerilog <$> procedural "top" smallConfig)
+    v <- Hog.forAll (GenVerilog <$> (procedural "top" smallConfig :: Gen (Verilog ())))
     Hog.assert . isRight $ parse parseModDecl
                                  "input_test"
                                  (alexScanTokens . uncomment "test" $ show v)
