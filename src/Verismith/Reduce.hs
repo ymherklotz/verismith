@@ -44,6 +44,7 @@ import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString (ByteString)
 import Data.Foldable (foldrM)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -681,16 +682,25 @@ reduceSynth ::
   b ->
   (SourceInfo ()) ->
   m (SourceInfo ())
-reduceSynth mt datadir a b = reduce (fromText $ "reduce_" <> toText a <> "_" <> toText b <> ".v") synth
+reduceSynth mt datadir a b src = do
+  counter <- liftSh . liftIO $ newIORef (0 :: Int)
+  reduce (fromText $ prefix <> ".v") (synth counter) src
   where
-    synth src' = liftSh $ do
+    synth counter src' = liftSh $ do
+      count <- liftIO $ readIORef counter
+      liftIO $ writeIORef counter (count + 1)
+      Shelly.mkdir (fromText $ prefix <> "_" <> showT count)
+      current_dir <- Shelly.pwd
+      Shelly.cd (fromText $ prefix <> "_" <> showT count)
       r <- runResultT $ do
         runSynth a src'
         runSynth b src'
         runEquiv mt datadir a b src'
+      Shelly.cd current_dir
       return $ case r of
         Fail (EquivFail _) -> True
         _ -> False
+    prefix = "reduce_" <> toText a <> "_" <> toText b
 
 reduceSynthesis :: (Synthesiser a, MonadSh m) => a -> SourceInfo () -> m (SourceInfo ())
 reduceSynthesis a = reduce (fromText $ "reduce_" <> toText a <> ".v") synth

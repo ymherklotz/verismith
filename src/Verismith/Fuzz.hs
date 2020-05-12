@@ -397,7 +397,7 @@ reduction rsrc = do
   simFails <- failedSimulations
   _ <- liftSh $ mapM (red checker datadir) fails
   _ <- liftSh $ mapM redSynth synthFails
-  _ <- liftSh $ mapM (redSim datadir) simFails
+  -- _ <- liftSh $ mapM (redSim datadir) simFails
   return ()
   where
     red checker datadir (SynthResult a b _ _) = do
@@ -490,7 +490,7 @@ fuzz gen = do
     $ conf
       & configProperty
       . propSeed
-      ?~ seed'
+        ?~ seed'
   (tsynth, _) <- titleRun "Synthesis" $ synthesis src
   (tequiv, _) <-
     if (_fuzzOptsNoEquiv opts)
