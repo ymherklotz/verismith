@@ -1,36 +1,34 @@
-{-|
-Module      : Verismith.Verilog.Internal
-Description : Defaults and common functions.
-Copyright   : (c) 2018-2019, Yann Herklotz
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Portability : POSIX
-
-Defaults and common functions.
--}
-
+-- |
+-- Module      : Verismith.Verilog.Internal
+-- Description : Defaults and common functions.
+-- Copyright   : (c) 2018-2019, Yann Herklotz
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Defaults and common functions.
 module Verismith.Verilog.Internal
-    ( regDecl
-    , wireDecl
-    , emptyMod
-    , setModName
-    , addModPort
-    , addModDecl
-    , testBench
-    , addTestBench
-    , defaultPort
-    , portToExpr
-    , modName
-    , yPort
-    , wire
-    , reg
-    )
+  ( regDecl,
+    wireDecl,
+    emptyMod,
+    setModName,
+    addModPort,
+    addModDecl,
+    testBench,
+    addTestBench,
+    defaultPort,
+    portToExpr,
+    modName,
+    yPort,
+    wire,
+    reg,
+  )
 where
 
-import           Control.Lens
-import           Data.Text             (Text)
-import           Verismith.Verilog.AST
+import Control.Lens
+import Data.Text (Text)
+import Verismith.Verilog.AST
 
 regDecl :: Identifier -> (ModItem ann)
 regDecl i = Decl Nothing (Port Reg False (Range 1 0) i) Nothing
@@ -54,20 +52,23 @@ addModDecl :: (ModDecl ann) -> (Verilog ann) -> (Verilog ann)
 addModDecl desc = _Wrapped %~ (:) desc
 
 testBench :: (ModDecl ann)
-testBench = ModDecl
+testBench =
+  ModDecl
     "main"
     []
     []
-    [ regDecl "a"
-    , regDecl "b"
-    , wireDecl "c"
-    , ModInst "and"
-              "and_gate"
-              [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"]
-    , Initial $ SeqBlock
-        [ BlockAssign . Assign (RegId "a") Nothing $ Number 1
-        , BlockAssign . Assign (RegId "b") Nothing $ Number 1
-        ]
+    [ regDecl "a",
+      regDecl "b",
+      wireDecl "c",
+      ModInst
+        "and"
+        "and_gate"
+        [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"],
+      Initial $
+        SeqBlock
+          [ BlockAssign . Assign (RegId "a") Nothing $ Number 1,
+            BlockAssign . Assign (RegId "b") Nothing $ Number 1
+          ]
     ]
     []
 

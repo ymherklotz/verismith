@@ -1,50 +1,52 @@
-{-|
-Module      : Reduce
-Description : Test reduction.
-Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Portability : POSIX
-
-Test reduction.
--}
-
 {-# LANGUAGE QuasiQuotes #-}
 
+-- |
+-- Module      : Reduce
+-- Description : Test reduction.
+-- Copyright   : (c) 2019, Yann Herklotz Grave
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Test reduction.
 module Reduce
-    ( reduceUnitTests
-    )
+  ( reduceUnitTests,
+  )
 where
 
-import           Data.List        ((\\))
-import           Test.Tasty
-import           Test.Tasty.HUnit
-import           Verismith
-import           Verismith.Reduce
+import Data.List ((\\))
 import Data.Text (Text)
+import Test.Tasty
+import Test.Tasty.HUnit
+import Verismith
+import Verismith.Reduce
 
 sourceInfo :: Text -> Verilog ReduceAnn -> SourceInfo ReduceAnn
 sourceInfo = SourceInfo
 
 reduceUnitTests :: TestTree
-reduceUnitTests = testGroup
+reduceUnitTests =
+  testGroup
     "Reducer tests"
-    [ moduleReducerTest
-    , modItemReduceTest
-    , halveStatementsTest
-    , statementReducerTest
-    , activeWireTest
-    , cleanTest
-    , cleanAllTest
-    , removeDeclTest
+    [ moduleReducerTest,
+      modItemReduceTest,
+      halveStatementsTest,
+      statementReducerTest,
+      activeWireTest,
+      cleanTest,
+      cleanAllTest,
+      removeDeclTest
     ]
 
 removeConstInConcatTest :: TestTree
 removeConstInConcatTest = testCase "Remove const in concat" $ do
-    GenVerilog (removeDecl srcInfo1) @?= golden1
+  GenVerilog (removeDecl srcInfo1) @?= golden1
   where
-    srcInfo1 = sourceInfo "top" [verilog|
+    srcInfo1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top;
   wire a;
   reg b;
@@ -57,7 +59,11 @@ module top;
   end
 endmodule
 |]
-    golden1 = GenVerilog $ sourceInfo "top" [verilog|
+    golden1 =
+      GenVerilog $
+        sourceInfo
+          "top"
+          [verilog|
 module top;
   wire a;
   reg b;
@@ -73,9 +79,12 @@ endmodule
 
 removeDeclTest :: TestTree
 removeDeclTest = testCase "Remove declarations" $ do
-    GenVerilog (removeDecl srcInfo1) @?= golden1
-    where
-        srcInfo1 = sourceInfo "top" [verilog|
+  GenVerilog (removeDecl srcInfo1) @?= golden1
+  where
+    srcInfo1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top;
   wire a;
   wire b;
@@ -103,7 +112,11 @@ module top;
   assign b = g;
 endmodule
 |]
-        golden1 = GenVerilog $ sourceInfo "top" [verilog|
+    golden1 =
+      GenVerilog $
+        sourceInfo
+          "top"
+          [verilog|
 module top;
   wire a;
   wire b;
@@ -130,9 +143,12 @@ endmodule
 |]
 
 cleanAllTest = testCase "Clean all" $ do
-    GenVerilog (cleanSourceInfoAll srcInfo1) @?= golden1
-    where
-        srcInfo1 = sourceInfo "top" [verilog|
+  GenVerilog (cleanSourceInfoAll srcInfo1) @?= golden1
+  where
+    srcInfo1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top;
   wire a;
   wire b;
@@ -160,7 +176,11 @@ module mod2;
   assign b = c + d;
 endmodule
 |]
-        golden1 = GenVerilog $ sourceInfo "top" [verilog|
+    golden1 =
+      GenVerilog $
+        sourceInfo
+          "top"
+          [verilog|
 module top;
   wire a;
   wire b;
@@ -191,10 +211,12 @@ endmodule
 
 cleanTest :: TestTree
 cleanTest = testCase "Clean expression" $ do
-    clean ["wire1", "wire2"] srcInfo1 @?= golden1
-    clean ["wire1", "wire3"] srcInfo2 @?= golden2
-    where
-        srcInfo1 = GenVerilog . sourceInfo "top" $ [verilog|
+  clean ["wire1", "wire2"] srcInfo1 @?= golden1
+  clean ["wire1", "wire3"] srcInfo2 @?= golden2
+  where
+    srcInfo1 =
+      GenVerilog . sourceInfo "top" $
+        [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -202,7 +224,9 @@ module top;
   assign wire1 = wire2[wire3];
 endmodule
 |]
-        golden1 = GenVerilog . sourceInfo "top" $ [verilog|
+    golden1 =
+      GenVerilog . sourceInfo "top" $
+        [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -210,7 +234,9 @@ module top;
   assign wire1 = wire2[1'b0];
 endmodule
 |]
-        srcInfo2 = GenVerilog . sourceInfo "top" $ [verilog|
+    srcInfo2 =
+      GenVerilog . sourceInfo "top" $
+        [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -218,7 +244,9 @@ module top;
   assign wire1 = wire2[wire3:wire1];
 endmodule
 |]
-        golden2 = GenVerilog . sourceInfo "top" $ [verilog|
+    golden2 =
+      GenVerilog . sourceInfo "top" $
+        [verilog|
 module top;
   wire wire1;
   wire wire2;
@@ -227,15 +255,17 @@ module top;
 endmodule
 |]
 
-
 activeWireTest :: TestTree
 activeWireTest = testCase "Active wires" $ do
-    findActiveWires "top" verilog1 \\ ["x", "y", "z", "w"]          @?= []
-    findActiveWires "top" verilog2 \\ ["x", "y", "z"]               @?= []
-    findActiveWires "top" verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
-    findActiveWires "top" verilog4 \\ ["x", "y", "w", "a", "b"]     @?= []
-    where
-        verilog1 = sourceInfo "top" [verilog|
+  findActiveWires "top" verilog1 \\ ["x", "y", "z", "w"] @?= []
+  findActiveWires "top" verilog2 \\ ["x", "y", "z"] @?= []
+  findActiveWires "top" verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
+  findActiveWires "top" verilog4 \\ ["x", "y", "w", "a", "b"] @?= []
+  where
+    verilog1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(y, x);
   input x;
   output y;
@@ -246,7 +276,10 @@ module top(y, x);
   assign y = w + z;
 endmodule
 |]
-        verilog2 = sourceInfo "top" [verilog|
+    verilog2 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(y, x);
   input x;
   output y;
@@ -255,7 +288,10 @@ module top(y, x);
   assign z = 0;
 endmodule
 |]
-        verilog3 = sourceInfo "top" [verilog|
+    verilog3 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -276,7 +312,10 @@ module top(clk, y, x);
   assign y = {r1, r2, r3};
 endmodule
 |]
-        verilog4 = sourceInfo "top" [verilog|
+    verilog4 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(y, x);
   input x;
   output y;
@@ -303,9 +342,12 @@ endmodule
 
 halveStatementsTest :: TestTree
 halveStatementsTest = testCase "Statements" $ do
-    GenVerilog <$> halveStatements "top" (tagAlways "top" srcInfo1) @?= golden1
-    where
-        srcInfo1 = sourceInfo "top" [verilog|
+  GenVerilog <$> halveStatements "top" (tagAlways "top" srcInfo1) @?= golden1
+  where
+    srcInfo1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -327,7 +369,13 @@ module top(clk, y, x);
   assign y = {r1, r2, r3};
 endmodule
 |]
-        golden1 = GenVerilog <$> Dual (tagAlways "top" $ sourceInfo "top" [verilog|
+    golden1 =
+      GenVerilog
+        <$> Dual
+          ( tagAlways "top" $
+              sourceInfo
+                "top"
+                [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -346,7 +394,12 @@ module top(clk, y, x);
   end
   assign y = {r1, r2, r3};
 endmodule
-|]) (tagAlways "top" $ sourceInfo "top" [verilog|
+|]
+          )
+          ( tagAlways "top" $
+              sourceInfo
+                "top"
+                [verilog|
 module top(clk, y, x);
   input clk;
   input x;
@@ -366,13 +419,17 @@ module top(clk, y, x);
   end
   assign y = {r1, r2, r3};
 endmodule
-|])
+|]
+          )
 
 modItemReduceTest :: TestTree
 modItemReduceTest = testCase "Module items" $ do
-    GenVerilog <$> halveModItems "top" srcInfo1 @?= golden1
-    where
-        srcInfo1 = sourceInfo "top" [verilog|
+  GenVerilog <$> halveModItems "top" srcInfo1 @?= golden1
+  where
+    srcInfo1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(y, x);
   input x;
   output y;
@@ -383,7 +440,12 @@ module top(y, x);
   assign y = w;
 endmodule
 |]
-        golden1 = GenVerilog <$> Dual (sourceInfo "top" [verilog|
+    golden1 =
+      GenVerilog
+        <$> Dual
+          ( sourceInfo
+              "top"
+              [verilog|
 module top(y, x);
   input x;
   output y;
@@ -392,7 +454,11 @@ module top(y, x);
   assign y = 1'b0;
   assign z = x;
 endmodule
-|]) (sourceInfo "top" [verilog|
+|]
+          )
+          ( sourceInfo
+              "top"
+              [verilog|
 module top(y, x);
   input x;
   output y;
@@ -401,14 +467,19 @@ module top(y, x);
   assign y = w;
   assign w = 1'b0;
 endmodule
-|])
+|]
+          )
 
 statementReducerTest :: TestTree
 statementReducerTest = testCase "Statement reducer" $ do
-    GenVerilog <$> halveStatements "top" srcInfo1 @?= fmap GenVerilog golden1
-    GenVerilog <$> halveStatements "top" srcInfo2 @?= fmap GenVerilog golden2
-    where
-        srcInfo1 = tagAlways "top" $ sourceInfo "top" [verilog|
+  GenVerilog <$> halveStatements "top" srcInfo1 @?= fmap GenVerilog golden1
+  GenVerilog <$> halveStatements "top" srcInfo2 @?= fmap GenVerilog golden2
+  where
+    srcInfo1 =
+      tagAlways "top" $
+        sourceInfo
+          "top"
+          [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -428,7 +499,12 @@ module top(y, x);
   end
 endmodule
 |]
-        golden1 = Dual (tagAlways "top" $ sourceInfo "top" [verilog|
+    golden1 =
+      Dual
+        ( tagAlways "top" $
+            sourceInfo
+              "top"
+              [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -445,7 +521,12 @@ module top(y, x);
     d <= 4;
   end
 endmodule
-|]) . tagAlways "top" $ sourceInfo "top" [verilog|
+|]
+        )
+        . tagAlways "top"
+        $ sourceInfo
+          "top"
+          [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -463,7 +544,11 @@ module top(y, x);
   end
 endmodule
 |]
-        srcInfo2 = tagAlways "top" $ sourceInfo "top" [verilog|
+    srcInfo2 =
+      tagAlways "top" $
+        sourceInfo
+          "top"
+          [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -476,7 +561,12 @@ module top(y, x);
   end
 endmodule
 |]
-        golden2 = Dual (tagAlways "top" $ sourceInfo "top" [verilog|
+    golden2 =
+      Dual
+        ( tagAlways "top" $
+            sourceInfo
+              "top"
+              [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -484,7 +574,12 @@ module top(y, x);
   always @(posedge clk)
       y <= 2;
 endmodule
-|]) . tagAlways "top" $ sourceInfo "top" [verilog|
+|]
+        )
+        . tagAlways "top"
+        $ sourceInfo
+          "top"
+          [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -496,10 +591,13 @@ endmodule
 
 moduleReducerTest :: TestTree
 moduleReducerTest = testCase "Module reducer" $ do
-    halveModules srcInfo1 @?= golden1
-    halveModules srcInfo2 @?= golden2
-    where
-        srcInfo1 = sourceInfo "top" [verilog|
+  halveModules srcInfo1 @?= golden1
+  halveModules srcInfo2 @?= golden2
+  where
+    srcInfo1 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -511,13 +609,20 @@ module m(y, x);
   input wire [4:0] x;
 endmodule
 |]
-        golden1 = Single $ sourceInfo "top" [verilog|
+    golden1 =
+      Single $
+        sourceInfo
+          "top"
+          [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
 endmodule
 |]
-        srcInfo2 = sourceInfo "top" [verilog|
+    srcInfo2 =
+      sourceInfo
+        "top"
+        [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -535,7 +640,11 @@ module m2(y, x);
   input wire [4:0] x;
 endmodule
 |]
-        golden2 = Dual (sourceInfo "top" [verilog|
+    golden2 =
+      Dual
+        ( sourceInfo
+            "top"
+            [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
@@ -546,7 +655,11 @@ module m(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
 endmodule
-|]) $ sourceInfo "top" [verilog|
+|]
+        )
+        $ sourceInfo
+          "top"
+          [verilog|
 module top(y, x);
   output wire [4:0] y;
   input wire [4:0] x;
