@@ -167,8 +167,6 @@ import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.List.NonEmpty ((<|), NonEmpty (..))
 import Data.String (IsString, fromString)
 import Data.Text (Text, pack)
-import Data.Traversable (sequenceA)
-import Data.Void (Void)
 import GHC.Generics (Generic)
 import Verismith.Verilog.BitVec
 
@@ -176,23 +174,6 @@ class Functor m => Annotations m where
   removeAnn :: m a -> m a
   clearAnn :: m a -> m ()
   clearAnn = fmap (\_ -> ()) . removeAnn
-
--- | Attributes which can be set to various nodes in the AST.
---
--- @
--- (* synthesis *)
--- @
-data Attribute
-  = AttrAssign Identifier ConstExpr
-  | AttrName Identifier
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
-
--- | Annotations which can be added to the AST. These are supported in all the
--- nodes of the AST and a custom type can be declared for them.
-data Annotation a
-  = Ann a
-  | AnnAttrs [Attribute]
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -225,22 +206,6 @@ instance Num Delay where
   abs (Delay a) = Delay $ abs a
   signum (Delay a) = Delay $ signum a
   fromInteger = Delay . fromInteger
-
--- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
-data Event
-  = EId {-# UNPACK #-} !Identifier
-  | EExpr !Expr
-  | EAll
-  | EPosEdge {-# UNPACK #-} !Identifier
-  | ENegEdge {-# UNPACK #-} !Identifier
-  | EOr !Event !Event
-  | EComb !Event !Event
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
-
-$(makeBaseFunctor ''Event)
-
-instance Plated Event where
-  plate = uniplate
 
 -- | Binary operators that are currently supported in the verilog generation.
 data BinaryOperator
@@ -285,49 +250,6 @@ data UnaryOperator
   | UnNxor
   | UnNxorInv
   deriving (Eq, Show, Ord, Data, Generic, NFData)
-
--- | Verilog expression, which can either be a primary expression, unary
--- expression, binary operator expression or a conditional expression.
-data Expr
-  = Number {-# UNPACK #-} !BitVec
-  | Id {-# UNPACK #-} !Identifier
-  | VecSelect {-# UNPACK #-} !Identifier !Expr
-  | RangeSelect {-# UNPACK #-} !Identifier !Range
-  | Concat !(NonEmpty Expr)
-  | UnOp !UnaryOperator !Expr
-  | BinOp !Expr !BinaryOperator !Expr
-  | Cond !Expr !Expr !Expr
-  | Appl !Identifier !Expr
-  | Str {-# UNPACK #-} !Text
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
-
-$(makeLenses ''Expr)
-
-$(makeBaseFunctor ''Expr)
-
-instance Num Expr where
-  a + b = BinOp a BinPlus b
-  a - b = BinOp a BinMinus b
-  a * b = BinOp a BinTimes b
-  negate = UnOp UnMinus
-  abs = undefined
-  signum = undefined
-  fromInteger = Number . fromInteger
-
-instance Semigroup Expr where
-  (Concat a) <> (Concat b) = Concat $ a <> b
-  (Concat a) <> b = Concat $ a <> (b :| [])
-  a <> (Concat b) = Concat $ a <| b
-  a <> b = Concat $ a <| b :| []
-
-instance Monoid Expr where
-  mempty = Number 0
-
-instance IsString Expr where
-  fromString = Str . fromString
-
-instance Plated Expr where
-  plate = uniplate
 
 -- | Constant expression, which are known before simulation at compile time.
 data ConstExpr
@@ -408,6 +330,84 @@ instance IsString ConstExpr where
 instance Plated ConstExpr where
   plate = uniplate
 
+-- | Range that can be associated with any port or left hand side. Contains the
+-- msb and lsb bits as 'ConstExpr'. This means that they can be generated using
+-- parameters, which can in turn be changed at synthesis time.
+data Range
+  = Range
+      { rangeMSB :: !ConstExpr,
+        rangeLSB :: !ConstExpr
+      }
+  deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+instance Num Range where
+  (Range s1 a) + (Range s2 b) = Range (s1 + s2) $ a + b
+  (Range s1 a) - (Range s2 b) = Range (s1 - s2) . max 0 $ a - b
+  (Range s1 a) * (Range s2 b) = Range (s1 * s2) $ a * b
+  negate = undefined
+  abs = id
+  signum _ = 1
+  fromInteger = flip Range 0 . fromInteger . (-) 1
+
+-- | Verilog expression, which can either be a primary expression, unary
+-- expression, binary operator expression or a conditional expression.
+data Expr
+  = Number {-# UNPACK #-} !BitVec
+  | Id {-# UNPACK #-} !Identifier
+  | VecSelect {-# UNPACK #-} !Identifier !Expr
+  | RangeSelect {-# UNPACK #-} !Identifier !Range
+  | Concat !(NonEmpty Expr)
+  | UnOp !UnaryOperator !Expr
+  | BinOp !Expr !BinaryOperator !Expr
+  | Cond !Expr !Expr !Expr
+  | Appl !Identifier !Expr
+  | Str {-# UNPACK #-} !Text
+  deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeLenses ''Expr)
+
+$(makeBaseFunctor ''Expr)
+
+instance Num Expr where
+  a + b = BinOp a BinPlus b
+  a - b = BinOp a BinMinus b
+  a * b = BinOp a BinTimes b
+  negate = UnOp UnMinus
+  abs = undefined
+  signum = undefined
+  fromInteger = Number . fromInteger
+
+instance Semigroup Expr where
+  (Concat a) <> (Concat b) = Concat $ a <> b
+  (Concat a) <> b = Concat $ a <> (b :| [])
+  a <> (Concat b) = Concat $ a <| b
+  a <> b = Concat $ a <| b :| []
+
+instance Monoid Expr where
+  mempty = Number 0
+
+instance IsString Expr where
+  fromString = Str . fromString
+
+instance Plated Expr where
+  plate = uniplate
+
+-- | Verilog syntax for an event, such as @\@x@, which is used for always blocks
+data Event
+  = EId {-# UNPACK #-} !Identifier
+  | EExpr !Expr
+  | EAll
+  | EPosEdge {-# UNPACK #-} !Identifier
+  | ENegEdge {-# UNPACK #-} !Identifier
+  | EOr !Event !Event
+  | EComb !Event !Event
+  deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+$(makeBaseFunctor ''Event)
+
+instance Plated Event where
+  plate = uniplate
+
 -- | Task call, which is similar to function calls.
 data Task
   = Task
@@ -460,26 +460,7 @@ data PortType
   | Reg
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
--- | Range that can be associated with any port or left hand side. Contains the
--- msb and lsb bits as 'ConstExpr'. This means that they can be generated using
--- parameters, which can in turn be changed at synthesis time.
-data Range
-  = Range
-      { rangeMSB :: !ConstExpr,
-        rangeLSB :: !ConstExpr
-      }
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
-
 $(makeLenses ''PortType)
-
-instance Num Range where
-  (Range s1 a) + (Range s2 b) = Range (s1 + s2) $ a + b
-  (Range s1 a) - (Range s2 b) = Range (s1 - s2) . max 0 $ a - b
-  (Range s1 a) * (Range s2 b) = Range (s1 * s2) $ a * b
-  negate = undefined
-  abs = id
-  signum _ = 1
-  fromInteger = flip Range 0 . fromInteger . (-) 1
 
 -- | Port declaration. It contains information about the type of the port, the
 -- size, and the port name. It used to also contain information about if it was
@@ -622,7 +603,7 @@ instance Plated (Statement a) where
     StmntCase a b <$> traverse (traverseStmntCasePair f) c
       <*> traverse f d
   plate f (ForLoop a b c d) = ForLoop a b c <$> f d
-  plate f a = pure a
+  plate _ a = pure a
 
 instance Semigroup (Statement a) where
   (SeqBlock a) <> (SeqBlock b) = SeqBlock $ a <> b
@@ -641,10 +622,10 @@ instance Functor Statement where
   fmap f (StmntCase ct ce cp cdef) = StmntCase ct ce (fmap f <$> cp) $ fmap f <$> cdef
   fmap f (ForLoop a b c s) = ForLoop a b c $ fmap f s
   fmap f (StmntAnn a s) = StmntAnn (f a) $ fmap f s
-  fmap f (BlockAssign a) = BlockAssign a
-  fmap f (NonBlockAssign a) = NonBlockAssign a
-  fmap f (TaskEnable t) = TaskEnable t
-  fmap f (SysTaskEnable s) = SysTaskEnable s
+  fmap _ (BlockAssign a) = BlockAssign a
+  fmap _ (NonBlockAssign a) = NonBlockAssign a
+  fmap _ (TaskEnable t) = TaskEnable t
+  fmap _ (SysTaskEnable s) = SysTaskEnable s
 
 instance Annotations Statement where
   removeAnn (StmntAnn _ s) = removeAnn s
@@ -705,11 +686,11 @@ instance Functor ModItem where
   fmap f (ModItemAnn a mi) = ModItemAnn (f a) $ fmap f mi
   fmap f (Initial s) = Initial $ fmap f s
   fmap f (Always s) = Always $ fmap f s
-  fmap f (ModCA c) = ModCA c
-  fmap f (ModInst a b c) = ModInst a b c
-  fmap f (Decl a b c) = Decl a b c
-  fmap f (ParamDecl p) = ParamDecl p
-  fmap f (LocalParamDecl l) = LocalParamDecl l
+  fmap _ (ModCA c) = ModCA c
+  fmap _ (ModInst a b c) = ModInst a b c
+  fmap _ (Decl a b c) = Decl a b c
+  fmap _ (ParamDecl p) = ParamDecl p
+  fmap _ (LocalParamDecl l) = LocalParamDecl l
 
 instance Annotations ModItem where
   removeAnn (ModItemAnn _ mi) = removeAnn mi
@@ -733,9 +714,11 @@ $(makeLenses ''ModDecl)
 
 instance Functor ModDecl where
   fmap f (ModDecl i out inp mis params) = ModDecl i out inp (fmap f <$> mis) params
+  fmap f (ModDeclAnn a mi) = ModDeclAnn (f a) $ fmap f mi
 
 instance Annotations ModDecl where
   removeAnn (ModDecl i out inp mis params) = ModDecl i out inp (fmap removeAnn mis) params
+  removeAnn (ModDeclAnn _ mi) = mi
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e) = ModConn <$> f e
@@ -787,6 +770,23 @@ instance Functor SourceInfo where
 
 instance Annotations SourceInfo where
   removeAnn (SourceInfo t v) = SourceInfo t $ removeAnn v
+
+-- | Attributes which can be set to various nodes in the AST.
+--
+-- @
+-- (* synthesis *)
+-- @
+data Attribute
+  = AttrAssign Identifier ConstExpr
+  | AttrName Identifier
+  deriving (Eq, Show, Ord, Data, Generic, NFData)
+
+-- | Annotations which can be added to the AST. These are supported in all the
+-- nodes of the AST and a custom type can be declared for them.
+data Annotation a
+  = Ann a
+  | AnnAttrs [Attribute]
+  deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 getModule :: Traversal' (Verilog a) (ModDecl a)
 getModule = _Wrapped . traverse
