@@ -249,6 +249,7 @@ relevantModItem _ _ = False
 isAssign :: (Statement ReduceAnn) -> Bool
 isAssign (BlockAssign _) = True
 isAssign (NonBlockAssign _) = True
+isAssign (ForLoop _ _ _ _) = True
 isAssign _ = False
 
 lValName :: LVal -> [Identifier]
@@ -320,6 +321,18 @@ fixModInst (SourceInfo _ (Verilog decl)) (ModInst n g i) = case m of
       | otherwise = Nothing
 fixModInst _ a = a
 
+eventIdent :: Event -> [Identifier]
+eventIdent (EId i) = [i]
+eventIdent (EExpr e) =
+  case exprId e of
+    Nothing -> []
+    Just eid -> [eid]
+eventIdent EAll = []
+eventIdent (EPosEdge i) = [i]
+eventIdent (ENegEdge i) = [i]
+eventIdent (EOr e1 e2) = eventIdent e1 <> eventIdent e2
+eventIdent (EComb e1 e2) = eventIdent e1 <> eventIdent e2
+
 findActiveWires :: Identifier -> (SourceInfo ReduceAnn) -> [Identifier]
 findActiveWires t src =
   nub $
@@ -329,12 +342,16 @@ findActiveWires t src =
       <> fmap portToId o
       <> fmap paramToId p
       <> modinstwires
+      <> events
   where
     assignWires = m ^.. modItems . traverse . modContAssign . contAssignNetLVal
     assignStat =
       concatMap lValName $
         (allStat ^.. traverse . stmntBA . assignReg)
           <> (allStat ^.. traverse . stmntNBA . assignReg)
+          <> (allStat ^.. traverse . forAssign . assignReg)
+          <> (allStat ^.. traverse . forIncr . assignReg)
+    events = concatMap eventIdent $ (allStat ^.. traverse . statEvent)
     allStat = filter isAssign . concat $ fmap universe stat
     stat =
       (m ^.. modItems . traverse . _Initial)
@@ -405,7 +422,7 @@ halveModules srcInfo@(SourceInfo top _) =
     . addMod main
     <$> combine (infoSrc . _Wrapped) repl srcInfo
   where
-    repl = remove1 . filter (not . matchesModName (Identifier top))
+    repl = halve . filter (not . matchesModName (Identifier top))
     main = srcInfo ^. mainModule
 
 moduleBot :: (SourceInfo ReduceAnn) -> Bool

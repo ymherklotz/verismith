@@ -261,6 +261,7 @@ activeWireTest = testCase "Active wires" $ do
   findActiveWires "top" verilog2 \\ ["x", "y", "z"] @?= []
   findActiveWires "top" verilog3 \\ ["x", "y", "clk", "r1", "r2"] @?= []
   findActiveWires "top" verilog4 \\ ["x", "y", "w", "a", "b"] @?= []
+  findActiveWires "top" verilog5 \\ ["r2", "r1", "x", "y"] @?= []
   where
     verilog1 =
       sourceInfo
@@ -337,6 +338,23 @@ module m2(y, z, x);
   input x;
   output y;
   output z;
+endmodule
+|]
+    verilog5 =
+      sourceInfo
+        "top"
+        [verilog|
+module top(y, x);
+  input x;
+  output y;
+  reg r1;
+  reg r2;
+  reg r3;
+  always @* begin
+    for (r1 = 1; r1 < 2; r1 = r1 + 1) begin
+      r2 <= 1'b0;
+    end
+  end
 endmodule
 |]
 
