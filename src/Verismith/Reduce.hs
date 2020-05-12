@@ -132,6 +132,11 @@ halve [] = Single []
 halve [_] = Single []
 halve l = Dual a b where (a, b) = splitAt (length l `div` 2) l
 
+remove1 :: Replace [a]
+remove1 [] = Single []
+remove1 [_] = Single []
+remove1 (a : b) = Dual [a] b
+
 halveNonEmpty :: Replace (NonEmpty a)
 halveNonEmpty l = case NonEmpty.splitAt (length l `div` 2) l of
   ([], []) -> None
@@ -228,29 +233,6 @@ halveIndExpr e = Single e
 halveModExpr :: Replace (ModItem ReduceAnn)
 halveModExpr (ModCA ca) = ModCA <$> combine contAssignExpr halveIndExpr ca
 halveModExpr a = Single a
-
--- | Remove all the undefined mod instances.
-cleanModInst :: (SourceInfo ReduceAnn) -> (SourceInfo ReduceAnn)
-cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
-  where
-    validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
-    cleaned = cleanModInst' validInst <$> srcInfo ^. infoSrc . _Wrapped
-
--- | Clean all the undefined module instances in a specific module using a
--- context.
-cleanModInst' :: [Identifier] -> (ModDecl ReduceAnn) -> (ModDecl ReduceAnn)
-cleanModInst' ids m = m & modItems .~ newModItem
-  where
-    newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
-
--- | Check if a mod instance is in the current context.
-validModInst :: [Identifier] -> (ModItem ReduceAnn) -> Bool
-validModInst ids (ModInst i _ _) = i `elem` ids
-validModInst _ _ = True
-
--- | Adds a '(ModDecl ReduceAnn)' to a '(SourceInfo ReduceAnn)'.
-addMod :: (ModDecl ReduceAnn) -> (SourceInfo ReduceAnn) -> (SourceInfo ReduceAnn)
-addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
 
 -- | Split a module declaration in half by trying to remove assign
 -- statements. This is only done in the main module of the source.
@@ -390,6 +372,29 @@ halveAlways (ModItemAnn Active (Always s)) = ModItemAnn Active . Always <$> halv
 halveAlways r@(ModItemAnn Reduced (Always s)) = Single r
 halveAlways a = Single a
 
+-- | Check if a mod instance is in the current context.
+validModInst :: [Identifier] -> (ModItem ReduceAnn) -> Bool
+validModInst ids (ModInst i _ _) = i `elem` ids
+validModInst _ _ = True
+
+-- | Clean all the undefined module instances in a specific module using a
+-- context.
+cleanModInst' :: [Identifier] -> (ModDecl ReduceAnn) -> (ModDecl ReduceAnn)
+cleanModInst' ids m = m & modItems .~ newModItem
+  where
+    newModItem = filter (validModInst ids) $ m ^.. modItems . traverse
+
+-- | Remove all the undefined mod instances.
+cleanModInst :: (SourceInfo ReduceAnn) -> (SourceInfo ReduceAnn)
+cleanModInst srcInfo = srcInfo & infoSrc . _Wrapped .~ cleaned
+  where
+    validInst = srcInfo ^.. infoSrc . _Wrapped . traverse . modId
+    cleaned = cleanModInst' validInst <$> srcInfo ^. infoSrc . _Wrapped
+
+-- | Adds a '(ModDecl ReduceAnn)' to a '(SourceInfo ReduceAnn)'.
+addMod :: (ModDecl ReduceAnn) -> (SourceInfo ReduceAnn) -> (SourceInfo ReduceAnn)
+addMod m srcInfo = srcInfo & infoSrc . _Wrapped %~ (m :)
+
 -- | Removes half the modules randomly, until it reaches a minimal amount of
 -- modules. This is done by doing a binary search on the list of modules and
 -- removing the instantiations from the main module body.
@@ -400,7 +405,7 @@ halveModules srcInfo@(SourceInfo top _) =
     . addMod main
     <$> combine (infoSrc . _Wrapped) repl srcInfo
   where
-    repl = halve . filter (not . matchesModName (Identifier top))
+    repl = remove1 . filter (not . matchesModName (Identifier top))
     main = srcInfo ^. mainModule
 
 moduleBot :: (SourceInfo ReduceAnn) -> Bool
@@ -680,7 +685,7 @@ reduceSynth ::
   Shelly.FilePath ->
   a ->
   b ->
-  (SourceInfo ()) ->
+  SourceInfo () ->
   m (SourceInfo ())
 reduceSynth mt datadir a b src = do
   counter <- liftSh . liftIO $ newIORef (0 :: Int)
