@@ -424,7 +424,7 @@ reduction rsrc = do
   simFails <- failedSimulations
   _ <- liftSh $ mapM (red checker datadir) fails
   _ <- liftSh $ mapM redSynth synthFails
-  -- _ <- liftSh $ mapM (redSim datadir) simFails
+  _ <- liftSh $ mapM (redSim datadir) simFails
   return ()
   where
     red checker datadir (SynthResult a b _ _) = do
