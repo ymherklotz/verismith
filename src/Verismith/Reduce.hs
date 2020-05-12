@@ -49,7 +49,7 @@ import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (mapMaybe)
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import Shelly ((<.>), fromText)
 import qualified Shelly
 import Shelly.Lifted (MonadSh, liftSh, rm_rf, writefile)
@@ -597,10 +597,12 @@ reduce_ out eval title tag untag repl bot usrc = do
   writefile out $ genSource src
   liftSh
     . Shelly.echo
-    $ "Reducing " <> title <> " (Modules: "
+    $ "Reducing " <> title <> " (modules: "
       <> showT (length . getVerilog $ _infoSrc src)
-      <> ", Module items: "
+      <> ", module items: "
       <> showT (length (src ^.. infoSrc . _Wrapped . traverse . modItems . traverse))
+      <> ", loc: "
+      <> showT (length . lines . unpack $ genSource usrc)
       <> ")"
   if bot src
     then return $ untag src
