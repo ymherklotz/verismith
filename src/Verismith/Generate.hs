@@ -32,8 +32,12 @@ module Verismith.Generate
     exprRecList,
     exprWithContext,
     makeIdentifier,
-    nextPort,
-    newPort,
+    nextWirePort,
+    nextNBPort,
+    nextBPort,
+    newWirePort,
+    newNBPort,
+    newBPort,
     scopedExpr,
     contAssign,
     lvalFromPort,
@@ -85,7 +89,9 @@ import Verismith.Verilog.Mutate
 
 data Context a
   = Context
-      { _variables :: [Port],
+      { _wires :: [Port],
+        _nonblocking :: [Port],
+        _blocking :: [Port],
         _parameters :: [Parameter],
         _modules :: [ModDecl a],
         _nameCounter :: {-# UNPACK #-} !Int,
@@ -329,54 +335,115 @@ makeIdentifier prefix = do
   nameCounter += 1
   return ident
 
-getPort' :: PortType -> Identifier -> [Port] -> StateGen ann Port
-getPort' pt i c = case filter portId c of
-  x : _ -> return x
-  [] -> newPort i pt
+newPort_ :: Bool -> PortType -> Identifier -> StateGen ann Port
+newPort_ blk pt ident = do
+  p <- Port pt <$> Hog.bool <*> range <*> pure ident
+  case pt of
+    Reg -> if blk then blocking %= (p :) else nonblocking %= (p :)
+    Wire -> wires %= (p :)
+  return p
+
+-- | Creates a new port based on the current name counter and adds it to the
+-- current context.  It will be added to the '_wires' list.
+newWirePort :: Identifier -> StateGen ann Port
+newWirePort = newPort_ False Wire
+
+-- | Creates a new port based on the current name counter and adds it to the
+-- current context.  It will be added to the '_nonblocking' list.
+newNBPort :: Identifier -> StateGen ann Port
+newNBPort = newPort_ False Reg
+
+-- | Creates a new port based on the current name counter and adds it to the
+-- current context.  It will be added to the '_blocking' list.
+newBPort :: Identifier -> StateGen ann Port
+newBPort = newPort_ True Reg
+
+getPort' :: Bool -> PortType -> Identifier -> StateGen ann (Maybe Port)
+getPort' blk pt i = do
+  cont <- get
+  let b = _blocking cont
+  let nb = _nonblocking cont
+  let w = _wires cont
+  let (c, nc) =
+        case pt of
+          Reg -> if blk then (b, nb <> w) else (nb, b <> w)
+          Wire -> (w, b <> nb)
+  case (filter portId c, filter portId nc) of
+    (_, x : _) -> return Nothing
+    (x : _, []) -> return $ Just x
+    ([], []) ->
+      fmap
+        Just
+        ( case pt of
+            Reg -> if blk then newBPort i else newNBPort i
+            Wire -> newWirePort i
+        )
   where
     portId (Port pt' _ _ i') = i == i' && pt == pt'
+
+try :: StateGen ann (Maybe a) -> StateGen ann a
+try a = do
+  r <- a
+  case r of
+    Nothing -> try a
+    Just res -> return res
 
 -- | Makes a new 'Identifier' and then checks if the 'Port' already exists, if
 -- it does the existant 'Port' is returned, otherwise a new port is created with
 -- 'newPort'. This is used subsequently in all the functions to create a port,
 -- in case a port with the same name was already created. This could be because
 -- the generation is currently in the other branch of an if-statement.
-nextPort :: Maybe Text -> PortType -> StateGen ann Port
-nextPort i pt = do
-  context <- get
-  ident <- makeIdentifier $ fromMaybe (T.toLower $ showT pt) i
-  getPort' pt ident (_variables context)
+nextWirePort :: Maybe Text -> StateGen ann Port
+nextWirePort i = try $ do
+  ident <- makeIdentifier $ fromMaybe (T.toLower $ showT Wire) i
+  getPort' False Wire ident
 
--- | Creates a new port based on the current name counter and adds it to the
--- current context.
-newPort :: Identifier -> PortType -> StateGen ann Port
-newPort ident pt = do
-  p <- Port pt <$> Hog.bool <*> range <*> pure ident
-  variables %= (p :)
-  return p
+nextNBPort :: Maybe Text -> StateGen ann Port
+nextNBPort i = try $ do
+  ident <- makeIdentifier $ fromMaybe (T.toLower $ showT Reg) i
+  getPort' False Reg ident
+
+nextBPort :: Maybe Text -> StateGen ann Port
+nextBPort i = try $ do
+  ident <- makeIdentifier $ fromMaybe (T.toLower $ showT Reg) i
+  getPort' True Reg ident
+
+allVariables :: StateGen ann [Port]
+allVariables =
+  fmap (\context -> _wires context <> _nonblocking context <> _blocking context) get
+
+shareableVariables :: StateGen ann [Port]
+shareableVariables =
+  fmap (\context -> _wires context <> _nonblocking context) get
 
 -- | Generates an expression from variables that are currently in scope.
-scopedExpr :: StateGen ann Expr
-scopedExpr = do
+scopedExpr_ :: [Port] -> StateGen ann Expr
+scopedExpr_ vars = do
   context <- get
   prob <- askProbability
   Hog.sized
     . exprWithContext (_probExpr prob) (_parameters context)
-    $ _variables context
+    $ vars
+
+scopedExprAll :: StateGen ann Expr
+scopedExprAll = allVariables >>= scopedExpr_
+
+scopedExpr :: StateGen ann Expr
+scopedExpr = shareableVariables >>= scopedExpr_
 
 -- | Generates a random continuous assignment and assigns it to a random wire
 -- that is created.
 contAssign :: StateGen ann ContAssign
 contAssign = do
   expr <- scopedExpr
-  p <- nextPort Nothing Wire
+  p <- nextWirePort Nothing
   return $ ContAssign (p ^. portName) expr
 
 -- | Generate a random assignment and assign it to a random 'Reg'.
-assignment :: StateGen ann Assign
-assignment = do
-  expr <- scopedExpr
-  lval <- lvalFromPort <$> nextPort Nothing Reg
+assignment :: Bool -> StateGen ann Assign
+assignment blk = do
+  expr <- scopedExprAll
+  lval <- lvalFromPort <$> (if blk then nextBPort else nextNBPort) Nothing
   return $ Assign lval Nothing expr
 
 -- | Generate a random 'Statement' safely, by also increasing the depth counter.
@@ -393,7 +460,7 @@ seqBlock = do
 -- start.
 conditional :: StateGen ann (Statement ann)
 conditional = do
-  expr <- scopedExpr
+  expr <- scopedExprAll
   nc <- _nameCounter <$> get
   tstat <- seqBlock
   nc' <- _nameCounter <$> get
@@ -408,7 +475,7 @@ conditional = do
 forLoop :: StateGen ann (Statement ann)
 forLoop = do
   num <- Hog.int (Hog.linear 0 20)
-  var <- lvalFromPort <$> nextPort (Just "forvar") Reg
+  var <- lvalFromPort <$> nextBPort (Just "forvar")
   ForLoop
     (Assign var Nothing 0)
     (BinOp (varId var) BinLT $ fromIntegral num)
@@ -424,8 +491,8 @@ statement = do
   cont <- get
   let defProb i = prob ^. probStmnt . i
   Hog.frequency
-    [ (defProb probStmntBlock, BlockAssign <$> assignment),
-      (defProb probStmntNonBlock, NonBlockAssign <$> assignment),
+    [ (defProb probStmntBlock, BlockAssign <$> assignment True),
+      (defProb probStmntNonBlock, NonBlockAssign <$> assignment False),
       (onDepth cont (defProb probStmntCond), conditional),
       (onDepth cont (defProb probStmntFor), forLoop)
     ]
@@ -434,7 +501,10 @@ statement = do
 
 -- | Generate a sequential always block which is dependent on the clock.
 alwaysSeq :: StateGen ann (ModItem ann)
-alwaysSeq = Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
+alwaysSeq = do
+  always <- Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
+  blocking .= []
+  return always
 
 -- | Should resize a port that connects to a module port if the latter is
 -- larger.  This should not cause any problems if the same net is used as input
@@ -456,13 +526,18 @@ resizePort ps i ra = foldl' func []
 -- representation for the clock.
 instantiate :: (ModDecl ann) -> StateGen ann (ModItem ann)
 instantiate (ModDecl i outP inP _ _) = do
-  context <- get
-  outs <- replicateM (length outP) (nextPort Nothing Wire)
-  ins <- take (length inpFixed) <$> Hog.shuffle (context ^. variables)
+  vars <- shareableVariables
+  outs <- replicateM (length outP) $ nextWirePort Nothing
+  ins <- take (length inpFixed) <$> Hog.shuffle vars
   insLit <- replicateM (length inpFixed - length ins) (Number <$> genBitVec)
-  mapM_ (uncurry process) . zip (ins ^.. traverse . portName) $ inpFixed ^.. traverse . portSize
+  mapM_ (uncurry process)
+    . zip
+      ( zip
+          (ins ^.. traverse . portName)
+          (ins ^.. traverse . portType)
+      )
+    $ inpFixed ^.. traverse . portSize
   ident <- makeIdentifier "modinst"
-  vs <- view variables <$> get
   Hog.choice
     [ return . ModInst i ident $ ModConn <$> (toE (outs <> clkPort <> ins) <> insLit),
       ModInst i ident
@@ -479,9 +554,11 @@ instantiate (ModDecl i outP inP _ _) = do
     filterFunc (Port _ _ _ n)
       | n == "clk" = False
       | otherwise = True
-    process p r = do
+    process (p, t) r = do
       params <- view parameters <$> get
-      variables %= resizePort params p r
+      case t of
+        Reg -> nonblocking %= resizePort params p r
+        Wire -> wires %= resizePort params p r
 
 -- | Generates a module instance by also generating a new module if there are
 -- not enough modules currently in the context. It keeps generating new modules
@@ -511,9 +588,13 @@ modInst = do
     then do
       let currMods = context ^. modules
       let params = context ^. parameters
-      let vars = context ^. variables
+      let w = _wires context
+      let nb = _nonblocking context
+      let b = _blocking context
       modules .= []
-      variables .= []
+      wires .= []
+      nonblocking .= []
+      blocking .= []
       parameters .= []
       modDepth -= 1
       chosenMod <- moduleDef Nothing
@@ -521,7 +602,9 @@ modInst = do
       let genMods = ncont ^. modules
       modDepth += 1
       parameters .= params
-      variables .= vars
+      wires .= w
+      nonblocking .= nb
+      blocking .= b
       modules .= chosenMod : currMods <> genMods
       instantiate chosenMod
     else Hog.element (context ^. modules) >>= instantiate
@@ -618,12 +701,13 @@ selectwfreq s n a@(l : ls)
 moduleDef :: Maybe Identifier -> StateGen ann (ModDecl ann)
 moduleDef top = do
   name <- moduleName top
-  portList <- Hog.list (Hog.linear 4 10) $ nextPort Nothing Wire
+  portList <- Hog.list (Hog.linear 4 10) $ nextWirePort Nothing
   mi <- Hog.list (Hog.linear 4 100) modItem
   ps <- Hog.list (Hog.linear 0 10) parameter
   context <- get
+  vars <- shareableVariables
   config <- ask
-  let (newPorts, local) = partition (`identElem` portList) $ _variables context
+  let (newPorts, local) = partition (`identElem` portList) $ vars
   let size =
         evalRange (_parameters context) 32
           . sum
@@ -654,7 +738,7 @@ procedural top config = do
   return . Verilog $ mainMod : st ^. modules
   where
     context =
-      Context [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
+      Context [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
