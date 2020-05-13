@@ -92,6 +92,7 @@ data Context a
       { _wires :: [Port],
         _nonblocking :: [Port],
         _blocking :: [Port],
+        _outofscope :: [Port],
         _parameters :: [Parameter],
         _modules :: [ModDecl a],
         _nameCounter :: {-# UNPACK #-} !Int,
@@ -503,6 +504,8 @@ statement = do
 alwaysSeq :: StateGen ann (ModItem ann)
 alwaysSeq = do
   always <- Always . EventCtrl (EPosEdge "clk") . Just <$> seqBlock
+  blk <- fmap _blocking get
+  outofscope %= mappend blk
   blocking .= []
   return always
 
@@ -591,10 +594,12 @@ modInst = do
       let w = _wires context
       let nb = _nonblocking context
       let b = _blocking context
+      let oos = _outofscope context
       modules .= []
       wires .= []
       nonblocking .= []
       blocking .= []
+      outofscope .= []
       parameters .= []
       modDepth -= 1
       chosenMod <- moduleDef Nothing
@@ -605,6 +610,7 @@ modInst = do
       wires .= w
       nonblocking .= nb
       blocking .= b
+      outofscope .= oos
       modules .= chosenMod : currMods <> genMods
       instantiate chosenMod
     else Hog.element (context ^. modules) >>= instantiate
@@ -707,7 +713,7 @@ moduleDef top = do
   context <- get
   vars <- shareableVariables
   config <- ask
-  let (newPorts, local) = partition (`identElem` portList) $ vars
+  let (newPorts, local) = partition (`identElem` portList) $ vars <> _outofscope context
   let size =
         evalRange (_parameters context) 32
           . sum
@@ -738,7 +744,7 @@ procedural top config = do
   return . Verilog $ mainMod : st ^. modules
   where
     context =
-      Context [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
+      Context [] [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
