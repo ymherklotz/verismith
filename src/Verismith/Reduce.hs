@@ -656,7 +656,7 @@ reduce ::
   -- | Reduced output.
   m (SourceInfo ())
 reduce fp eval rsrc =
-  fmap (clearAnn . removeDecl) $
+  fmap clearAnn $
     red "Modules" id id halveModules moduleBot src
       >>= redAll "Module items" idTag idTag halveModItems modItemBot
       >>= redAll "Statements" tagAlways untagAlways halveStatements (const defaultBot)
