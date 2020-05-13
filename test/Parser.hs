@@ -1,35 +1,33 @@
-{-|
-Module      : Parser
-Description : Test the parser.
-Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Portability : POSIX
-
-Test the parser.
--}
-
+-- |
+-- Module      : Parser
+-- Description : Test the parser.
+-- Copyright   : (c) 2019, Yann Herklotz Grave
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Test the parser.
 module Parser
-    ( parserTests
-    , parseUnitTests
-    )
+  ( parserTests,
+    parseUnitTests,
+  )
 where
 
-import           Control.Lens
-import           Data.Either                  (either, isRight)
-import           Hedgehog                     (Gen, Property, (===))
-import qualified Hedgehog                     as Hog
-import qualified Hedgehog.Gen                 as Hog
-import           Test.Tasty
-import           Test.Tasty.Hedgehog
-import           Test.Tasty.HUnit
-import           Text.Parsec
-import           Verismith
-import           Verismith.Internal
-import           Verismith.Verilog.Lex
-import           Verismith.Verilog.Parser
-import           Verismith.Verilog.Preprocess (uncomment)
+import Control.Lens
+import Data.Either (either, isRight)
+import Hedgehog ((===), Gen, Property)
+import qualified Hedgehog as Hog
+import qualified Hedgehog.Gen as Hog
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.Hedgehog
+import Text.Parsec
+import Verismith
+import Verismith.Internal
+import Verismith.Verilog.Lex
+import Verismith.Verilog.Parser
+import Verismith.Verilog.Preprocess (uncomment)
 
 smallConfig :: Config
 smallConfig = defaultConfig & configProperty . propSize .~ 5
@@ -39,93 +37,101 @@ randomMod' = Hog.resize 20 (randomMod 3 10)
 
 parserInputMod :: Property
 parserInputMod = Hog.property $ do
-    v <- GenVerilog <$> Hog.forAll randomMod' :: Hog.PropertyT IO (GenVerilog (ModDecl ()))
-    Hog.assert . isRight $ parse parseModDecl
-                                 "input_test_mod"
-                                 (alexScanTokens . uncomment "test" $ show v)
+  v <- GenVerilog <$> Hog.forAll randomMod' :: Hog.PropertyT IO (GenVerilog (ModDecl ()))
+  Hog.assert . isRight $
+    parse
+      parseModDecl
+      "input_test_mod"
+      (alexScanTokens . uncomment "test" $ show v)
 
 parserIdempotentMod :: Property
 parserIdempotentMod = Hog.property $ do
-    v <- Hog.forAll randomMod' :: Hog.PropertyT IO (ModDecl ())
-    let sv = vshow v
-    p sv === (p . p) sv
+  v <- Hog.forAll randomMod' :: Hog.PropertyT IO (ModDecl ())
+  let sv = vshow v
+  p sv === (p . p) sv
   where
     vshow = show . GenVerilog
     p sv =
-        either (\x -> show x <> "\n" <> sv) vshow
-            . parse parseModDecl "idempotent_test_mod"
-            $ alexScanTokens sv
+      either (\x -> show x <> "\n" <> sv) vshow
+        . parse parseModDecl "idempotent_test_mod"
+        $ alexScanTokens sv
 
 parserInput :: Property
 parserInput = Hog.property $ do
-    v <- Hog.forAll (GenVerilog <$> procedural "top" smallConfig)
-    Hog.assert . isRight $ parse parseModDecl
-                                 "input_test"
-                                 (alexScanTokens . uncomment "test" $ show v)
+  v <- Hog.forAll (GenVerilog <$> (procedural "top" smallConfig :: Gen (Verilog ())))
+  Hog.assert . isRight $
+    parse
+      parseModDecl
+      "input_test"
+      (alexScanTokens . uncomment "test" $ show v)
 
 parserIdempotent :: Property
 parserIdempotent = Hog.property $ do
-    v <- Hog.forAll (procedural "top" smallConfig) :: Hog.PropertyT IO (Verilog ())
-    let sv = vshow v
-    p sv === (p . p) sv
+  v <- Hog.forAll (procedural "top" smallConfig) :: Hog.PropertyT IO (Verilog ())
+  let sv = vshow v
+  p sv === (p . p) sv
   where
     vshow = showT . GenVerilog
-    p sv = either (\x -> showT x <> "\n" <> sv) vshow
-        $ parseVerilog "idempotent_test" sv
+    p sv =
+      either (\x -> showT x <> "\n" <> sv) vshow $
+        parseVerilog "idempotent_test" sv
 
 parserTests :: TestTree
-parserTests = testGroup
+parserTests =
+  testGroup
     "Parser properties"
-    [ testProperty "Input Mod"       parserInputMod
-    , testProperty "Input"           parserInput
-    , testProperty "Idempotence Mod" parserIdempotentMod
-    , testProperty "Idempotence"     parserIdempotent
+    [ testProperty "Input Mod" parserInputMod,
+      testProperty "Input" parserInput,
+      testProperty "Idempotence Mod" parserIdempotentMod,
+      testProperty "Idempotence" parserIdempotent
     ]
 
 testParse :: (Eq a, Show a) => Parser a -> String -> String -> a -> TestTree
 testParse p name input golden =
-    testCase name $ case parse p "testcase" (alexScanTokens input) of
-        Left  e      -> assertFailure $ show e
-        Right result -> golden @=? result
+  testCase name $ case parse p "testcase" (alexScanTokens input) of
+    Left e -> assertFailure $ show e
+    Right result -> golden @=? result
 
 testParseFail :: (Eq a, Show a) => Parser a -> String -> String -> TestTree
 testParseFail p name input =
-    testCase name $ case parse p "testcase" (alexScanTokens input) of
-        Left  _ -> return ()
-        Right _ -> assertFailure "Parse incorrectly succeeded"
+  testCase name $ case parse p "testcase" (alexScanTokens input) of
+    Left _ -> return ()
+    Right _ -> assertFailure "Parse incorrectly succeeded"
 
 parseEventUnit :: TestTree
-parseEventUnit = testGroup
+parseEventUnit =
+  testGroup
     "Event"
-    [ testFailure "No empty event" "@()"
-    , test "@*"   EAll
-    , test "@(*)" EAll
-    , test "@(posedge clk)" $ EPosEdge "clk"
-    , test "@(negedge clk)" $ ENegEdge "clk"
-    , test "@(wire1)" $ EId "wire1"
-    , test "@(a or b or c or d)"
-        $ EOr (EId "a") (EOr (EId "b") (EOr (EId "c") (EId "d")))
-    , test "@(a, b, c, d)"
-        $ EComb (EId "a") (EComb (EId "b") (EComb (EId "c") (EId "d")))
-    , test "@(posedge a or negedge b or c or d)"
-        $ EOr (EPosEdge "a") (EOr (ENegEdge "b") (EOr (EId "c") (EId "d")))
+    [ testFailure "No empty event" "@()",
+      test "@*" EAll,
+      test "@(*)" EAll,
+      test "@(posedge clk)" $ EPosEdge "clk",
+      test "@(negedge clk)" $ ENegEdge "clk",
+      test "@(wire1)" $ EId "wire1",
+      test "@(a or b or c or d)" $
+        EOr (EId "a") (EOr (EId "b") (EOr (EId "c") (EId "d"))),
+      test "@(a, b, c, d)" $
+        EComb (EId "a") (EComb (EId "b") (EComb (EId "c") (EId "d"))),
+      test "@(posedge a or negedge b or c or d)" $
+        EOr (EPosEdge "a") (EOr (ENegEdge "b") (EOr (EId "c") (EId "d")))
     ]
   where
     test a = testParse parseEvent ("Test " <> a) a
     testFailure = testParseFail parseEvent
 
 parseAlwaysUnit :: TestTree
-parseAlwaysUnit = testGroup
+parseAlwaysUnit =
+  testGroup
     "Always"
-    [ test "Empty" "always begin end" $ Always (SeqBlock [])
-    , test "Empty with event @*"             "always @* begin end"
-        $ Always (EventCtrl EAll (Just (SeqBlock [])))
-    , test "Empty with event @(posedge clk)" "always @(posedge clk) begin end"
-        $ Always (EventCtrl (EPosEdge "clk") (Just (SeqBlock [])))
+    [ test "Empty" "always begin end" $ Always (SeqBlock []),
+      test "Empty with event @*" "always @* begin end" $
+        Always (EventCtrl EAll (Just (SeqBlock []))),
+      test "Empty with event @(posedge clk)" "always @(posedge clk) begin end" $
+        Always (EventCtrl (EPosEdge "clk") (Just (SeqBlock [])))
     ]
-    where
-      test :: String -> String -> ModItem () -> TestTree
-      test = testParse parseModItem
+  where
+    test :: String -> String -> ModItem () -> TestTree
+    test = testParse parseModItem
 
 parseUnitTests :: TestTree
 parseUnitTests = testGroup "Parser unit" [parseEventUnit, parseAlwaysUnit]

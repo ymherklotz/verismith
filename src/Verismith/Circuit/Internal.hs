@@ -1,27 +1,25 @@
-{-|
-Module      : Verismith.Circuit.Internal
-Description : Internal helpers for generation.
-Copyright   : (c) 2018-2019, Yann Herklotz
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Portability : POSIX
-
-Internal helpers for generation.
--}
-
+-- |
+-- Module      : Verismith.Circuit.Internal
+-- Description : Internal helpers for generation.
+-- Copyright   : (c) 2018-2019, Yann Herklotz
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Internal helpers for generation.
 module Verismith.Circuit.Internal
-    ( fromNode
-    , filterGr
-    , only
-    , inputs
-    , outputs
-    )
+  ( fromNode,
+    filterGr,
+    only,
+    inputs,
+    outputs,
+  )
 where
 
-import           Data.Graph.Inductive (Graph, Node)
+import Data.Graph.Inductive (Graph, Node)
 import qualified Data.Graph.Inductive as G
-import qualified Data.Text            as T
+import qualified Data.Text as T
 
 -- | Convert an integer into a label.
 --
@@ -36,13 +34,13 @@ filterGr graph f = filter f $ G.nodes graph
 
 -- | Takes two functions that return an 'Int', and compares there results to 0
 -- and not 0 respectively. This result is returned.
-only
-    :: (Graph gr)
-    => gr n e
-    -> (gr n e -> Node -> Int)
-    -> (gr n e -> Node -> Int)
-    -> Node
-    -> Bool
+only ::
+  (Graph gr) =>
+  gr n e ->
+  (gr n e -> Node -> Int) ->
+  (gr n e -> Node -> Int) ->
+  Node ->
+  Bool
 only graph fun1 fun2 n = fun1 graph n == 0 && fun2 graph n /= 0
 
 -- | Returns all the input nodes to a graph, which means nodes that do not have

@@ -1,29 +1,27 @@
-{-|
-Module      : Verismith.Verilog.Token
-Description : Tokens for Verilog parsing.
-Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Portability : POSIX
-
-Tokens for Verilog parsing.
--}
-
+-- |
+-- Module      : Verismith.Verilog.Token
+-- Description : Tokens for Verilog parsing.
+-- Copyright   : (c) 2019, Yann Herklotz Grave
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Tokens for Verilog parsing.
 module Verismith.Verilog.Token
-    ( Token(..)
-    , TokenName(..)
-    , Position(..)
-    , tokenString
-    )
+  ( Token (..),
+    TokenName (..),
+    Position (..),
+    tokenString,
+  )
 where
 
-import           Text.Printf
+import Text.Printf
 
 tokenString :: Token -> String
 tokenString (Token _ s _) = s
 
-data Position = Position String Int Int deriving Eq
+data Position = Position String Int Int deriving (Eq)
 
 instance Show Position where
   show (Position f l c) = printf "%s:%d:%d" f l c

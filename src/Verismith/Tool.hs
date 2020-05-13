@@ -1,55 +1,63 @@
-{-|
-Module      : Verismith.Tool
-Description : Simulator implementations.
-Copyright   : (c) 2019, Yann Herklotz Grave
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Portability : POSIX
-
-Simulator implementations.
--}
-
+-- |
+-- Module      : Verismith.Tool
+-- Description : Simulator implementations.
+-- Copyright   : (c) 2019, Yann Herklotz Grave
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Simulator implementations.
 module Verismith.Tool
-    (
-    -- * Simulators
+  ( -- * Simulators
+
     -- ** Icarus
-      Icarus(..)
-    , defaultIcarus
+    Icarus (..),
+    defaultIcarus,
+
     -- * Synthesisers
+
     -- ** Yosys
-    , Yosys(..)
-    , defaultYosys
+    Yosys (..),
+    defaultYosys,
+
     -- ** Vivado
-    , Vivado(..)
-    , defaultVivado
+    Vivado (..),
+    defaultVivado,
+
     -- ** XST
-    , XST(..)
-    , defaultXST
+    XST (..),
+    defaultXST,
+
     -- ** Quartus
-    , Quartus(..)
-    , defaultQuartus
+    Quartus (..),
+    defaultQuartus,
+
     -- ** Quartus Light
-    , QuartusLight(..)
-    , defaultQuartusLight
+    QuartusLight (..),
+    defaultQuartusLight,
+
     -- ** Identity
-    , Identity(..)
-    , defaultIdentity
+    Identity (..),
+    defaultIdentity,
+
     -- * Equivalence
-    , runEquiv
+    runEquiv,
+
     -- * Simulation
-    , runSim
+    runSim,
+
     -- * Synthesis
-    , runSynth
-    , logger
-    )
+    runSynth,
+    logger,
+  )
 where
 
-import           Verismith.Tool.Icarus
-import           Verismith.Tool.Identity
-import           Verismith.Tool.Internal
-import           Verismith.Tool.Quartus
-import           Verismith.Tool.QuartusLight
-import           Verismith.Tool.Vivado
-import           Verismith.Tool.XST
-import           Verismith.Tool.Yosys
+import Verismith.Tool.Icarus
+import Verismith.Tool.Identity
+import Verismith.Tool.Internal
+import Verismith.Tool.Quartus
+import Verismith.Tool.QuartusLight
+import Verismith.Tool.Vivado
+import Verismith.Tool.XST
+import Verismith.Tool.Yosys
