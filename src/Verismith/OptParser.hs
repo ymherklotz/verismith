@@ -68,6 +68,10 @@ data Opts
         configOptConfigFile :: !(Maybe FilePath),
         configOptDoRandomise :: !Bool
       }
+  | DistanceOpt
+      { distanceOptVerilogA :: !FilePath,
+        distanceOptVerilogB :: !FilePath
+      }
 
 textOption :: Mod OptionFields String -> Parser Text
 textOption = fmap T.pack . Opt.strOption
@@ -283,6 +287,18 @@ configOpts =
                 "Randomise the given default config, or the default config by randomly switchin on and off options."
         )
 
+distanceOpts :: Parser Opts
+distanceOpts =
+  DistanceOpt
+    <$> ( fromText . T.pack
+            <$> Opt.strArgument
+              (Opt.metavar "FILE" <> Opt.help "First verilog file.")
+        )
+    <*> ( fromText . T.pack
+            <$> Opt.strArgument
+              (Opt.metavar "FILE" <> Opt.help "Second verilog file.")
+        )
+
 argparse :: Parser Opts
 argparse =
   Opt.hsubparser
@@ -337,6 +353,17 @@ argparse =
               )
           )
           <> Opt.metavar "config"
+      )
+    <|> Opt.hsubparser
+      ( Opt.command
+          "distance"
+          ( Opt.info
+              distanceOpts
+              ( Opt.progDesc
+                  "Calculate the distance between two different pieces of Verilog."
+              )
+          )
+          <> Opt.metavar "distance"
       )
 
 version :: Parser (a -> a)

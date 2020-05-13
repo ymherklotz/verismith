@@ -13,6 +13,7 @@ where
 import Data.Either (either, isRight)
 import qualified Data.Graph.Inductive as G
 import Data.Text (Text)
+import Distance (distanceTests)
 import Hedgehog ((===), Gen, Property)
 import qualified Hedgehog as Hog
 import qualified Hedgehog.Gen as Hog
@@ -47,5 +48,6 @@ propertyTests =
   testGroup
     "Property Tests"
     [ testProperty "acyclic graph generation check" acyclicGraph,
-      parserTests
+      parserTests,
+      distanceTests
     ]
