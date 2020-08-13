@@ -1,4 +1,7 @@
-# Verismith [![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
+# Verismith
+
+[![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3598790.svg)](https://doi.org/10.5281/zenodo.3598790)
 
 Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog.
 
