@@ -3,6 +3,7 @@
 [![Build Status](https://travis-ci.com/ymherklotz/verismith.svg?token=qfBKKGwxeWkjDsy7e16x&branch=master)](https://travis-ci.com/ymherklotz/verismith)
 [![FPGA'20 DOI](https://img.shields.io/badge/FPGA'20%20DOI-10.1145%2F3373087.3375310-blue)](https://doi.org/10.1145/3373087.3375310)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3598790.svg)](https://doi.org/10.5281/zenodo.3598790)
+[![Hackage](https://img.shields.io/hackage/v/verismith?color=614f88)](http://hackage.haskell.org/package/verismith)
 
 Verilog Fuzzer to test the major verilog compilers by generating random, valid and deterministic Verilog.
 
