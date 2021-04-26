@@ -113,10 +113,11 @@ portDir PortInOut = "inout"
 -- | Generate a '(ModItem ann)'.
 moduleItem :: Show ann => ModItem ann -> Doc a
 moduleItem (ModCA ca) = contAssign ca
-moduleItem (ModInst i name conn) =
+moduleItem (ModInst i param name conn) =
   (<> semi) $
     hsep
       [ identifier i,
+        "#" <> (parens . hsep $ punctuate comma (mConn <$> param)),
         identifier name,
         parens . hsep $ punctuate comma (mConn <$> conn)
       ]

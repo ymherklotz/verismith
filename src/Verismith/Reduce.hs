@@ -294,7 +294,7 @@ isModule :: Identifier -> (ModDecl ReduceAnn) -> Bool
 isModule i (ModDecl n _ _ _ _) = i == n
 
 modInstActive :: [(ModDecl ReduceAnn)] -> (ModItem ReduceAnn) -> [Identifier]
-modInstActive decl (ModInst n _ i) = case m of
+modInstActive decl (ModInst n _ _ i) = case m of
   Nothing -> []
   Just m' -> concat $ calcActive m' <$> zip i [0 ..]
   where
@@ -308,9 +308,9 @@ modInstActive decl (ModInst n _ i) = case m of
 modInstActive _ _ = []
 
 fixModInst :: (SourceInfo ReduceAnn) -> (ModItem ReduceAnn) -> (ModItem ReduceAnn)
-fixModInst (SourceInfo _ (Verilog decl)) (ModInst n g i) = case m of
+fixModInst (SourceInfo _ (Verilog decl)) (ModInst n p g i) = case m of
   Nothing -> error "Moditem not found"
-  Just m' -> ModInst n g . mapMaybe (fixModInst' m') $ zip i [0 ..]
+  Just m' -> ModInst n p g . mapMaybe (fixModInst' m') $ zip i [0 ..]
   where
     m = safe head $ filter (isModule n) decl
     fixModInst' (ModDecl _ o i' _ _) (ModConn e, n')
@@ -391,7 +391,7 @@ halveAlways a = Single a
 
 -- | Check if a mod instance is in the current context.
 validModInst :: [Identifier] -> (ModItem ReduceAnn) -> Bool
-validModInst ids (ModInst i _ _) = i `elem` ids
+validModInst ids (ModInst i _ _ _) = i `elem` ids
 validModInst _ _ = True
 
 -- | Clean all the undefined module instances in a specific module using a

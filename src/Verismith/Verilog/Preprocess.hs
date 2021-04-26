@@ -28,6 +28,7 @@ uncomment file = uncomment'
       "" -> ""
       '/' : '/' : rest -> "  " ++ removeEOL rest
       '/' : '*' : rest -> "  " ++ remove rest
+      '(' : '*' : ')' : rest -> '(' : '*' : ')' : rest ++ remove rest
       '(' : '*' : rest -> "  " ++ remove rest
       '"' : rest -> '"' : ignoreString rest
       b : rest -> b : uncomment' rest
@@ -92,6 +93,7 @@ preprocess env file content =
           "" : pp (head stack) (tail stack) env_ rest
         | otherwise ->
           error $ "`endif  without associated `ifdef/`ifndef: " ++ file
+      "`timescale" : _ -> pp on stack env_ rest
       _ -> (if on then ppLine env_ a else "") : pp on stack env_ rest
 
 ppLine :: [(String, String)] -> String -> String

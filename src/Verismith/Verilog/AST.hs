@@ -663,6 +663,7 @@ data ModItem a
   = ModCA {_modContAssign :: !ContAssign}
   | ModInst
       { _modInstId :: {-# UNPACK #-} !Identifier,
+        _modInstDecl :: [ModConn],
         _modInstName :: {-# UNPACK #-} !Identifier,
         _modInstConns :: [ModConn]
       }
@@ -687,7 +688,7 @@ instance Functor ModItem where
   fmap f (Initial s) = Initial $ fmap f s
   fmap f (Always s) = Always $ fmap f s
   fmap _ (ModCA c) = ModCA c
-  fmap _ (ModInst a b c) = ModInst a b c
+  fmap _ (ModInst a b c d) = ModInst a b c d
   fmap _ (Decl a b c) = Decl a b c
   fmap _ (ParamDecl p) = ParamDecl p
   fmap _ (LocalParamDecl l) = LocalParamDecl l
@@ -726,8 +727,8 @@ traverseModConn f (ModConnNamed a e) = ModConnNamed a <$> f e
 
 traverseModItem :: (Applicative f) => (Expr -> f Expr) -> (ModItem ann) -> f (ModItem ann)
 traverseModItem f (ModCA (ContAssign a e)) = ModCA . ContAssign a <$> f e
-traverseModItem f (ModInst a b e) =
-  ModInst a b <$> sequenceA (traverseModConn f <$> e)
+traverseModItem f (ModInst a b c e) =
+  ModInst a b c <$> sequenceA (traverseModConn f <$> e)
 traverseModItem _ e = pure e
 
 -- | The complete sourcetext for the Verilog module.

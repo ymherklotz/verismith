@@ -128,7 +128,7 @@ instance Mutate LocalParam where
 
 instance Mutate (ModItem ann) where
   mutExpr f (ModCA (ContAssign a e)) = ModCA . ContAssign a $ f e
-  mutExpr f (ModInst a b conns) = ModInst a b $ mutExpr f conns
+  mutExpr f (ModInst a params b conns) = ModInst a (mutExpr f params) b $ mutExpr f conns
   mutExpr f (Initial s) = Initial $ mutExpr f s
   mutExpr f (Always s) = Always $ mutExpr f s
   mutExpr f (ModItemAnn a s) = ModItemAnn a $ mutExpr f s
@@ -244,7 +244,7 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
         <*> pure Nothing
     inst =
       ModInst
-        (m ^. modId)
+        (m ^. modId) []
         (m ^. modId <> (Identifier . showT $ count + 1))
         conns
     count =
@@ -263,7 +263,7 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
 -- m m(y, x);
 -- <BLANKLINE>
 instantiateMod_ :: (ModDecl ann) -> (ModItem ann)
-instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
+instantiateMod_ m = ModInst (m ^. modId) [] (m ^. modId) conns
   where
     conns =
       ModConn
@@ -278,7 +278,7 @@ instantiateMod_ m = ModInst (m ^. modId) (m ^. modId) conns
 -- m m(.y(y), .x(x));
 -- <BLANKLINE>
 instantiateModSpec_ :: Text -> (ModDecl ann) -> (ModItem ann)
-instantiateModSpec_ outChar m = ModInst (m ^. modId) (m ^. modId) conns
+instantiateModSpec_ outChar m = ModInst (m ^. modId) [] (m ^. modId) conns
   where
     conns = zipWith ModConnNamed ids (Id <$> instIds)
     ids = filterChar outChar (name modOutPorts) <> name modInPorts

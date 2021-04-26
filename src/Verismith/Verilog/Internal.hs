@@ -62,6 +62,7 @@ testBench =
       wireDecl "c",
       ModInst
         "and"
+        []
         "and_gate"
         [ModConn $ Id "c", ModConn $ Id "a", ModConn $ Id "b"],
       Initial $

@@ -542,8 +542,8 @@ instantiate (ModDecl i outP inP _ _) = do
     $ inpFixed ^.. traverse . portSize
   ident <- makeIdentifier "modinst"
   Hog.choice
-    [ return . ModInst i ident $ ModConn <$> (toE (outs <> clkPort <> ins) <> insLit),
-      ModInst i ident
+    [ return . ModInst i [] ident $ ModConn <$> (toE (outs <> clkPort <> ins) <> insLit),
+      ModInst i [] ident
         <$> Hog.shuffle
           ( zipWith
               ModConnNamed

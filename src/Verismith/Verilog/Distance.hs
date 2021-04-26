@@ -142,7 +142,7 @@ instance Distance (Statement a) where
 
 instance Distance (ModItem a) where
   distance (ModCA _) (ModCA _) = 0
-  distance (ModInst _ _ _) (ModInst _ _ _) = 0
+  distance (ModInst _ _ _ _) (ModInst _ _ _ _) = 0
   distance (Initial _) (Initial _) = 0
   distance (Always s1) (Always s2) = distance s1 s2
   distance (Decl _ _ _) (Decl _ _ _) = 0

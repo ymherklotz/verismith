@@ -224,6 +224,16 @@ prefix name fun = Prefix ((tok name <?> "prefix") >> return fun)
 commaSep :: Parser a -> Parser [a]
 commaSep = flip sepBy $ tok SymComma
 
+toNE :: Parser [a] -> Parser (NonEmpty a)
+toNE p = do
+  p' <- p
+  case p' of
+    a : b -> return $ a :| b
+    _ -> fail "List is empty."
+
+commaSepNE :: Parser a -> Parser (NonEmpty a)
+commaSepNE = toNE . commaSep
+
 parseContAssign :: Parser ContAssign
 parseContAssign = do
   var <- tok KWAssign *> identifier
@@ -347,6 +357,22 @@ parseLoop = do
   statement <- parseStatement
   return $ ForLoop a expr incr statement
 
+parseDefaultPair :: Parser (Statement a)
+parseDefaultPair = tok' KWDefault *> tok' SymColon *> parseStatement
+
+parseCasePair :: Parser (CasePair ann)
+parseCasePair = do
+  expr <- parseExpr <* tok' SymColon
+  CasePair expr <$> parseStatement
+
+parseCase :: Parser (Statement ann)
+parseCase = do
+  expr <- tok' KWCase *> parseExpr
+  cp <- manyTill parseCasePair (lookAhead ((parseDefaultPair $> ()) <|> tok' KWEndcase))
+  def <- option Nothing $ Just <$> parseDefaultPair
+  tok' KWEndcase
+  return (StmntCase CaseStandard expr cp def)
+
 eventList :: TokenName -> Parser [Event]
 eventList t = do
   l <- sepBy parseEvent' (tok t)
@@ -354,14 +380,11 @@ eventList t = do
 
 parseEvent :: Parser Event
 parseEvent =
-  tok' SymAtAster
-    $> EAll
+  (tok' SymAtAster $> EAll)
     <|> try (tok' SymAt *> tok' SymParenLAsterParenR $> EAll)
     <|> try
       ( tok' SymAt
-          *> tok' SymParenL
-          *> tok' SymAster
-          *> tok' SymParenR
+          *> parens (tok' SymAster)
           $> EAll
       )
     <|> try (tok' SymAt *> parens parseEvent')
@@ -410,6 +433,7 @@ parseStatement =
   parseSeq
     <|> parseConditional
     <|> parseLoop
+    <|> parseCase
     <|> parseEventCtrl
     <|> parseDelayCtrl
     <|> try parseBlocking
@@ -437,10 +461,30 @@ parseModConn = try (fmap ModConn parseExpr) <|> namedModConn
 parseModInst :: Parser (ModItem ann)
 parseModInst = do
   m <- identifier
+  params <- option [] $ tok' SymPound *> parens (commaSep parseModConn)
   name <- identifier
   modconns <- parens (commaSep parseModConn)
   tok' SymSemi
-  return $ ModInst m name modconns
+  return $ ModInst m params name modconns
+
+parseParam :: Parser Parameter
+parseParam = do
+  i <- tok' KWParameter *> identifier
+  expr <- tok' SymEq *> parseConstExpr
+  return $ Parameter i expr
+
+parseParam' :: Parser Parameter
+parseParam' = do
+  i <- identifier
+  expr <- tok' SymEq *> parseConstExpr
+  return $ Parameter i expr
+
+parseParams :: Parser [Parameter]
+parseParams = tok' SymPound *> parens (commaSep parseParam)
+
+parseParamDecl :: Parser (ModItem ann)
+parseParamDecl =
+  ParamDecl <$> (tok' KWParameter *> commaSepNE parseParam' <* tok' SymSemi)
 
 parseModItem :: Parser (ModItem ann)
 parseModItem =
@@ -449,6 +493,7 @@ parseModItem =
     <|> parseAlways
     <|> parseInitial
     <|> parseModInst
+    <|> parseParamDecl
 
 parseModList :: Parser [Identifier]
 parseModList = list <|> return [] where list = parens $ commaSep identifier
@@ -459,15 +504,6 @@ filterDecl _ _ = False
 
 modPorts :: PortDir -> [ModItem ann] -> [Port]
 modPorts p mis = filter (filterDecl p) mis ^.. traverse . declPort
-
-parseParam :: Parser Parameter
-parseParam = do
-  i <- tok' KWParameter *> identifier
-  expr <- tok' SymEq *> parseConstExpr
-  return $ Parameter i expr
-
-parseParams :: Parser [Parameter]
-parseParams = tok' SymPound *> parens (commaSep parseParam)
 
 parseModDecl :: Parser (ModDecl ann)
 parseModDecl = do
