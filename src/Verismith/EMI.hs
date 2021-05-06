@@ -1,0 +1,11 @@
+-- |
+-- Module      : Verismith.EMI
+-- Description : Definition of the circuit graph.
+-- Copyright   : (c) 2021, Yann Herklotz
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Portability : POSIX
+--
+-- Equivalence modulo inputs (EMI) testing.  This file should get an existing design, and spit out a
+-- modified design that is equivalent under some specific values of the extra inputs.
