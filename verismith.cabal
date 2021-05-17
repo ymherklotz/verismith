@@ -42,6 +42,7 @@ library
                  , Verismith.Circuit.Random
                  , Verismith.Config
                  , Verismith.CounterEg
+                 , Verismith.EMI
                  , Verismith.Fuzz
                  , Verismith.Generate
                  , Verismith.Internal

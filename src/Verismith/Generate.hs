@@ -20,6 +20,23 @@ module Verismith.Generate
     proceduralSrcIO,
     randomMod,
 
+    -- ** Data types
+    EMIContext(..),
+    emiNewInputs,
+    Context(..),
+    wires,
+    nonblocking,
+    blocking,
+    outofscope,
+    parameters,
+    modules,
+    nameCounter,
+    stmntDepth,
+    modDepth,
+    determinism,
+    emiContext,
+    StateGen(..),
+
     -- ** Generate Functions
     largeNum,
     wireSize,
@@ -87,6 +104,11 @@ import Verismith.Verilog.Eval
 import Verismith.Verilog.Internal
 import Verismith.Verilog.Mutate
 
+data EMIContext = EMIContext { _emiNewInputs :: [Port]
+                             }
+
+makeLenses ''EMIContext
+
 data Context a
   = Context
       { _wires :: [Port],
@@ -98,7 +120,8 @@ data Context a
         _nameCounter :: {-# UNPACK #-} !Int,
         _stmntDepth :: {-# UNPACK #-} !Int,
         _modDepth :: {-# UNPACK #-} !Int,
-        _determinism :: !Bool
+        _determinism :: !Bool,
+        _emiContext :: !(Maybe EMIContext)
       }
 
 makeLenses ''Context
@@ -744,7 +767,7 @@ procedural top config = do
   return . Verilog $ mainMod : st ^. modules
   where
     context =
-      Context [] [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
+      Context [] [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True Nothing
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
