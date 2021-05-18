@@ -97,3 +97,21 @@ proceduralEMI moddecl config = do
 
 proceduralEMIIO :: ModDecl () -> Config -> IO (ModDecl ())
 proceduralEMIIO t = Hog.sample . proceduralEMI t
+
+-- m = (head . head $ [verilog|
+-- module m;
+--   always @(posedge clk) begin
+--     if (z == 2) begin
+--       ry = 2;
+--     end
+--     x <= y;
+--     y <= z;
+--   end
+-- endmodule
+-- |] ^.. _Wrapped )
+-- p :: Show a => ModDecl a -> IO ()
+-- p = T.putStrLn . genSource
+--
+-- customConfig = defaultConfig &
+--     (configEMI . confEMIGenerateProb .~ 1)
+--   . (configEMI . confEMINoGenerateProb .~ 0)

@@ -101,7 +101,7 @@ randDelete i = do
   return $ if r then i else 0
 
 randomise :: Config -> IO Config
-randomise config@(Config a _ c d e) = do
+randomise config@(Config emi a _ c d e) = do
   mia <- return $ cm ^. probModItemAssign
   misa <- return $ cm ^. probModItemSeqAlways
   mica <- return $ cm ^. probModItemCombAlways
@@ -124,6 +124,7 @@ randomise config@(Config a _ c d e) = do
   eus <- randDelete $ ce ^. probExprUnsigned
   return $
     Config
+      emi
       a
       ( Probability
           (ProbModItem mia misa mica mii)
@@ -162,6 +163,11 @@ handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc checker) 
       )
       defaultYosys
       (fuzzMultiple gen)
+  return ()
+handleOpts (EMIOpts o configF f k n nosim noequiv noreduction) = do
+  config <- getConfig configF
+  datadir <- getDataDir
+  putStrLn "Starting EMI testing..."
   return ()
 handleOpts (Generate f c) = do
   config <- getConfig c
