@@ -31,6 +31,9 @@ module Verismith.Config
     -- *** Module
     ProbMod (..),
 
+    -- ** EMI Configuration
+    ConfEMI(..),
+
     -- ** ConfProperty
     ConfProperty (..),
 
@@ -46,10 +49,13 @@ module Verismith.Config
     fromVivado,
     fromQuartus,
     fromQuartusLight,
+    configEMI,
     configProbability,
     configProperty,
     configSimulators,
     configSynthesisers,
+    confEMIGenerateProb,
+    confEMINoGenerateProb,
     probModItem,
     probMod,
     probModDropOutput,
@@ -240,6 +246,14 @@ data Probability
       }
   deriving (Eq, Show)
 
+data ConfEMI
+  = ConfEMI
+      { -- | Probability of generating a new EMI statement with a new EMI entry.
+        _confEMIGenerateProb :: {-# UNPACK #-} !Int,
+        _confEMINoGenerateProb :: {-# UNPACK #-} !Int
+      }
+  deriving (Eq, Show)
+
 -- | @[property]@: properties for the generated Verilog file.
 data ConfProperty
   = ConfProperty
@@ -310,7 +324,8 @@ data SynthDescription
 
 data Config
   = Config
-      { _configInfo :: Info,
+      { _configEMI :: {-# UNPACK #-} !ConfEMI,
+        _configInfo :: {-# UNPACK #-} !Info,
         _configProbability :: {-# UNPACK #-} !Probability,
         _configProperty :: {-# UNPACK #-} !ConfProperty,
         _configSimulators :: [SimDescription],
@@ -327,6 +342,8 @@ $(makeLenses ''ProbStatement)
 $(makeLenses ''ProbMod)
 
 $(makeLenses ''Probability)
+
+$(makeLenses ''ConfEMI)
 
 $(makeLenses ''ConfProperty)
 
@@ -380,6 +397,7 @@ fromQuartusLight (QuartusLight a b c) =
 defaultConfig :: Config
 defaultConfig =
   Config
+    (ConfEMI 2 8)
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr defMod)
     (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1 Nothing)
@@ -553,6 +571,18 @@ synthesiser =
     <*> Toml.dioptional (Toml.text "output")
     .= synthOut
 
+emiCodec :: TomlCodec ConfEMI
+emiCodec =
+  ConfEMI
+    <$> defaultValue
+      (defaultConfig ^. configEMI . confEMIGenerateProb)
+      (Toml.int "generate_prob")
+    .= _confEMIGenerateProb
+    <*> defaultValue
+      (defaultConfig ^. configEMI . confEMINoGenerateProb)
+      (Toml.int "nogenerate_prob")
+    .= _confEMINoGenerateProb
+
 infoCodec :: TomlCodec Info
 infoCodec =
   Info
@@ -569,6 +599,10 @@ configCodec :: TomlCodec Config
 configCodec =
   Config
     <$> defaultValue
+      (defaultConfig ^. configEMI)
+      (Toml.table emiCodec "emi")
+    .= _configEMI
+    <*> defaultValue
       (defaultConfig ^. configInfo)
       (Toml.table infoCodec "info")
     .= _configInfo
