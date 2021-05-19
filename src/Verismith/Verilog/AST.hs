@@ -133,6 +133,8 @@ module Verismith.Verilog.AST
     modInPorts,
     modItems,
     modParams,
+    _ModDeclAnn,
+    _ModDecl,
     ModItem (..),
     modContAssign,
     modInstId,
@@ -174,6 +176,7 @@ class Functor m => Annotations m where
   removeAnn :: m a -> m a
   clearAnn :: m a -> m ()
   clearAnn = fmap (\_ -> ()) . removeAnn
+  collectAnn :: m a -> [a]
 
 -- | Identifier in Verilog. This is just a string of characters that can either
 -- be lowercase and uppercase for now. This might change in the future though,
@@ -537,6 +540,7 @@ instance Functor CasePair where
 
 instance Annotations CasePair where
   removeAnn (CasePair e s) = CasePair e $ removeAnn s
+  collectAnn (CasePair _ s) = collectAnn s
 
 traverseStmntCasePair ::
   Functor f =>
@@ -636,6 +640,14 @@ instance Annotations Statement where
   removeAnn (StmntCase ct ce cp cdef) = StmntCase ct ce (fmap removeAnn cp) $ fmap removeAnn cdef
   removeAnn (ForLoop a b c s) = ForLoop a b c $ removeAnn s
   removeAnn s = s
+  collectAnn (StmntAnn _ s) = collectAnn s
+  collectAnn (TimeCtrl _ s) = concatMap collectAnn s
+  collectAnn (EventCtrl _ s) = concatMap collectAnn s
+  collectAnn (SeqBlock s) = concatMap collectAnn s
+  collectAnn (CondStmnt _ ms1 ms2) = concatMap collectAnn ms1 <> concatMap collectAnn ms2
+  collectAnn (StmntCase _ _ cp cdef) =  concatMap collectAnn cp <> concatMap collectAnn cdef
+  collectAnn (ForLoop _ _ _ s) = collectAnn s
+  collectAnn _ = []
 
 -- | Parameter that can be assigned in blocks or modules using @parameter@.
 data Parameter
@@ -669,6 +681,12 @@ data ModItem a
       }
   | Initial !(Statement a)
   | Always !(Statement a)
+  | Property
+      { _moditemPropLabel :: {-# UNPACK #-} !Identifier,
+        _moditemPropEvent :: !Event,
+        _moditemPropBodyL :: Maybe Expr,
+        _moditemPropBodyR :: Expr
+      }
   | Decl
       { _declDir :: !(Maybe PortDir),
         _declPort :: !Port,
@@ -698,6 +716,10 @@ instance Annotations ModItem where
   removeAnn (Initial s) = Initial $ removeAnn s
   removeAnn (Always s) = Always $ removeAnn s
   removeAnn mi = mi
+  collectAnn (ModItemAnn _ mi) = collectAnn mi
+  collectAnn (Initial s) = collectAnn s
+  collectAnn (Always s) = collectAnn s
+  collectAnn mi = []
 
 -- | 'module' module_identifier [list_of_ports] ';' { module_item } 'end_module'
 data ModDecl a
@@ -711,7 +733,12 @@ data ModDecl a
   | ModDeclAnn a (ModDecl a)
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
+instance Plated (ModDecl a) where
+  plate f (ModDeclAnn b m) = ModDeclAnn b <$> plate f m
+  plate _ m = pure m
+
 $(makeLenses ''ModDecl)
+$(makePrisms ''ModDecl)
 
 instance Functor ModDecl where
   fmap f (ModDecl i out inp mis params) = ModDecl i out inp (fmap f <$> mis) params
@@ -720,6 +747,8 @@ instance Functor ModDecl where
 instance Annotations ModDecl where
   removeAnn (ModDecl i out inp mis params) = ModDecl i out inp (fmap removeAnn mis) params
   removeAnn (ModDeclAnn _ mi) = mi
+  collectAnn (ModDecl _ _ _ mis _) = concatMap collectAnn mis
+  collectAnn (ModDeclAnn a mi) = a : collectAnn mi
 
 traverseModConn :: (Applicative f) => (Expr -> f Expr) -> ModConn -> f ModConn
 traverseModConn f (ModConn e) = ModConn <$> f e

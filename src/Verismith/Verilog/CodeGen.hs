@@ -133,6 +133,12 @@ moduleItem (Decl dir p ini) =
 moduleItem (ParamDecl p) = hcat [paramList p, semi]
 moduleItem (LocalParamDecl p) = hcat [localParamList p, semi]
 moduleItem (ModItemAnn a mi) = sep [hsep ["/*", pretty $ show a, "*/"], moduleItem mi]
+moduleItem (Property l e bl br) =
+  sep [hcat [identifier l, ":"], "assume property", parens $ event e,
+       hcat [case bl of
+               Just bl' -> sep [expr bl', "|=>", expr br]
+               Nothing -> expr br, semi]
+      ]
 
 mConn :: ModConn -> Doc a
 mConn (ModConn c) = expr c
