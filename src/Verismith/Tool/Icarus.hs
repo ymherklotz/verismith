@@ -12,6 +12,7 @@ module Verismith.Tool.Icarus
   ( Icarus (..),
     defaultIcarus,
     runSimIc,
+    runSimIcEMI,
     runSimIcEC,
   )
 where
@@ -175,6 +176,45 @@ tbModule bss top =
   where
     inConcat = (RegConcat . filter (/= (Id "clk")) $ (Id . fromPort <$> (top ^. modInPorts)))
 
+tbModule' :: [Identifier] -> [ByteString] -> (ModDecl ann) -> (Verilog ann)
+tbModule' ids bss top =
+  Verilog
+    [ instantiateMod top $
+        ModDecl
+          "testbench"
+          []
+          []
+          [ Initial $
+              fold
+                [ BlockAssign (Assign "clk" Nothing 0),
+                  BlockAssign (Assign inConcat Nothing 0),
+                  BlockAssign (Assign inIds Nothing 0)
+                ]
+                <> fold
+                  ( ( \r ->
+                        TimeCtrl
+                          10
+                          (Just $ BlockAssign (Assign inConcat Nothing r))
+                    )
+                      . fromInteger
+                      . fromBytes <$> bss
+                  )
+                <> (TimeCtrl 10 . Just . SysTaskEnable $ Task "finish" []),
+            Always . TimeCtrl 5 . Just $
+              BlockAssign
+                (Assign "clk" Nothing (UnOp UnNot (Id "clk"))),
+            Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable $
+              Task "strobe" ["%b", Id "y"]
+          ]
+          []
+    ]
+  where
+    inConcat = (RegConcat
+                . filter (flip notElem $ fmap Id ids)
+                . filter (/= (Id "clk"))
+                $ (Id . fromPort <$> (top ^. modInPorts)))
+    inIds = RegConcat $ fmap Id ids
+
 counterTestBench :: CounterEg -> (ModDecl ann) -> (Verilog ann)
 counterTestBench (CounterEg _ states) m = tbModule filtered m
   where
@@ -230,15 +270,34 @@ runSimIc ::
   -- | Synthesis tool to be tested.
   b ->
   -- | Original generated program to test.
-  (SourceInfo ann) ->
+  SourceInfo ann ->
   -- | Test vectors to be passed as inputs to the generated Verilog.
   [ByteString] ->
-  -- | What the correct output should be. If
-  -- 'Nothing' is passed, then just return 'Pass
-  -- ByteString' with the answer.
+  -- | What the correct output should be. If 'Nothing' is passed, then just return 'Pass ByteString'
+  -- with the answer.
   Maybe ByteString ->
   ResultSh ByteString
 runSimIc = runSimIc' tbModule
+
+runSimIcEMI ::
+  (Synthesiser b, Show ann) =>
+  -- | EMI Ids
+  [Identifier] ->
+  -- | Data directory.
+  FilePath ->
+  -- | Icarus simulator.
+  Icarus ->
+  -- | Synthesis tool to be tested.
+  b ->
+  -- | Original generated program to test.
+  SourceInfo ann ->
+  -- | Test vectors to be passed as inputs to the generated Verilog.
+  [ByteString] ->
+  -- | What the correct output should be. If 'Nothing' is passed, then just return 'Pass ByteString'
+  -- with the answer.
+  Maybe ByteString ->
+  ResultSh ByteString
+runSimIcEMI ids = runSimIc' (tbModule' ids)
 
 runSimIcEC ::
   (Synthesiser b, Show ann) =>

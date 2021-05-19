@@ -324,10 +324,6 @@ equivalence src = do
       where
         dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
-equivalenceEMI :: (MonadBaseControl IO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
-equivalenceEMI src = do
-  datadir <- fmap _fuzzDataDir askOpts
-
 simulation :: (MonadIO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
 simulation src = do
   datadir <- fmap _fuzzDataDir askOpts
@@ -362,6 +358,31 @@ simulation src = do
           writefile "syn_identity.v" $ genSource src
         ident <- runSimIcEC datadir defaultIcarus defaultIdentitySynth src b Nothing
         runSimIcEC datadir defaultIcarus a src b (Just ident)
+      where
+        dir = fromText $ "countereg_sim_" <> toText a
+
+simulationEMI :: (MonadIO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
+simulationEMI src = do
+  datadir <- fmap _fuzzDataDir askOpts
+  synth <- passedSynthesis
+  counterEgs <- failEquivWithIdentityCE
+  vals <- liftIO $ generateByteString Nothing 32 20
+  ident <- liftSh $ sim datadir vals Nothing defaultIdentitySynth
+  resTimes <- liftSh $ mapM (sim datadir vals (justPass $ snd ident)) synth
+  fuzzSimResults .= toSimResult defaultIcarusSim vals synth resTimes
+  liftSh
+    . inspect
+    $ (\(_, r) -> bimap show (T.unpack . T.take 10 . showBS) r)
+      <$> (ident : resTimes)
+  where
+    sim datadir b i a = toolRun ("simulation for " <> toText a) . runResultT $ do
+      make dir
+      pop dir $ do
+        liftSh $ do
+          cp (fromText ".." </> fromText (toText a) </> synthOutput a) $
+            synthOutput a
+          writefile "rtl.v" $ genSource src
+        runSimIc datadir defaultIcarus a src b i
       where
         dir = fromText $ "countereg_sim_" <> toText a
 
@@ -610,24 +631,13 @@ fuzzEMI gen = do
       . propSeed
         ?~ seed'
   (tsynth, _) <- titleRun "Synthesis" $ synthesis src
-  (tequiv, _) <-
-    if (_fuzzOptsNoEquiv opts)
-      then return (0, mempty)
-      else titleRun "Equivalence Check" $ equivalenceEMI src
   (_, _) <-
     if (_fuzzOptsNoSim opts)
       then return (0, mempty)
-      else titleRun "Simulation" $ simulation src
+      else titleRun "Simulation" $ simulationEMI src
   fails <- failEquivWithIdentity
   failedSim <- failedSimulations
   synthFails <- failedSynthesis
-  redResult <-
-    whenMaybe
-      ( not (null failedSim && null fails && null synthFails)
-          && not (_fuzzOptsNoReduction opts)
-      )
-      . titleRun "Reduction"
-      $ reduction src
   state_ <- get
   currdir <- liftSh pwd
   let vi = flip view state_
@@ -639,6 +649,6 @@ fuzzEMI gen = do
           (vi fuzzSynthStatus)
           size
           tsynth
-          tequiv
-          (getTime redResult)
+          0
+          0
   return report
