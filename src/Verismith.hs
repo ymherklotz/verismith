@@ -160,8 +160,6 @@ handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc checker) 
           (toFP datadir)
           cc
           checker
-      )
-      defaultYosys
       (fuzzMultiple gen)
   return ()
 handleOpts (EMIOpts o configF f k n nosim noequiv noreduction) = do

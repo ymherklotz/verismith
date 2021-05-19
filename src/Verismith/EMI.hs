@@ -12,8 +12,6 @@
 -- Equivalence modulo inputs (EMI) testing.  This file should get an existing design, and spit out a
 -- modified design that is equivalent under some specific values of the extra inputs.
 module Verismith.EMI
-  ( genEMI,
-  )
 where
 
 import Control.Lens hiding (Context)
@@ -21,6 +19,7 @@ import Control.Monad (replicateM)
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Data.Text (Text)
+import Data.List (intercalate)
 import qualified Data.Text as T
 import Hedgehog (Gen, GenT, MonadGen)
 import qualified Hedgehog as Hog
@@ -39,6 +38,14 @@ import Verismith.Generate
 import Verismith.Verilog.CodeGen
 import Verismith.Verilog.Quote
 import qualified Data.Text.IO as T
+
+data EMIInputs a = EMIInputs [Identifier]
+                 | EMIOrig a
+                 deriving (Eq)
+
+instance Show a => Show (EMIInputs a) where
+  show (EMIInputs i) = "EMI: " <> intercalate ", " (T.unpack . getIdentifier <$> i)
+  show (EMIOrig a) = show a
 
 newPort' :: Identifier -> StateGen a Port
 newPort' ident = do
@@ -68,26 +75,32 @@ moditemEMI :: ModItem a -> StateGen a (ModItem a)
 moditemEMI (Always s) = Always <$> transformM statementEMI s
 moditemEMI m = return m
 
-genEMI :: (ModDecl a) -> StateGen a (ModDecl a)
-genEMI (ModDecl mid outp inp itms params) = do
-  itms' <- traverse moditemEMI itms
-  return (ModDecl mid outp inp itms' params)
+moddeclEMI :: ModDecl a -> StateGen a (ModDecl (EMIInputs a))
+moddeclEMI m = do
+  emiContext._Just.emiNewInputs .= []
+  m' <- traverseOf (modItems.traverse) moditemEMI m
+  c <- use (emiContext._Just.emiNewInputs)
+  return (ModDeclAnn (EMIInputs (c^..traverse.portName)) (fmap (\x -> EMIOrig x) m'))
+
+sourceEMI :: (SourceInfo a) -> StateGen a (SourceInfo (EMIInputs a))
+sourceEMI s =
+  traverseOf (infoSrc._Wrapped.traverse) moddeclEMI s
 
 initNewRegs :: [Port] -> ModDecl a -> ModDecl a
 initNewRegs ps m = m & modItems %~ (++ (Decl (Just PortIn) <$> ps <*> pure Nothing))
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
-proceduralEMI :: ModDecl a -> Config -> Gen (ModDecl a)
-proceduralEMI moddecl config = do
+proceduralEMI :: SourceInfo a -> Config -> Gen (SourceInfo (EMIInputs a))
+proceduralEMI src config = do
   (mainMod, st) <-
     Hog.resize num $
       runStateT
-        (Hog.distributeT (runReaderT (genEMI moddecl) config))
+        (Hog.distributeT (runReaderT (sourceEMI src) config))
         context
-  let addMod = modInPorts %~ ((st ^. emiContext . _Just . emiNewInputs) ++ )
-  let initMod = initNewRegs (st ^. emiContext . _Just . emiNewInputs)
-  return (initMod $ addMod mainMod)
+  let addMod = modInPorts %~ ((st ^. emiContext._Just.emiNewInputs) ++ )
+  let initMod = initNewRegs (st ^. emiContext._Just.emiNewInputs)
+  return (mainMod & infoSrc._Wrapped.traverse %~ (initMod . addMod))
   where
     context =
       Context [] [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
@@ -95,23 +108,35 @@ proceduralEMI moddecl config = do
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
 
-proceduralEMIIO :: ModDecl () -> Config -> IO (ModDecl ())
+proceduralEMIIO :: SourceInfo a -> Config -> IO (SourceInfo (EMIInputs a))
 proceduralEMIIO t = Hog.sample . proceduralEMI t
 
--- m = (head . head $ [verilog|
--- module m;
---   always @(posedge clk) begin
---     if (z == 2) begin
---       ry = 2;
---     end
---     x <= y;
---     y <= z;
---   end
--- endmodule
--- |] ^.. _Wrapped )
--- p :: Show a => ModDecl a -> IO ()
--- p = T.putStrLn . genSource
---
--- customConfig = defaultConfig &
---     (configEMI . confEMIGenerateProb .~ 1)
---   . (configEMI . confEMINoGenerateProb .~ 0)
+-- Test code
+
+m = SourceInfo "m" [verilog|
+module m;
+  always @(posedge clk) begin
+    if (z == 2) begin
+      ry = 2;
+    end
+    x <= y;
+    y <= z;
+  end
+endmodule
+
+module m2;
+  always @(posedge clk) begin
+    if (z == 2) begin
+      ry = 2;
+    end
+    x <= y;
+    y <= z;
+  end
+endmodule
+|]
+p :: Show a => SourceInfo a -> IO ()
+p = T.putStrLn . genSource
+
+customConfig = defaultConfig &
+    (configEMI . confEMIGenerateProb .~ 1)
+  . (configEMI . confEMINoGenerateProb .~ 0)

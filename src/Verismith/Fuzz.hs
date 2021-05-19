@@ -324,6 +324,10 @@ equivalence src = do
       where
         dir = fromText $ "equiv_" <> toText a <> "_" <> toText b
 
+equivalenceEMI :: (MonadBaseControl IO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
+equivalenceEMI src = do
+  datadir <- fmap _fuzzDataDir askOpts
+
 simulation :: (MonadIO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
 simulation src = do
   datadir <- fmap _fuzzDataDir askOpts
@@ -590,3 +594,51 @@ sampleSeed s gen =
                 Just x ->
                   pure (seed, Hog.treeValue x)
      in loop (100 :: Int)
+
+fuzzEMI :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzzEMI gen = do
+  conf <- askConfig
+  opts <- askOpts
+  let seed = conf ^. configProperty . propSeed
+  (seed', src) <- generateSample $ genMethod conf seed gen
+  let size = length . lines . T.unpack $ genSource src
+  liftSh
+    . writefile "config.toml"
+    . encodeConfig
+    $ conf
+      & configProperty
+      . propSeed
+        ?~ seed'
+  (tsynth, _) <- titleRun "Synthesis" $ synthesis src
+  (tequiv, _) <-
+    if (_fuzzOptsNoEquiv opts)
+      then return (0, mempty)
+      else titleRun "Equivalence Check" $ equivalenceEMI src
+  (_, _) <-
+    if (_fuzzOptsNoSim opts)
+      then return (0, mempty)
+      else titleRun "Simulation" $ simulation src
+  fails <- failEquivWithIdentity
+  failedSim <- failedSimulations
+  synthFails <- failedSynthesis
+  redResult <-
+    whenMaybe
+      ( not (null failedSim && null fails && null synthFails)
+          && not (_fuzzOptsNoReduction opts)
+      )
+      . titleRun "Reduction"
+      $ reduction src
+  state_ <- get
+  currdir <- liftSh pwd
+  let vi = flip view state_
+  let report =
+        FuzzReport
+          currdir
+          (vi fuzzSynthResults)
+          (vi fuzzSimResults)
+          (vi fuzzSynthStatus)
+          size
+          tsynth
+          tequiv
+          (getTime redResult)
+  return report
