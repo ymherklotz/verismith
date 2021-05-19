@@ -80,7 +80,8 @@ moddeclEMI m = do
   emiContext._Just.emiNewInputs .= []
   m' <- traverseOf (modItems.traverse) moditemEMI m
   c <- use (emiContext._Just.emiNewInputs)
-  return (ModDeclAnn (EMIInputs (c^..traverse.portName)) (fmap (\x -> EMIOrig x) m'))
+  let m'' = m' & modInPorts %~ (c ++ ) & (initNewRegs c)
+  return (ModDeclAnn (EMIInputs (c^..traverse.portName)) (fmap (\x -> EMIOrig x) m''))
 
 sourceEMI :: (SourceInfo a) -> StateGen a (SourceInfo (EMIInputs a))
 sourceEMI s =
@@ -98,9 +99,7 @@ proceduralEMI src config = do
       runStateT
         (Hog.distributeT (runReaderT (sourceEMI src) config))
         context
-  let addMod = modInPorts %~ ((st ^. emiContext._Just.emiNewInputs) ++ )
-  let initMod = initNewRegs (st ^. emiContext._Just.emiNewInputs)
-  return (mainMod & infoSrc._Wrapped.traverse %~ (initMod . addMod))
+  return mainMod
   where
     context =
       Context [] [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
@@ -111,8 +110,65 @@ proceduralEMI src config = do
 proceduralEMIIO :: SourceInfo a -> Config -> IO (SourceInfo (EMIInputs a))
 proceduralEMIIO t = Hog.sample . proceduralEMI t
 
+-- | Make top level module for equivalence verification. Also takes in how many
+-- modules to instantiate.
+makeTopEMI :: Int -> ModDecl (EMIInputs ann) -> (ModDecl (EMIInputs ann), [Identifier])
+makeTopEMI i m' = (ModDecl (m ^. modId) ys nports modIt [], anns)
+  where
+    ys = yPort . flip makeIdFrom "y" <$> [1 .. i]
+    modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
+    modN n =
+      m & modId %~ makeIdFrom n & modOutPorts .~ [yPort (makeIdFrom n "y")]
+    anns = concatMap (\x -> case x of
+                         EMIInputs x -> x
+                         _ -> []
+                     ) (collectAnn m')
+    m = removeAnn m'
+    nports = filter (\x -> (x^.portName) `notElem` anns) (m^.modInPorts)
+
+createProperty :: Identifier -> ModItem a
+createProperty i =
+  Property (i <> "_emi_prop") (EPosEdge "clk") Nothing (BinOp (Id i) BinEq 0)
+
+createAssignment :: Identifier -> Statement a
+createAssignment i = BlockAssign (Assign (RegId i) Nothing 0)
+
+addAssumesEMI :: (ModDecl a, [Identifier])
+              -> (ModDecl a, [Identifier])
+addAssumesEMI (m, i) = (m & modItems %~ (++ mods), i)
+  where
+    mods = fmap createProperty i
+
+addAssignmentsEMI :: (ModDecl a, [Identifier])
+                  -> (ModDecl a, [Identifier])
+addAssignmentsEMI (m, i) = (m & modItems %~ (mods :), i)
+  where
+    mods = Initial (SeqBlock (createAssignment <$> i))
+
+-- | Make a top module with an assert that requires @y_1@ to always be equal to
+-- @y_2@, which can then be proven using a formal verification tool.
+makeTopAssertEMI :: Bool -> ModDecl (EMIInputs ann) -> (ModDecl (EMIInputs ann), [Identifier])
+makeTopAssertEMI b =
+  bimap (modItems %~ (assert :)) id
+  . (if b then addAssumesEMI else addAssignmentsEMI)
+  . makeTopEMI 2
+  where
+    assert =
+      Always . EventCtrl e . Just $
+        SeqBlock
+          [TaskEnable $ Task "assert" [BinOp (Id "y_1") BinEq (Id "y_2")]]
+    e = EPosEdge "clk"
+
+initModEMI :: (ModDecl ann, [Identifier]) -> (ModDecl ann)
+initModEMI (m, i) = m & modItems %~ ((out ++ inp ++ other) ++)
+  where
+    out = Decl (Just PortOut) <$> (m ^. modOutPorts) <*> pure Nothing
+    inp = Decl (Just PortIn) <$> (m^.modInPorts) <*> pure Nothing
+    other = Decl Nothing <$> map (\i' -> Port Reg False (Range 0 0) i') i <*> pure Nothing
+
 -- Test code
 
+m :: SourceInfo ()
 m = SourceInfo "m" [verilog|
 module m;
   always @(posedge clk) begin
@@ -134,9 +190,11 @@ module m2;
   end
 endmodule
 |]
-p :: Show a => SourceInfo a -> IO ()
+p :: Show a => ModDecl a -> IO ()
 p = T.putStrLn . genSource
 
 customConfig = defaultConfig &
     (configEMI . confEMIGenerateProb .~ 1)
   . (configEMI . confEMINoGenerateProb .~ 0)
+
+top = ((initModEMI . makeTopAssertEMI False . (\s -> s^.mainModule)) <$> proceduralEMIIO m customConfig) >>= p
