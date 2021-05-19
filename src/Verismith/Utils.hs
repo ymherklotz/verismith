@@ -11,6 +11,12 @@ module Verismith.Utils
   )
 where
 
+import qualified Data.ByteString.Lazy as L
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.IO as T
+import Data.ByteString.Builder (byteStringHex, toLazyByteString)
 import Data.ByteString (ByteString, pack)
 import System.Random (mkStdGen, newStdGen, randoms)
 
@@ -27,3 +33,6 @@ generateByteString mseed size n = do
     repeatedly f as = b : repeatedly f as'
       where
         (b, as') = f as
+
+showBS :: ByteString -> Text
+showBS = decodeUtf8 . L.toStrict . toLazyByteString . byteStringHex
