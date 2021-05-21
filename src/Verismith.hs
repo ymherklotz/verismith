@@ -74,6 +74,7 @@ import Verismith.Verilog
 import Verismith.Verilog
 import Verismith.Verilog.Distance
 import Verismith.Verilog.Parser (parseSourceInfoFile)
+import Verismith.EMI
 import Prelude hiding (FilePath)
 
 toFP :: String -> FilePath
@@ -160,12 +161,32 @@ handleOpts (Fuzz o configF f k n nosim noequiv noreduction file top cc checker) 
           (toFP datadir)
           cc
           checker
+      )
+      defaultYosys
       (fuzzMultiple gen)
   return ()
-handleOpts (EMIOpts o configF f k n nosim noequiv noreduction) = do
+handleOpts (EMIOpts o configF f k n nosim noequiv noreduction top file) = do
   config <- getConfig configF
   datadir <- getDataDir
-  putStrLn "Starting EMI testing..."
+  src <- parseSourceInfoFile top (T.pack file) :: IO (SourceInfo ())
+  let gen = proceduralEMI src config
+  _ <-
+    runFuzz
+      ( FuzzOpts
+          (Just $ fromText o)
+          f
+          k
+          n
+          nosim
+          noequiv
+          noreduction
+          config
+          (toFP datadir)
+          False
+          Nothing
+      )
+      defaultYosys
+      (fuzzMultipleEMI gen)
   return ()
 handleOpts (Generate f c) = do
   config <- getConfig c

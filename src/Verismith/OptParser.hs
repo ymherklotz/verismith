@@ -54,7 +54,9 @@ data Opts
         emiNum :: {-# UNPACK #-} !Int,
         emiNoSim :: !Bool,
         emiNoEquiv :: !Bool,
-        emiNoReduction :: !Bool
+        emiNoReduction :: !Bool,
+        emiTopModule :: Text,
+        emiInputFile :: FilePath
       }
   | Generate
       { generateFilename :: !(Maybe FilePath),
@@ -243,6 +245,15 @@ emiOpts =
               <> Opt.help
                 "Do not run reduction on a failed testcase."
         )
+    <*> textOption
+      ( Opt.long "top"
+          <> Opt.short 't'
+          <> Opt.metavar "MODULE"
+          <> Opt.help "Top module for the Verilog module."
+          <> Opt.showDefault
+          <> Opt.value "top"
+      )
+    <*> Opt.strArgument (Opt.metavar "FILE" <> Opt.help "Verilog input file to pass to EMI.")
 
 genOpts :: Parser Opts
 genOpts =
