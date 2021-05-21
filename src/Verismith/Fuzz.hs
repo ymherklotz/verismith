@@ -18,6 +18,7 @@ module Verismith.Fuzz
     fuzz,
     fuzzInDir,
     fuzzMultiple,
+    fuzzMultipleEMI,
     runFuzz,
     sampleSeed,
 
@@ -62,6 +63,7 @@ import Verismith.Tool.Yosys
 import Verismith.Utils (generateByteString)
 import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
+import Verismith.EMI
 import Prelude hiding (FilePath)
 
 data FuzzOpts
@@ -361,12 +363,12 @@ simulation src = do
       where
         dir = fromText $ "countereg_sim_" <> toText a
 
-simulationEMI :: (MonadIO m, MonadSh m, Show ann) => (SourceInfo ann) -> Fuzz m ()
+simulationEMI :: (MonadIO m, MonadSh m, Show ann) => (SourceInfo (EMIInputs ann)) -> Fuzz m ()
 simulationEMI src = do
   datadir <- fmap _fuzzDataDir askOpts
   synth <- passedSynthesis
   counterEgs <- failEquivWithIdentityCE
-  vals <- liftIO $ generateByteString Nothing 32 20
+  vals <- liftIO $ generateByteString Nothing 32 100
   ident <- liftSh $ sim datadir vals Nothing defaultIdentitySynth
   resTimes <- liftSh $ mapM (sim datadir vals (justPass $ snd ident)) synth
   fuzzSimResults .= toSimResult defaultIcarusSim vals synth resTimes
@@ -382,9 +384,9 @@ simulationEMI src = do
           cp (fromText ".." </> fromText (toText a) </> synthOutput a) $
             synthOutput a
           writefile "rtl.v" $ genSource src
-        runSimIc datadir defaultIcarus a src b i
+        runSimIcEMI (getTopEMIIdent src) datadir defaultIcarus a (clearAnn src) b i
       where
-        dir = fromText $ "countereg_sim_" <> toText a
+        dir = fromText $ "emi_sim_" <> toText a
 
 failEquivWithIdentity :: (MonadSh m) => Fuzz m [SynthResult]
 failEquivWithIdentity = filter withIdentity . _fuzzSynthResults <$> get
@@ -550,12 +552,14 @@ fuzz gen = do
           (getTime redResult)
   return report
 
-fuzzInDir :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
-fuzzInDir src = do
+fuzzInDirG :: (MonadFuzz m, Ord ann, Show ann) =>
+  (Gen (SourceInfo ann) -> Fuzz m FuzzReport) ->
+  Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzzInDirG f src = do
   fuzzOpts <- askOpts
   let fp = fromMaybe "fuzz" $ _fuzzOptsOutput fuzzOpts
   make fp
-  res <- pop fp $ fuzz src
+  res <- pop fp $ f src
   liftSh $ do
     writefile (fp <.> "html") $ printResultReport (bname fp) res
     when (passedFuzz res && not (_fuzzOptsKeepAll fuzzOpts)) $ rm_rf fp
@@ -563,11 +567,12 @@ fuzzInDir src = do
   where
     bname = T.pack . takeBaseName . T.unpack . toTextIgnore
 
-fuzzMultiple ::
+fuzzMultipleG ::
   (MonadFuzz m, Ord ann, Show ann) =>
+  (Gen (SourceInfo ann) -> Fuzz m FuzzReport) ->
   Gen (SourceInfo ann) ->
   Fuzz m [FuzzReport]
-fuzzMultiple src = do
+fuzzMultipleG f src = do
   fuzzOpts <- askOpts
   let seed = (_fuzzOptsConfig fuzzOpts) ^. configProperty . propSeed
   x <- case _fuzzOptsOutput fuzzOpts of
@@ -591,13 +596,12 @@ fuzzMultiple src = do
         results
     return results
   where
-    fuzzDir' :: (Show a, MonadFuzz m) => a -> Fuzz m FuzzReport
     fuzzDir' n' =
       local
         ( fuzzEnvOpts . fuzzOptsOutput
             .~ (Just . fromText $ "fuzz_" <> showT n')
         )
-        $ fuzzInDir src
+        $ fuzzInDirG f src
 
 sampleSeed :: MonadSh m => Maybe Seed -> Gen a -> m (Seed, a)
 sampleSeed s gen =
@@ -616,7 +620,7 @@ sampleSeed s gen =
                   pure (seed, Hog.treeValue x)
      in loop (100 :: Int)
 
-fuzzEMI :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzzEMI :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo (EMIInputs ann)) -> Fuzz m FuzzReport
 fuzzEMI gen = do
   conf <- askConfig
   opts <- askOpts
@@ -652,3 +656,15 @@ fuzzEMI gen = do
           0
           0
   return report
+
+fuzzInDir :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m FuzzReport
+fuzzInDir = fuzzInDirG fuzz
+
+fuzzInDirEMI :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo (EMIInputs ann)) -> Fuzz m FuzzReport
+fuzzInDirEMI = fuzzInDirG fuzzEMI
+
+fuzzMultiple :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo ann) -> Fuzz m [FuzzReport]
+fuzzMultiple = fuzzMultipleG fuzz
+
+fuzzMultipleEMI :: (MonadFuzz m, Ord ann, Show ann) => Gen (SourceInfo (EMIInputs ann)) -> Fuzz m [FuzzReport]
+fuzzMultipleEMI = fuzzMultipleG fuzzEMI

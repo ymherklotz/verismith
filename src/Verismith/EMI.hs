@@ -41,7 +41,7 @@ import qualified Data.Text.IO as T
 
 data EMIInputs a = EMIInputs [Identifier]
                  | EMIOrig a
-                 deriving (Eq)
+                 deriving (Eq, Ord)
 
 instance Show a => Show (EMIInputs a) where
   show (EMIInputs i) = "EMI: " <> intercalate ", " (T.unpack . getIdentifier <$> i)
@@ -78,9 +78,15 @@ moditemEMI m = return m
 moddeclEMI :: ModDecl a -> StateGen a (ModDecl (EMIInputs a))
 moddeclEMI m = do
   emiContext._Just.emiNewInputs .= []
+  blocking .= []
+  nonblocking .= []
+  wires .= []
   m' <- traverseOf (modItems.traverse) moditemEMI m
   c <- use (emiContext._Just.emiNewInputs)
-  let m'' = m' & modInPorts %~ (c ++ ) & (initNewRegs c)
+  b <- use blocking
+  nb <- use nonblocking
+  w <- use wires
+  let m'' = m' & modInPorts %~ (c ++ ) & initNewRegs c & initNewInnerRegs (b <> nb <> w)
   return (ModDeclAnn (EMIInputs (c^..traverse.portName)) (fmap (\x -> EMIOrig x) m''))
 
 sourceEMI :: (SourceInfo a) -> StateGen a (SourceInfo (EMIInputs a))
@@ -89,6 +95,9 @@ sourceEMI s =
 
 initNewRegs :: [Port] -> ModDecl a -> ModDecl a
 initNewRegs ps m = m & modItems %~ (++ (Decl (Just PortIn) <$> ps <*> pure Nothing))
+
+initNewInnerRegs :: [Port] -> ModDecl a -> ModDecl a
+initNewInnerRegs ps m = m & modItems %~ (++ (Decl Nothing <$> ps <*> pure Nothing))
 
 -- | Procedural generation method for random Verilog. Uses internal 'Reader' and
 -- 'State' to keep track of the current Verilog code structure.
@@ -102,7 +111,7 @@ proceduralEMI src config = do
   return mainMod
   where
     context =
-      Context [] [] [] [] [] [] 0 (confProp propStmntDepth) (confProp propModDepth) True
+      Context [] [] [] [] [] [] 100000 (confProp propStmntDepth) (confProp propModDepth) True
         (Just (EMIContext []))
     num = fromIntegral $ confProp propSize
     confProp i = config ^. configProperty . i
@@ -166,6 +175,12 @@ initModEMI (m, i) = m & modItems %~ ((out ++ inp ++ other) ++)
     inp = Decl (Just PortIn) <$> (m^.modInPorts) <*> pure Nothing
     other = Decl Nothing <$> map (\i' -> Port Reg False (Range 0 0) i') i <*> pure Nothing
 
+getTopEMIIdent :: SourceInfo (EMIInputs a) -> [Identifier]
+getTopEMIIdent s = concatMap (\x -> case x of
+                                 EMIInputs x -> x
+                                 _ -> []
+                             ) (collectAnn (s^.mainModule))
+
 -- Test code
 
 m :: SourceInfo ()
@@ -193,8 +208,12 @@ endmodule
 p :: Show a => ModDecl a -> IO ()
 p = T.putStrLn . genSource
 
+p2 :: Show a => SourceInfo a -> IO ()
+p2 = T.putStrLn . genSource
+
 customConfig = defaultConfig &
     (configEMI . confEMIGenerateProb .~ 1)
   . (configEMI . confEMINoGenerateProb .~ 0)
 
-top = ((initModEMI . makeTopAssertEMI False . (\s -> s^.mainModule)) <$> proceduralEMIIO m customConfig) >>= p
+top = ((initModEMI . makeTopAssertEMI True . (\s -> s^.mainModule)) <$> proceduralEMIIO m customConfig) >>= p
+top2 = proceduralEMIIO m customConfig >>= p2
