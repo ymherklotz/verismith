@@ -188,7 +188,7 @@ tbModule' ids bss top =
               fold
                 [ BlockAssign (Assign "clk" Nothing 0),
                   BlockAssign (Assign inConcat Nothing 0),
-                  BlockAssign (Assign inIds Nothing 0)
+                  if null ids then mempty else BlockAssign (Assign inIds Nothing 0)
                 ]
                 <> fold
                   ( ( \r ->
