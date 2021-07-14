@@ -8,4 +8,4 @@ RUN nix-env -i yosys git tmux vim gcc iverilog cabal-install wget
 COPY . /verismith
 
 WORKDIR /verismith
-RUN nix-shell --run "true"
+RUN nix-shell --run "cabal update"
