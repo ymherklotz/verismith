@@ -65,11 +65,11 @@ moduleDecl (ModDeclAnn a m) = sep [hsep ["/*", pretty $ show a, "*/"], moduleDec
 
 -- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
 paramList :: NonEmpty Parameter -> Doc a
-paramList ps = tupled . toList $ parameter <$> ps
+paramList ps = vsep . punctuate ", " . toList $ parameter <$> ps
 
 -- | Generates a localparam list. Can only be called with a 'NonEmpty' list.
 localParamList :: NonEmpty LocalParam -> Doc a
-localParamList ps = tupled . toList $ localParam <$> ps
+localParamList ps = vsep . punctuate ", " . toList $ localParam <$> ps
 
 -- | Generates the assignment for a 'Parameter'.
 parameter :: Parameter -> Doc a

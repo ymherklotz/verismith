@@ -66,6 +66,7 @@ module Verismith.Verilog.AST
 
     -- * Expression
     Expr (..),
+    _Id,
     ConstExpr (..),
     ConstExprF (..),
     constToExpr,
@@ -368,6 +369,7 @@ data Expr
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''Expr)
+$(makePrisms ''Expr)
 
 $(makeBaseFunctor ''Expr)
 

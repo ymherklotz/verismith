@@ -1,7 +1,6 @@
 { nixpkgs ? null, compiler ? "ghc865", doBenchmark ? false } :
 let
   pinnedPkg = builtins.fetchGit {
-    name = "nixos-unstable-2020-03-06";
     url = https://github.com/nixos/nixpkgs/;
     rev = "93ba4ecd58602d3f69f74f9d45d60a8f949544e2";
   };

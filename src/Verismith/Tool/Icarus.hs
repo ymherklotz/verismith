@@ -32,6 +32,7 @@ import qualified Data.ByteString.Lazy as L (ByteString)
 import Data.Char (digitToInt)
 import Data.Foldable (fold)
 import Data.List (transpose)
+import Data.List.NonEmpty (NonEmpty(..), fromList)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -204,7 +205,7 @@ tbModule' ids bss top =
               BlockAssign
                 (Assign "clk" Nothing (UnOp UnNot (Id "clk"))),
             Always . EventCtrl (EPosEdge "clk") . Just . SysTaskEnable $
-              Task "strobe" ["%b", Id "y"]
+              Task "strobe" ["%b", Concat (fromList $ fmap Id outputs)]
           ]
           []
     ]
@@ -214,6 +215,8 @@ tbModule' ids bss top =
                 . filter (/= (Id "clk"))
                 $ (Id . fromPort <$> (top ^. modInPorts)))
     inIds = RegConcat $ fmap Id ids
+    outputs = top^..modOutPorts.traverse.portName
+
 
 counterTestBench :: CounterEg -> (ModDecl ann) -> (Verilog ann)
 counterTestBench (CounterEg _ states) m = tbModule filtered m
