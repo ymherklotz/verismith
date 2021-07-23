@@ -75,6 +75,7 @@ import Verismith.Verilog
 import Verismith.Verilog.Distance
 import Verismith.Verilog.Parser (parseSourceInfoFile)
 import Verismith.EMI
+import Verismith.Shuffle
 import Prelude hiding (FilePath)
 
 toFP :: String -> FilePath
@@ -216,9 +217,9 @@ handleOpts (ShuffleOpt f t o nshuffle nrename) = do
     Left l -> print l
     Right v -> do
       let sv = SourceInfo t v
-      sv' <- if nshuffle then return sv else shuffleLines sv
-      sv'' <- if nrename then return sv' else renameVariables sv'
-      case ( o, GenVerilog sv'') of
+      sv' <- if nshuffle then return sv else shuffleLinesIO sv
+      sv'' <- if nrename then return sv' else renameVariablesIO sv'
+      case ( o, GenVerilog sv'' :: GenVerilog (SourceInfo ())) of
         (Nothing, a) -> print a
         (Just o', a) -> writeFile (T.unpack $ toTextIgnore o') $ show a
   where

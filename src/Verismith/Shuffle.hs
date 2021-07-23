@@ -103,11 +103,11 @@ shuffleLines    = applyModules shuffleLinesModule
 renameVariables = applyModules renameVariablesModule
 identityMod     = applyModules identModule
 
-shuffleLinesIO :: (SourceInfo a) -> Gen (SourceInfo a)
+shuffleLinesIO :: (SourceInfo a) -> IO (SourceInfo a)
 shuffleLinesIO = Hog.sample . shuffleLines
 
-renameVariablesIO :: (SourceInfo a) -> Gen (SourceInfo a)
-renameVariablesIO = Hog.sample . renameVariables
+renameVariablesIO :: (SourceInfo a) -> IO (SourceInfo a)
+renameVariablesIO =  Hog.sample . renameVariables
 
 m' :: SourceInfo ()
 m' = SourceInfo "m" [verilog|
