@@ -99,9 +99,15 @@ applyModules f s = do
     ms = s^.infoSrc._Wrapped
 
 shuffleLines, renameVariables, identityMod :: (SourceInfo a) -> Gen (SourceInfo a)
-shuffleLines = applyModules shuffleLinesModule
+shuffleLines    = applyModules shuffleLinesModule
 renameVariables = applyModules renameVariablesModule
-identityMod = applyModules identModule
+identityMod     = applyModules identModule
+
+shuffleLinesIO :: (SourceInfo a) -> Gen (SourceInfo a)
+shuffleLinesIO = Hog.sample . shuffleLines
+
+renameVariablesIO :: (SourceInfo a) -> Gen (SourceInfo a)
+renameVariablesIO = Hog.sample . renameVariables
 
 m' :: SourceInfo ()
 m' = SourceInfo "m" [verilog|

@@ -210,6 +210,20 @@ handleOpts (Parse f t o rc) = do
   where
     file = T.unpack . toTextIgnore $ f
     mapply i f = if i then f else id
+handleOpts (ShuffleOpt f t o nshuffle nrename) = do
+  verilogSrc <- T.readFile file
+  case parseVerilog (T.pack file) verilogSrc of
+    Left l -> print l
+    Right v -> do
+      let sv = SourceInfo t v
+      sv' <- if nshuffle then return sv else shuffleLines sv
+      sv'' <- if nrename then return sv' else renameVariables sv'
+      case ( o, GenVerilog sv'') of
+        (Nothing, a) -> print a
+        (Just o', a) -> writeFile (T.unpack $ toTextIgnore o') $ show a
+  where
+    file = T.unpack . toTextIgnore $ f
+    mapply i f = if i then f else id
 handleOpts (Reduce f t _ ls' False) = do
   src <- parseSourceInfoFile t (toTextIgnore f)
   datadir <- getDataDir

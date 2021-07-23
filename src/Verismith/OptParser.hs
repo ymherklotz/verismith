@@ -84,6 +84,13 @@ data Opts
       { distanceOptVerilogA :: !FilePath,
         distanceOptVerilogB :: !FilePath
       }
+  | ShuffleOpt
+    { shuffleOptFilename :: !FilePath,
+      shuffleOptTop :: !Text,
+      shuffleOptOutput :: !(Maybe FilePath),
+      shuffleOptShuffleLines :: !Bool,
+      shuffleOptRenameVars :: !Bool
+    }
 
 textOption :: Mod OptionFields String -> Parser Text
 textOption = fmap T.pack . Opt.strOption
@@ -301,6 +308,37 @@ parseOpts =
                 "Remove constants in concatenation to simplify the Verilog."
         )
 
+shuffleOpts :: Parser Opts
+shuffleOpts =
+  ShuffleOpt
+    <$> ( fromText . T.pack
+            <$> Opt.strArgument
+              (Opt.metavar "FILE" <> Opt.help "Verilog input file.")
+        )
+    <*> textOption
+      ( Opt.short 't'
+          <> Opt.long "top"
+          <> Opt.metavar "TOP"
+          <> Opt.help "Name of top level module."
+          <> Opt.showDefault
+          <> Opt.value "top"
+      )
+    <*> ( Opt.optional
+            . Opt.strOption
+            $ Opt.long "output"
+              <> Opt.short 'o'
+              <> Opt.metavar "FILE"
+              <> Opt.help "Output file to write the parsed file to."
+        )
+    <*> ( Opt.switch $
+            Opt.long "no-shuffle-lines"
+              <> Opt.help
+                "Shuffle the lines in a Verilog file." )
+    <*> ( Opt.switch $
+            Opt.long "no-rename-vars"
+              <> Opt.help
+                "Rename the variables in a Verilog file." )
+
 reduceOpts :: Parser Opts
 reduceOpts =
   Reduce
@@ -426,6 +464,17 @@ argparse =
               )
           )
           <> Opt.metavar "reduce"
+      )
+    <|> Opt.hsubparser
+      ( Opt.command
+          "shuffle"
+          ( Opt.info
+              shuffleOpts
+              ( Opt.progDesc
+                  "Shuffle a Verilog file."
+              )
+          )
+          <> Opt.metavar "shuffle"
       )
     <|> Opt.hsubparser
       ( Opt.command
