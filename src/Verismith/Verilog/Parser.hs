@@ -187,7 +187,7 @@ parseTable =
       binary SymPercent (sBinOp BinMod) AssocLeft
     ],
     [ binary SymPlus (sBinOp BinPlus) AssocLeft,
-      binary SymDash (sBinOp BinPlus) AssocLeft
+      binary SymDash (sBinOp BinMinus) AssocLeft
     ],
     [ binary SymLtLt (sBinOp BinLSL) AssocLeft,
       binary SymGtGt (sBinOp BinLSR) AssocLeft
