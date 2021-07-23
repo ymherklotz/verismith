@@ -60,7 +60,7 @@ moduleDecl (ModDecl i outP inP items ps) =
     modI = vsep $ moduleItem <$> items
     outIn = outP ++ inP
     params [] = ""
-    params (p : pps) = hcat ["#", paramList (p :| pps)]
+    params (p : pps) = hcat ["#(", paramList (p :| pps), ")"]
 moduleDecl (ModDeclAnn a m) = sep [hsep ["/*", pretty $ show a, "*/"], moduleDecl m]
 
 -- | Generates a parameter list. Can only be called with a 'NonEmpty' list.
