@@ -59,6 +59,9 @@ renameIdent map (Identifier e) = Identifier $ Map.findWithDefault e e map
 
 renameExpr :: Map.Map Text Text -> Expr -> Expr
 renameExpr map (Id e) = Id (renameIdent map e)
+renameExpr map (VecSelect e a) = VecSelect (renameIdent map e) a
+renameExpr map (RangeSelect e r) = RangeSelect (renameIdent map e) r
+renameExpr map (Appl e r) = Appl (renameIdent map e) r
 renameExpr _ e = e
 
 renameVariablesModule :: (MonadGen m) => ModDecl a -> m (ModDecl a)
@@ -127,7 +130,7 @@ module fir_kernel_4tap_arch_1 #(
     wire [BW-1:0] second_sum;
 
     always @* two_shift = S<<1;
-    assign first_sum = X1 + X2 + (X3<<S);
+    assign first_sum = X1 ? X1[2:0] : X1;
     assign second_sum = X4 + (X5 << S);
     assign result = ((first_sum >> two_shift) + second_sum) >> S;
 endmodule
