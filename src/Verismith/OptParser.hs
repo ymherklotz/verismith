@@ -89,7 +89,10 @@ data Opts
       shuffleOptTop :: !Text,
       shuffleOptOutput :: !(Maybe FilePath),
       shuffleOptShuffleLines :: !Bool,
-      shuffleOptRenameVars :: !Bool
+      shuffleOptRenameVars :: !Bool,
+      shuffleOptEquiv :: !Bool,
+      shuffleOptEquivFolder :: !FilePath,
+      shuffleOptChecker :: !(Maybe Text)
     }
   | Equiv
     { equivOutput :: !FilePath,
@@ -345,6 +348,23 @@ shuffleOpts =
             Opt.long "no-rename-vars"
               <> Opt.help
                 "Rename the variables in a Verilog file." )
+    <*> ( Opt.switch $
+            Opt.long "noequiv"
+              <> Opt.help
+                "Do not check equivalence between input and output (currently only verismith generated Verilog is likely to pass this equivalence check)." )
+    <*> ( Opt.strOption $
+            Opt.long "equiv-output"
+              <> Opt.short 'e'
+              <> Opt.metavar "FOLDER"
+              <> Opt.help "Output folder to write the equivalence checking files in."
+              <> Opt.showDefault
+              <> Opt.value "equiv"
+        )
+    <*> ( Opt.optional . textOption $
+            Opt.long "checker"
+              <> Opt.metavar "CHECKER"
+              <> Opt.help "Define the checker to use."
+        )
 
 reduceOpts :: Parser Opts
 reduceOpts =
