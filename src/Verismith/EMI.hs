@@ -125,7 +125,7 @@ makeTopEMI :: Int -> ModDecl (EMIInputs ann) -> (ModDecl (EMIInputs ann), [Ident
 makeTopEMI i m' = (ModDecl (m ^. modId) ys nports modIt [], anns)
   where
     ys = yPort . flip makeIdFrom "y" <$> [1 .. i]
-    modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
+    modIt = instantiateModSpec_ True "_" . modN <$> [1 .. i]
     modN n =
       m & modId %~ makeIdFrom n & modOutPorts .~ [yPort (makeIdFrom n "y")]
     anns = concatMap (\x -> case x of

@@ -3,7 +3,7 @@
 -- |
 -- Module      : Verismith.Tool.Yosys
 -- Description : Yosys simulator implementation.
--- Copyright   : (c) 2018-2019, Yann Herklotz
+-- Copyright   : (c) 2018-2022, Yann Herklotz
 -- License     : GPL-3
 -- Maintainer  : yann [at] yannherklotz [dot] com
 -- Stability   : experimental
@@ -94,7 +94,7 @@ runEquivYosys yosys sim1 sim2 srcInfo = do
     S.writefile "top.v"
       . genSource
       . initMod
-      . makeTop 2
+      . makeTop False 2
       $ srcInfo
         ^. mainModule
     S.writefile checkFile $ yosysSatConfig sim1 sim2 srcInfo

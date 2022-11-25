@@ -33,63 +33,70 @@ instance Show OptTool where
 
 data Opts
   = Fuzz
-      { fuzzOutput :: Text,
-        fuzzConfigFile :: !(Maybe FilePath),
-        fuzzForced :: !Bool,
-        fuzzKeepAll :: !Bool,
-        fuzzNum :: {-# UNPACK #-} !Int,
-        fuzzNoSim :: !Bool,
-        fuzzNoEquiv :: !Bool,
-        fuzzNoReduction :: !Bool,
-        fuzzExistingFile :: !(Maybe FilePath),
-        fuzzExistingFileTop :: !Text,
-        fuzzCrossCheck :: !Bool,
-        fuzzChecker :: !(Maybe Text)
-      }
+    { fuzzOutput :: Text,
+      fuzzConfigFile :: !(Maybe FilePath),
+      fuzzForced :: !Bool,
+      fuzzKeepAll :: !Bool,
+      fuzzNum :: {-# UNPACK #-} !Int,
+      fuzzNoSim :: !Bool,
+      fuzzNoEquiv :: !Bool,
+      fuzzNoReduction :: !Bool,
+      fuzzExistingFile :: !(Maybe FilePath),
+      fuzzExistingFileTop :: !Text,
+      fuzzCrossCheck :: !Bool,
+      fuzzChecker :: !(Maybe Text)
+    }
   | EMIOpts
-      { emiOutput :: Text,
-        emiConfigFile :: !(Maybe FilePath),
-        emiForced :: !Bool,
-        emiKeepAll :: !Bool,
-        emiNum :: {-# UNPACK #-} !Int,
-        emiNoSim :: !Bool,
-        emiNoEquiv :: !Bool,
-        emiNoReduction :: !Bool,
-        emiTopModule :: Text,
-        emiInputFile :: FilePath
-      }
+    { emiOutput :: Text,
+      emiConfigFile :: !(Maybe FilePath),
+      emiForced :: !Bool,
+      emiKeepAll :: !Bool,
+      emiNum :: {-# UNPACK #-} !Int,
+      emiNoSim :: !Bool,
+      emiNoEquiv :: !Bool,
+      emiNoReduction :: !Bool,
+      emiTopModule :: Text,
+      emiInputFile :: FilePath
+    }
   | Generate
-      { generateFilename :: !(Maybe FilePath),
-        generateConfigFile :: !(Maybe FilePath)
-      }
+    { generateFilename :: !(Maybe FilePath),
+      generateConfigFile :: !(Maybe FilePath)
+    }
   | Parse
-      { parseFilename :: !FilePath,
-        parseTop :: !Text,
-        parseOutput :: !(Maybe FilePath),
-        parseRemoveConstInConcat :: !Bool
-      }
+    { parseFilename :: !FilePath,
+      parseTop :: !Text,
+      parseOutput :: !(Maybe FilePath),
+      parseRemoveConstInConcat :: !Bool
+    }
   | Reduce
-      { reduceFilename :: !FilePath,
-        reduceTop :: !Text,
-        reduceScript :: !(Maybe FilePath),
-        reduceSynthesiserDesc :: ![SynthDescription],
-        reduceRerun :: !Bool
-      }
+    { reduceFilename :: !FilePath,
+      reduceTop :: !Text,
+      reduceScript :: !(Maybe FilePath),
+      reduceSynthesiserDesc :: ![SynthDescription],
+      reduceRerun :: !Bool
+    }
   | ConfigOpt
-      { configOptWriteConfig :: !(Maybe FilePath),
-        configOptConfigFile :: !(Maybe FilePath),
-        configOptDoRandomise :: !Bool
-      }
+    { configOptWriteConfig :: !(Maybe FilePath),
+      configOptConfigFile :: !(Maybe FilePath),
+      configOptDoRandomise :: !Bool
+    }
   | DistanceOpt
-      { distanceOptVerilogA :: !FilePath,
-        distanceOptVerilogB :: !FilePath
-      }
+    { distanceOptVerilogA :: !FilePath,
+      distanceOptVerilogB :: !FilePath
+    }
   | ShuffleOpt
     { shuffleOptFilename :: !FilePath,
       shuffleOptTop :: !Text,
       shuffleOptOutput :: !(Maybe FilePath),
       shuffleOptShuffleLines :: !Bool,
       shuffleOptRenameVars :: !Bool
+    }
+  | Equiv
+    { equivOutput :: !FilePath,
+      equivFilenameA :: !FilePath,
+      equivFilenameB :: !FilePath,
+      equivFileTop :: !Text,
+      equivChecker :: !(Maybe Text)
     }
 
 textOption :: Mod OptionFields String -> Parser Text
@@ -410,6 +417,39 @@ distanceOpts =
               (Opt.metavar "FILE" <> Opt.help "Second verilog file.")
         )
 
+equivOpts :: Parser Opts
+equivOpts =
+  Equiv
+    <$> Opt.strOption
+      ( Opt.long "output"
+          <> Opt.short 'o'
+          <> Opt.metavar "DIR"
+          <> Opt.help "Output directory that the equivalence run takes place in."
+          <> Opt.showDefault
+          <> Opt.value "output"
+      )
+    <*> ( fromText . T.pack
+            <$> Opt.strArgument
+              (Opt.metavar "FILEA" <> Opt.help "First verilog file.")
+        )
+    <*> ( fromText . T.pack
+            <$> Opt.strArgument
+              (Opt.metavar "FILEB" <> Opt.help "Second verilog file.")
+        )
+    <*> textOption
+      ( Opt.long "source-top"
+          <> Opt.short 't'
+          <> Opt.metavar "TOP"
+          <> Opt.help "Define the top module to compare between the source files."
+          <> Opt.showDefault
+          <> Opt.value "top"
+      )
+    <*> ( Opt.optional . textOption $
+            Opt.long "checker"
+              <> Opt.metavar "CHECKER"
+              <> Opt.help "Define the checker to use."
+        )
+
 argparse :: Parser Opts
 argparse =
   Opt.hsubparser
@@ -497,6 +537,17 @@ argparse =
               )
           )
           <> Opt.metavar "distance"
+      )
+    <|> Opt.hsubparser
+      ( Opt.command
+          "equiv"
+          ( Opt.info
+              equivOpts
+              ( Opt.progDesc
+                  "Check two different pieces of Verilog are equivalent."
+              )
+          )
+          <> Opt.metavar "equiv"
       )
 
 version :: Parser (a -> a)

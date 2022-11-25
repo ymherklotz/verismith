@@ -3,7 +3,7 @@
 -- |
 -- Module      : Verismith.Verilog.Mutate
 -- Description : Functions to mutate the Verilog AST.
--- Copyright   : (c) 2018-2019, Yann Herklotz
+-- Copyright   : (c) 2018-2022, Yann Herklotz
 -- License     : GPL-3
 -- Maintainer  : yann [at] yannherklotz [dot] com
 -- Stability   : experimental
@@ -277,10 +277,10 @@ instantiateMod_ m = ModInst (m ^. modId) [] (m ^. modId) conns
 -- >>> GenVerilog $ instantiateModSpec_ "_" m
 -- m m(.y(y), .x(x));
 -- <BLANKLINE>
-instantiateModSpec_ :: Text -> (ModDecl ann) -> (ModItem ann)
-instantiateModSpec_ outChar m = ModInst (m ^. modId) [] (m ^. modId) conns
+instantiateModSpec_ :: Bool -> Text -> (ModDecl ann) -> (ModItem ann)
+instantiateModSpec_ named outChar m = ModInst (m ^. modId) [] (m ^. modId) conns
   where
-    conns = zipWith ModConnNamed ids (Id <$> instIds)
+    conns = (if named then zipWith ModConnNamed ids else map ModConn) (Id <$> instIds)
     ids = filterChar outChar (name modOutPorts) <> name modInPorts
     instIds = name modOutPorts <> name modInPorts
     name v = m ^.. v . traverse . portName
@@ -311,18 +311,18 @@ makeIdFrom a i = (i <>) . Identifier . ("_" <>) $ showT a
 
 -- | Make top level module for equivalence verification. Also takes in how many
 -- modules to instantiate.
-makeTop :: Int -> (ModDecl ann) -> (ModDecl ann)
-makeTop i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt []
+makeTop :: Bool -> Int -> (ModDecl ann) -> (ModDecl ann)
+makeTop named i m = ModDecl (m ^. modId) ys (m ^. modInPorts) modIt []
   where
     ys = yPort . flip makeIdFrom "y" <$> [1 .. i]
-    modIt = instantiateModSpec_ "_" . modN <$> [1 .. i]
+    modIt = instantiateModSpec_ named "_" . modN <$> [1 .. i]
     modN n =
       m & modId %~ makeIdFrom n & modOutPorts .~ [yPort (makeIdFrom n "y")]
 
 -- | Make a top module with an assert that requires @y_1@ to always be equal to
 -- @y_2@, which can then be proven using a formal verification tool.
 makeTopAssert :: (ModDecl ann) -> (ModDecl ann)
-makeTopAssert = (modItems %~ (++ [assert])) . makeTop 2
+makeTopAssert = (modItems %~ (++ [assert])) . makeTop False 2
   where
     assert =
       Always . EventCtrl e . Just $

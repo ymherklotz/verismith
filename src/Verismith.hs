@@ -3,7 +3,7 @@
 -- |
 -- Module      : Verismith
 -- Description : Verismith
--- Copyright   : (c) 2018-2019, Yann Herklotz
+-- Copyright   : (c) 2018-2022, Yann Herklotz
 -- License     : GPL-3
 -- Maintainer  : yann [at] yannherklotz [dot] com
 -- Stability   : experimental
@@ -283,6 +283,24 @@ handleOpts (DistanceOpt v1 v2) = do
   src2 <- parseSourceInfoFile (T.pack v2) (toTextIgnore v2)
   let d = distance src1 src2
   putStrLn ("Distance: " <> show d)
+handleOpts (Equiv o v1 v2 top checker) = do
+  datadir <- getDataDir
+  src <- parseSourceInfoFile top (toTextIgnore v1) :: IO (SourceInfo ())
+  shelly $ do
+    mkdir o
+    cp v1 (o </> fn1)
+    cp v2 (o </> fn2)
+  res <- shelly . runResultT $ pop o $ do
+      runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) src
+  case res of
+    Pass _ -> putStrLn "Equivalence check passed"
+    Fail (EquivFail _) -> putStrLn "Equivalence check failed"
+    Fail TimeoutError -> putStrLn "Equivalence check timed out"
+    Fail _ -> putStrLn "Equivalence check error"
+  where
+    fn1 = "rtl1.v"
+    fn2 = "rtl2.v"
+    mkid f = Verismith.Tool.Identity "" (fromText f)
 
 defaultMain :: IO ()
 defaultMain = do
