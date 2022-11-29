@@ -211,20 +211,35 @@ handleOpts (Parse f t o rc) = do
   where
     file = T.unpack . toTextIgnore $ f
     mapply i f = if i then f else id
-handleOpts (ShuffleOpt f t o nshuffle nrename) = do
+handleOpts (ShuffleOpt f t o nshuffle nrename noequiv equivdir checker) = do
+  datadir <- getDataDir
   verilogSrc <- T.readFile file
   case parseVerilog (T.pack file) verilogSrc of
     Left l -> print l
     Right v -> do
       let sv = SourceInfo t v
-      sv' <- if nshuffle then return sv else shuffleLinesIO sv
-      sv'' <- if nrename then return sv' else renameVariablesIO sv'
-      case ( o, GenVerilog sv'' :: GenVerilog (SourceInfo ())) of
-        (Nothing, a) -> print a
-        (Just o', a) -> writeFile (T.unpack $ toTextIgnore o') $ show a
+      sv' <- runShuffle nshuffle nrename sv
+      let gv = GenVerilog sv' :: GenVerilog (SourceInfo ())
+      if noequiv then return () else do
+        shelly $ do
+          mkdir equivdir
+          cp file (equivdir </> fn1)
+        writeFile (equivdir </> fn2) $ show gv
+        res <- shelly . runResultT $ pop equivdir $ do
+          runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) sv'
+        case res of
+          Pass _ -> putStrLn "Equivalence check passed"
+          Fail (EquivFail _) -> putStrLn "Equivalence check failed"
+          Fail TimeoutError -> putStrLn "Equivalence check timed out"
+          Fail _ -> putStrLn "Equivalence check error"
+      case o of
+        Nothing -> print gv
+        Just o' -> writeFile (T.unpack $ toTextIgnore o') $ show gv
   where
     file = T.unpack . toTextIgnore $ f
-    mapply i f = if i then f else id
+    fn1 = "rtl1.v"
+    fn2 = "rtl2.v"
+    mkid f = Verismith.Tool.Identity "" (fromText f)
 handleOpts (Reduce f t _ ls' False) = do
   src <- parseSourceInfoFile t (toTextIgnore f)
   datadir <- getDataDir

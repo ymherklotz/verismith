@@ -112,6 +112,12 @@ shuffleLinesIO = Hog.sample . shuffleLines
 renameVariablesIO :: (SourceInfo a) -> IO (SourceInfo a)
 renameVariablesIO =  Hog.sample . renameVariables
 
+runShuffle :: Bool -> Bool -> SourceInfo a -> IO (SourceInfo a)
+runShuffle nshuf nren sv = do
+  sv' <- fopt nren renameVariablesIO sv
+  fopt nshuf shuffleLinesIO sv'
+  where fopt o f = if o then return else f
+
 m' :: SourceInfo ()
 m' = SourceInfo "m" [verilog|
 module fir_kernel_4tap_arch_1 #(
