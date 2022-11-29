@@ -1,7 +1,7 @@
 -- |
 -- Module      : Verismith.Verilog.Parser
 -- Description : Minimal Verilog parser to reconstruct the AST.
--- Copyright   : (c) 2019, Yann Herklotz
+-- Copyright   : (c) 2019-2022, Yann Herklotz
 -- License     : GPL-3
 -- Maintainer  : yann [at] yannherklotz [dot] com
 -- Stability   : experimental
@@ -198,7 +198,7 @@ parseTable =
     [ binary SymLt (sBinOp BinLT) AssocNone,
       binary SymGt (sBinOp BinGT) AssocNone,
       binary SymLtEq (sBinOp BinLEq) AssocNone,
-      binary SymGtEq (sBinOp BinLEq) AssocNone
+      binary SymGtEq (sBinOp BinGEq) AssocNone
     ],
     [ binary SymEqEq (sBinOp BinEq) AssocNone,
       binary SymBangEq (sBinOp BinNEq) AssocNone
