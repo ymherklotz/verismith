@@ -34,6 +34,7 @@ library
   default-language: Haskell2010
   build-tools: alex >=3 && <4
   other-modules: Paths_verismith
+--  ghc-options: -ddump-simpl -ddump-to-file
   exposed-modules: Verismith
                  , Verismith.Circuit
                  , Verismith.Circuit.Base
@@ -75,6 +76,15 @@ library
                  , Verismith.Verilog.Preprocess
                  , Verismith.Verilog.Quote
                  , Verismith.Verilog.Token
+                 , Verismith.Verilog2005
+                 , Verismith.Verilog2005.Token
+                 , Verismith.Verilog2005.Lexer
+                 , Verismith.Verilog2005.AST
+                 , Verismith.Verilog2005.Utils
+                 , Verismith.Verilog2005.LibPretty
+                 , Verismith.Verilog2005.PrettyPrinter
+                 , Verismith.Verilog2005.Parser
+                 , Verismith.Verilog2005.Generator
   build-depends: array >=0.5 && <0.6
                , base >=4.7 && <5
                , binary >= 0.8.5.1 && <0.9
@@ -106,6 +116,9 @@ library
                , transformers >=0.5 && <0.6
                , transformers-base >=0.4.5 && <0.5
                , containers
+               , unordered-containers
+               , mwc-probability
+               , vector
   default-extensions: OverloadedStrings
 
 executable verismith

@@ -39,7 +39,7 @@ $decimalDigit = [0-9]
 @binaryNumber = @size? @binaryBase @binaryValue
 @octalNumber  = @size? @octalBase  @octalValue
 @hexNumber    = @size? @hexBase    @hexValue
-  
+ 
 -- $exp  = [eE]
 -- $sign = [\+\-]
 -- @realNumber = unsignedNumber "." unsignedNumber | unsignedNumber ( "." unsignedNumber)? exp sign? unsignedNumber
