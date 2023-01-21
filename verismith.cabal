@@ -125,7 +125,7 @@ benchmark benchmark
   build-depends: base >=4 && <5
                , verismith
                , criterion >=1.5.5 && <1.6
-               , lens >=4.16.1 && <4.19
+               , lens >=4.16.1 && <5.1
   default-extensions: OverloadedStrings
 
 test-suite test
@@ -142,7 +142,7 @@ test-suite test
                , verismith
                , fgl >=5.6 && <5.8
                , hedgehog >=1.0 && <1.2
-               , lens >=4.16.1 && <4.19
+               , lens >=4.16.1 && <5.1
                , parsec >= 3.1 && < 3.2
                , tasty >=1.0.1.1 && <1.3
                , tasty-hedgehog >=1.0 && <1.1
