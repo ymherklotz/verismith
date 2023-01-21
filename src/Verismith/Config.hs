@@ -103,7 +103,7 @@ import Control.Applicative (Alternative)
 import Control.Lens hiding ((.=))
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
 import qualified Data.Text.IO as T
 import Data.Version (showVersion)
 import Development.GitRev
@@ -352,10 +352,9 @@ $(makeLenses ''Info)
 $(makeLenses ''Config)
 
 defaultValue ::
-  (Alternative r, Applicative w) =>
-  b ->
-  Toml.Codec r w a b ->
-  Toml.Codec r w a b
+  a ->
+  TomlCodec a ->
+  TomlCodec a
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 fromXST :: XST -> SynthDescription
@@ -629,12 +628,7 @@ parseConfigFile = Toml.decodeFile configCodec
 parseConfig :: Text -> Config
 parseConfig t = case Toml.decode configCodec t of
   Right c -> c
-  Left Toml.TrivialError -> error "Trivial error while parsing Toml config"
-  Left (Toml.KeyNotFound k) -> error $ "Key " ++ show k ++ " not found"
-  Left (Toml.TableNotFound k) -> error $ "Table " ++ show k ++ " not found"
-  Left (Toml.TypeMismatch k _ _) ->
-    error $ "Type mismatch with key " ++ show k
-  Left _ -> error "Config file parse error"
+  Left e -> error (unpack $ Toml.prettyTomlDecodeErrors e)
 
 encodeConfig :: Config -> Text
 encodeConfig = Toml.encode configCodec
