@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Main where
 
 import Control.Lens ((&), (.~))
@@ -15,8 +16,8 @@ main =
   defaultMain
     [ bgroup
         "generation"
-        [ bench "default" $ nfAppIO (proceduralIO "top") defaultConfig,
-          bench "depth" . nfAppIO (proceduralIO "top") $ defaultConfig & configProperty . propStmntDepth .~ 10,
-          bench "size" . nfAppIO (proceduralIO "top") $ defaultConfig & configProperty . propSize .~ 40
+        [ bench "default" $ nfAppIO (proceduralIO @() "top") defaultConfig,
+          bench "depth" . nfAppIO (proceduralIO @() "top") $ defaultConfig & configProperty . propStmntDepth .~ 10,
+          bench "size" . nfAppIO (proceduralIO @() "top") $ defaultConfig & configProperty . propSize .~ 40
         ]
     ]
