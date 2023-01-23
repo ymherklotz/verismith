@@ -535,14 +535,7 @@ data CasePair a
       { _casePairExpr :: !Expr,
         _casePairStmnt :: !(Statement a)
       }
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
-
-instance Functor CasePair where
-  fmap f (CasePair e s) = CasePair e $ fmap f s
-
-instance Annotations CasePair where
-  removeAnn (CasePair e s) = CasePair e $ removeAnn s
-  collectAnn (CasePair _ s) = collectAnn s
+  deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 traverseStmntCasePair ::
   Functor f =>
@@ -596,7 +589,7 @@ data Statement a
         _forStmnt :: Statement a
       }
   | StmntAnn a (Statement a)
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
+  deriving (Eq, Show, Ord, Data, Functor, Generic, NFData)
 
 $(makeLenses ''Statement)
 
@@ -620,19 +613,6 @@ instance Semigroup (Statement a) where
 instance Monoid (Statement a) where
   mempty = SeqBlock []
 
-instance Functor Statement where
-  fmap f (TimeCtrl e s) = TimeCtrl e $ fmap f <$> s
-  fmap f (EventCtrl e s) = EventCtrl e $ fmap f <$> s
-  fmap f (SeqBlock s) = SeqBlock $ fmap f <$> s
-  fmap f (CondStmnt c ms1 ms2) = CondStmnt c (fmap f <$> ms1) $ fmap f <$> ms2
-  fmap f (StmntCase ct ce cp cdef) = StmntCase ct ce (fmap f <$> cp) $ fmap f <$> cdef
-  fmap f (ForLoop a b c s) = ForLoop a b c $ fmap f s
-  fmap f (StmntAnn a s) = StmntAnn (f a) $ fmap f s
-  fmap _ (BlockAssign a) = BlockAssign a
-  fmap _ (NonBlockAssign a) = NonBlockAssign a
-  fmap _ (TaskEnable t) = TaskEnable t
-  fmap _ (SysTaskEnable s) = SysTaskEnable s
-
 instance Annotations Statement where
   removeAnn (StmntAnn _ s) = removeAnn s
   removeAnn (TimeCtrl e s) = TimeCtrl e $ fmap removeAnn s
@@ -650,6 +630,10 @@ instance Annotations Statement where
   collectAnn (StmntCase _ _ cp cdef) =  concatMap collectAnn cp <> concatMap collectAnn cdef
   collectAnn (ForLoop _ _ _ s) = collectAnn s
   collectAnn _ = []
+
+instance Annotations CasePair where
+  removeAnn (CasePair e s) = CasePair e $ removeAnn s
+  collectAnn (CasePair _ s) = collectAnn s
 
 -- | Parameter that can be assigned in blocks or modules using @parameter@.
 data Parameter
@@ -697,21 +681,11 @@ data ModItem a
   | ParamDecl {_paramDecl :: NonEmpty Parameter}
   | LocalParamDecl {_localParamDecl :: NonEmpty LocalParam}
   | ModItemAnn a (ModItem a)
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
+  deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 $(makePrisms ''ModItem)
 
 $(makeLenses ''ModItem)
-
-instance Functor ModItem where
-  fmap f (ModItemAnn a mi) = ModItemAnn (f a) $ fmap f mi
-  fmap f (Initial s) = Initial $ fmap f s
-  fmap f (Always s) = Always $ fmap f s
-  fmap _ (ModCA c) = ModCA c
-  fmap _ (ModInst a b c d) = ModInst a b c d
-  fmap _ (Decl a b c) = Decl a b c
-  fmap _ (ParamDecl p) = ParamDecl p
-  fmap _ (LocalParamDecl l) = LocalParamDecl l
 
 instance Annotations ModItem where
   removeAnn (ModItemAnn _ mi) = removeAnn mi
@@ -733,7 +707,7 @@ data ModDecl a
         _modParams :: ![Parameter]
       }
   | ModDeclAnn a (ModDecl a)
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
+  deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 instance Plated (ModDecl a) where
   plate f (ModDeclAnn b m) = ModDeclAnn b <$> plate f m
@@ -741,10 +715,6 @@ instance Plated (ModDecl a) where
 
 $(makeLenses ''ModDecl)
 $(makePrisms ''ModDecl)
-
-instance Functor ModDecl where
-  fmap f (ModDecl i out inp mis params) = ModDecl i out inp (fmap f <$> mis) params
-  fmap f (ModDeclAnn a mi) = ModDeclAnn (f a) $ fmap f mi
 
 instance Annotations ModDecl where
   removeAnn (ModDecl i out inp mis params) = ModDecl i out inp (fmap removeAnn mis) params
@@ -764,7 +734,7 @@ traverseModItem _ e = pure e
 
 -- | The complete sourcetext for the Verilog module.
 newtype Verilog a = Verilog {getVerilog :: [ModDecl a]}
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
+  deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 $(makeWrapped ''Verilog)
 
@@ -773,9 +743,6 @@ instance Semigroup (Verilog a) where
 
 instance Monoid (Verilog a) where
   mempty = Verilog mempty
-
-instance Functor Verilog where
-  fmap f (Verilog v) = Verilog $ fmap f <$> v
 
 instance Annotations Verilog where
   removeAnn (Verilog v) = Verilog $ fmap removeAnn v
@@ -787,7 +754,7 @@ data SourceInfo a
       { _infoTop :: {-# UNPACK #-} !Text,
         _infoSrc :: !(Verilog a)
       }
-  deriving (Eq, Show, Ord, Data, Generic, NFData)
+  deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 $(makeLenses ''SourceInfo)
 
@@ -796,9 +763,6 @@ instance Semigroup (SourceInfo a) where
 
 instance Monoid (SourceInfo a) where
   mempty = SourceInfo mempty mempty
-
-instance Functor SourceInfo where
-  fmap f (SourceInfo t v) = SourceInfo t $ fmap f v
 
 instance Annotations SourceInfo where
   removeAnn (SourceInfo t v) = SourceInfo t $ removeAnn v
