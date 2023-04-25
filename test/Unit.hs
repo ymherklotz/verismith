@@ -7,6 +7,7 @@ import Control.Lens
 import Data.List.NonEmpty (NonEmpty (..))
 import Parser (parseUnitTests)
 import Reduce (reduceUnitTests)
+import Config (configUnitTests)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Verismith
@@ -21,7 +22,8 @@ unitTests =
           transformExpectedResult
           (transform trans transformTestData),
       parseUnitTests,
-      reduceUnitTests
+      reduceUnitTests,
+      configUnitTests
     ]
 
 transformTestData :: Expr
