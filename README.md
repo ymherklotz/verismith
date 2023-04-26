@@ -210,6 +210,22 @@ If you use Verismith in your research, please cite our [FPGA '20 paper](https://
 }
 ```
 
+## Contributing
+
+### Running the [ormolu formatter](https://github.com/tweag/ormolu).
+
+It can be installed using the following:
+
+```shell
+cabal install ormolu
+```
+
+Then, it can be run on all the files in this repository using (in bash):
+
+```shell
+ormolu --mode inplace $(find src test app -name '*.hs')
+```
+
 ## License
 
 This open source version of Verismith is licensed under the GPLv3 license, which can be seen in the [LICENSE](/LICENSE) file.
