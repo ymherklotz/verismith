@@ -23,11 +23,10 @@ import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
 import Prelude hiding (FilePath)
 
-data Identity
-  = Identity
-      { identityDesc :: !Text,
-        identityOutput :: !FilePath
-      }
+data Identity = Identity
+  { identityDesc :: !Text,
+    identityOutput :: !FilePath
+  }
   deriving (Eq)
 
 instance Tool Identity where
@@ -44,7 +43,7 @@ instance Synthesiser Identity where
 instance NFData Identity where
   rnf = rwhnf
 
-runSynthIdentity :: Show ann => Identity -> (SourceInfo ann) -> ResultSh ()
+runSynthIdentity :: (Show ann) => Identity -> (SourceInfo ann) -> ResultSh ()
 runSynthIdentity (Identity _ out) = writefile out . genSource
 
 defaultIdentity :: Identity

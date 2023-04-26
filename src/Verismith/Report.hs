@@ -41,7 +41,7 @@ module Verismith.Report
 where
 
 import Control.DeepSeq (NFData, rnf)
-import Control.Lens hiding ((<.>), Identity)
+import Control.Lens hiding (Identity, (<.>))
 import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.Maybe (fromMaybe)
@@ -51,13 +51,13 @@ import qualified Data.Text as T
 import Data.Text.Lazy (toStrict)
 import Data.Time
 import Shelly
-  ( (<.>),
-    (</>),
-    FilePath,
+  ( FilePath,
     fromText,
     toTextIgnore,
+    (<.>),
+    (</>),
   )
-import Text.Blaze.Html ((!), Html)
+import Text.Blaze.Html (Html, (!))
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
@@ -204,20 +204,19 @@ instance Show SynthStatus where
 
 -- | The complete state that will be used during fuzzing, which contains the
 -- results from all the operations.
-data FuzzReport
-  = FuzzReport
-      { _fuzzDir :: !FilePath,
-        -- | Results of the equivalence check.
-        _synthResults :: ![SynthResult],
-        -- | Results of the simulation.
-        _simResults :: ![SimResult],
-        -- | Results of the synthesis step.
-        _synthStatus :: ![SynthStatus],
-        _fileLines :: {-# UNPACK #-} !Int,
-        _synthTime :: !NominalDiffTime,
-        _equivTime :: !NominalDiffTime,
-        _reducTime :: !NominalDiffTime
-      }
+data FuzzReport = FuzzReport
+  { _fuzzDir :: !FilePath,
+    -- | Results of the equivalence check.
+    _synthResults :: ![SynthResult],
+    -- | Results of the simulation.
+    _simResults :: ![SimResult],
+    -- | Results of the synthesis step.
+    _synthStatus :: ![SynthStatus],
+    _fileLines :: {-# UNPACK #-} !Int,
+    _synthTime :: !NominalDiffTime,
+    _equivTime :: !NominalDiffTime,
+    _reducTime :: !NominalDiffTime
+  }
   deriving (Eq, Show)
 
 $(makeLenses ''FuzzReport)
@@ -399,7 +398,7 @@ summary name fuzz = H.docTypeHtml $ do
                   . sum
                   $ fuzz
                     ^.. traverse
-                    . fileLines,
+                      . fileLines,
                 sumUp synthTime,
                 sumUp equivTime,
                 sumUp reducTime

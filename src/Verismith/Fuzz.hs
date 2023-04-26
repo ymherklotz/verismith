@@ -53,6 +53,7 @@ import Shelly.Lifted (MonadSh, liftSh, sub)
 import System.FilePath.Posix (takeBaseName)
 import Verismith.Config
 import Verismith.CounterEg (CounterEg (..))
+import Verismith.EMI
 import Verismith.Internal
 import Verismith.Reduce
 import Verismith.Report
@@ -63,23 +64,21 @@ import Verismith.Tool.Yosys
 import Verismith.Utils (generateByteString)
 import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
-import Verismith.EMI
 import Prelude hiding (FilePath)
 
-data FuzzOpts
-  = FuzzOpts
-      { _fuzzOptsOutput :: !(Maybe FilePath),
-        _fuzzOptsForced :: !Bool,
-        _fuzzOptsKeepAll :: !Bool,
-        _fuzzOptsIterations :: {-# UNPACK #-} !Int,
-        _fuzzOptsNoSim :: !Bool,
-        _fuzzOptsNoEquiv :: !Bool,
-        _fuzzOptsNoReduction :: !Bool,
-        _fuzzOptsConfig :: {-# UNPACK #-} !Config,
-        _fuzzDataDir :: !FilePath,
-        _fuzzOptsCrossCheck :: !Bool,
-        _fuzzOptsChecker :: !(Maybe Text)
-      }
+data FuzzOpts = FuzzOpts
+  { _fuzzOptsOutput :: !(Maybe FilePath),
+    _fuzzOptsForced :: !Bool,
+    _fuzzOptsKeepAll :: !Bool,
+    _fuzzOptsIterations :: {-# UNPACK #-} !Int,
+    _fuzzOptsNoSim :: !Bool,
+    _fuzzOptsNoEquiv :: !Bool,
+    _fuzzOptsNoReduction :: !Bool,
+    _fuzzOptsConfig :: {-# UNPACK #-} !Config,
+    _fuzzDataDir :: !FilePath,
+    _fuzzOptsCrossCheck :: !Bool,
+    _fuzzOptsChecker :: !(Maybe Text)
+  }
   deriving (Show, Eq)
 
 $(makeLenses ''FuzzOpts)
@@ -100,23 +99,21 @@ defaultFuzzOpts =
       _fuzzOptsChecker = Nothing
     }
 
-data FuzzEnv
-  = FuzzEnv
-      { _getSynthesisers :: ![SynthTool],
-        _getSimulators :: ![SimTool],
-        _yosysInstance :: {-# UNPACK #-} !Yosys,
-        _fuzzEnvOpts :: {-# UNPACK #-} !FuzzOpts
-      }
+data FuzzEnv = FuzzEnv
+  { _getSynthesisers :: ![SynthTool],
+    _getSimulators :: ![SimTool],
+    _yosysInstance :: {-# UNPACK #-} !Yosys,
+    _fuzzEnvOpts :: {-# UNPACK #-} !FuzzOpts
+  }
   deriving (Eq, Show)
 
 $(makeLenses ''FuzzEnv)
 
-data FuzzState
-  = FuzzState
-      { _fuzzSynthResults :: ![SynthResult],
-        _fuzzSimResults :: ![SimResult],
-        _fuzzSynthStatus :: ![SynthStatus]
-      }
+data FuzzState = FuzzState
+  { _fuzzSynthResults :: ![SynthResult],
+    _fuzzSimResults :: ![SimResult],
+    _fuzzSynthStatus :: ![SynthStatus]
+  }
   deriving (Eq, Show)
 
 $(makeLenses ''FuzzState)
@@ -129,10 +126,10 @@ type Fuzz m = StateT FuzzState (ReaderT FuzzEnv m)
 
 type MonadFuzz m = (MonadBaseControl IO m, MonadIO m, MonadSh m)
 
-runFuzz :: MonadIO m => FuzzOpts -> Yosys -> Fuzz Sh a -> m a
+runFuzz :: (MonadIO m) => FuzzOpts -> Yosys -> Fuzz Sh a -> m a
 runFuzz fo yos m = shelly $ runFuzz' fo yos m
 
-runFuzz' :: Monad m => FuzzOpts -> Yosys -> Fuzz m b -> m b
+runFuzz' :: (Monad m) => FuzzOpts -> Yosys -> Fuzz m b -> m b
 runFuzz' fo yos m =
   runReaderT
     (evalStateT m (FuzzState [] [] []))
@@ -150,10 +147,10 @@ runFuzz' fo yos m =
   where
     conf = _fuzzOptsConfig fo
 
-askConfig :: Monad m => Fuzz m Config
+askConfig :: (Monad m) => Fuzz m Config
 askConfig = asks (_fuzzOptsConfig . _fuzzEnvOpts)
 
-askOpts :: Monad m => Fuzz m FuzzOpts
+askOpts :: (Monad m) => Fuzz m FuzzOpts
 askOpts = asks _fuzzEnvOpts
 
 genMethod conf seed gen =
@@ -198,16 +195,16 @@ passedFuzz (FuzzReport _ synth sim synthstat _ _ _ _) =
     passedSim = length $ filter (not . filterSim) sim
     passedSynthStat = length $ filter (not . filterSynthStat) synthstat
 
-synthesisers :: Monad m => Fuzz m [SynthTool]
+synthesisers :: (Monad m) => Fuzz m [SynthTool]
 synthesisers = lift $ asks _getSynthesisers
 
---simulators :: (Monad m) => Fuzz () m [SimTool]
---simulators = lift $ asks getSimulators
+-- simulators :: (Monad m) => Fuzz () m [SimTool]
+-- simulators = lift $ asks getSimulators
 
 combinations :: [a] -> [b] -> [(a, b)]
 combinations l1 l2 = [(x, y) | x <- l1, y <- l2]
 
-logT :: MonadSh m => Text -> m ()
+logT :: (MonadSh m) => Text -> m ()
 logT = liftSh . logger
 
 timeit :: (MonadIO m, MonadSh m) => m a -> m (NominalDiffTime, a)
@@ -229,21 +226,21 @@ synthesis src = do
       liftSh . mkdir_p . fromText $ toText a
       pop (fromText $ toText a) $ runSynth a src
 
-passedSynthesis :: MonadSh m => Fuzz m [SynthTool]
+passedSynthesis :: (MonadSh m) => Fuzz m [SynthTool]
 passedSynthesis = fmap toSynth . filter passed . _fuzzSynthStatus <$> get
   where
     passed (SynthStatus _ (Pass _) _) = True
     passed _ = False
     toSynth (SynthStatus s _ _) = s
 
-failedSynthesis :: MonadSh m => Fuzz m [SynthTool]
+failedSynthesis :: (MonadSh m) => Fuzz m [SynthTool]
 failedSynthesis = fmap toSynth . filter failed . _fuzzSynthStatus <$> get
   where
     failed (SynthStatus _ (Fail SynthFail) _) = True
     failed _ = False
     toSynth (SynthStatus s _ _) = s
 
-make :: MonadSh m => FilePath -> m ()
+make :: (MonadSh m) => FilePath -> m ()
 make f = liftSh $ mkdir_p f
 
 pop :: (MonadBaseControl IO m, MonadSh m) => FilePath -> m a -> m a
@@ -446,7 +443,7 @@ titleRun t f = do
   logT $ "### Finished " <> t <> " (" <> showT diff <> ") ###"
   return (diff, res)
 
-whenMaybe :: Applicative m => Bool -> m a -> m (Maybe a)
+whenMaybe :: (Applicative m) => Bool -> m a -> m (Maybe a)
 whenMaybe b x = if b then Just <$> x else pure Nothing
 
 getTime :: (Num n) => Maybe (n, a) -> n
@@ -488,7 +485,7 @@ hatFreqs l = zip hat (return <$> l)
     h = length l `div` 2
     hat = (+ h) . negate . abs . (h -) <$> [1 .. length l]
 
-meanFreqs :: Source a => Frequency a
+meanFreqs :: (Source a) => Frequency a
 meanFreqs l = zip hat (return <$> l)
   where
     hat = calc <$> sizes
@@ -516,7 +513,7 @@ fuzz gen = do
     . encodeConfig
     $ conf
       & configProperty
-      . propSeed
+        . propSeed
         ?~ seed'
   (tsynth, _) <- titleRun "Synthesis" $ synthesis src
   (tequiv, _) <-
@@ -552,9 +549,11 @@ fuzz gen = do
           (getTime redResult)
   return report
 
-fuzzInDirG :: (MonadFuzz m, Ord ann, Show ann) =>
+fuzzInDirG ::
+  (MonadFuzz m, Ord ann, Show ann) =>
   (Gen (SourceInfo ann) -> Fuzz m FuzzReport) ->
-  Gen (SourceInfo ann) -> Fuzz m FuzzReport
+  Gen (SourceInfo ann) ->
+  Fuzz m FuzzReport
 fuzzInDirG f src = do
   fuzzOpts <- askOpts
   let fp = fromMaybe "fuzz" $ _fuzzOptsOutput fuzzOpts
@@ -603,7 +602,7 @@ fuzzMultipleG f src = do
         )
         $ fuzzInDirG f src
 
-sampleSeed :: MonadSh m => Maybe Seed -> Gen a -> m (Seed, a)
+sampleSeed :: (MonadSh m) => Maybe Seed -> Gen a -> m (Seed, a)
 sampleSeed s gen =
   liftSh $
     let loop n =
@@ -632,7 +631,7 @@ fuzzEMI gen = do
     . encodeConfig
     $ conf
       & configProperty
-      . propSeed
+        . propSeed
         ?~ seed'
   (tsynth, _) <- titleRun "Synthesis" $ synthesis src
   (_, _) <-

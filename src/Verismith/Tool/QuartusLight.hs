@@ -24,12 +24,11 @@ import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
 import Prelude hiding (FilePath)
 
-data QuartusLight
-  = QuartusLight
-      { quartusLightBin :: !(Maybe FilePath),
-        quartusLightDesc :: !Text,
-        quartusLightOutput :: !FilePath
-      }
+data QuartusLight = QuartusLight
+  { quartusLightBin :: !(Maybe FilePath),
+    quartusLightDesc :: !Text,
+    quartusLightOutput :: !FilePath
+  }
   deriving (Eq)
 
 instance Tool QuartusLight where
@@ -49,7 +48,7 @@ instance NFData QuartusLight where
 defaultQuartusLight :: QuartusLight
 defaultQuartusLight = QuartusLight Nothing "quartus" "syn_quartus.v"
 
-runSynthQuartusLight :: Show ann => QuartusLight -> (SourceInfo ann) -> ResultSh ()
+runSynthQuartusLight :: (Show ann) => QuartusLight -> (SourceInfo ann) -> ResultSh ()
 runSynthQuartusLight sim (SourceInfo top src) = do
   dir <- liftSh pwd
   let ex = execute_ SynthFail dir "quartus"

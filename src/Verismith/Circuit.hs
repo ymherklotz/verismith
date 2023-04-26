@@ -40,4 +40,4 @@ fromGraph = do
       . head
     $ nestUpTo 5 (generateAST gr)
       ^.. _Wrapped
-      . traverse
+        . traverse

@@ -23,7 +23,7 @@ import Control.Lens
 import Control.Monad (void)
 import Data.Either (fromRight)
 import Data.Text (Text, unpack)
-import Shelly ((</>), FilePath)
+import Shelly (FilePath, (</>))
 import qualified Shelly as S
 import Shelly.Lifted (liftSh, readfile)
 import Verismith.CounterEg (parseCounterEg)
@@ -35,12 +35,11 @@ import Verismith.Verilog.CodeGen
 import Verismith.Verilog.Mutate
 import Prelude hiding (FilePath)
 
-data Yosys
-  = Yosys
-      { yosysBin :: !(Maybe FilePath),
-        yosysDesc :: !Text,
-        yosysOutput :: !FilePath
-      }
+data Yosys = Yosys
+  { yosysBin :: !(Maybe FilePath),
+    yosysDesc :: !Text,
+    yosysOutput :: !FilePath
+  }
   deriving (Eq)
 
 instance Tool Yosys where
@@ -63,7 +62,7 @@ defaultYosys = Yosys Nothing "yosys" "syn_yosys.v"
 yosysPath :: Yosys -> FilePath
 yosysPath sim = maybe (S.fromText "yosys") (</> S.fromText "yosys") $ yosysBin sim
 
-runSynthYosys :: Show ann => Yosys -> (SourceInfo ann) -> ResultSh ()
+runSynthYosys :: (Show ann) => Yosys -> (SourceInfo ann) -> ResultSh ()
 runSynthYosys sim (SourceInfo _ src) = do
   dir <- liftSh $ do
     dir' <- S.pwd
@@ -133,7 +132,10 @@ runEquiv mt datadir sim1 sim2 srcInfo = do
       Nothing -> ResultT . return . Fail $ EquivFail Nothing
       Just _ ->
         ResultT $
-          Fail . EquivFail . Just . fromRight mempty
+          Fail
+            . EquivFail
+            . Just
+            . fromRight mempty
             . parseCounterEg
             <$> readfile "proof/engine_0/trace.smtc"
     124 -> ResultT . return $ Fail TimeoutError

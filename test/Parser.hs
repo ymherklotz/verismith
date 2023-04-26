@@ -16,7 +16,7 @@ where
 
 import Control.Lens
 import Data.Either (either, isRight)
-import Hedgehog ((===), Gen, Property)
+import Hedgehog (Gen, Property, (===))
 import qualified Hedgehog as Hog
 import qualified Hedgehog.Gen as Hog
 import Test.Tasty

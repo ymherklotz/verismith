@@ -46,10 +46,10 @@ doubleName :: Text -> Text
 doubleName n = n <> " " <> n
 {-# INLINE doubleName #-}
 
-outputText :: Synthesiser a => a -> Text
+outputText :: (Synthesiser a) => a -> Text
 outputText = toTextIgnore . synthOutput
 
-yosysSynthConfig :: Synthesiser a => Text -> a -> FilePath -> Text
+yosysSynthConfig :: (Synthesiser a) => Text -> a -> FilePath -> Text
 yosysSynthConfig t a fp =
   T.unlines
     [ "read_verilog " <> toTextIgnore fp,
@@ -57,7 +57,7 @@ yosysSynthConfig t a fp =
       "write_verilog " <> outputText a
     ]
 
-yosysSynthConfigStd :: Synthesiser a => a -> FilePath -> Text
+yosysSynthConfigStd :: (Synthesiser a) => a -> FilePath -> Text
 yosysSynthConfigStd = yosysSynthConfig "synth"
 
 yosysSatConfig :: (Synthesiser a, Synthesiser b) => a -> b -> (SourceInfo ann) -> Text
@@ -78,7 +78,7 @@ yosysSatConfig sim1 sim2 (SourceInfo top src) =
 yosysSimConfig :: Text
 yosysSimConfig = "read_verilog rtl.v; proc;;\nrename mod mod_rtl"
 
-quartusLightSynthConfig :: Synthesiser a => a -> FilePath -> Text -> FilePath -> Text
+quartusLightSynthConfig :: (Synthesiser a) => a -> FilePath -> Text -> FilePath -> Text
 quartusLightSynthConfig q sdc top fp =
   T.unlines
     [ "load_package flow",
@@ -101,7 +101,7 @@ quartusLightSynthConfig q sdc top fp =
       "project_close"
     ]
 
-quartusSynthConfig :: Synthesiser a => a -> FilePath -> Text -> FilePath -> Text
+quartusSynthConfig :: (Synthesiser a) => a -> FilePath -> Text -> FilePath -> Text
 quartusSynthConfig q sdc top fp =
   T.unlines
     [ "load_package flow",

@@ -31,11 +31,10 @@ import GHC.Generics (Generic)
 
 -- | Bit Vector that stores the bits in an arbitrary container together with the
 -- size.
-data BitVecF a
-  = BitVec
-      { width :: {-# UNPACK #-} !Int,
-        value :: !a
-      }
+data BitVecF a = BitVec
+  { width :: {-# UNPACK #-} !Int,
+    value :: !a
+  }
   deriving (Show, Eq, Ord, Data, Functor, Foldable, Traversable, Generic, NFData)
 
 -- | Specialisation of the above with Integer, so that infinitely large bit
@@ -78,10 +77,10 @@ instance (Num a, Bits a) => Bits (BitVecF a) where
 instance (Num a, Bits a) => FiniteBits (BitVecF a) where
   finiteBitSize (BitVec w _) = w
 
-instance Bits a => Semigroup (BitVecF a) where
+instance (Bits a) => Semigroup (BitVecF a) where
   (BitVec w1 v1) <> (BitVec w2 v2) = BitVec (w1 + w2) (shiftL v1 w2 .|. v2)
 
-instance Bits a => Monoid (BitVecF a) where
+instance (Bits a) => Monoid (BitVecF a) where
   mempty = BitVec 0 zeroBits
 
 -- | BitVecF construction, given width and value.

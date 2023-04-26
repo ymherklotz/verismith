@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
+
 module Main where
 
 import Control.Lens ((&), (.~))

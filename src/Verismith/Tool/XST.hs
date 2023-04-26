@@ -26,12 +26,11 @@ import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
 import Prelude hiding (FilePath)
 
-data XST
-  = XST
-      { xstBin :: !(Maybe FilePath),
-        xstDesc :: !Text,
-        xstOutput :: !FilePath
-      }
+data XST = XST
+  { xstBin :: !(Maybe FilePath),
+    xstDesc :: !Text,
+    xstOutput :: !FilePath
+  }
   deriving (Eq)
 
 instance Tool XST where
@@ -51,7 +50,7 @@ instance NFData XST where
 defaultXST :: XST
 defaultXST = XST Nothing "xst" "syn_xst.v"
 
-runSynthXST :: Show ann => XST -> (SourceInfo ann) -> ResultSh ()
+runSynthXST :: (Show ann) => XST -> (SourceInfo ann) -> ResultSh ()
 runSynthXST sim (SourceInfo top src) = do
   dir <- liftSh pwd
   let exec n =

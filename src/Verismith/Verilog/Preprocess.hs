@@ -61,10 +61,12 @@ uncomment file = uncomment'
 -- | A simple `define preprocessor.
 preprocess :: [(String, String)] -> FilePath -> String -> String
 preprocess env file content =
-  unlines $ pp True [] env $ lines $
-    uncomment
-      file
-      content
+  unlines $
+    pp True [] env $
+      lines $
+        uncomment
+          file
+          content
   where
     pp :: Bool -> [Bool] -> [(String, String)] -> [String] -> [String]
     pp _ _ _ [] = []
@@ -85,14 +87,14 @@ preprocess env file content =
         "" : pp (on && notElem name (map fst env_)) (on : stack) env_ rest
       "`else" : _
         | not $ null stack ->
-          "" : pp (head stack && not on) stack env_ rest
+            "" : pp (head stack && not on) stack env_ rest
         | otherwise ->
-          error $ "`else  without associated `ifdef/`ifndef: " ++ file
+            error $ "`else  without associated `ifdef/`ifndef: " ++ file
       "`endif" : _
         | not $ null stack ->
-          "" : pp (head stack) (tail stack) env_ rest
+            "" : pp (head stack) (tail stack) env_ rest
         | otherwise ->
-          error $ "`endif  without associated `ifdef/`ifndef: " ++ file
+            error $ "`endif  without associated `ifdef/`ifndef: " ++ file
       "`timescale" : _ -> pp on stack env_ rest
       _ -> (if on then ppLine env_ a else "") : pp on stack env_ rest
 

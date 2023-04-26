@@ -62,9 +62,9 @@ class Tool a where
   toText :: a -> Text
 
 -- | Simulation type class.
-class Tool a => Simulator a where
+class (Tool a) => Simulator a where
   runSim ::
-    Show ann =>
+    (Show ann) =>
     -- | Simulator instance
     a ->
     -- | Run information
@@ -104,9 +104,9 @@ instance Monoid Failed where
   mempty = EmptyFail
 
 -- | Synthesiser type class.
-class Tool a => Synthesiser a where
+class (Tool a) => Synthesiser a where
   runSynth ::
-    Show ann =>
+    (Show ann) =>
     -- | Synthesiser tool instance
     a ->
     -- | Run information

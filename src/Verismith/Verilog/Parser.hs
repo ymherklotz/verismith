@@ -264,10 +264,10 @@ number = number' <$> numLit
           | "'d" `isPrefixOf` a' = read $ drop 2 a'
           | "'h" `isPrefixOf` a' = read $ "0x" ++ drop 2 a'
           | "'b" `isPrefixOf` a' =
-            foldl
-              (\n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0))
-              0
-              (drop 2 a')
+              foldl
+                (\n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0))
+                0
+                (drop 2 a')
           | otherwise = error $ "Invalid number format: " ++ a'
 
 -- toInteger' :: Decimal -> Integer
@@ -312,9 +312,9 @@ parsePortDir =
   tok KWOutput
     $> PortOut
     <|> tok KWInput
-    $> PortIn
+      $> PortIn
     <|> tok KWInout
-    $> PortInOut
+      $> PortInOut
 
 parseDecl :: Parser (ModItem ann)
 parseDecl = (Just <$> parsePortDir >>= parseNetDecl) <|> parseNetDecl Nothing
@@ -542,14 +542,14 @@ mergeIO a _ = a
 
 genmoditem :: Map.Map Identifier (ModItem a) -> ModItem a -> Map.Map Identifier (ModItem a)
 genmoditem m (Decl a b c) =
-  Map.insertWith mergeIO (b^.portName) (Decl a b c) m
+  Map.insertWith mergeIO (b ^. portName) (Decl a b c) m
 genmoditem m b = m
 
 modifyelements :: [ModItem a] -> [ModItem a]
 modifyelements ma = ndecl <> nodecl
   where
     ndecl = Map.elems $ foldl genmoditem Map.empty ma
-    isDecl Decl{} = True
+    isDecl Decl {} = True
     isDecl _ = False
     nodecl = filter isDecl ma
 
@@ -569,7 +569,7 @@ parseVerilog ::
   -- message if parse fails.
   Either Text (Verilog ann)
 parseVerilog s =
-  bimap showT id --(_Wrapped.traverse.modItems %~ modifyelements)
+  bimap showT id -- (_Wrapped.traverse.modItems %~ modifyelements)
     . parse parseVerilogSrc (T.unpack s)
     . alexScanTokens
     . preprocess [] (T.unpack s)

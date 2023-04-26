@@ -59,25 +59,24 @@ import Options.Applicative
 import Paths_verismith (getDataDir)
 import Shelly hiding (command)
 import Shelly.Lifted (liftSh)
+import System.Exit (exitFailure, exitSuccess)
 import System.Random (randomIO)
-import System.Exit (exitSuccess, exitFailure)
 import Verismith.Circuit
 import Verismith.Config
+import Verismith.EMI
 import Verismith.Fuzz
 import Verismith.Generate
 import Verismith.OptParser
 import Verismith.Reduce
 import Verismith.Report
 import Verismith.Result
+import Verismith.Shuffle
 import Verismith.Tool
 import Verismith.Tool.Internal
 import Verismith.Utils (generateByteString)
 import Verismith.Verilog
-import Verismith.Verilog
 import Verismith.Verilog.Distance
 import Verismith.Verilog.Parser (parseSourceInfoFile)
-import Verismith.EMI
-import Verismith.Shuffle
 import Prelude hiding (FilePath)
 
 toFP :: String -> FilePath
@@ -93,12 +92,19 @@ logMsg :: Text -> Text -> IO ()
 logMsg level msg = do
   currentTime <- getZonedTime
   T.putStrLn $
-    "[" <> level <> "] "
-    <> T.pack (formatTime defaultTimeLocale "%H:%M:%S " currentTime)
-    <> msg
+    "["
+      <> level
+      <> "] "
+      <> T.pack (formatTime defaultTimeLocale "%H:%M:%S " currentTime)
+      <> msg
 
+logInfo :: Text -> IO ()
 logInfo = logMsg "INFO"
+
+logWarn :: Text -> IO ()
 logWarn = logMsg "WARN"
+
+logFatal :: Text -> IO ()
 logFatal = logMsg "FATAL"
 
 getConfig' :: Bool -> Maybe FilePath -> IO Config
@@ -251,18 +257,20 @@ handleOpts (ShuffleOpt f t o nshuffle nrename noequiv equivdir checker) = do
       let sv = SourceInfo t v
       sv' <- runShuffle nshuffle nrename sv
       let gv = GenVerilog sv' :: GenVerilog (SourceInfo ())
-      if noequiv then return () else do
-        shelly $ do
-          mkdir equivdir
-          cp file (equivdir </> fn1)
-        writeFile (equivdir </> fn2) $ show gv
-        res <- shelly . runResultT $ pop equivdir $ do
-          runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) sv'
-        case res of
-          Pass _ -> putStrLn "Equivalence check passed"
-          Fail (EquivFail _) -> putStrLn "Equivalence check failed"
-          Fail TimeoutError -> putStrLn "Equivalence check timed out"
-          Fail _ -> putStrLn "Equivalence check error"
+      if noequiv
+        then return ()
+        else do
+          shelly $ do
+            mkdir equivdir
+            cp file (equivdir </> fn1)
+          writeFile (equivdir </> fn2) $ show gv
+          res <- shelly . runResultT $ pop equivdir $ do
+            runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) sv'
+          case res of
+            Pass _ -> putStrLn "Equivalence check passed"
+            Fail (EquivFail _) -> putStrLn "Equivalence check failed"
+            Fail TimeoutError -> putStrLn "Equivalence check timed out"
+            Fail _ -> putStrLn "Equivalence check error"
       case o of
         Nothing -> print gv
         Just o' -> writeFile (T.unpack $ toTextIgnore o') $ show gv
@@ -337,7 +345,7 @@ handleOpts (Equiv o v1 v2 top checker) = do
     cp v1 (o </> fn1)
     cp v2 (o </> fn2)
   res <- shelly . runResultT $ pop o $ do
-      runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) src
+    runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) src
   case res of
     Pass _ -> putStrLn "Equivalence check passed"
     Fail (EquivFail _) -> putStrLn "Equivalence check failed"
@@ -401,7 +409,7 @@ onFailure t _ = do
       chdir ".." $ cp_r (fromText t) $ fromText (t <> "_failed")
       return $ Fail EmptyFail
 
-checkEquivalence :: Show ann => SourceInfo ann -> Text -> IO Bool
+checkEquivalence :: (Show ann) => SourceInfo ann -> Text -> IO Bool
 checkEquivalence src dir = shellyFailDir $ do
   mkdir_p (fromText dir)
   curr <- toTextIgnore <$> pwd

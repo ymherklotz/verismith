@@ -1,35 +1,33 @@
-{-|
-Module      : Verismith.Verilog.Distance
-Description : Definition of the distance function for the abstract syntax tree.
-Copyright   : (c) 2020, Yann Herklotz
-License     : GPL-3
-Maintainer  : yann [at] yannherklotz [dot] com
-Stability   : experimental
-Poratbility : POSIX
-
-Define the distance function for the abstract syntax tree, so that different
-Verilog files can be compared.  This allows us to define a metric on how
-different two pieces of Verilog are.  Currently, differences in expressions are
-ignored, as these are not that interesting.
--}
-
+-- |
+-- Module      : Verismith.Verilog.Distance
+-- Description : Definition of the distance function for the abstract syntax tree.
+-- Copyright   : (c) 2020, Yann Herklotz
+-- License     : GPL-3
+-- Maintainer  : yann [at] yannherklotz [dot] com
+-- Stability   : experimental
+-- Poratbility : POSIX
+--
+-- Define the distance function for the abstract syntax tree, so that different
+-- Verilog files can be compared.  This allows us to define a metric on how
+-- different two pieces of Verilog are.  Currently, differences in expressions are
+-- ignored, as these are not that interesting.
 module Verismith.Verilog.Distance where
 
-import Verismith.Verilog.AST
-import Verismith.Verilog.Eval
 import Data.Functor.Foldable (cata)
 import Data.Text (Text, unpack)
+import Verismith.Verilog.AST
+import Verismith.Verilog.Eval
 
 data Pair a b = Pair a b
-  deriving Show
+  deriving (Show)
 
-instance Eq b => Eq (Pair a b) where
+instance (Eq b) => Eq (Pair a b) where
   Pair _ a == Pair _ b = a == b
 
-instance Ord b => Ord (Pair a b) where
+instance (Ord b) => Ord (Pair a b) where
   Pair _ a <= Pair _ b = a <= b
 
-eqDistance :: Eq a => a -> a -> Int
+eqDistance :: (Eq a) => a -> a -> Int
 eqDistance a b = if a == b then 0 else 1
 {-# INLINE eqDistance #-}
 
@@ -44,47 +42,50 @@ class Distance a where
   dempty :: a -> Int
   dempty _ = 1
 
-minimumloc :: Distance a => a -> [a] -> Pair Int Int
+minimumloc :: (Distance a) => a -> [a] -> Pair Int Int
 minimumloc ah [] = Pair 0 $ dempty ah
-minimumloc ah b = minimum $ (\(loc, el) -> Pair loc (udistance ah el)) <$> zip [0..] b
+minimumloc ah b = minimum $ (\(loc, el) -> Pair loc (udistance ah el)) <$> zip [0 ..] b
 
 removeAt :: Int -> [a] -> [a]
 removeAt loc lst =
-  let (a, b) = splitAt loc lst in
-    if null b then a else a ++ tail b
+  let (a, b) = splitAt loc lst
+   in if null b then a else a ++ tail b
 
-remdist :: Distance a => [a] -> [a] -> Int
+remdist :: (Distance a) => [a] -> [a] -> Int
 remdist [] a = distance [] a
 remdist a [] = distance [] a
-remdist (x:xs) b
+remdist (x : xs) b
   | cost <= dx = udistance xs (removeAt loc b) + cost
   | otherwise = udistance xs b + dx
   where
     Pair loc cost = minimumloc x b
     dx = dempty x
 
-instance Distance a => Distance [a] where
+instance (Distance a) => Distance [a] where
   distance [] [] = 0
   distance [] l = sum $ dempty <$> l
   distance l [] = sum $ dempty <$> l
-  distance a@(ah:at) b@(bh:bt) =
-    let cost = distance ah bh in
-      if cost == 0 then
-        distance at bt
-      else
-        minimum [ distance at b + dempty ah
-                , distance bt a + dempty bh
-                , distance at bt + cost
-                ]
+  distance a@(ah : at) b@(bh : bt) =
+    let cost = distance ah bh
+     in if cost == 0
+          then distance at bt
+          else
+            minimum
+              [ distance at b + dempty ah,
+                distance bt a + dempty bh,
+                distance at bt + cost
+              ]
 
-  udistance a b = minimum [ remdist a b
-                          , remdist b a
-                          ]
+  udistance a b =
+    minimum
+      [ remdist a b,
+        remdist b a
+      ]
 
   dempty [] = 0
-  dempty (a:b) = maximum [dempty a, dempty b]
+  dempty (a : b) = maximum [dempty a, dempty b]
 
-instance Distance a => Distance (Maybe a) where
+instance (Distance a) => Distance (Maybe a) where
   distance Nothing a = dempty a
   distance a Nothing = dempty a
   distance (Just a) (Just b) = distance a b

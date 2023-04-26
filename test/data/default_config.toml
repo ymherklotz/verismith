@@ -3,10 +3,6 @@
   generate_prob = 2
   nogenerate_prob = 8
 
-[info]
-  commit = "5afd0cad78dbefe47626befdcd72beda1ebb8b7b"
-  version = "1.0.0.2"
-
 [probability]
   expr.binary = 5
   expr.concatenation = 3

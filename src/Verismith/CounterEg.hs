@@ -15,7 +15,7 @@ where
 import Control.Applicative ((<|>))
 import Data.Bifunctor (bimap)
 import Data.Binary (encode)
-import Data.Bits ((.|.), shiftL)
+import Data.Bits (shiftL, (.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -27,11 +27,10 @@ import qualified Data.Text as T
 import Numeric (readInt)
 import qualified Text.Parsec as P
 
-data CounterEg
-  = CounterEg
-      { _counterEgInitial :: ![(Text, Text)],
-        _counterEgStates :: ![[(Text, Text)]]
-      }
+data CounterEg = CounterEg
+  { _counterEgInitial :: ![(Text, Text)],
+    _counterEgStates :: ![[(Text, Text)]]
+  }
   deriving (Eq, Show)
 
 instance Semigroup CounterEg where

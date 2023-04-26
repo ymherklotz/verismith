@@ -32,7 +32,7 @@ import qualified Data.ByteString.Lazy as L (ByteString)
 import Data.Char (digitToInt)
 import Data.Foldable (fold)
 import Data.List (transpose)
-import Data.List.NonEmpty (NonEmpty(..), fromList)
+import Data.List.NonEmpty (NonEmpty (..), fromList)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -50,11 +50,10 @@ import Verismith.Verilog.Internal
 import Verismith.Verilog.Mutate
 import Prelude hiding (FilePath)
 
-data Icarus
-  = Icarus
-      { icarusPath :: FilePath,
-        vvpPath :: FilePath
-      }
+data Icarus = Icarus
+  { icarusPath :: FilePath,
+    vvpPath :: FilePath
+  }
   deriving (Eq)
 
 instance Show Icarus where
@@ -109,7 +108,7 @@ mask = T.replace "x" "0"
 callback :: ByteString -> Text -> ByteString
 callback b t = b <> convert (mask t)
 
-runSimIcarus :: Show ann => Icarus -> (SourceInfo ann) -> [ByteString] -> ResultSh ByteString
+runSimIcarus :: (Show ann) => Icarus -> (SourceInfo ann) -> [ByteString] -> ResultSh ByteString
 runSimIcarus sim rinfo bss = do
   let tb =
         ModDecl
@@ -163,7 +162,8 @@ tbModule bss top =
                           (Just $ BlockAssign (Assign inConcat Nothing r))
                     )
                       . fromInteger
-                      . fromBytes <$> bss
+                      . fromBytes
+                      <$> bss
                   )
                 <> (TimeCtrl 10 . Just . SysTaskEnable $ Task "finish" []),
             Always . TimeCtrl 5 . Just $
@@ -198,7 +198,8 @@ tbModule' ids bss top =
                           (Just $ BlockAssign (Assign inConcat Nothing r))
                     )
                       . fromInteger
-                      . fromBytes <$> bss
+                      . fromBytes
+                      <$> bss
                   )
                 <> (TimeCtrl 10 . Just . SysTaskEnable $ Task "finish" []),
             Always . TimeCtrl 5 . Just $
@@ -210,13 +211,14 @@ tbModule' ids bss top =
           []
     ]
   where
-    inConcat = (RegConcat
-                . filter (flip notElem $ fmap Id ids)
-                . filter (/= (Id "clk"))
-                $ (Id . fromPort <$> (top ^. modInPorts)))
+    inConcat =
+      ( RegConcat
+          . filter (flip notElem $ fmap Id ids)
+          . filter (/= (Id "clk"))
+          $ (Id . fromPort <$> (top ^. modInPorts))
+      )
     inIds = RegConcat $ fmap Id ids
-    outputs = top^..modOutPorts.traverse.portName
-
+    outputs = top ^.. modOutPorts . traverse . portName
 
 counterTestBench :: CounterEg -> (ModDecl ann) -> (Verilog ann)
 counterTestBench (CounterEg _ states) m = tbModule filtered m

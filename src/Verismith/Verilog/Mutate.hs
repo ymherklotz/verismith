@@ -147,13 +147,13 @@ instance Mutate (Verilog ann) where
 instance Mutate (SourceInfo ann) where
   mutExpr f (SourceInfo a b) = SourceInfo a $ mutExpr f b
 
-instance Mutate a => Mutate [a] where
+instance (Mutate a) => Mutate [a] where
   mutExpr f a = mutExpr f <$> a
 
-instance Mutate a => Mutate (Maybe a) where
+instance (Mutate a) => Mutate (Maybe a) where
   mutExpr f a = mutExpr f <$> a
 
-instance Mutate a => Mutate (GenVerilog a) where
+instance (Mutate a) => Mutate (GenVerilog a) where
   mutExpr f (GenVerilog a) = GenVerilog $ mutExpr f a
 
 -- | Return if the 'Identifier' is in a '(ModDecl ann)'.
@@ -195,10 +195,10 @@ replace = (transform .) . idTrans
 nestId :: Identifier -> (ModDecl ann) -> (ModDecl ann)
 nestId i m
   | not $ inPort i m =
-    let expr = fromMaybe def . findAssign i $ m ^. modItems
-     in m & get %~ replace i expr
+      let expr = fromMaybe def . findAssign i $ m ^. modItems
+       in m & get %~ replace i expr
   | otherwise =
-    m
+      m
   where
     get = modItems . traverse . modContAssign . contAssignExpr
     def = Id i
@@ -244,7 +244,8 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
         <*> pure Nothing
     inst =
       ModInst
-        (m ^. modId) []
+        (m ^. modId)
+        []
         (m ^. modId <> (Identifier . showT $ count + 1))
         conns
     count =
@@ -252,8 +253,8 @@ instantiateMod m main = main & modItems %~ ((out ++ regIn ++ [inst]) ++)
         . filter (== m ^. modId)
         $ main
           ^.. modItems
-          . traverse
-          . modInstId
+            . traverse
+            . modInstId
     conns = uncurry ModConnNamed . fmap Id <$> zip (allVars m) (allVars m)
 
 -- | Instantiate without adding wire declarations. It also does not count the
@@ -269,7 +270,7 @@ instantiateMod_ m = ModInst (m ^. modId) [] (m ^. modId) conns
       ModConn
         . Id
         <$> (m ^.. modOutPorts . traverse . portName)
-        ++ (m ^.. modInPorts . traverse . portName)
+          ++ (m ^.. modInPorts . traverse . portName)
 
 -- | Instantiate without adding wire declarations. It also does not count the
 -- current instantiations of the same module.
@@ -408,8 +409,8 @@ combineAssigns_ comb p ps =
     . fold
     $ Id
       <$> ps
-      ^.. traverse
-      . portName
+        ^.. traverse
+          . portName
 
 fromPort :: Port -> Identifier
 fromPort (Port _ _ _ i) = i

@@ -21,9 +21,9 @@ module Verismith.Generate
     randomMod,
 
     -- ** Data types
-    EMIContext(..),
+    EMIContext (..),
     emiNewInputs,
-    Context(..),
+    Context (..),
     wires,
     nonblocking,
     blocking,
@@ -35,7 +35,7 @@ module Verismith.Generate
     modDepth,
     determinism,
     emiContext,
-    StateGen(..),
+    StateGen (..),
 
     -- ** Generate Functions
     largeNum,
@@ -104,25 +104,25 @@ import Verismith.Verilog.Eval
 import Verismith.Verilog.Internal
 import Verismith.Verilog.Mutate
 
-data EMIContext = EMIContext { _emiNewInputs :: [Port]
-                             }
+data EMIContext = EMIContext
+  { _emiNewInputs :: [Port]
+  }
 
 makeLenses ''EMIContext
 
-data Context a
-  = Context
-      { _wires :: [Port],
-        _nonblocking :: [Port],
-        _blocking :: [Port],
-        _outofscope :: [Port],
-        _parameters :: [Parameter],
-        _modules :: [ModDecl a],
-        _nameCounter :: {-# UNPACK #-} !Int,
-        _stmntDepth :: {-# UNPACK #-} !Int,
-        _modDepth :: {-# UNPACK #-} !Int,
-        _determinism :: !Bool,
-        _emiContext :: !(Maybe EMIContext)
-      }
+data Context a = Context
+  { _wires :: [Port],
+    _nonblocking :: [Port],
+    _blocking :: [Port],
+    _outofscope :: [Port],
+    _parameters :: [Parameter],
+    _modules :: [ModDecl a],
+    _nameCounter :: {-# UNPACK #-} !Int,
+    _stmntDepth :: {-# UNPACK #-} !Int,
+    _modDepth :: {-# UNPACK #-} !Int,
+    _determinism :: !Bool,
+    _emiContext :: !(Maybe EMIContext)
+  }
 
 makeLenses ''Context
 
@@ -144,8 +144,8 @@ random ctx fun = do
   expr <- Hog.sized (exprWithContext (ProbExpr 1 1 0 1 1 1 1 0 1 1) [] ctx)
   return . ModCA $ fun expr
 
---randomAssigns :: [Identifier] -> [Gen ModItem]
---randomAssigns ids = random ids . ContAssign <$> ids
+-- randomAssigns :: [Identifier] -> [Gen ModItem]
+-- randomAssigns ids = random ids . ContAssign <$> ids
 
 randomOrdAssigns :: (MonadGen m) => [Port] -> [Port] -> [m (ModItem ann)]
 randomOrdAssigns inp ids = snd $ foldr generate (inp, []) ids
@@ -258,29 +258,29 @@ unOp =
 constExprWithContext :: (MonadGen m) => [Parameter] -> ProbExpr -> Hog.Size -> m ConstExpr
 constExprWithContext ps prob size
   | size == 0 =
-    Hog.frequency
-      [ (prob ^. probExprNum, ConstNum <$> genBitVec),
-        ( if null ps then 0 else prob ^. probExprId,
-          ParamId . view paramIdent <$> Hog.element ps
-        )
-      ]
+      Hog.frequency
+        [ (prob ^. probExprNum, ConstNum <$> genBitVec),
+          ( if null ps then 0 else prob ^. probExprId,
+            ParamId . view paramIdent <$> Hog.element ps
+          )
+        ]
   | size > 0 =
-    Hog.frequency
-      [ (prob ^. probExprNum, ConstNum <$> genBitVec),
-        ( if null ps then 0 else prob ^. probExprId,
-          ParamId . view paramIdent <$> Hog.element ps
-        ),
-        (prob ^. probExprUnOp, ConstUnOp <$> unOp <*> subexpr 2),
-        ( prob ^. probExprBinOp,
-          ConstBinOp <$> subexpr 2 <*> binOp <*> subexpr 2
-        ),
-        ( prob ^. probExprCond,
-          ConstCond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2
-        ),
-        ( prob ^. probExprConcat,
-          ConstConcat <$> Hog.nonEmpty (Hog.linear 0 10) (subexpr 2)
-        )
-      ]
+      Hog.frequency
+        [ (prob ^. probExprNum, ConstNum <$> genBitVec),
+          ( if null ps then 0 else prob ^. probExprId,
+            ParamId . view paramIdent <$> Hog.element ps
+          ),
+          (prob ^. probExprUnOp, ConstUnOp <$> unOp <*> subexpr 2),
+          ( prob ^. probExprBinOp,
+            ConstBinOp <$> subexpr 2 <*> binOp <*> subexpr 2
+          ),
+          ( prob ^. probExprCond,
+            ConstCond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2
+          ),
+          ( prob ^. probExprConcat,
+            ConstConcat <$> Hog.nonEmpty (Hog.linear 0 10) (subexpr 2)
+          )
+        ]
   | otherwise = constExprWithContext ps prob 0
   where
     subexpr y = constExprWithContext ps prob $ size `div` y
@@ -330,16 +330,16 @@ exprWithContext prob ps [] n
     subexpr y = exprWithContext prob ps [] $ n `div` y
 exprWithContext prob ps l n
   | n == 0 =
-    Hog.frequency $
-      (prob ^. probExprId, Id . fromPort <$> Hog.element l)
-        : exprSafeList prob
+      Hog.frequency $
+        (prob ^. probExprId, Id . fromPort <$> Hog.element l)
+          : exprSafeList prob
   | n > 0 =
-    Hog.frequency $
-      (prob ^. probExprId, Id . fromPort <$> Hog.element l)
-        : (prob ^. probExprRangeSelect, rangeSelect ps l)
-        : exprRecList prob subexpr
+      Hog.frequency $
+        (prob ^. probExprId, Id . fromPort <$> Hog.element l)
+          : (prob ^. probExprRangeSelect, rangeSelect ps l)
+          : exprRecList prob subexpr
   | otherwise =
-    exprWithContext prob ps l 0
+      exprWithContext prob ps l 0
   where
     subexpr y = exprWithContext prob ps l $ n `div` y
 
@@ -717,10 +717,10 @@ selectwfreq :: (MonadGen m) => Int -> Int -> [a] -> m [a]
 selectwfreq _ _ [] = return []
 selectwfreq s n a@(l : ls)
   | s > 0 && n > 0 =
-    Hog.frequency
-      [ (s, (l :) <$> selectwfreq s n ls),
-        (n, selectwfreq s n ls)
-      ]
+      Hog.frequency
+        [ (s, (l :) <$> selectwfreq s n ls),
+          (n, selectwfreq s n ls)
+        ]
   | otherwise = return a
 
 -- | Generates a module definition randomly. It always has one output port which
@@ -742,7 +742,7 @@ moduleDef top = do
           . sum
           $ local
             ^.. traverse
-            . portSize
+              . portSize
   let (ProbMod n s) = config ^. configProbability . probMod
   newlocal <- selectwfreq s n local
   let clock = Port Wire False 1 "clk"

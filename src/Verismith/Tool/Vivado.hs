@@ -24,12 +24,11 @@ import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
 import Prelude hiding (FilePath)
 
-data Vivado
-  = Vivado
-      { vivadoBin :: !(Maybe FilePath),
-        vivadoDesc :: !Text,
-        vivadoOutput :: !FilePath
-      }
+data Vivado = Vivado
+  { vivadoBin :: !(Maybe FilePath),
+    vivadoDesc :: !Text,
+    vivadoOutput :: !FilePath
+  }
   deriving (Eq)
 
 instance Tool Vivado where
@@ -49,7 +48,7 @@ instance NFData Vivado where
 defaultVivado :: Vivado
 defaultVivado = Vivado Nothing "vivado" "syn_vivado.v"
 
-runSynthVivado :: Show ann => Vivado -> (SourceInfo ann) -> ResultSh ()
+runSynthVivado :: (Show ann) => Vivado -> (SourceInfo ann) -> ResultSh ()
 runSynthVivado sim (SourceInfo top src) = do
   dir <- liftSh pwd
   liftSh $ do

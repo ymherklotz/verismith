@@ -9,12 +9,12 @@ import Control.Applicative ((<|>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Options.Applicative
-  ( (<**>),
-    Mod (..),
+  ( Mod (..),
     OptionFields (..),
     Parser (..),
     ParserInfo (..),
     ReadM (..),
+    (<**>),
   )
 import qualified Options.Applicative as Opt
 import Shelly (FilePath (..), fromText)
@@ -33,74 +33,74 @@ instance Show OptTool where
 
 data Opts
   = Fuzz
-    { fuzzOutput :: Text,
-      fuzzConfigFile :: !(Maybe FilePath),
-      fuzzForced :: !Bool,
-      fuzzKeepAll :: !Bool,
-      fuzzNum :: {-# UNPACK #-} !Int,
-      fuzzNoSim :: !Bool,
-      fuzzNoEquiv :: !Bool,
-      fuzzNoReduction :: !Bool,
-      fuzzExistingFile :: !(Maybe FilePath),
-      fuzzExistingFileTop :: !Text,
-      fuzzCrossCheck :: !Bool,
-      fuzzChecker :: !(Maybe Text)
-    }
+      { fuzzOutput :: Text,
+        fuzzConfigFile :: !(Maybe FilePath),
+        fuzzForced :: !Bool,
+        fuzzKeepAll :: !Bool,
+        fuzzNum :: {-# UNPACK #-} !Int,
+        fuzzNoSim :: !Bool,
+        fuzzNoEquiv :: !Bool,
+        fuzzNoReduction :: !Bool,
+        fuzzExistingFile :: !(Maybe FilePath),
+        fuzzExistingFileTop :: !Text,
+        fuzzCrossCheck :: !Bool,
+        fuzzChecker :: !(Maybe Text)
+      }
   | EMIOpts
-    { emiOutput :: Text,
-      emiConfigFile :: !(Maybe FilePath),
-      emiForced :: !Bool,
-      emiKeepAll :: !Bool,
-      emiNum :: {-# UNPACK #-} !Int,
-      emiNoSim :: !Bool,
-      emiNoEquiv :: !Bool,
-      emiNoReduction :: !Bool,
-      emiTopModule :: Text,
-      emiInputFile :: FilePath
-    }
+      { emiOutput :: Text,
+        emiConfigFile :: !(Maybe FilePath),
+        emiForced :: !Bool,
+        emiKeepAll :: !Bool,
+        emiNum :: {-# UNPACK #-} !Int,
+        emiNoSim :: !Bool,
+        emiNoEquiv :: !Bool,
+        emiNoReduction :: !Bool,
+        emiTopModule :: Text,
+        emiInputFile :: FilePath
+      }
   | Generate
-    { generateFilename :: !(Maybe FilePath),
-      generateConfigFile :: !(Maybe FilePath)
-    }
+      { generateFilename :: !(Maybe FilePath),
+        generateConfigFile :: !(Maybe FilePath)
+      }
   | Parse
-    { parseFilename :: !FilePath,
-      parseTop :: !Text,
-      parseOutput :: !(Maybe FilePath),
-      parseRemoveConstInConcat :: !Bool
-    }
+      { parseFilename :: !FilePath,
+        parseTop :: !Text,
+        parseOutput :: !(Maybe FilePath),
+        parseRemoveConstInConcat :: !Bool
+      }
   | Reduce
-    { reduceFilename :: !FilePath,
-      reduceTop :: !Text,
-      reduceScript :: !(Maybe FilePath),
-      reduceSynthesiserDesc :: ![SynthDescription],
-      reduceRerun :: !Bool
-    }
+      { reduceFilename :: !FilePath,
+        reduceTop :: !Text,
+        reduceScript :: !(Maybe FilePath),
+        reduceSynthesiserDesc :: ![SynthDescription],
+        reduceRerun :: !Bool
+      }
   | ConfigOpt
-    { configOptWriteConfig :: !(Maybe FilePath),
-      configOptConfigFile :: !(Maybe FilePath),
-      configOptDoRandomise :: !Bool
-    }
+      { configOptWriteConfig :: !(Maybe FilePath),
+        configOptConfigFile :: !(Maybe FilePath),
+        configOptDoRandomise :: !Bool
+      }
   | DistanceOpt
-    { distanceOptVerilogA :: !FilePath,
-      distanceOptVerilogB :: !FilePath
-    }
+      { distanceOptVerilogA :: !FilePath,
+        distanceOptVerilogB :: !FilePath
+      }
   | ShuffleOpt
-    { shuffleOptFilename :: !FilePath,
-      shuffleOptTop :: !Text,
-      shuffleOptOutput :: !(Maybe FilePath),
-      shuffleOptShuffleLines :: !Bool,
-      shuffleOptRenameVars :: !Bool,
-      shuffleOptEquiv :: !Bool,
-      shuffleOptEquivFolder :: !FilePath,
-      shuffleOptChecker :: !(Maybe Text)
-    }
+      { shuffleOptFilename :: !FilePath,
+        shuffleOptTop :: !Text,
+        shuffleOptOutput :: !(Maybe FilePath),
+        shuffleOptShuffleLines :: !Bool,
+        shuffleOptRenameVars :: !Bool,
+        shuffleOptEquiv :: !Bool,
+        shuffleOptEquivFolder :: !FilePath,
+        shuffleOptChecker :: !(Maybe Text)
+      }
   | Equiv
-    { equivOutput :: !FilePath,
-      equivFilenameA :: !FilePath,
-      equivFilenameB :: !FilePath,
-      equivFileTop :: !Text,
-      equivChecker :: !(Maybe Text)
-    }
+      { equivOutput :: !FilePath,
+        equivFilenameA :: !FilePath,
+        equivFilenameB :: !FilePath,
+        equivFileTop :: !Text,
+        equivChecker :: !(Maybe Text)
+      }
 
 textOption :: Mod OptionFields String -> Parser Text
 textOption = fmap T.pack . Opt.strOption
@@ -122,11 +122,11 @@ parseSynthDesc val
   | val == "vivado" = Just $ SynthDescription "vivado" Nothing Nothing Nothing
   | val == "xst" = Just $ SynthDescription "xst" Nothing Nothing Nothing
   | val == "quartus" =
-    Just $
-      SynthDescription "quartus" Nothing Nothing Nothing
+      Just $
+        SynthDescription "quartus" Nothing Nothing Nothing
   | val == "identity" =
-    Just $
-      SynthDescription "identity" Nothing Nothing Nothing
+      Just $
+        SynthDescription "identity" Nothing Nothing Nothing
   | otherwise = Nothing
 
 parseSim :: String -> Maybe OptTool
@@ -153,12 +153,14 @@ fuzzOpts =
               <> Opt.help "Config file for the current fuzz run."
         )
     <*> ( Opt.switch $
-            Opt.long "force" <> Opt.short 'f'
+            Opt.long "force"
+              <> Opt.short 'f'
               <> Opt.help
                 "Overwrite the specified directory."
         )
     <*> ( Opt.switch $
-            Opt.long "keep" <> Opt.short 'k'
+            Opt.long "keep"
+              <> Opt.short 'k'
               <> Opt.help
                 "Keep all the directories."
         )
@@ -230,12 +232,14 @@ emiOpts =
               <> Opt.help "Config file for the current fuzz run."
         )
     <*> ( Opt.switch $
-            Opt.long "force" <> Opt.short 'f'
+            Opt.long "force"
+              <> Opt.short 'f'
               <> Opt.help
                 "Overwrite the specified directory."
         )
     <*> ( Opt.switch $
-            Opt.long "keep" <> Opt.short 'k'
+            Opt.long "keep"
+              <> Opt.short 'k'
               <> Opt.help
                 "Keep all the directories."
         )
@@ -343,15 +347,18 @@ shuffleOpts =
     <*> ( Opt.switch $
             Opt.long "no-shuffle-lines"
               <> Opt.help
-                "Shuffle the lines in a Verilog file." )
+                "Shuffle the lines in a Verilog file."
+        )
     <*> ( Opt.switch $
             Opt.long "no-rename-vars"
               <> Opt.help
-                "Rename the variables in a Verilog file." )
+                "Rename the variables in a Verilog file."
+        )
     <*> ( Opt.switch $
             Opt.long "noequiv"
               <> Opt.help
-                "Do not check equivalence between input and output (currently only verismith generated Verilog is likely to pass this equivalence check)." )
+                "Do not check equivalence between input and output (currently only verismith generated Verilog is likely to pass this equivalence check)."
+        )
     <*> ( Opt.strOption $
             Opt.long "equiv-output"
               <> Opt.short 'e'
@@ -484,16 +491,16 @@ argparse =
         <> Opt.metavar "fuzz"
     )
     <|> Opt.hsubparser
-    ( Opt.command
-        "emi"
-        ( Opt.info
-            emiOpts
-            ( Opt.progDesc
-                "EMI testing using generated inputs, or existing Verilog designs."
-            )
-        )
-        <> Opt.metavar "emi"
-    )
+      ( Opt.command
+          "emi"
+          ( Opt.info
+              emiOpts
+              ( Opt.progDesc
+                  "EMI testing using generated inputs, or existing Verilog designs."
+              )
+          )
+          <> Opt.metavar "emi"
+      )
     <|> Opt.hsubparser
       ( Opt.command
           "generate"

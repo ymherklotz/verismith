@@ -167,13 +167,13 @@ import Control.Lens hiding ((<|))
 import Data.Data
 import Data.Data.Lens
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Data.List.NonEmpty ((<|), NonEmpty (..))
+import Data.List.NonEmpty (NonEmpty (..), (<|))
 import Data.String (IsString, fromString)
 import Data.Text (Text, pack)
 import GHC.Generics (Generic)
 import Verismith.Verilog.BitVec
 
-class Functor m => Annotations m where
+class (Functor m) => Annotations m where
   removeAnn :: m a -> m a
   clearAnn :: m a -> m ()
   clearAnn = fmap (\_ -> ()) . removeAnn
@@ -337,11 +337,10 @@ instance Plated ConstExpr where
 -- | Range that can be associated with any port or left hand side. Contains the
 -- msb and lsb bits as 'ConstExpr'. This means that they can be generated using
 -- parameters, which can in turn be changed at synthesis time.
-data Range
-  = Range
-      { rangeMSB :: !ConstExpr,
-        rangeLSB :: !ConstExpr
-      }
+data Range = Range
+  { rangeMSB :: !ConstExpr,
+    rangeLSB :: !ConstExpr
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 instance Num Range where
@@ -414,11 +413,10 @@ instance Plated Event where
   plate = uniplate
 
 -- | Task call, which is similar to function calls.
-data Task
-  = Task
-      { _taskName :: {-# UNPACK #-} !Identifier,
-        _taskExpr :: [Expr]
-      }
+data Task = Task
+  { _taskName :: {-# UNPACK #-} !Identifier,
+    _taskExpr :: [Expr]
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''Task)
@@ -475,13 +473,12 @@ $(makeLenses ''PortType)
 --
 -- This is now implemented inside '(ModDecl ann)' itself, which uses a list of output
 -- and input ports.
-data Port
-  = Port
-      { _portType :: !PortType,
-        _portSigned :: !Bool,
-        _portSize :: {-# UNPACK #-} !Range,
-        _portName :: {-# UNPACK #-} !Identifier
-      }
+data Port = Port
+  { _portType :: !PortType,
+    _portSigned :: !Bool,
+    _portSize :: {-# UNPACK #-} !Range,
+    _portName :: {-# UNPACK #-} !Identifier
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''Port)
@@ -504,12 +501,11 @@ data ModConn
 
 $(makeLenses ''ModConn)
 
-data Assign
-  = Assign
-      { _assignReg :: !LVal,
-        _assignDelay :: !(Maybe Delay),
-        _assignExpr :: !Expr
-      }
+data Assign = Assign
+  { _assignReg :: !LVal,
+    _assignDelay :: !(Maybe Delay),
+    _assignExpr :: !Expr
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''Assign)
@@ -519,26 +515,24 @@ $(makeLenses ''Assign)
 -- @
 -- assign x = 2'b1;
 -- @
-data ContAssign
-  = ContAssign
-      { _contAssignNetLVal :: {-# UNPACK #-} !Identifier,
-        _contAssignExpr :: !Expr
-      }
+data ContAssign = ContAssign
+  { _contAssignNetLVal :: {-# UNPACK #-} !Identifier,
+    _contAssignExpr :: !Expr
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''ContAssign)
 
 -- | Case pair which contains an expression followed by a statement which will
 -- get executed if the expression matches the expression in the case statement.
-data CasePair a
-  = CasePair
-      { _casePairExpr :: !Expr,
-        _casePairStmnt :: !(Statement a)
-      }
+data CasePair a = CasePair
+  { _casePairExpr :: !Expr,
+    _casePairStmnt :: !(Statement a)
+  }
   deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 traverseStmntCasePair ::
-  Functor f =>
+  (Functor f) =>
   (Statement a1 -> f (Statement a2)) ->
   CasePair a1 ->
   f (CasePair a2)
@@ -599,7 +593,8 @@ instance Plated (Statement a) where
   plate f (SeqBlock s) = SeqBlock <$> traverse f s
   plate f (CondStmnt e s1 s2) = CondStmnt e <$> traverse f s1 <*> traverse f s2
   plate f (StmntCase a b c d) =
-    StmntCase a b <$> traverse (traverseStmntCasePair f) c
+    StmntCase a b
+      <$> traverse (traverseStmntCasePair f) c
       <*> traverse f d
   plate f (ForLoop a b c d) = ForLoop a b c <$> f d
   plate _ a = pure a
@@ -627,7 +622,7 @@ instance Annotations Statement where
   collectAnn (EventCtrl _ s) = concatMap collectAnn s
   collectAnn (SeqBlock s) = concatMap collectAnn s
   collectAnn (CondStmnt _ ms1 ms2) = concatMap collectAnn ms1 <> concatMap collectAnn ms2
-  collectAnn (StmntCase _ _ cp cdef) =  concatMap collectAnn cp <> concatMap collectAnn cdef
+  collectAnn (StmntCase _ _ cp cdef) = concatMap collectAnn cp <> concatMap collectAnn cdef
   collectAnn (ForLoop _ _ _ s) = collectAnn s
   collectAnn _ = []
 
@@ -636,22 +631,20 @@ instance Annotations CasePair where
   collectAnn (CasePair _ s) = collectAnn s
 
 -- | Parameter that can be assigned in blocks or modules using @parameter@.
-data Parameter
-  = Parameter
-      { _paramIdent :: {-# UNPACK #-} !Identifier,
-        _paramValue :: ConstExpr
-      }
+data Parameter = Parameter
+  { _paramIdent :: {-# UNPACK #-} !Identifier,
+    _paramValue :: ConstExpr
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''Parameter)
 
 -- | Local parameter that can be assigned anywhere using @localparam@. It cannot
 -- be changed by initialising the module.
-data LocalParam
-  = LocalParam
-      { _localParamIdent :: {-# UNPACK #-} !Identifier,
-        _localParamValue :: ConstExpr
-      }
+data LocalParam = LocalParam
+  { _localParamIdent :: {-# UNPACK #-} !Identifier,
+    _localParamValue :: ConstExpr
+  }
   deriving (Eq, Show, Ord, Data, Generic, NFData)
 
 $(makeLenses ''LocalParam)
@@ -749,11 +742,10 @@ instance Annotations Verilog where
 
 -- | Top level type which contains all the source code and associated
 -- information.
-data SourceInfo a
-  = SourceInfo
-      { _infoTop :: {-# UNPACK #-} !Text,
-        _infoSrc :: !(Verilog a)
-      }
+data SourceInfo a = SourceInfo
+  { _infoTop :: {-# UNPACK #-} !Text,
+    _infoSrc :: !(Verilog a)
+  }
   deriving (Eq, Show, Ord, Functor, Data, Generic, NFData)
 
 $(makeLenses ''SourceInfo)

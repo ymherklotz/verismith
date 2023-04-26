@@ -58,10 +58,10 @@ applyUnary UnNxorInv a
   | popCount a `mod` 2 == 0 = 1
   | otherwise = 0
 
-compXor :: Bits c => c -> c -> c
+compXor :: (Bits c) => c -> c -> c
 compXor a = complement . xor a
 
-toIntegral :: Num p => (t1 -> t2 -> Bool) -> t1 -> t2 -> p
+toIntegral :: (Num p) => (t1 -> t2 -> Bool) -> t1 -> t2 -> p
 toIntegral a b c = if a b c then 1 else 0
 
 toInt :: (Integral a, Num t1) => (t2 -> t1 -> t3) -> t2 -> a -> t3

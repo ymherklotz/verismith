@@ -89,10 +89,10 @@ instance Bifunctor Result where
 -- | The transformer for the 'Result' type. This
 newtype ResultT a m b = ResultT {runResultT :: m (Result a b)}
 
-instance Functor f => Functor (ResultT a f) where
+instance (Functor f) => Functor (ResultT a f) where
   fmap f = ResultT . fmap (fmap f) . runResultT
 
-instance Monad m => Applicative (ResultT a m) where
+instance (Monad m) => Applicative (ResultT a m) where
   pure = ResultT . pure . pure
   f <*> a = ResultT $ do
     f' <- runResultT f
@@ -104,7 +104,7 @@ instance Monad m => Applicative (ResultT a m) where
           Fail e -> return (Fail e)
           Pass v -> return (Pass $ k v)
 
-instance Monad m => Monad (ResultT a m) where
+instance (Monad m) => Monad (ResultT a m) where
   a >>= b = ResultT $ do
     m <- runResultT a
     case m of
@@ -118,10 +118,10 @@ instance (MonadSh m, Monoid a) => MonadSh (ResultT a m) where
       . catch_sh (Pass <$> s)
       $ (const (Fail <$> return mempty) :: RunFailed -> Sh (Result a b))
 
-instance MonadIO m => MonadIO (ResultT a m) where
+instance (MonadIO m) => MonadIO (ResultT a m) where
   liftIO s = ResultT $ Pass <$> liftIO s
 
-instance MonadBase b m => MonadBase b (ResultT a m) where
+instance (MonadBase b m) => MonadBase b (ResultT a m) where
   liftBase = liftBaseDefault
 
 instance MonadTrans (ResultT e) where
@@ -134,7 +134,7 @@ instance MonadTransControl (ResultT a) where
   {-# INLINEABLE liftWith #-}
   {-# INLINEABLE restoreT #-}
 
-instance MonadBaseControl IO m => MonadBaseControl IO (ResultT a m) where
+instance (MonadBaseControl IO m) => MonadBaseControl IO (ResultT a m) where
   type StM (ResultT a m) b = ComposeSt (ResultT a) m b
   liftBaseWith = defaultLiftBaseWith
   restoreM = defaultRestoreM

@@ -23,7 +23,7 @@ import Language.Haskell.TH.Syntax
 import Verismith.Verilog.AST (Verilog)
 import Verismith.Verilog.Parser
 
-liftDataWithText :: Data a => a -> Q Exp
+liftDataWithText :: (Data a) => a -> Q Exp
 liftDataWithText = dataToExpQ $ fmap liftText . cast
 
 liftText :: T.Text -> Q Exp

@@ -9,13 +9,13 @@
 --
 -- Test the parser.
 module Config
-  ( configUnitTests
+  ( configUnitTests,
   )
 where
 
+import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.HUnit
-import qualified Data.Text as T
 import Verismith
 import Verismith.Config
 
@@ -37,7 +37,8 @@ testParse name fp conf =
 
 configUnitTests :: TestTree
 configUnitTests =
-  testGroup "Config unit tests"
-    [ testParse "Default configuration parsed" "test/data/default_config.toml" defaultConfig
-    , testParseFailure "Additional fields not parsed" "test/data/additional.toml"
+  testGroup
+    "Config unit tests"
+    [ testParse "Default configuration parsed" "test/data/default_config.toml" defaultConfig,
+      testParseFailure "Additional fields not parsed" "test/data/additional.toml"
     ]

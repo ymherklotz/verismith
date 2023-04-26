@@ -11,13 +11,13 @@ module Verismith.Utils
   )
 where
 
+import Data.ByteString (ByteString, pack)
+import Data.ByteString.Builder (byteStringHex, toLazyByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as T
-import Data.ByteString.Builder (byteStringHex, toLazyByteString)
-import Data.ByteString (ByteString, pack)
 import System.Random (mkStdGen, newStdGen, randoms)
 
 generateByteString :: (Maybe Int) -> Int -> Int -> IO [ByteString]

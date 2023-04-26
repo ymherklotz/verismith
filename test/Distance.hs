@@ -1,5 +1,5 @@
 module Distance
-  ( distanceTests
+  ( distanceTests,
   )
 where
 
@@ -7,9 +7,9 @@ import Hedgehog (Property, (===))
 import qualified Hedgehog as Hog
 import qualified Hedgehog.Gen as Hog
 import qualified Hedgehog.Range as Hog
-import Verismith.Verilog.Distance
 import Test.Tasty
 import Test.Tasty.Hedgehog
+import Verismith.Verilog.Distance
 
 distanceLess :: Property
 distanceLess = Hog.property $ do
@@ -24,7 +24,9 @@ distanceEq = Hog.property $ do
   udistance x x === 0
 
 distanceTests :: TestTree
-distanceTests = testGroup "Distance tests"
-  [ testProperty "Unordered distance <= distance" distanceLess
-  , testProperty "distance x x === 0" distanceEq
-  ]
+distanceTests =
+  testGroup
+    "Distance tests"
+    [ testProperty "Unordered distance <= distance" distanceLess,
+      testProperty "distance x x === 0" distanceEq
+    ]
