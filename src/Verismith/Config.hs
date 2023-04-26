@@ -93,6 +93,8 @@ module Verismith.Config
     propDefaultYosys,
     parseConfigFile,
     parseConfig,
+    parseConfigFileRelaxed,
+    parseConfigRelaxed,
     encodeConfig,
     encodeConfigFile,
     versionInfo,
@@ -622,13 +624,29 @@ configCodec =
       (Toml.list synthesiser "synthesiser")
     .= _configSynthesisers
 
-parseConfigFile :: FilePath -> IO Config
-parseConfigFile = Toml.decodeFile configCodec
+parseConfigFile :: FilePath -> IO (Either Text Config)
+parseConfigFile fp = do
+  decoded <- Toml.decodeFileExact configCodec fp
+  case decoded of
+    Right c -> return $ Right c
+    Left e -> return . Left $ Toml.prettyTomlDecodeErrors e
 
-parseConfig :: Text -> Config
-parseConfig t = case Toml.decode configCodec t of
-  Right c -> c
-  Left e -> error (unpack $ Toml.prettyTomlDecodeErrors e)
+parseConfig :: Text -> Either Text Config
+parseConfig t = case Toml.decodeExact configCodec t of
+  Right c -> Right c
+  Left e -> Left $ Toml.prettyTomlDecodeErrors e
+
+parseConfigFileRelaxed :: FilePath -> IO (Either Text Config)
+parseConfigFileRelaxed fp = do
+  decoded <- Toml.decodeFileEither configCodec fp
+  case decoded of
+    Right c -> return $ Right c
+    Left e -> return . Left $ Toml.prettyTomlDecodeErrors e
+
+parseConfigRelaxed :: Text -> Either Text Config
+parseConfigRelaxed t = case Toml.decode configCodec t of
+  Right c -> Right c
+  Left e -> Left $ Toml.prettyTomlDecodeErrors e
 
 encodeConfig :: Config -> Text
 encodeConfig = Toml.encode configCodec

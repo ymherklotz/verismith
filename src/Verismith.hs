@@ -51,6 +51,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as T
+import Data.Time
 import Hedgehog (Gen)
 import qualified Hedgehog.Gen as Hog
 import Hedgehog.Internal.Seed (Seed)
@@ -59,6 +60,7 @@ import Paths_verismith (getDataDir)
 import Shelly hiding (command)
 import Shelly.Lifted (liftSh)
 import System.Random (randomIO)
+import System.Exit (exitSuccess, exitFailure)
 import Verismith.Circuit
 import Verismith.Config
 import Verismith.Fuzz
@@ -87,9 +89,38 @@ myForkIO io = do
   _ <- forkFinally io (\_ -> putMVar mvar ())
   return mvar
 
-getConfig :: Maybe FilePath -> IO Config
-getConfig s =
-  maybe (return defaultConfig) parseConfigFile $ T.unpack . toTextIgnore <$> s
+logMsg :: Text -> Text -> IO ()
+logMsg level msg = do
+  currentTime <- getZonedTime
+  T.putStrLn $
+    "[" <> level <> "] "
+    <> T.pack (formatTime defaultTimeLocale "%H:%M:%S " currentTime)
+    <> msg
+
+logInfo = logMsg "INFO"
+logWarn = logMsg "WARN"
+logFatal = logMsg "FATAL"
+
+getConfig' :: Bool -> Maybe FilePath -> IO Config
+getConfig' strict s = do
+  config <- maybe def (parseConfigFile . T.unpack . toTextIgnore) s
+  case config of
+    Left errFst -> do
+      when strict $ mapM_ logFatal (T.lines errFst) >> exitFailure
+      relaxedConfig <- maybe def (parseConfigFileRelaxed . T.unpack . toTextIgnore) s
+      case relaxedConfig of
+        Left errSnd -> do
+          mapM_ logFatal $ T.lines errSnd
+          exitFailure
+        Right x -> do
+          mapM_ logWarn (T.lines errFst)
+          logWarn "Ignoring additional fields"
+          return x
+    Right x -> return x
+  where
+    def = return (Right defaultConfig)
+
+getConfig = getConfig' True
 
 getGenerator :: Config -> Text -> Maybe FilePath -> IO (Gen (SourceInfo ()))
 getGenerator config top s =
