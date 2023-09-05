@@ -41,8 +41,10 @@ where
 import Control.Concurrent
 import Control.Lens hiding ((<.>))
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder (byteStringHex, toLazyByteString)
+import Data.ByteString.Internal (unpackChars)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Graph.Inductive as G
 import qualified Data.Graph.Inductive.Dot as G
@@ -51,6 +53,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.IO as LT
 import Data.Time
 import Hedgehog (Gen)
 import qualified Hedgehog.Gen as Hog
@@ -60,6 +64,7 @@ import Paths_verismith (getDataDir)
 import Shelly hiding (command)
 import Shelly.Lifted (liftSh)
 import System.Exit (exitFailure, exitSuccess)
+import System.IO
 import System.Random (randomIO)
 import Verismith.Circuit
 import Verismith.Config
@@ -77,6 +82,7 @@ import Verismith.Utils (generateByteString)
 import Verismith.Verilog
 import Verismith.Verilog.Distance
 import Verismith.Verilog.Parser (parseSourceInfoFile)
+import qualified Verismith.Verilog2005 as V2
 import Prelude hiding (FilePath)
 
 toFP :: String -> FilePath
@@ -233,21 +239,13 @@ handleOpts (Generate f c) = do
     T.unpack
       . toTextIgnore
       <$> f
-handleOpts (Parse f t o rc) = do
-  verilogSrc <- T.readFile file
-  case parseVerilog (T.pack file) verilogSrc of
-    Left l -> print l
-    Right v ->
-      case ( o,
-             GenVerilog
-               . mapply rc (takeReplace . removeConstInConcat)
-               $ SourceInfo t v
-           ) of
-        (Nothing, a) -> print a
-        (Just o', a) -> writeFile (T.unpack $ toTextIgnore o') $ show a
-  where
-    file = T.unpack . toTextIgnore $ f
-    mapply i f = if i then f else id
+handleOpts (Parse f o) = do
+  (ast, warns) <- V2.parseVerilog2005 (T.unpack (toTextIgnore f))
+  mapM_ (hPutStrLn stderr) warns
+  let s = V2.genSource (Just 80) ast
+  case o of
+    Nothing -> L.putStr s
+    Just o' -> L.writeFile o' s
 handleOpts (ShuffleOpt f t o nshuffle nrename noequiv equivdir checker) = do
   datadir <- getDataDir
   verilogSrc <- T.readFile file
@@ -264,8 +262,9 @@ handleOpts (ShuffleOpt f t o nshuffle nrename noequiv equivdir checker) = do
             mkdir equivdir
             cp file (equivdir </> fn1)
           writeFile (equivdir </> fn2) $ show gv
-          res <- shelly . runResultT $ pop equivdir $ do
-            runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) sv'
+          res <- shelly . runResultT $
+            pop equivdir $ do
+              runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) sv'
           case res of
             Pass _ -> putStrLn "Equivalence check passed"
             Fail (EquivFail _) -> putStrLn "Equivalence check failed"
@@ -344,8 +343,9 @@ handleOpts (Equiv o v1 v2 top checker) = do
     mkdir o
     cp v1 (o </> fn1)
     cp v2 (o </> fn2)
-  res <- shelly . runResultT $ pop o $ do
-    runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) src
+  res <- shelly . runResultT $
+    pop o $ do
+      runEquiv checker (toFP datadir) (mkid fn1) (mkid fn2) src
   case res of
     Pass _ -> putStrLn "Equivalence check passed"
     Fail (EquivFail _) -> putStrLn "Equivalence check failed"

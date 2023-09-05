@@ -63,11 +63,9 @@ data Opts
         generateConfigFile :: !(Maybe FilePath)
       }
   | Parse
-      { parseFilename :: !FilePath,
-        parseTop :: !Text,
-        parseOutput :: !(Maybe FilePath),
-        parseRemoveConstInConcat :: !Bool
-      }
+    { parseFilename :: !FilePath,
+      parseOutput :: !(Maybe FilePath)
+    }
   | Reduce
       { reduceFilename :: !FilePath,
         reduceTop :: !Text,
@@ -301,25 +299,12 @@ parseOpts =
             <$> Opt.strArgument
               (Opt.metavar "FILE" <> Opt.help "Verilog input file.")
         )
-    <*> textOption
-      ( Opt.short 't'
-          <> Opt.long "top"
-          <> Opt.metavar "TOP"
-          <> Opt.help "Name of top level module."
-          <> Opt.showDefault
-          <> Opt.value "top"
-      )
     <*> ( Opt.optional
             . Opt.strOption
             $ Opt.long "output"
               <> Opt.short 'o'
               <> Opt.metavar "FILE"
               <> Opt.help "Output file to write the parsed file to."
-        )
-    <*> ( Opt.switch $
-            Opt.long "remove-const-in-concat"
-              <> Opt.help
-                "Remove constants in concatenation to simplify the Verilog."
         )
 
 shuffleOpts :: Parser Opts
