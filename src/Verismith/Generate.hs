@@ -97,7 +97,7 @@ import qualified Hedgehog as Hog
 import qualified Hedgehog.Gen as Hog
 import qualified Hedgehog.Range as Hog
 import Verismith.Config
-import Verismith.Internal
+import Verismith.Utils
 import Verismith.Verilog.AST
 import Verismith.Verilog.BitVec
 import Verismith.Verilog.Eval
@@ -258,29 +258,29 @@ unOp =
 constExprWithContext :: (MonadGen m) => [Parameter] -> ProbExpr -> Hog.Size -> m ConstExpr
 constExprWithContext ps prob size
   | size == 0 =
-      Hog.frequency
-        [ (prob ^. probExprNum, ConstNum <$> genBitVec),
-          ( if null ps then 0 else prob ^. probExprId,
-            ParamId . view paramIdent <$> Hog.element ps
-          )
-        ]
+    Hog.frequency
+      [ (prob ^. probExprNum, ConstNum <$> genBitVec),
+        ( if null ps then 0 else prob ^. probExprId,
+          ParamId . view paramIdent <$> Hog.element ps
+        )
+      ]
   | size > 0 =
-      Hog.frequency
-        [ (prob ^. probExprNum, ConstNum <$> genBitVec),
-          ( if null ps then 0 else prob ^. probExprId,
-            ParamId . view paramIdent <$> Hog.element ps
-          ),
-          (prob ^. probExprUnOp, ConstUnOp <$> unOp <*> subexpr 2),
-          ( prob ^. probExprBinOp,
-            ConstBinOp <$> subexpr 2 <*> binOp <*> subexpr 2
-          ),
-          ( prob ^. probExprCond,
-            ConstCond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2
-          ),
-          ( prob ^. probExprConcat,
-            ConstConcat <$> Hog.nonEmpty (Hog.linear 0 10) (subexpr 2)
-          )
-        ]
+    Hog.frequency
+      [ (prob ^. probExprNum, ConstNum <$> genBitVec),
+        ( if null ps then 0 else prob ^. probExprId,
+          ParamId . view paramIdent <$> Hog.element ps
+        ),
+        (prob ^. probExprUnOp, ConstUnOp <$> unOp <*> subexpr 2),
+        ( prob ^. probExprBinOp,
+          ConstBinOp <$> subexpr 2 <*> binOp <*> subexpr 2
+        ),
+        ( prob ^. probExprCond,
+          ConstCond <$> subexpr 2 <*> subexpr 2 <*> subexpr 2
+        ),
+        ( prob ^. probExprConcat,
+          ConstConcat <$> Hog.nonEmpty (Hog.linear 0 10) (subexpr 2)
+        )
+      ]
   | otherwise = constExprWithContext ps prob 0
   where
     subexpr y = constExprWithContext ps prob $ size `div` y
@@ -330,16 +330,16 @@ exprWithContext prob ps [] n
     subexpr y = exprWithContext prob ps [] $ n `div` y
 exprWithContext prob ps l n
   | n == 0 =
-      Hog.frequency $
-        (prob ^. probExprId, Id . fromPort <$> Hog.element l)
-          : exprSafeList prob
+    Hog.frequency $
+      (prob ^. probExprId, Id . fromPort <$> Hog.element l) :
+      exprSafeList prob
   | n > 0 =
-      Hog.frequency $
-        (prob ^. probExprId, Id . fromPort <$> Hog.element l)
-          : (prob ^. probExprRangeSelect, rangeSelect ps l)
-          : exprRecList prob subexpr
+    Hog.frequency $
+      (prob ^. probExprId, Id . fromPort <$> Hog.element l) :
+      (prob ^. probExprRangeSelect, rangeSelect ps l) :
+      exprRecList prob subexpr
   | otherwise =
-      exprWithContext prob ps l 0
+    exprWithContext prob ps l 0
   where
     subexpr y = exprWithContext prob ps l $ n `div` y
 
@@ -717,10 +717,10 @@ selectwfreq :: (MonadGen m) => Int -> Int -> [a] -> m [a]
 selectwfreq _ _ [] = return []
 selectwfreq s n a@(l : ls)
   | s > 0 && n > 0 =
-      Hog.frequency
-        [ (s, (l :) <$> selectwfreq s n ls),
-          (n, selectwfreq s n ls)
-        ]
+    Hog.frequency
+      [ (s, (l :) <$> selectwfreq s n ls),
+        (n, selectwfreq s n ls)
+      ]
   | otherwise = return a
 
 -- | Generates a module definition randomly. It always has one output port which

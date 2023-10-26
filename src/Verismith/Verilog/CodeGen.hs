@@ -26,7 +26,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Prettyprint.Doc
 import Numeric (showHex)
-import Verismith.Internal hiding (comma)
+import Verismith.Utils hiding (comma)
 import Verismith.Verilog.AST
 import Verismith.Verilog.BitVec
 
@@ -316,8 +316,8 @@ task :: Task -> Doc a
 task (Task i e)
   | null e = identifier i
   | otherwise =
-      hsep
-        [identifier i, parens . hsep $ punctuate comma (expr <$> e)]
+    hsep
+      [identifier i, parens . hsep $ punctuate comma (expr <$> e)]
 
 -- | Render the 'Text' to 'IO'. This is equivalent to 'putStrLn'.
 render :: (Source a) => a -> IO ()

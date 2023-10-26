@@ -63,9 +63,9 @@ data Opts
         generateConfigFile :: !(Maybe FilePath)
       }
   | Parse
-    { parseFilename :: !FilePath,
-      parseOutput :: !(Maybe FilePath)
-    }
+      { parseFilename :: !FilePath,
+        parseOutput :: !(Maybe FilePath)
+      }
   | Reduce
       { reduceFilename :: !FilePath,
         reduceTop :: !Text,
@@ -120,11 +120,11 @@ parseSynthDesc val
   | val == "vivado" = Just $ SynthDescription "vivado" Nothing Nothing Nothing
   | val == "xst" = Just $ SynthDescription "xst" Nothing Nothing Nothing
   | val == "quartus" =
-      Just $
-        SynthDescription "quartus" Nothing Nothing Nothing
+    Just $
+      SynthDescription "quartus" Nothing Nothing Nothing
   | val == "identity" =
-      Just $
-        SynthDescription "identity" Nothing Nothing Nothing
+    Just $
+      SynthDescription "identity" Nothing Nothing Nothing
   | otherwise = Nothing
 
 parseSim :: String -> Maybe OptTool

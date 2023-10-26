@@ -29,7 +29,7 @@ import qualified Hedgehog.Gen as Hog
 import qualified Hedgehog.Range as HogR
 import Verismith.Config
 import Verismith.Generate
-import Verismith.Internal
+import Verismith.Utils
 import Verismith.Verilog.AST
 import Verismith.Verilog.BitVec
 import Verismith.Verilog.CodeGen

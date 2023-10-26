@@ -44,7 +44,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Verismith.Circuit.Internal
-import Verismith.Internal
+import Verismith.Utils
 import Verismith.Verilog.AST
 import Verismith.Verilog.BitVec
 import Verismith.Verilog.CodeGen
@@ -195,10 +195,10 @@ replace = (transform .) . idTrans
 nestId :: Identifier -> (ModDecl ann) -> (ModDecl ann)
 nestId i m
   | not $ inPort i m =
-      let expr = fromMaybe def . findAssign i $ m ^. modItems
-       in m & get %~ replace i expr
+    let expr = fromMaybe def . findAssign i $ m ^. modItems
+     in m & get %~ replace i expr
   | otherwise =
-      m
+    m
   where
     get = modItems . traverse . modContAssign . contAssignExpr
     def = Id i

@@ -46,7 +46,6 @@ library
                  , Verismith.EMI
                  , Verismith.Fuzz
                  , Verismith.Generate
-                 , Verismith.Internal
                  , Verismith.OptParser
                  , Verismith.Reduce
                  , Verismith.Report

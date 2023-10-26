@@ -54,14 +54,13 @@ import System.FilePath.Posix (takeBaseName)
 import Verismith.Config
 import Verismith.CounterEg (CounterEg (..))
 import Verismith.EMI
-import Verismith.Internal
 import Verismith.Reduce
 import Verismith.Report
 import Verismith.Result
 import Verismith.Tool.Icarus
 import Verismith.Tool.Internal
 import Verismith.Tool.Yosys
-import Verismith.Utils (generateByteString)
+import Verismith.Utils
 import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen
 import Prelude hiding (FilePath)
@@ -136,8 +135,8 @@ runFuzz' fo yos m =
     ( FuzzEnv
         { _getSynthesisers =
             ( force $
-                defaultIdentitySynth
-                  : (descriptionToSynth <$> conf ^. configSynthesisers)
+                defaultIdentitySynth :
+                (descriptionToSynth <$> conf ^. configSynthesisers)
             ),
           _getSimulators = (force $ descriptionToSim <$> conf ^. configSimulators),
           _yosysInstance = yos,

@@ -53,12 +53,12 @@ import Data.Text (Text, unpack)
 import Shelly (fromText, (<.>))
 import qualified Shelly
 import Shelly.Lifted (MonadSh, liftSh, rm_rf, writefile)
-import Verismith.Internal
 import Verismith.Result
 import Verismith.Tool
 import Verismith.Tool.Icarus
 import Verismith.Tool.Identity
 import Verismith.Tool.Internal
+import Verismith.Utils
 import Verismith.Verilog
 import Verismith.Verilog.AST
 import Verismith.Verilog.CodeGen

@@ -62,10 +62,10 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Verismith.Config
-import Verismith.Internal
 import Verismith.Result
 import Verismith.Tool
 import Verismith.Tool.Internal
+import Verismith.Utils
 import Prelude hiding (FilePath)
 
 -- | Common type alias for synthesis results

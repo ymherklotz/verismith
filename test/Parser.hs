@@ -24,7 +24,6 @@ import Test.Tasty.HUnit
 import Test.Tasty.Hedgehog
 import Text.Parsec
 import Verismith
-import Verismith.Internal
 import Verismith.Verilog.Lex
 import Verismith.Verilog.Parser
 import Verismith.Verilog.Preprocess (uncomment)

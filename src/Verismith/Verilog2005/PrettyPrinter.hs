@@ -23,6 +23,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromJust, fromMaybe)
 import Data.String
 import qualified Data.Vector.Unboxed as V
+import Verismith.Utils hiding (comma)
 import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.LibPretty
 import Verismith.Verilog2005.Utils

@@ -70,7 +70,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Semigroup
 import Data.String
-import Verismith.Verilog2005.Utils (foldrMap1, nonEmpty)
+import Verismith.Utils (foldrMap1, nonEmpty)
 
 infixr 6 <+>
 

@@ -147,8 +147,10 @@ instance
   where
   newtype ShM (ResultT a m) b = ResultTShM (ShM m (Result a b))
   liftShWith f =
-    ResultT $ liftM return $ liftShWith $ \runInSh -> f $ \k ->
-      liftM ResultTShM $ runInSh $ runResultT k
+    ResultT $
+      liftM return $
+        liftShWith $ \runInSh -> f $ \k ->
+          liftM ResultTShM $ runInSh $ runResultT k
   restoreSh (ResultTShM m) = ResultT . restoreSh $ m
   {-# INLINE liftShWith #-}
   {-# INLINE restoreSh #-}

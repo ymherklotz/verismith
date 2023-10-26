@@ -32,6 +32,7 @@ import Text.Parsec hiding (satisfy, uncons)
 import Text.Parsec.Error
 import Text.Parsec.Expr
 import Text.Printf (printf)
+import Verismith.Utils
 import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.Lexer
 import Verismith.Verilog2005.PrettyPrinter

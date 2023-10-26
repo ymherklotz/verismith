@@ -52,8 +52,8 @@ import Shelly
 import Shelly.Lifted (MonadSh, liftSh)
 import System.FilePath.Posix (takeBaseName)
 import Verismith.CounterEg (CounterEg)
-import Verismith.Internal
 import Verismith.Result
+import Verismith.Utils
 import Verismith.Verilog.AST
 import Prelude hiding (FilePath)
 

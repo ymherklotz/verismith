@@ -35,9 +35,9 @@ import qualified Data.Vector.Unboxed as VU
 import Data.Word
 import Numeric.Natural
 import System.Random.MWC.Probability
+import Verismith.Utils (liftA4, liftA5, mkpair)
 import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.Lexer
-import Verismith.Verilog2005.Utils (liftA4, liftA5, mkpair)
 
 infixl 4 <.>
 
@@ -79,7 +79,7 @@ data CategoricalProbability
   = CPDiscrete ![Double]
   | CPBiasedUniform
       { _CPBUBiases :: ![(Double, Int)],
-        _CPBUUniforWeight :: Double
+        _CPBUUniformWeight :: Double
       }
 
 defCatProb :: CategoricalProbability
