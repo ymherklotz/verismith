@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
 -- Module      : Verismith.Verilog2005.Generator
 -- Description : AST random generator
 -- Copyright   : (c) 2023 Quentin Corradi
@@ -6,84 +5,41 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Verismith.Verilog2005.Generator
-  ( garbageVerilog2005,
+  ( runGarbageGeneration,
     GeneratorOpts,
     GenM,
-    NumberProbability,
-    CategoricalProbability,
     defGeneratorOpts,
   )
 where
 
 import Control.Applicative (liftA2, liftA3)
+import Control.Lens.Combinators
 import Control.Monad.Reader
 import Control.Monad.State.Lazy
 import qualified Data.ByteString as B
 import Data.ByteString.Internal (c2w)
 import qualified Data.IntMap.Strict as IntMap
-import Data.List
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import Data.Tuple
-import qualified Data.Vector as V
-import Data.Vector.Mutable (PrimMonad, PrimState, RealWorld)
 import qualified Data.Vector.Unboxed as VU
-import Data.Word
 import Numeric.Natural
 import System.Random.MWC.Probability
+import Verismith.Config
 import Verismith.Utils (liftA4, liftA5, mkpair)
 import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.Lexer
+import Verismith.Verilog2005.Randomness
 
 infixl 4 <.>
 
 (<.>) :: (Monad m, Applicative m) => m (a -> m b) -> m a -> m b
 (<.>) mf mx = join $ mf <*> mx
-
-icast :: (Integral a, Num b) => a -> b
-icast = fromIntegral . toInteger
-
--- | Geometric distribution expected length to failure probability
--- expected length l is (1 - f) / f where f is the failure probability
--- so the failure probability is 1 / (1 + l)
-length2prob :: Int -> Double
-length2prob l = 1 / icast (1 + l)
-
-data NumberProbability
-  = NPUniform
-      { _NPULow :: !Int,
-        _NPUHigh :: !Int
-      }
-  | NPBinomial
-      { _NPBOffset :: !Int,
-        _NPBTrials :: !Int,
-        _NPBPSuccess :: !Double
-      }
-  | NPNegativeBinomial -- Geometric is negative binomial with 1 failure
-      { _NPNBOffset :: !Int,
-        _NPNBFailRate :: !Double,
-        _NPNBFailure :: !Int
-      }
-  | NPPoisson
-      { _NPPOffset :: !Int,
-        _NPPParam :: !Double
-      }
-  | NPDiscrete ![(Double, Int)] -- Weight, outcome index
-  | NPLinearComb ![(Double, NumberProbability)]
-
-data CategoricalProbability
-  = CPDiscrete ![Double]
-  | CPBiasedUniform
-      { _CPBUBiases :: ![(Double, Int)],
-        _CPBUUniformWeight :: Double
-      }
-
-defCatProb :: CategoricalProbability
-defCatProb = CPBiasedUniform [] 1
 
 attenuate :: [(Double, a)] -> Double -> CategoricalProbability -> CategoricalProbability
 attenuate l d p = case p of
@@ -92,49 +48,8 @@ attenuate l d p = case p of
     let im = IntMap.fromListWith (+) $ map swap wl
      in CPDiscrete $ map (\(k, a) -> IntMap.findWithDefault wb k im * d ** (fst a)) $ zip [0 ..] l
 
-avoid :: [Int] -> Int -> Int
-avoid l x = case l of
-  h : t | h <= x -> avoid t $ x + 1
-  _ -> x
-
-uniq :: Ord b => (a -> b) -> (a -> a -> a) -> [a] -> [a]
-uniq f m l = case sortBy (\x y -> compare (f y) (f x)) l of
-  [] -> []
-  h : t -> toList $ foldl' (\(x :| a) e -> if f x == f e then (m x e) :| a else e :| x : a) (h :| []) t
-
-clean :: Int -> [(Double, Int)] -> [(Double, Int)]
-clean t =
-  map (\(x, y) -> (x, max 0 y))
-    . uniq snd (\(x1, y1) (x2, y2) -> (x1 + x2, y1))
-    . filter ((<= t) . snd)
-
-sampleCat :: PrimMonad m => Int -> Gen (PrimState m) -> CategoricalProbability -> m Int
-sampleCat t gen d = case d of
-  CPDiscrete l -> sample (categorical $ take (t + 1) l) gen
-  CPBiasedUniform l b ->
-    let ll = clean t l
-        uw = icast (t - length ll) * b
-     in sample (discrete $ (uw, Nothing) : map (\(x, y) -> (x, Just y)) ll) gen
-          >>= maybe (avoid (map snd ll) <$> sample (uniformR (0, t - length ll)) gen) return
-
-sampleIn :: (Functor m, PrimMonad m) => [a] -> Gen (PrimState m) -> CategoricalProbability -> m a
-sampleIn l gen d = (V.fromList l V.!) <$> sampleCat (length l - 1) gen d
-
-sampleInString ::
-  (Functor m, PrimMonad m) =>
-  B.ByteString ->
-  Gen (PrimState m) ->
-  CategoricalProbability ->
-  m Word8
-sampleInString s gen d = (B.index s) <$> sampleCat (B.length s - 1) gen d
-
-type GenM = ReaderT GeneratorOpts IO
-
-type MonadGen m = (PrimMonad m, MonadReader GeneratorOpts m, PrimState m ~ RealWorld)
-
-data GeneratorOpts = GeneratorOpts -- TODO LATER: duplicate for each use
-  { goGenerator :: !(Gen (PrimState GenM)),
-    goRecursiveAttenuation :: !Double,
+data GeneratorOpts = GeneratorOpts -- TODO LATER: duplicate OptionalElement for each use
+  { goRecursiveAttenuation :: !Double,
     goCurrentAttenuation :: !Double,
     goOptionalElement :: !Double,
     goConfigs :: !NumberProbability,
@@ -162,7 +77,7 @@ data GeneratorOpts = GeneratorOpts -- TODO LATER: duplicate for each use
     goModuleItem :: !CategoricalProbability,
     goPortType :: !CategoricalProbability,
     goModuleCell :: !Double,
-    goUnconnectedDrive1_0 :: !Double,
+    goUnconnectedDrive :: !CategoricalProbability,
     goTimeMagnitude :: !CategoricalProbability,
     goSpecifyItems :: !NumberProbability,
     goSpecifyItem :: !CategoricalProbability,
@@ -191,7 +106,7 @@ data GeneratorOpts = GeneratorOpts -- TODO LATER: duplicate for each use
     goBlockDeclType :: !CategoricalProbability,
     goNetType :: !CategoricalProbability,
     goNet_Tri :: !Double,
-    goVector_Scalar :: !CategoricalProbability,
+    goVectoring :: !CategoricalProbability,
     goRegister :: !Double,
     goDirection :: !CategoricalProbability,
     goDriveStrength :: !CategoricalProbability,
@@ -248,242 +163,138 @@ data GeneratorOpts = GeneratorOpts -- TODO LATER: duplicate for each use
     goHexadecimalSymbol :: !CategoricalProbability
   }
 
-defGeneratorOpts :: IO GeneratorOpts
+defGeneratorOpts :: GeneratorOpts
 defGeneratorOpts =
-  ( \gen ->
-      GeneratorOpts
-        { goGenerator = gen,
-          goRecursiveAttenuation = 0.5,
-          goCurrentAttenuation = 1,
-          goOptionalElement = 0.5,
-          goConfigs = NPPoisson 0 1,
-          goConfigItems = NPPoisson 0 1,
-          goDesigns = NPPoisson 0 1,
-          goCell_Inst = 0.5,
-          goLiblist_Use = 0.5,
-          goPrimitives = NPPoisson 0 2,
-          goSequential_Combinatorial = 0.5,
-          goTableRows = NPPoisson 0 4,
-          goPortInitialisation = 0.5,
-          goPrimitiveInitialisation = defCatProb,
-          goEdgeSensitiveRow = 0.5,
-          goTableInLevel = defCatProb,
-          goTableOutLevel = defCatProb,
-          goEdgeSimple = 0.5,
-          goEdgePos_Neg = 0.5,
-          goModules = NPPoisson 1 2,
-          goParameters = NPNegativeBinomial 0 0.5 1,
-          goLocalParameters = NPNegativeBinomial 0 0.5 1,
-          goParameterOverrides = NPNegativeBinomial 0 0.75 1,
-          goDeclarations = NPPoisson 0 1,
-          goOtherItems = NPPoisson 0 3,
-          goArguments = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          goModuleItem = CPDiscrete [4, 2, 1],
-          goPortType = defCatProb,
-          goModuleCell = 0.5,
-          goUnconnectedDrive1_0 = 0.5,
-          goTimeMagnitude = defCatProb,
-          goSpecifyItems = NPPoisson 0 1,
-          goSpecifyItem = defCatProb,
-          goSpecifyParameters = NPPoisson 0 1,
-          goInitialisation_PathPulse = 0.5,
-          goModulePathCondition = defCatProb,
-          goPathDelayCount = defCatProb,
-          goPathFull_Parallel = 0.5,
-          goFullPathTerms = NPPoisson 0 1,
-          goPulseEvent_Detect = 0.5,
-          goShowCancelled = 0.5,
-          goPolarity = 0.5,
-          goEdgeSensitivity = defCatProb,
-          goSystemTimingCheck = defCatProb,
-          goTimingTransition = 0.25,
-          goTimingCheckNeg_Pos = 0.5,
-          goGenerateSingle_Block = 0.5,
-          goGenerateItem = defCatProb,
-          goModGenDeclaration = defCatProb,
-          goDimension_Initialisation = 0.5,
-          goAutomatic = 0.5,
-          goModGenItem = defCatProb,
-          goStatement = defCatProb,
-          goTypeAbstract_Concrete = 0.5,
-          goAbstractType = defCatProb,
-          goBlockDeclType = defCatProb,
-          goNetType = defCatProb,
-          goNet_Tri = 0.5,
-          goVector_Scalar = defCatProb,
-          goRegister = 0.5,
-          goDirection = defCatProb,
-          goDriveStrength = defCatProb,
-          goChargeStrength = defCatProb,
-          goNInpGate = defCatProb,
-          goLoopStatement = defCatProb,
-          goCaseStatement = defCatProb,
-          goProcContAssign = defCatProb,
-          goPCAVar_Net = 0.5,
-          goGate = defCatProb,
-          goGateReverse = 0.5,
-          goGate1_0 = 0.5,
-          goDelayEvent = defCatProb,
-          goEvents = NPNegativeBinomial 0 0.5 1,
-          goEvent = defCatProb,
-          goEventPrefix = defCatProb,
-          goNamed_Positional = 0.5,
-          goBlockPar_Seq = 0.5,
-          goAssignmentBlocking = 0.5,
-          goCaseBranches = NPNegativeBinomial 0 0.25 1,
-          goLValues = NPNegativeBinomial 0 0.5 1,
-          goAttributes = NPNegativeBinomial 0 0.75 1,
-          goPaths = NPNegativeBinomial 0 0.75 1,
-          goDelay = CPDiscrete [1, 1, 2, 4],
-          goMinTypMax = 0.5,
-          goRangeExpr = defCatProb,
-          goRangeOffsetPos_Neg = 0.5,
-          goDimensions = NPNegativeBinomial 0 0.5 1,
-          goSignedness = 0.5,
-          goExpression = CPDiscrete [2, 2, 2, 1],
-          goConcatenations = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          goUnaryOperation = defCatProb,
-          goBinaryOperation = defCatProb,
-          goPrimary = CPDiscrete [2, 4, 4, 4, 4, 4, 2, 4, 1, 1, 1, 1, 1],
-          goIntRealIdent = defCatProb,
-          goEscaped_Simple = 0.5,
-          goSimpleLetters = NPNegativeBinomial 0 0.125 1,
-          goSimpleLetter = defCatProb,
-          goEscapedLetters = NPNegativeBinomial 0 0.125 1,
-          goEscapedLetter = defCatProb,
-          goSystemLetters = NPNegativeBinomial 0 0.125 1,
-          goStringCharacters = NPNegativeBinomial 0 0.125 1,
-          goStringCharacter = defCatProb,
-          goFixed_Floating = 0.5,
-          goExponentSign = defCatProb,
-          goX_Z = 0.5,
-          goBinarySymbols = NPNegativeBinomial 0 0.125 1,
-          goBinarySymbol = defCatProb,
-          goOctalSymbols = NPNegativeBinomial 0 0.125 1,
-          goOctalSymbol = defCatProb,
-          goDecimalSymbols = NPNegativeBinomial 0 0.125 1,
-          goDecimalSymbol = defCatProb,
-          goHexadecimalSymbols = NPNegativeBinomial 0 0.125 1,
-          goHexadecimalSymbol = defCatProb
-        }
-  )
-    <$> createSystemRandom
+  GeneratorOpts
+    { goRecursiveAttenuation = 0.5,
+      goCurrentAttenuation = 1,
+      goOptionalElement = 0.5,
+      goConfigs = NPPoisson 0 1,
+      goConfigItems = NPPoisson 0 1,
+      goDesigns = NPPoisson 0 1,
+      goCell_Inst = 0.5,
+      goLiblist_Use = 0.5,
+      goPrimitives = NPPoisson 0 2,
+      goSequential_Combinatorial = 0.5,
+      goTableRows = NPPoisson 0 4,
+      goPortInitialisation = 0.5,
+      goPrimitiveInitialisation = uniformCP,
+      goEdgeSensitiveRow = 0.5,
+      goTableInLevel = uniformCP,
+      goTableOutLevel = uniformCP,
+      goEdgeSimple = 0.5,
+      goEdgePos_Neg = 0.5,
+      goModules = NPPoisson 1 2,
+      goParameters = NPNegativeBinomial 0 0.5 1,
+      goLocalParameters = NPNegativeBinomial 0 0.5 1,
+      goParameterOverrides = NPNegativeBinomial 0 0.75 1,
+      goDeclarations = NPPoisson 0 1,
+      goOtherItems = NPPoisson 0 3,
+      goArguments = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+      goModuleItem = CPDiscrete [4, 2, 1],
+      goPortType = uniformCP,
+      goModuleCell = 0.5,
+      goUnconnectedDrive = uniformCP,
+      goTimeMagnitude = uniformCP,
+      goSpecifyItems = NPPoisson 0 1,
+      goSpecifyItem = uniformCP,
+      goSpecifyParameters = NPPoisson 0 1,
+      goInitialisation_PathPulse = 0.5,
+      goModulePathCondition = uniformCP,
+      goPathDelayCount = uniformCP,
+      goPathFull_Parallel = 0.5,
+      goFullPathTerms = NPPoisson 0 1,
+      goPulseEvent_Detect = 0.5,
+      goShowCancelled = 0.5,
+      goPolarity = 0.5,
+      goEdgeSensitivity = uniformCP,
+      goSystemTimingCheck = uniformCP,
+      goTimingTransition = 0.25,
+      goTimingCheckNeg_Pos = 0.5,
+      goGenerateSingle_Block = 0.5,
+      goGenerateItem = uniformCP,
+      goModGenDeclaration = uniformCP,
+      goDimension_Initialisation = 0.5,
+      goAutomatic = 0.5,
+      goModGenItem = uniformCP,
+      goStatement = uniformCP,
+      goTypeAbstract_Concrete = 0.5,
+      goAbstractType = uniformCP,
+      goBlockDeclType = uniformCP,
+      goNetType = uniformCP,
+      goNet_Tri = 0.5,
+      goVectoring = uniformCP,
+      goRegister = 0.5,
+      goDirection = uniformCP,
+      goDriveStrength = uniformCP,
+      goChargeStrength = uniformCP,
+      goNInpGate = uniformCP,
+      goLoopStatement = uniformCP,
+      goCaseStatement = uniformCP,
+      goProcContAssign = uniformCP,
+      goPCAVar_Net = 0.5,
+      goGate = uniformCP,
+      goGateReverse = 0.5,
+      goGate1_0 = 0.5,
+      goDelayEvent = uniformCP,
+      goEvents = NPNegativeBinomial 0 0.5 1,
+      goEvent = uniformCP,
+      goEventPrefix = uniformCP,
+      goNamed_Positional = 0.5,
+      goBlockPar_Seq = 0.5,
+      goAssignmentBlocking = 0.5,
+      goCaseBranches = NPNegativeBinomial 0 0.25 1,
+      goLValues = NPNegativeBinomial 0 0.5 1,
+      goAttributes = NPNegativeBinomial 0 0.75 1,
+      goPaths = NPNegativeBinomial 0 0.75 1,
+      goDelay = CPDiscrete [1, 1, 2, 4],
+      goMinTypMax = 0.5,
+      goRangeExpr = uniformCP,
+      goRangeOffsetPos_Neg = 0.5,
+      goDimensions = NPNegativeBinomial 0 0.5 1,
+      goSignedness = 0.5,
+      goExpression = CPDiscrete [2, 2, 2, 1],
+      goConcatenations = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+      goUnaryOperation = uniformCP,
+      goBinaryOperation = uniformCP,
+      goPrimary = CPDiscrete [2, 4, 4, 4, 4, 4, 2, 4, 1, 1, 1, 1, 1],
+      goIntRealIdent = uniformCP,
+      goEscaped_Simple = 0.5,
+      goSimpleLetters = NPNegativeBinomial 0 0.125 1,
+      goSimpleLetter = uniformCP,
+      goEscapedLetters = NPNegativeBinomial 0 0.125 1,
+      goEscapedLetter = uniformCP,
+      goSystemLetters = NPNegativeBinomial 0 0.125 1,
+      goStringCharacters = NPNegativeBinomial 0 0.125 1,
+      goStringCharacter = uniformCP,
+      goFixed_Floating = 0.5,
+      goExponentSign = uniformCP,
+      goX_Z = 0.5,
+      goBinarySymbols = NPNegativeBinomial 0 0.125 1,
+      goBinarySymbol = uniformCP,
+      goOctalSymbols = NPNegativeBinomial 0 0.125 1,
+      goOctalSymbol = uniformCP,
+      goDecimalSymbols = NPNegativeBinomial 0 0.125 1,
+      goDecimalSymbol = uniformCP,
+      goHexadecimalSymbols = NPNegativeBinomial 0 0.125 1,
+      goHexadecimalSymbol = uniformCP
+    }
 
-sampleBernoulli :: MonadGen m => (GeneratorOpts -> Double) -> m Bool
-sampleBernoulli p = sample <$> (bernoulli <$> asks p) <.> asks goGenerator
+type GenM' = GenM GeneratorOpts
 
-choice :: MonadGen m => (GeneratorOpts -> Double) -> m a -> m a -> m a
-choice c t f = sampleBernoulli c >>= \b -> if b then t else f
+tameRecursion :: GenM' a -> GenM' a
+tameRecursion = local $
+  \(go, s) -> (go {goCurrentAttenuation = goRecursiveAttenuation go * goCurrentAttenuation go}, s)
 
-sampleMaybe :: MonadGen m => (GeneratorOpts -> Double) -> m a -> m (Maybe a)
-sampleMaybe c x = choice c (Just <$> x) (pure Nothing)
-
-sampleEither :: MonadGen m => (GeneratorOpts -> Double) -> m a -> m b -> m (Either a b)
-sampleEither c t f = choice c (Left <$> t) (Right <$> f)
-
-sampleEnum ::
-  forall a m.
-  (MonadGen m, Bounded a, Enum a) =>
-  (GeneratorOpts -> CategoricalProbability) ->
-  m a
-sampleEnum p = toEnum . (mib +) <$> (sampleCat (mab - mib - 1) <$> asks goGenerator <.> asks p)
-  where
-    mib = fromEnum (minBound :: a)
-    mab = fromEnum (maxBound :: a)
-
-sampleFrom :: MonadGen m => (GeneratorOpts -> CategoricalProbability) -> [a] -> m a
-sampleFrom p l = sampleIn l <$> asks goGenerator <.> asks p
-
-sampleFromString ::
-  MonadGen m => (GeneratorOpts -> CategoricalProbability) -> B.ByteString -> m Word8
-sampleFromString p s = sampleInString s <$> asks goGenerator <.> asks p
-
-sampleBranch :: MonadGen m => (GeneratorOpts -> CategoricalProbability) -> [m a] -> m a
-sampleBranch p l = join $ sampleFrom p l
-
-sampleNum :: MonadGen m => (GeneratorOpts -> NumberProbability) -> m Int
-sampleNum p = asks goGenerator >>= \gen -> asks p >>= \d -> aux gen d
-  where
-    aux gen d = case d of
-      NPUniform l h -> sample (uniformR (l, h)) gen
-      NPBinomial o t f -> (o +) <$> sample (binomial t f) gen
-      NPNegativeBinomial o r f -> (o +) <$> sample (negativeBinomial f r) gen
-      NPPoisson o p -> (o +) <$> sample (poisson p) gen
-      NPDiscrete l -> sample (discrete l) gen
-      NPLinearComb l -> sample (discrete l) gen >>= aux gen
-
-sampleN :: MonadGen m => (GeneratorOpts -> NumberProbability) -> m b -> m [b]
-sampleN p x = sampleNum p >>= sequence . flip replicate x
-
-sampleNE :: MonadGen m => (GeneratorOpts -> NumberProbability) -> m b -> m (NonEmpty b)
-sampleNE p x = liftA2 (:|) x $ sampleN p x
-
-sampleString ::
-  MonadGen m =>
-  (GeneratorOpts -> NumberProbability) ->
-  (GeneratorOpts -> CategoricalProbability) ->
-  B.ByteString ->
-  m B.ByteString
-sampleString np cp s = B.pack <$> sampleN np (sampleFromString cp s)
-
-sampleNEString ::
-  MonadGen m =>
-  (GeneratorOpts -> NumberProbability) ->
-  (GeneratorOpts -> CategoricalProbability) ->
-  B.ByteString ->
-  m B.ByteString
-sampleNEString np cp s = B.pack . toList <$> sampleNE np (sampleFromString cp s)
-
-deleteFirstOrdered :: Ord c => (a -> c) -> (b -> c) -> [a] -> [b] -> [a]
-deleteFirstOrdered pa pb la lb = case (la, lb) of
-  (ha : ta, hb : tb) -> case compare (pa ha) (pb hb) of
-    LT -> ha : deleteFirstOrdered pa pb ta lb
-    EQ -> deleteFirstOrdered pa pb ta tb
-    GT -> deleteFirstOrdered pa pb la tb
-  _ -> la
-
-merge :: Ord a => [a] -> [a] -> [a]
-merge la lb = case (la, lb) of
-  (ha : ta, hb : tb) -> case compare ha hb of
-    LT -> ha : merge ta lb
-    EQ -> ha : hb : merge ta tb
-    GT -> hb : merge la tb
-  (_, []) -> la
-  _ -> lb
-
-sampleFiltered :: MonadGen m => (GeneratorOpts -> CategoricalProbability) -> Int -> [Int] -> m Int
-sampleFiltered p t l = do
-  gen <- asks goGenerator
-  d <- asks p
-  case d of
-    CPDiscrete l ->
-      avoid ll
-        <$> sample (discrete $ deleteFirstOrdered snd id (zip (take (t + 1) l) [0 .. t]) ll) gen
-    CPBiasedUniform l' b ->
-      let ll' = deleteFirstOrdered snd id (clean t l') ll
-          uw = icast (t - length ll - length ll') * b
-       in sample (discrete $ (uw, Nothing) : map (\(x, y) -> (x, Just y)) ll') gen
-            >>= maybe
-              ( avoid (merge ll $ map snd ll')
-                  <$> sample (uniformR (0, t - length ll - length ll')) gen
-              )
-              return
-  where
-    ll = sort $ filter (<= t) l
-
-tameRecursion :: MonadGen m => m a -> m a
-tameRecursion =
-  local (\go -> go {goCurrentAttenuation = goRecursiveAttenuation go * goCurrentAttenuation go})
-
-freshRecursion :: MonadGen m => m a -> m a
-freshRecursion = local (\go -> go {goCurrentAttenuation = 1})
+freshRecursion :: GenM' a -> GenM' a
+freshRecursion = local $ \(go, s) -> (go {goCurrentAttenuation = 1}, s)
 
 sampleAttenuatedBranch ::
-  MonadGen m => (GeneratorOpts -> CategoricalProbability) -> [(Double, m a)] -> m a
+  (GeneratorOpts -> CategoricalProbability) -> [(Double, GenM' a)] -> GenM' a
 sampleAttenuatedBranch p l = do
-  gen <- asks goGenerator
-  d <- asks p
-  a <- asks goCurrentAttenuation
+  gen <- asks snd
+  d <- asks $ p . fst
+  a <- asks $ goCurrentAttenuation . fst
   join $ sampleIn (map snd l) gen (attenuate l a d)
 
 idSimpleLetter :: B.ByteString -- 0-9$ are forbidden as first letters
@@ -494,14 +305,14 @@ digitCharacter = "0123456789"
 
 -- Start of actual generation
 
-garbageIdent :: MonadGen m => m B.ByteString
+garbageIdent :: GenM' B.ByteString
 garbageIdent =
   choice
     goEscaped_Simple
     ( B.pack . (c2w '\\' :)
         <$> sampleN
           goEscapedLetters
-          (toEnum <$> sampleFiltered goEscapedLetter 255 (map fromEnum " \t\f\n"))
+          (toEnum <$> sampleSegment goEscapedLetter 33 127)
     )
     ( do
         fl <- sampleFromString goSimpleLetter (B.take 53 idSimpleLetter)
@@ -514,23 +325,23 @@ garbageIdent =
         loop s
     )
 
-garbageIdentified :: MonadGen m => m x -> m (Identified x)
+garbageIdentified :: GenM' x -> GenM' (Identified x)
 garbageIdentified = liftA2 Identified garbageIdent
 
-garbageSysIdent :: MonadGen m => m B.ByteString
+garbageSysIdent :: GenM' B.ByteString
 garbageSysIdent = sampleNEString goSystemLetters goSimpleLetter idSimpleLetter
 
-garbageHierIdent :: MonadGen m => m HierIdent
+garbageHierIdent :: GenM' HierIdent
 garbageHierIdent =
   liftA2
     HierIdent
     (sampleN goPaths $ garbageIdentified $ sampleMaybe goOptionalElement garbageCExpr)
     garbageIdent
 
-garbageInteger :: MonadGen m => m Natural
+garbageInteger :: GenM' Natural
 garbageInteger = parseDecimal <$> sampleString goDecimalSymbols goDecimalSymbol digitCharacter
 
-garbageReal :: MonadGen m => m B.ByteString
+garbageReal :: GenM' B.ByteString
 garbageReal =
   choice
     goFixed_Floating
@@ -549,7 +360,7 @@ garbageReal =
   where
     number = sampleNEString goDecimalSymbols goDecimalSymbol digitCharacter
 
-garbageNumIdent :: MonadGen m => m NumIdent
+garbageNumIdent :: GenM' NumIdent
 garbageNumIdent =
   sampleBranch
     goIntRealIdent
@@ -558,7 +369,7 @@ garbageNumIdent =
       NIIdent <$> garbageIdent
     ]
 
-garbagePrim :: MonadGen m => m i -> m r -> m (GenPrim i r)
+garbagePrim :: GenM' i -> GenM' r -> GenM' (GenPrim i r)
 garbagePrim ident grng =
   sampleAttenuatedBranch
     goPrimary
@@ -573,11 +384,9 @@ garbagePrim ident grng =
             PrimString $
               B.pack $
                 map c2w $
-                  "\"" ++ concatMap (\x -> case x of '"' -> "\\\""; '\\' -> "\\\\"; _ -> [x]) s ++ "\""
+                  "\"" ++ concatMap (\x -> case x of '"' -> "\\\""; '\\' -> "\\\\"; '\n' -> "\\n"; _ -> [x]) s ++ "\""
         )
-          <$> sampleN
-            goStringCharacters
-            (toEnum <$> sampleFiltered goStringCharacter 255 (map fromEnum "\n"))
+          <$> sampleN goStringCharacters (sampleEnum goStringCharacter)
       ),
       (0, liftA2 PrimIdent ident $ tameRecursion grng),
       recurse $ PrimConcat <$> sampleNE goConcatenations gexpr,
@@ -589,7 +398,8 @@ garbagePrim ident grng =
   where
     mknum x =
       ( 0,
-        garbageInteger >>= \sz ->
+        do
+          sz <- garbageInteger -- TODO: limit size to [0;65535]
           liftA2
             (PrimNumber $ if sz == 0 then Nothing else Just sz)
             (sampleBernoulli goSignedness)
@@ -598,7 +408,7 @@ garbagePrim ident grng =
     gexpr = garbageGenExpr ident grng
     recurse x = (1, tameRecursion x)
 
-garbageGenExpr :: MonadGen m => m i -> m r -> m (GenExpr i r)
+garbageGenExpr :: GenM' i -> GenM' r -> GenM' (GenExpr i r)
 garbageGenExpr ident grng =
   sampleAttenuatedBranch
     goExpression
@@ -625,17 +435,17 @@ garbageGenExpr ident grng =
   where
     gexpr = garbageGenExpr ident grng
 
-garbageGenMinTypMax :: MonadGen m => m e -> m (GenMinTypMax e)
+garbageGenMinTypMax :: GenM' e -> GenM' (GenMinTypMax e)
 garbageGenMinTypMax gexpr =
   choice goMinTypMax (liftA3 MTMFull gexpr gexpr gexpr) (MTMSingle <$> gexpr)
 
-garbageRange2 :: MonadGen m => m Range2
+garbageRange2 :: GenM' Range2
 garbageRange2 = liftA2 Range2 garbageCExpr garbageCExpr
 
-garbageDims :: MonadGen m => m [Range2]
+garbageDims :: GenM' [Range2]
 garbageDims = sampleN goDimensions garbageRange2
 
-garbageGenRangeExpr :: MonadGen m => m e -> m (GenRangeExpr e)
+garbageGenRangeExpr :: GenM' e -> GenM' (GenRangeExpr e)
 garbageGenRangeExpr ge =
   sampleBranch
     goRangeExpr
@@ -644,49 +454,49 @@ garbageGenRangeExpr ge =
       liftA3 GREBaseOff ge (sampleBernoulli goRangeOffsetPos_Neg) garbageCExpr
     ]
 
-garbageGenDimRange :: MonadGen m => m e -> m (GenDimRange e)
+garbageGenDimRange :: GenM' e -> GenM' (GenDimRange e)
 garbageGenDimRange ge = liftA2 GenDimRange (sampleN goDimensions ge) (garbageGenRangeExpr ge)
 
-garbageExpr :: MonadGen m => m Expr
+garbageExpr :: GenM' Expr
 garbageExpr =
   Expr
     <$> garbageGenExpr
       (tameRecursion garbageHierIdent)
       (sampleMaybe goOptionalElement garbageDimRange)
 
-garbageCExpr :: MonadGen m => m CExpr
+garbageCExpr :: GenM' CExpr
 garbageCExpr =
   CExpr <$> garbageGenExpr garbageIdent (sampleMaybe goOptionalElement garbageCRangeExpr)
 
-garbageRangeExpr :: MonadGen m => m RangeExpr
+garbageRangeExpr :: GenM' RangeExpr
 garbageRangeExpr = garbageGenRangeExpr garbageExpr
 
-garbageCRangeExpr :: MonadGen m => m CRangeExpr
+garbageCRangeExpr :: GenM' CRangeExpr
 garbageCRangeExpr = garbageGenRangeExpr garbageCExpr
 
-garbageDimRange :: MonadGen m => m DimRange
+garbageDimRange :: GenM' DimRange
 garbageDimRange = DimRange <$> garbageGenDimRange garbageExpr
 
-garbageCDimRange :: MonadGen m => m CDimRange
+garbageCDimRange :: GenM' CDimRange
 garbageCDimRange = CDimRange <$> garbageGenDimRange garbageCExpr
 
-garbageMinTypMax :: MonadGen m => m MinTypMax
+garbageMinTypMax :: GenM' MinTypMax
 garbageMinTypMax = garbageGenMinTypMax garbageExpr
 
-garbageCMinTypMax :: MonadGen m => m CMinTypMax
+garbageCMinTypMax :: GenM' CMinTypMax
 garbageCMinTypMax = garbageGenMinTypMax garbageCExpr
 
-garbageAttributes :: MonadGen m => m [Attribute]
+garbageAttributes :: GenM' [Attribute]
 garbageAttributes =
   sampleN goAttributes $ garbageIdentified $ sampleMaybe goOptionalElement garbageCExpr
 
-garbageAttributed :: MonadGen m => m x -> m (Attributed x)
+garbageAttributed :: GenM' x -> GenM' (Attributed x)
 garbageAttributed = liftA2 Attributed garbageAttributes
 
-garbageAttrIded :: MonadGen m => m x -> m (AttrIded x)
+garbageAttrIded :: GenM' x -> GenM' (AttrIded x)
 garbageAttrIded = liftA3 AttrIded garbageAttributes garbageIdent
 
-garbageDelay1 :: MonadGen m => m Delay1
+garbageDelay1 :: GenM' Delay1
 garbageDelay1 =
   freshRecursion $
     sampleBranch
@@ -695,7 +505,7 @@ garbageDelay1 =
         D11 <$> garbageMinTypMax
       ]
 
-garbageDelay2 :: MonadGen m => m Delay2
+garbageDelay2 :: GenM' Delay2
 garbageDelay2 =
   freshRecursion $
     sampleBranch
@@ -705,7 +515,7 @@ garbageDelay2 =
         liftA2 D22 garbageMinTypMax garbageMinTypMax
       ]
 
-garbageDelay3 :: MonadGen m => m Delay3
+garbageDelay3 :: GenM' Delay3
 garbageDelay3 =
   freshRecursion $
     sampleBranch
@@ -716,26 +526,26 @@ garbageDelay3 =
         liftA3 D33 garbageMinTypMax garbageMinTypMax garbageMinTypMax
       ]
 
-garbageLValue :: MonadGen m => m dr -> m (LValue dr)
+garbageLValue :: GenM' dr -> GenM' (LValue dr)
 garbageLValue gdr =
   freshRecursion $
     sampleN goLValues (garbageLValue gdr) >>= \l -> case l of
       [] -> liftA2 LVSingle garbageHierIdent $ sampleMaybe goOptionalElement gdr
       h : t -> return $ LVConcat $ h :| t
 
-garbageNetLV :: MonadGen m => m NetLValue
+garbageNetLV :: GenM' NetLValue
 garbageNetLV = garbageLValue garbageCDimRange
 
-garbageVarLV :: MonadGen m => m VarLValue
+garbageVarLV :: GenM' VarLValue
 garbageVarLV = garbageLValue garbageDimRange
 
-garbageVarAssign :: MonadGen m => m VarAssign
+garbageVarAssign :: GenM' VarAssign
 garbageVarAssign = liftA2 VarAssign garbageVarLV $ freshRecursion garbageExpr
 
-garbageNetAssign :: MonadGen m => m NetAssign
+garbageNetAssign :: GenM' NetAssign
 garbageNetAssign = liftA2 NetAssign garbageNetLV $ freshRecursion garbageExpr
 
-garbageStatement :: MonadGen m => m Statement
+garbageStatement :: GenM' Statement
 garbageStatement =
   sampleAttenuatedBranch
     goStatement
@@ -823,30 +633,30 @@ garbageStatement =
           liftA2 DECRepeat (freshRecursion garbageExpr) evctl
         ]
 
-garbageMybStmt :: MonadGen m => m MybStmt
+garbageMybStmt :: GenM' MybStmt
 garbageMybStmt = garbageAttributed $ sampleMaybe goOptionalElement garbageStatement
 
-garbageAttrStmt :: MonadGen m => m AttrStmt
+garbageAttrStmt :: GenM' AttrStmt
 garbageAttrStmt = garbageAttributed garbageStatement
 
-garbageSR :: MonadGen m => m SignRange
+garbageSR :: GenM' SignRange
 garbageSR =
   liftA2 SignRange (sampleBernoulli goSignedness) (sampleMaybe goOptionalElement garbageRange2)
 
-garbageFPT :: MonadGen m => m FunParType
+garbageFPT :: GenM' FunParType
 garbageFPT =
   choice
     goTypeAbstract_Concrete
     (FPTComType <$> sampleEnum goAbstractType)
     (FPTSignRange <$> garbageSR)
 
-garbageParameter :: MonadGen m => m Parameter
+garbageParameter :: GenM' Parameter
 garbageParameter = liftA4 Parameter garbageAttributes garbageIdent garbageFPT garbageCMinTypMax
 
-garbageParamOver :: MonadGen m => m ParamOver
+garbageParamOver :: GenM' ParamOver
 garbageParamOver = liftA3 ParamOver garbageAttributes garbageHierIdent garbageCMinTypMax
 
-garbageBlockDecl :: MonadGen m => m t -> m (BlockDecl t)
+garbageBlockDecl :: GenM' t -> GenM' (BlockDecl t)
 garbageBlockDecl m =
   sampleBranch
     goBlockDeclType
@@ -858,7 +668,7 @@ garbageBlockDecl m =
       BDEvent <$> garbageDims
     ]
 
-garbageStdBlockDecl :: MonadGen m => m ([Parameter], [Parameter], StdBlockDecl)
+garbageStdBlockDecl :: GenM' ([Parameter], [Parameter], StdBlockDecl)
 garbageStdBlockDecl =
   liftA3
     (,,)
@@ -866,7 +676,7 @@ garbageStdBlockDecl =
     (sampleN goLocalParameters garbageParameter)
     $ sampleN goDeclarations $ garbageAttrIded $ garbageBlockDecl garbageDims
 
-garbageDriveStrength :: MonadGen m => m DriveStrength
+garbageDriveStrength :: GenM' DriveStrength
 garbageDriveStrength = do
   x <- strall
   y <- strall
@@ -876,12 +686,9 @@ garbageDriveStrength = do
     (Just a, Nothing) -> return $ DSHighZ True a
     _ -> garbageDriveStrength
   where
-    strall =
-      sampleFrom
-        goDriveStrength
-        [Just StrSupply, Just StrStrong, Just StrPull, Just StrWeak, Nothing]
+    strall = sampleMaybeEnum goDriveStrength
 
-garbageNetKind :: MonadGen m => m NetKind
+garbageNetKind :: GenM' NetKind
 garbageNetKind =
   choice
     goNet_Tri
@@ -895,14 +702,14 @@ garbageNetKind =
         (liftA2 NKTriD garbageDriveStrength garbageExpr)
     )
 
-garbageTFT :: MonadGen m => m TaskFunType
+garbageTFT :: GenM' TaskFunType
 garbageTFT =
   choice
     goTypeAbstract_Concrete
     (TFTComType <$> sampleEnum goAbstractType)
     (liftA2 TFTRegSignRange (sampleBernoulli goRegister) garbageSR)
 
-garbageModGenDecl :: MonadGen m => m (AttrIded ModGenDecl)
+garbageModGenDecl :: GenM' (AttrIded ModGenDecl)
 garbageModGenDecl =
   garbageAttrIded $
     sampleBranch
@@ -915,7 +722,7 @@ garbageModGenDecl =
           (sampleBernoulli goSignedness)
           ( sampleMaybe goOptionalElement $
               mkpair
-                (sampleFrom goVector_Scalar [Nothing, Just True, Just False])
+                (sampleMaybeEnum goVectoring)
                 garbageRange2
           )
           $ sampleMaybe goOptionalElement garbageDelay3,
@@ -935,7 +742,7 @@ garbageModGenDecl =
           garbageStatement
       ]
 
-garbagePortAssign :: MonadGen m => m PortAssign
+garbagePortAssign :: GenM' PortAssign
 garbagePortAssign =
   choice
     goNamed_Positional
@@ -946,7 +753,7 @@ garbagePortAssign =
           (garbageAttributed $ sampleMaybe goOptionalElement garbageExpr)
     )
 
-garbageParamAssign :: MonadGen m => m ParamAssign
+garbageParamAssign :: GenM' ParamAssign
 garbageParamAssign =
   choice
     goNamed_Positional
@@ -958,7 +765,7 @@ garbageParamAssign =
     (ParamPositional <$> sampleN goArguments garbageExpr)
 
 -- do not generate unknown instantiations, there is no need to
-garbageModGenItem :: MonadGen m => m (Attributed ModGenItem)
+garbageModGenItem :: GenM' (Attributed ModGenItem)
 garbageModGenItem =
   garbageAttributed $
     sampleBranch
@@ -1010,7 +817,7 @@ garbageModGenItem =
     optblock = sampleMaybe goOptionalElement garbageGenerateBlock
     optname = choice goOptionalElement (pure ("", Nothing)) (mkpair garbageIdent optr2)
 
-garbageGenerateItem :: MonadGen m => m GenerateItem
+garbageGenerateItem :: GenM' GenerateItem
 garbageGenerateItem =
   garbageAttributes >>= \a ->
     sampleBranch
@@ -1034,7 +841,7 @@ garbageGenerateItem =
                 sn <- sampleBernoulli goSignedness
                 vs <-
                   sampleMaybe goOptionalElement $
-                    mkpair (sampleFrom goVector_Scalar [Nothing, Just True, Just False]) garbageRange2
+                    mkpair (sampleMaybeEnum goVectoring) garbageRange2
                 d3 <- optd3
                 nt <- sampleBernoulli goNet_Tri
                 di <- sampleBernoulli goDimension_Initialisation
@@ -1176,7 +983,7 @@ garbageGenerateItem =
     optblock = sampleMaybe goOptionalElement garbageGenerateBlock
     optname = choice goOptionalElement (pure ("", Nothing)) (mkpair garbageIdent optr2)
 
-garbageGenerateRegion :: MonadGen m => m GenerateRegion
+garbageGenerateRegion :: GenM' GenerateRegion
 garbageGenerateRegion =
   liftA4
     GenerateRegion
@@ -1185,23 +992,23 @@ garbageGenerateRegion =
     (sampleN goDeclarations garbageModGenDecl)
     (sampleN goOtherItems garbageModGenItem)
 
-garbageGenerateBlock :: MonadGen m => m GenerateBlock
+garbageGenerateBlock :: GenM' GenerateBlock
 garbageGenerateBlock =
   choice
     goGenerateSingle_Block
     (GBSingle <$> garbageGenerateItem)
     (GBBlock <$> garbageIdentified garbageGenerateRegion)
 
-garbageSpecTerm :: MonadGen m => m SpecTerm
+garbageSpecTerm :: GenM' SpecTerm
 garbageSpecTerm = garbageIdentified $ sampleMaybe goOptionalElement garbageCRangeExpr
 
-garbageSpecParam :: MonadGen m => m SpecParam
+garbageSpecParam :: GenM' SpecParam
 garbageSpecParam =
   liftA2 SpecParam (sampleMaybe goOptionalElement garbageRange2) $
     choice goInitialisation_PathPulse (SPDAssign <$> garbageIdentified garbageCMinTypMax) $
       liftA4 SPDPathPulse garbageSpecTerm garbageSpecTerm garbageCMinTypMax garbageCMinTypMax
 
-garbageSTC :: MonadGen m => m SystemTimingCheck
+garbageSTC :: GenM' SystemTimingCheck
 garbageSTC =
   sampleBranch
     goSystemTimingCheck
@@ -1236,7 +1043,7 @@ garbageSTC =
     gmmtm = sampleMaybe goOptionalElement garbageMinTypMax
     gde = garbageIdentified $ sampleMaybe goOptionalElement garbageCMinTypMax
 
-garbageModuleBlocks :: MonadGen m => m [ModuleBlock]
+garbageModuleBlocks :: GenM' [ModuleBlock]
 garbageModuleBlocks =
   sampleBernoulli goOptionalElement >>= \ts ->
     sampleN goModules $
@@ -1291,8 +1098,7 @@ garbageModuleBlocks =
                           )
                           (sampleMaybe goOptionalElement $ sampleBernoulli goPolarity)
                           ( sampleMaybe goOptionalElement $
-                              mkpair garbageExpr $
-                                sampleFrom goEdgeSensitivity [Nothing, Just True, Just False]
+                              mkpair garbageExpr $ sampleMaybeEnum goEdgeSensitivity
                           )
                           $ liftA2 (:|) garbageCMinTypMax $
                             sampleFrom goPathDelayCount [0, 1, 2, 5, 11]
@@ -1303,13 +1109,13 @@ garbageModuleBlocks =
           )
         <*> (if ts then Just <$> (mkpair gts gts) else pure Nothing)
         <*> sampleBernoulli goModuleCell
-        <*> sampleMaybe goOptionalElement (sampleBernoulli goUnconnectedDrive1_0)
+        <*> sampleMaybeEnum goUnconnectedDrive
         <*> sampleMaybe goOptionalElement (sampleEnum goNetType)
   where
-    gts = (2 -) <$> (sampleCat 17 <$> asks goGenerator <.> asks goTimeMagnitude)
+    gts = sampleSegment goTimeMagnitude 2 (-15)
     gmnt = sampleMaybe goOptionalElement $ sampleEnum goNetType
 
-garbageVerilog2005 :: MonadGen m => m Verilog2005
+garbageVerilog2005 :: GenM' Verilog2005
 garbageVerilog2005 =
   liftA4
     Verilog2005
@@ -1366,3 +1172,6 @@ garbageVerilog2005 =
     gport = mkpair garbageAttributes garbageIdent
     gpath = sampleN goPaths garbageIdent
     gdot1 = liftA2 Dot1Ident garbageIdent $ sampleMaybe goOptionalElement garbageIdent
+
+runGarbageGeneration :: Config -> IO Verilog2005
+runGarbageGeneration _c = createSystemRandom >>= runReaderT garbageVerilog2005 . (,) defGeneratorOpts

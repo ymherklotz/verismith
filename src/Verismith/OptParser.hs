@@ -60,7 +60,8 @@ data Opts
       }
   | Generate
       { generateFilename :: !(Maybe FilePath),
-        generateConfigFile :: !(Maybe FilePath)
+        generateConfigFile :: !(Maybe FilePath),
+        generateValidSyntax :: !Bool
       }
   | Parse
       { parseFilename :: !FilePath,
@@ -290,6 +291,11 @@ genOpts =
               <> Opt.short 'c'
               <> Opt.metavar "FILE"
               <> Opt.help "Config file for the generation run."
+        )
+    <*> ( Opt.switch $
+            Opt.long "invalid"
+              <> Opt.help
+                "Generate invalid Verilog that is only syntactically allowed."
         )
 
 parseOpts :: Parser Opts

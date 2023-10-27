@@ -83,6 +83,7 @@ library
                  , Verismith.Verilog2005.LibPretty
                  , Verismith.Verilog2005.PrettyPrinter
                  , Verismith.Verilog2005.Parser
+                 , Verismith.Verilog2005.Randomness
                  , Verismith.Verilog2005.Generator
   build-depends: array >=0.5 && <0.6
                , base >=4.7 && <5

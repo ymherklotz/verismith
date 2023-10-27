@@ -9,7 +9,7 @@
 module Verismith.Verilog2005
   ( parseVerilog2005,
     genSource,
-    garbageVerilog2005,
+    runGarbageGeneration,
     GeneratorOpts,
     GenM,
     NumberProbability,
@@ -123,3 +123,4 @@ import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.Generator
 import Verismith.Verilog2005.Parser
 import Verismith.Verilog2005.PrettyPrinter
+import Verismith.Verilog2005.Randomness

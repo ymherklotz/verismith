@@ -443,7 +443,7 @@ instance Show NetType where
 
 -- | Net drive strengths
 data Strength = StrSupply | StrStrong {-default-} | StrPull | StrWeak
-  deriving (Eq, Ord, Data, Generic)
+  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
 
 instance Show Strength where
   show x = case x of
