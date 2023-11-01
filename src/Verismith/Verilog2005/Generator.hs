@@ -19,7 +19,7 @@ import Control.Lens.Combinators
 import Control.Monad.Reader
 import Control.Monad.State.Lazy
 import qualified Data.ByteString as B
-import Data.ByteString.Internal (c2w)
+import Data.ByteString.Internal (c2w, w2c)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import Data.Tuple
@@ -382,6 +382,7 @@ garbagePrim ident grng =
                 map c2w $
                   "\"" ++ concatMap (\x -> case x of '"' -> "\\\""; '\\' -> "\\\\"; '\n' -> "\\n"; _ -> [x]) s ++ "\""
         )
+          . map w2c
           <$> sampleN goStringCharacters (sampleEnum goStringCharacter)
       ),
       (0, liftA2 PrimIdent ident $ tameRecursion grng),
@@ -1108,7 +1109,7 @@ garbageModuleBlocks =
         <*> sampleMaybeEnum goUnconnectedDrive
         <*> sampleMaybe goOptionalElement (sampleEnum goNetType)
   where
-    gts = sampleSegment goTimeMagnitude 2 (-15)
+    gts = sampleSegment goTimeMagnitude (-15) 2
     gmnt = sampleMaybe goOptionalElement $ sampleEnum goNetType
 
 garbageVerilog2005 :: GenM' Verilog2005

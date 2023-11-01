@@ -45,6 +45,7 @@ import qualified Data.Vector as V
 import Data.Vector.Mutable (PrimMonad, PrimState, RealWorld)
 import Data.Word
 import System.Random.MWC.Probability
+import Verismith.Utils (nonEmpty)
 
 infixl 4 <.>
 
@@ -106,11 +107,19 @@ clean t =
 sampleCategoricalProbability ::
   PrimMonad m => Int -> Gen (PrimState m) -> CategoricalProbability -> m Int
 sampleCategoricalProbability t gen d = case d of
-  CPDiscrete l -> sample (categorical $ take (t + 1) l) gen
+  CPDiscrete l ->
+    let ll = take (t + 1) l
+     in case ll of
+          [] -> error "Probability vector cannot be empty"
+          [x] -> return 0
+          _ -> sample (categorical ll) gen
   CPBiasedUniform l b ->
     let ll = clean t l
-        uw = icast (t - length ll) * b
-     in sample (discrete $ (uw, Nothing) : map (\(x, y) -> (x, Just y)) ll) gen
+        uw = icast (t + 1 - length ll) * b
+     in nonEmpty
+          (return Nothing)
+          (flip sample gen . discrete . ((uw, Nothing) :) . map (\(x, y) -> (x, Just y)) . toList)
+          ll
           >>= maybe (avoid (map snd ll) <$> sample (uniformR (0, t - length ll)) gen) return
 
 sampleNumberProbability :: PrimMonad m => Gen (PrimState m) -> NumberProbability -> m Int
