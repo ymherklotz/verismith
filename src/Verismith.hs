@@ -236,11 +236,11 @@ handleOpts (Generate f c sf) = do
   config <- getConfig c
   if sf
     then do
-      source <- proceduralIO "top" config :: IO (Verilog ())
-      maybe T.putStrLn T.writeFile (T.unpack . toTextIgnore <$> f) $ genSource source
-    else do
       source <- V2.runGarbageGeneration config
       maybe L.putStr L.writeFile f $ V2.genSource (Just 80) source
+    else do
+      source <- proceduralIO "top" config :: IO (Verilog ())
+      maybe T.putStrLn T.writeFile (T.unpack . toTextIgnore <$> f) $ genSource source
 handleOpts (Parse f o) = do
   (ast, warns) <- V2.parseVerilog2005 (T.unpack (toTextIgnore f))
   mapM_ (hPutStrLn stderr) warns
