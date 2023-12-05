@@ -13,6 +13,7 @@ module Verismith.Verilog2005.Parser
 where
 
 import Control.Applicative (liftA2, liftA3)
+import Control.Lens hiding ((<|))
 import Control.Monad (join)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS
@@ -39,24 +40,21 @@ import Verismith.Verilog2005.PrettyPrinter
 import Verismith.Verilog2005.Token
 import Verismith.Verilog2005.Utils
 
-ptrace :: String -> Parser ()
-ptrace s = do
-  p <- getPosition
-  inp <- getInput
-  setInput $ take 20 inp
-  parserTrace $ printf "at %d:%d, %s" (sourceLine p) (sourceColumn p) s
-  setInput inp
-
+-- | The parser monad with LocalCompDir (local values of compiler directives) as local state
+-- | and a writer monad for the list of warnings as the base monad
 type Parser = ParsecT [PosToken] LocalCompDir (Writer [String])
 
+-- | A production rule associated to a token without data
 type Produce a = (Token, a)
 
 type LProduce a = [Produce a]
 
+-- | A branching in the parser based on a token without data
 type Branch a = Produce (Parser a)
 
 type LBranch a = [Branch a]
 
+-- | Same as above but parametrised by attributes
 type AProduce a = Produce ([Attribute] -> a)
 
 type LAProduce a = [AProduce a]
@@ -74,24 +72,27 @@ hardfail m =
 warn :: SourcePos -> String -> Parser ()
 warn pos s = lift $ tell [printf "Line %d, column %d: %s" (sourceLine pos) (sourceColumn pos) s]
 
--- | Efficient token branching utility
+-- | Gets a number from a Token, erases the data associated with it
 getConsIndex :: Data a => a -> Int
 getConsIndex = constrIndex . toConstr
 
+-- | Efficient token branching utility
 mkActionMap :: LProduce a -> IntMap.IntMap a
 mkActionMap =
   IntMap.fromListWithKey (\k _ _ -> error $ "Conflict on " ++ show k)
     . map (\(d, a) -> (getConsIndex d, a))
 
--- | Parse exactly one token and produce a value
+-- | Updates the position information
 nextPos :: SourcePos -> PosToken -> [PosToken] -> SourcePos
 nextPos pos _ ptl = case ptl of
   PosToken (Somewhere l c) _ : _ -> setSourceColumn (setSourceLine pos l) c
   _ -> pos
 
+-- | Parse exactly one token and produce a value
 producePrim :: (Token -> Maybe a) -> Parser a
 producePrim f = tokenPrim show nextPos (f . _PTToken)
 
+-- | Parse exactly one token and branches
 branchPrim :: (Token -> Maybe (Parser a)) -> Parser a
 branchPrim = join . producePrim
 
@@ -107,46 +108,53 @@ anywherecompdir = skipMany $
         LitDecimal 1 -> Just ()
         LitDecimal 2 -> Just ()
         _ -> Nothing
-    CDCelldefine -> Just $ modifyState $ \s -> s {_LCDCell = True}
-    CDEndcelldefine -> Just $ modifyState $ \s -> s {_LCDCell = False}
+    CDCelldefine -> Just $ modifyState $ lcdCell .~ True
+    CDEndcelldefine -> Just $ modifyState $ lcdCell .~ False
     _ -> Nothing
 
--- | Basic one token parsing able to produce a value
+-- | Basic one token parsing able to produce a value using a function, uninformative error on failure
 fproduce :: (Token -> Maybe a) -> Parser a
 fproduce f = producePrim f <* anywherecompdir
 
+-- | Branches on a Token without data, informative error on failure
 lproduce :: LProduce a -> Parser a
 lproduce l =
   fproduce (\t -> IntMap.lookup (getConsIndex t) $ mkActionMap l)
     `labels` map (\(d, _) -> show d) l
 
+-- | Maps a function on the data given by branching on a Token without data
 maplproduce :: (a -> b) -> LProduce a -> LProduce b
 maplproduce f = map $ \(t, x) -> (t, f x)
 
+-- | Same as above but for branching with attributes
 maplaproduce :: (a -> b) -> LAProduce a -> LAProduce b
 maplaproduce f = map $ \(t, p) -> (t, \a -> f $ p a)
 
--- | Try to consume the provided token
+-- | Try to consume the provided token, informative error on failure
 consume :: Token -> Parser ()
 consume et = fproduce (\at -> if at == et then Just () else Nothing) <?> show et
 
+-- | Try to consume the provided token and returns true on success (cannot fail)
 optConsume :: Token -> Parser Bool
 optConsume et = option False $ fproduce $ \at -> if at == et then Just True else Nothing
 
--- | Branch on the next token
+-- | Branch on the next token using a function
 fbranch :: (Token -> Maybe (Parser a)) -> Parser a
 fbranch = join . fproduce
 
+-- | Parse attributes then branches on the next token using a LABranch
 labranch :: LABranch a -> Parser a
 labranch l = attributes >>= \a -> lproduce l >>= \p -> p a
 
+-- | Maps a function on the data given by a single branch with attributes
 mapabranch :: (a -> b) -> ABranch a -> ABranch b
 mapabranch f (t, p) = (t, \a -> f <$> p a)
 
+-- | Maps a function on the data given by a branching with attributes
 maplabranch :: (a -> b) -> LABranch a -> LABranch b
 maplabranch = map . mapabranch
 
--- | Specialised repeating combinators
+-- | Specialised repeating combinators; TODO: remove and use builtin
 accrmany :: (a -> m a -> m a) -> m a -> Parser a -> Parser (m a)
 accrmany f l p = loop l
   where
@@ -157,7 +165,7 @@ monoAccum p = loop mempty
   where
     loop acc = option acc $ p >>= \x -> loop $ x <> acc
 
--- | Econlosing that keeps track of the opening token position
+-- | Enclose a parser with tokens and keep track of the opening token position
 enclosed :: Token -> Token -> Parser a -> Parser a
 enclosed l r x =
   getPosition >>= \p ->
@@ -181,13 +189,15 @@ brackets = enclosed SymBrackL SymBrackR
 braces :: Parser a -> Parser a
 braces = enclosed SymBraceL SymBraceR
 
--- | Comma separated list with at least n (0) elements
+-- | Comma separated list
 csl :: Parser a -> Parser [a]
 csl p = sepBy p $ consume SymComma
 
+-- | Comma separated list with at least 1 element
 csl1 :: Parser a -> Parser (NonEmpty a)
 csl1 p = NE.fromList <$> sepBy1 p (consume SymComma)
 
+-- | Comma separated list with warning on 0 elements
 wcsl1 :: String -> Parser a -> Parser [a]
 wcsl1 s p = do
   pos <- getPosition
@@ -195,6 +205,7 @@ wcsl1 s p = do
   if null l then warn pos $ printf "Zero %s is a SystemVerilog feature" s else return ()
   return l
 
+-- | TODO HERE: remove all calls, then the definitions and use csl(1)
 rcsl :: Parser a -> Parser [a]
 rcsl p = option [] $ p >>= \x -> accrmany (:) [x] (consume SymComma *> p)
 
@@ -244,9 +255,12 @@ lenientIdent =
       )
       <?> "identifier"
 
--- | Dotted identifier with at most 1 dot
+-- | Library prefixed cell for config blocks
 dot1Ident :: Parser Dot1Ident
-dot1Ident = liftA2 Dot1Ident ident $ optionMaybe $ consume SymDot *> ident
+dot1Ident = do
+  f <- ident
+  s <- optionMaybe $ consume SymDot *> ident
+  return $ case s of Nothing -> Dot1Ident Nothing f; Just s -> Dot1Ident (Just f) s
 
 -- | Attribute list
 attribute :: Parser [Attribute]
@@ -460,10 +474,10 @@ trHierIdent safety s = do
         ident
   let hi =
         foldl'
-          (\hi (index, ss) -> HierIdent (Identified (_HIIdent hi) index : _HIPath hi) ss)
+          (\(HierIdent p i) (index, ss) -> HierIdent (Identified i index : p) ss)
           (HierIdent [] s)
           l
-  return hi {_HIPath = reverse $ _HIPath hi}
+  return $ hi & hiPath %~ reverse
 
 hierIdent :: Bool -> Parser HierIdent
 hierIdent safety = ident >>= trHierIdent safety
@@ -1182,7 +1196,7 @@ comModGenItem =
   maplabranch
     ( \bdl -> case bdl of
         Left lp -> GIParam lp
-        Right r -> GIMGD $ NE.map (\ai -> ai {_AIData = MGDBlockDecl $ _AIData ai}) r
+        Right r -> GIMGD $ NE.map (aiData %~ MGDBlockDecl) r
     )
     (blockDecl (consume SymEq *> (Right <$> constExpr) <|> Left <$> many range2))
     ++ maplproduce netDecl netType
@@ -1702,40 +1716,40 @@ specifyBlock =
 -- | Non port declaration module item
 npmodItem :: LABranch ([ParamOver], ModuleBlock)
 npmodItem =
-  mapabranch (\p -> ([], mempty {_MBParam = p})) (KWParameter, paramDecl False) :
+  mapabranch (\p -> ([], mempty {_mbParam = p})) (KWParameter, paramDecl False) :
   [ ( KWSpecparam,
       \a ->
-        (\p -> ([], mempty {_MBSpecParam = rmap (Attributed a) $ NE.toList p}))
+        (\p -> ([], mempty {_mbSpecParam = map (Attributed a) $ NE.toList p}))
           <$> specParam <* consume SymSemi
     ),
     ( KWGenerate,
       \a ->
         if not (null a)
           then hardfail "Generate region doesn't accept attributes"
-          else (\it -> ([], mempty {_MBBody = [MIGenReg it]})) <$> genReg <* consume KWEndgenerate
+          else (\it -> ([], mempty {_mbBody = [MIGenReg it]})) <$> genReg <* consume KWEndgenerate
     ),
     ( KWSpecify,
       \a ->
         if not (null a)
           then hardfail "Specify region doesn't accept attributes"
           else
-            (\(sp, b) -> ([], mempty {_MBBody = [MISpecBlock sp b]}))
+            (\(sp, b) -> ([], mempty {_mbBody = [MISpecBlock sp b]}))
               <$> monoAccum specifyBlock <* consume KWEndspecify
     )
   ]
 
 mgi2mb :: GenerateItem -> ([ParamOver], ModuleBlock)
 mgi2mb x = case x of
-  GIParam p -> ([], mempty {_MBLocalParam = NE.toList p})
+  GIParam p -> ([], mempty {_mbLocalParam = NE.toList p})
   GIParamOver o -> (NE.toList o, mempty)
-  GIMGD d -> ([], mempty {_MBDecl = NE.toList d})
-  GIMGI i -> ([], mempty {_MBBody = map MIMGI $ NE.toList i})
+  GIMGD d -> ([], mempty {_mbDecl = NE.toList d})
+  GIMGI i -> ([], mempty {_mbBody = map MIMGI $ NE.toList i})
 
 -- | Port declaration or module item
 modItem :: LABranch ([ParamOver], ModuleBlock)
 modItem =
   maplaproduce
-    (\p -> (\x -> ([], mempty {_MBPortDecl = x})) <$> p <* consume SymSemi)
+    (\p -> (\x -> ([], mempty {_mbPortDecl = x})) <$> p <* consume SymSemi)
     (portDecl False)
     ++ npmodItem
 
@@ -1770,32 +1784,27 @@ parseModule lcd a = do
   (po, m) <- p
   let modu =
         m
-          { _MBAttr = a,
-            _MBIdent = s,
-            _MBParam = _MBParam m ++ params,
-            _MBTimescale = _LCDTimescale lcd,
-            _MBCell = _LCDCell lcd,
-            _MBPull = _LCDPull lcd,
-            _MBDefNetType = _LCDDefNetType lcd
+          { _mbAttr = a,
+            _mbIdent = s,
+            _mbParam = _mbParam m ++ params,
+            _mbTimescale = _lcdTimescale lcd,
+            _mbCell = _lcdCell lcd,
+            _mbPull = _lcdPull lcd,
+            _mbDefNetType = _lcdDefNetType lcd
           }
       paramtopnames = getModuleParamTopNames modu
       poscope =
-        map
-          ( \p ->
-              let pid = _POIdent p
-               in if HashSet.member
-                    (case _HIPath pid of hid : _ -> _IdentIdent hid; [] -> _HIIdent pid)
-                    paramtopnames
-                    then p {_POIdent = pid {_HIPath = Identified s Nothing : _HIPath pid}}
-                    else p
-          )
-          po
+        po & each . poIdent
+          %~ \pid ->
+            if HashSet.member (pid ^. hierIdentFirst) paramtopnames
+              then pid & hiPath %~ (Identified s Nothing :)
+              else pid
   consume KWEndmodule
-  return mempty {_VModule = [modu], _VDefParam = poscope}
+  return mempty {_vModule = [modu], _vDefParam = poscope}
   where
     parseModItem i d l = do
       (po, m) <- monoAccum (parseItem mgi2mb l)
-      return (po, m {_MBPortInter = i, _MBPortDecl = _MBPortDecl m ++ d})
+      return (po, m {_mbPortInter = i, _mbPortDecl = _mbPortDecl m ++ d})
     xrcsl1 s acc p = do
       l <- (acc <>) <$> p
       pos <- getPosition
@@ -1989,7 +1998,7 @@ udp attr = do
     _ -> hardfail "Got mixed information between sequential and combinatorial UDP"
   consume KWEndtable
   consume KWEndprimitive
-  return mempty {_VPrimitive = [PrimitiveBlock attr udpid (outa, outs) ins body]}
+  return mempty {_vPrimitive = [PrimitiveBlock attr udpid (outa, outs) ins body]}
 
 -- | Parses an element of config blocks body
 configItem :: Parser ConfigItem
@@ -2027,7 +2036,7 @@ config = do
     body <- accrmany (:) b $ configItem
     return (body, d)
   consume KWEndconfig
-  return mempty {_VConfig = [ConfigBlock s design body d]}
+  return mempty {_vConfig = [ConfigBlock s design body d]}
 
 -- | Parses compiler directives
 compDir :: Parser ()
@@ -2038,23 +2047,23 @@ compDir =
           Just $
             branchPrim
               ( \t -> case t of
-                  KWPull0 -> Just $ modifyState $ \s -> s {_LCDPull = Just False}
-                  KWPull1 -> Just $ modifyState $ \s -> s {_LCDPull = Just True}
+                  KWPull0 -> Just $ modifyState $ lcdPull .~ Just False
+                  KWPull1 -> Just $ modifyState $ lcdPull .~ Just True
                   _ -> Nothing
               )
-        CDNounconnecteddrive -> Just $ modifyState $ \s -> s {_LCDPull = Nothing}
+        CDNounconnecteddrive -> Just $ modifyState $ lcdPull .~ Nothing
         CDDefaultnettype -> Just $ do
           nt <-
             Just <$> producePrim (\t -> IntMap.lookup (getConsIndex t) $ mkActionMap netType)
               <|> producePrim (\t -> if t == IdSimple "none" then Just Nothing else Nothing)
-          modifyState $ \s -> s {_LCDDefNetType = nt}
+          modifyState $ lcdDefNetType .~ nt
         CDResetall -> Just $ putState lcdDefault
         CDTimescale -> Just $ do
           uoff <- producePrim $ \t -> case t of CDTSInt i -> Just i; _ -> Nothing
           ubase <- producePrim $ \t -> case t of CDTSUnit i -> Just i; _ -> Nothing
           poff <- producePrim $ \t -> case t of CDTSInt i -> Just i; _ -> Nothing
           pbase <- producePrim $ \t -> case t of CDTSUnit i -> Just i; _ -> Nothing
-          modifyState $ \s -> s {_LCDTimescale = Just (ubase + uoff, pbase + poff)}
+          modifyState $ lcdTimescale .~ Just (ubase + uoff, pbase + poff)
         _ -> Nothing
     )
     *> anywherecompdir

@@ -9,10 +9,12 @@
 module Verismith.Verilog2005.Utils
   ( stmtDanglingElse,
     genDanglingElse,
+    hierIdentFirst,
     getModuleParamTopNames,
   )
 where
 
+import Control.Lens
 import qualified Data.ByteString as BS
 import qualified Data.HashSet as HS
 import Data.List (foldl')
@@ -36,10 +38,20 @@ genDanglingElse fb tb = case tb of
   Just (GBSingle (GIMGI (Attributed _ (MGIIf _ _ tfb) :| []))) -> (fb == Nothing) /= (tfb == Nothing)
   _ -> False
 
+-- | Access the first name of a hierarchical identifier
+hierIdentFirst :: Lens' HierIdent BS.ByteString
+hierIdentFirst =
+  lens
+    (\(HierIdent p i) -> case p of [] -> i; Identified h _ : _ -> h)
+    ( \(HierIdent p i) x -> case p of
+        [] -> HierIdent p x
+        Identified h m : t -> HierIdent (Identified x m : t) i
+    )
+
 addGBParamTopNames :: HS.HashSet BS.ByteString -> GenerateBlock -> HS.HashSet BS.ByteString
 addGBParamTopNames s mgi = case mgi of
   GBSingle gi -> case gi of
-    GIParam lp -> foldl' (\s p -> HS.insert (_ParamIdent p) s) s lp
+    GIParam lp -> foldl' (\s p -> HS.insert (_paramIdent p) s) s lp
     GIMGD lmgd -> foldl' addMGDParamTopNames s lmgd
     GIMGI lmgi -> foldl' (\s (Attributed _ mgi) -> addMGIParamTopNames s mgi) s lmgi
     _ -> s
@@ -71,7 +83,7 @@ addMGDParamTopNames s (AttrIded _ n mgd) = case mgd of
 getModuleParamTopNames :: ModuleBlock -> HS.HashSet BS.ByteString
 getModuleParamTopNames (ModuleBlock _ _ _ _ p _ d _ b _ _ _ _) =
   foldl'
-    (\s p -> HS.insert (_ParamIdent p) s)
+    (\s p -> HS.insert (_paramIdent p) s)
     ( foldl'
         addMGDParamTopNames
         ( foldl'

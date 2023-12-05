@@ -146,7 +146,7 @@ randDelete i = do
   return $ if r then i else 0
 
 randomise :: Config -> IO Config
-randomise config@(Config emi a _ c d e) = do
+randomise config@(Config emi a _ c d e f) = do
   mia <- return $ cm ^. probModItemAssign
   misa <- return $ cm ^. probModItemSeqAlways
   mica <- return $ cm ^. probModItemCombAlways
@@ -180,6 +180,7 @@ randomise config@(Config emi a _ c d e) = do
       c
       d
       e
+      f
   where
     cm = config ^. configProbability . probModItem
     cs = config ^. configProbability . probStmnt

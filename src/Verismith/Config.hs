@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
@@ -37,6 +38,13 @@ module Verismith.Config
     -- ** ConfProperty
     ConfProperty (..),
 
+    -- ** ConfGarbage
+    NumberProbability (..),
+    CategoricalProbability (..),
+    uniformCP,
+    GeneratorOpts (..),
+    defGeneratorOpts,
+
     -- ** Simulator Description
     SimDescription (..),
 
@@ -51,6 +59,7 @@ module Verismith.Config
     fromQuartusLight,
     configEMI,
     configProbability,
+    configGarbageGenerator,
     configProperty,
     configSimulators,
     configSynthesisers,
@@ -91,6 +100,7 @@ module Verismith.Config
     propDeterminism,
     propNonDeterminism,
     propDefaultYosys,
+    goSeed,
     parseConfigFile,
     parseConfig,
     parseConfigFileRelaxed,
@@ -101,13 +111,15 @@ module Verismith.Config
   )
 where
 
-import Control.Applicative (Alternative)
+import Control.Applicative (Alternative, liftA2, liftA3, (<|>))
 import Control.Lens hiding ((.=))
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text.IO as T
+import qualified Data.Vector.Unboxed as VU
 import Data.Version (showVersion)
+import Data.Word (Word32)
 import Development.GitRev
 import Hedgehog.Internal.Seed (Seed)
 import Paths_verismith (version)
@@ -119,6 +131,7 @@ import Verismith.Tool.QuartusLight
 import Verismith.Tool.Vivado
 import Verismith.Tool.XST
 import Verismith.Tool.Yosys
+import Verismith.Utils (uncurry3)
 
 -- $conf
 --
@@ -288,6 +301,290 @@ data ConfProperty = ConfProperty
   }
   deriving (Eq, Show)
 
+data NumberProbability
+  = NPUniform
+      { _NPULow :: !Int,
+        _NPUHigh :: !Int
+      }
+  | NPBinomial
+      { _NPBOffset :: !Int,
+        _NPBTrials :: !Int,
+        _NPBSuccess :: !Double
+      }
+  | NPNegativeBinomial -- Geometric is negative binomial with 1 failure
+      { _NPNBOffset :: !Int,
+        _NPNBFailRate :: !Double,
+        _NPNBFailure :: !Int
+      }
+  | NPPoisson
+      { _NPPOffset :: !Int,
+        _NPPParam :: !Double
+      }
+  | NPDiscrete !(NonEmpty (Double, Int)) -- Weight, outcome index
+  | NPLinearComb !(NonEmpty (Double, NumberProbability))
+  deriving (Eq, Show)
+
+data CategoricalProbability
+  = CPDiscrete !(NonEmpty Double)
+  | CPBiasedUniform
+      { _CPBUBiases :: ![(Double, Int)],
+        _CPBUUniformWeight :: Double
+      }
+  deriving (Eq, Show)
+
+uniformCP :: CategoricalProbability
+uniformCP = CPBiasedUniform [] 1
+
+data GeneratorOpts = GeneratorOpts -- TODO LATER: duplicate OptionalElement for each use
+  { _goSeed :: !(Maybe (VU.Vector Word32)),
+    _goExprCurAttenuation :: !Double,
+    _goAttribCurAttenuation :: !Double,
+    _goStmtCurAttenuation :: !Double,
+    _goExprRecAttenuation :: !Double,
+    _goAttribRecAttenuation :: !Double,
+    _goStmtRecAttenuation :: !Double,
+    _goOptionalElement :: !Double,
+    _goConfigs :: !NumberProbability,
+    _goConfigItems :: !NumberProbability,
+    _goDesigns :: !NumberProbability,
+    _goCell_Inst :: !Double,
+    _goLiblist_Use :: !Double,
+    _goPrimitives :: !NumberProbability,
+    _goSequential_Combinatorial :: !Double,
+    _goTableRows :: !NumberProbability,
+    _goPortInitialisation :: !Double,
+    _goPrimitiveInitialisation :: !CategoricalProbability,
+    _goEdgeSensitiveRow :: !Double,
+    _goTableInLevel :: !CategoricalProbability,
+    _goTableOutLevel :: !CategoricalProbability,
+    _goEdgeSimple :: !Double,
+    _goEdgePos_Neg :: !Double,
+    _goModules :: !NumberProbability,
+    _goParameters :: !NumberProbability,
+    _goLocalParameters :: !NumberProbability,
+    _goParameterOverrides :: !NumberProbability,
+    _goDeclarations :: !NumberProbability,
+    _goOtherItems :: !NumberProbability,
+    _goArguments :: !NumberProbability,
+    _goModuleItems :: !NumberProbability,
+    _goModuleItem :: !CategoricalProbability,
+    _goPortType :: !CategoricalProbability,
+    _goModuleCell :: !Double,
+    _goUnconnectedDrive :: !CategoricalProbability,
+    _goTimeMagnitude :: !CategoricalProbability,
+    _goSpecifyItems :: !NumberProbability,
+    _goSpecifyItem :: !CategoricalProbability,
+    _goSpecifyParameters :: !NumberProbability,
+    _goInitialisation_PathPulse :: !Double,
+    _goModulePathCondition :: !CategoricalProbability,
+    _goPathDelayCount :: !CategoricalProbability,
+    _goPathFull_Parallel :: !Double,
+    _goFullPathTerms :: !NumberProbability,
+    _goPulseEvent_Detect :: !Double,
+    _goShowCancelled :: !Double,
+    _goPolarity :: !CategoricalProbability,
+    _goEdgeSensitivity :: !CategoricalProbability,
+    _goSystemTimingCheck :: !CategoricalProbability,
+    _goTimingTransition :: !Double,
+    _goTimingCheckNeg_Pos :: !Double,
+    _goGenerateSingle_Block :: !Double,
+    _goGenerateItem :: !CategoricalProbability,
+    _goModGenItem :: !CategoricalProbability,
+    _goModGenDeclaration :: !CategoricalProbability,
+    _goDimension_Initialisation :: !Double,
+    _goAutomatic :: !Double,
+    _goStatement :: !CategoricalProbability,
+    _goTypeAbstract_Concrete :: !Double,
+    _goAbstractType :: !CategoricalProbability,
+    _goBlockDeclType :: !CategoricalProbability,
+    _goNetType :: !CategoricalProbability,
+    _goNet_Tri :: !Double,
+    _goVectoring :: !CategoricalProbability,
+    _goRegister :: !Double,
+    _goDirection :: !CategoricalProbability,
+    _goDriveStrength :: !CategoricalProbability,
+    _goChargeStrength :: !CategoricalProbability,
+    _goNInpGate :: !CategoricalProbability,
+    _goLoopStatement :: !CategoricalProbability,
+    _goCaseStatement :: !CategoricalProbability,
+    _goProcContAssign :: !CategoricalProbability,
+    _goPCAVar_Net :: !Double,
+    _goGate :: !CategoricalProbability,
+    _goGateReverse :: !Double,
+    _goGate1_0 :: !Double,
+    _goDelayEvent :: !CategoricalProbability,
+    _goEvents :: !NumberProbability,
+    _goEvent :: !CategoricalProbability,
+    _goEventPrefix :: !CategoricalProbability,
+    _goNamed_Positional :: !Double,
+    _goBlockPar_Seq :: !Double,
+    _goAssignmentBlocking :: !Double,
+    _goCaseBranches :: !NumberProbability,
+    _goLValues :: !NumberProbability,
+    _goAttributes :: !NumberProbability,
+    _goPaths :: !NumberProbability,
+    _goDelay :: !CategoricalProbability,
+    _goMinTypMax :: !Double,
+    _goRangeExpr :: !CategoricalProbability,
+    _goRangeOffsetPos_Neg :: !Double,
+    _goDimensions :: !NumberProbability,
+    _goSignedness :: !Double,
+    _goExpression :: !CategoricalProbability,
+    _goConcatenations :: !NumberProbability,
+    _goUnaryOperation :: !CategoricalProbability,
+    _goBinaryOperation :: !CategoricalProbability,
+    _goPrimary :: !CategoricalProbability,
+    _goIntRealIdent :: !CategoricalProbability,
+    _goEscaped_Simple :: !Double,
+    _goSimpleLetters :: !NumberProbability,
+    _goSimpleLetter :: !CategoricalProbability,
+    _goEscapedLetters :: !NumberProbability,
+    _goEscapedLetter :: !CategoricalProbability,
+    _goSystemLetters :: !NumberProbability,
+    _goLiteralWidth :: !CategoricalProbability,
+    _goStringCharacters :: !NumberProbability,
+    _goStringCharacter :: !CategoricalProbability,
+    _goFixed_Floating :: !Double,
+    _goExponentSign :: !CategoricalProbability,
+    _goX_Z :: !Double,
+    _goBinarySymbols :: !NumberProbability,
+    _goBinarySymbol :: !CategoricalProbability,
+    _goOctalSymbols :: !NumberProbability,
+    _goOctalSymbol :: !CategoricalProbability,
+    _goDecimalSymbols :: !NumberProbability,
+    _goDecimalSymbol :: !CategoricalProbability,
+    _goHexadecimalSymbols :: !NumberProbability,
+    _goHexadecimalSymbol :: !CategoricalProbability
+  }
+  deriving (Eq, Show)
+
+defGeneratorOpts :: GeneratorOpts
+defGeneratorOpts =
+  GeneratorOpts
+    { _goSeed = Nothing,
+      _goExprCurAttenuation = 1,
+      _goAttribCurAttenuation = 1,
+      _goStmtCurAttenuation = 1,
+      _goExprRecAttenuation = 0.5,
+      _goAttribRecAttenuation = 0.5,
+      _goStmtRecAttenuation = 0.5,
+      _goOptionalElement = 0.5,
+      _goConfigs = NPPoisson 0 1,
+      _goConfigItems = NPPoisson 0 1,
+      _goDesigns = NPPoisson 0 1,
+      _goCell_Inst = 0.5,
+      _goLiblist_Use = 0.5,
+      _goPrimitives = NPPoisson 0 2,
+      _goSequential_Combinatorial = 0.5,
+      _goTableRows = NPPoisson 0 4,
+      _goPortInitialisation = 0.5,
+      _goPrimitiveInitialisation = uniformCP,
+      _goEdgeSensitiveRow = 0.5,
+      _goTableInLevel = uniformCP,
+      _goTableOutLevel = uniformCP,
+      _goEdgeSimple = 0.5,
+      _goEdgePos_Neg = 0.5,
+      _goModules = NPPoisson 1 2,
+      _goParameters = NPNegativeBinomial 0 0.5 1,
+      _goLocalParameters = NPNegativeBinomial 0 0.5 1,
+      _goParameterOverrides = NPNegativeBinomial 0 0.75 1,
+      _goDeclarations = NPPoisson 0 1,
+      _goOtherItems = NPPoisson 0 3,
+      _goArguments = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+      _goModuleItems = NPPoisson 0 3,
+      _goModuleItem = CPDiscrete [4, 2, 1],
+      _goPortType = uniformCP,
+      _goModuleCell = 0.5,
+      _goUnconnectedDrive = uniformCP,
+      _goTimeMagnitude = uniformCP,
+      _goSpecifyItems = NPPoisson 0 1,
+      _goSpecifyItem = uniformCP,
+      _goSpecifyParameters = NPPoisson 0 1,
+      _goInitialisation_PathPulse = 0.5,
+      _goModulePathCondition = uniformCP,
+      _goPathDelayCount = uniformCP,
+      _goPathFull_Parallel = 0.5,
+      _goFullPathTerms = NPPoisson 0 1,
+      _goPulseEvent_Detect = 0.5,
+      _goShowCancelled = 0.5,
+      _goPolarity = uniformCP,
+      _goEdgeSensitivity = uniformCP,
+      _goSystemTimingCheck = uniformCP,
+      _goTimingTransition = 0.25,
+      _goTimingCheckNeg_Pos = 0.5,
+      _goGenerateSingle_Block = 0.5,
+      _goGenerateItem = uniformCP,
+      _goModGenDeclaration = uniformCP,
+      _goDimension_Initialisation = 0.5,
+      _goAutomatic = 0.5,
+      _goModGenItem = uniformCP,
+      _goStatement = uniformCP,
+      _goTypeAbstract_Concrete = 0.5,
+      _goAbstractType = uniformCP,
+      _goBlockDeclType = uniformCP,
+      _goNetType = uniformCP,
+      _goNet_Tri = 0.5,
+      _goVectoring = uniformCP,
+      _goRegister = 0.5,
+      _goDirection = uniformCP,
+      _goDriveStrength = uniformCP,
+      _goChargeStrength = uniformCP,
+      _goNInpGate = uniformCP,
+      _goLoopStatement = uniformCP,
+      _goCaseStatement = uniformCP,
+      _goProcContAssign = uniformCP,
+      _goPCAVar_Net = 0.5,
+      _goGate = uniformCP,
+      _goGateReverse = 0.5,
+      _goGate1_0 = 0.5,
+      _goDelayEvent = uniformCP,
+      _goEvents = NPNegativeBinomial 0 0.5 1,
+      _goEvent = uniformCP,
+      _goEventPrefix = uniformCP,
+      _goNamed_Positional = 0.5,
+      _goBlockPar_Seq = 0.5,
+      _goAssignmentBlocking = 0.5,
+      _goCaseBranches = NPNegativeBinomial 0 0.25 1,
+      _goLValues = NPNegativeBinomial 0 0.5 1,
+      _goAttributes = NPLinearComb [(2, NPDiscrete [(1, 0)]), (1, NPNegativeBinomial 0 0.75 1)],
+      _goPaths = NPNegativeBinomial 0 0.75 1,
+      _goDelay = CPDiscrete [1, 1, 2, 4],
+      _goMinTypMax = 0.5,
+      _goRangeExpr = uniformCP,
+      _goRangeOffsetPos_Neg = 0.5,
+      _goDimensions = NPNegativeBinomial 0 0.5 1,
+      _goSignedness = 0.5,
+      _goExpression = CPDiscrete [2, 2, 2, 1],
+      _goConcatenations = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+      _goUnaryOperation = uniformCP,
+      _goBinaryOperation = uniformCP,
+      _goPrimary = CPDiscrete [2, 4, 4, 4, 4, 4, 2, 4, 1, 1, 1, 1, 1],
+      _goIntRealIdent = uniformCP,
+      _goEscaped_Simple = 0.5,
+      _goSimpleLetters = NPNegativeBinomial 0 0.125 1,
+      _goSimpleLetter = uniformCP,
+      _goEscapedLetters = NPNegativeBinomial 0 0.125 1,
+      _goEscapedLetter = uniformCP,
+      _goSystemLetters = NPNegativeBinomial 0 0.125 1,
+      _goLiteralWidth =
+        CPBiasedUniform
+          [(1024, 1), (512, 8), (256, 16), (128, 32), (64, 64), (32, 128), (16, 256), (8, 512)]
+          1,
+      _goStringCharacters = NPNegativeBinomial 0 0.125 1,
+      _goStringCharacter = uniformCP,
+      _goFixed_Floating = 0.5,
+      _goExponentSign = uniformCP,
+      _goX_Z = 0.5,
+      _goBinarySymbols = NPNegativeBinomial 0 0.125 1,
+      _goBinarySymbol = uniformCP,
+      _goOctalSymbols = NPNegativeBinomial 0 0.125 1,
+      _goOctalSymbol = uniformCP,
+      _goDecimalSymbols = NPNegativeBinomial 0 0.125 1,
+      _goDecimalSymbol = uniformCP,
+      _goHexadecimalSymbols = NPNegativeBinomial 0 0.125 1,
+      _goHexadecimalSymbol = uniformCP
+    }
+
 data Info = Info
   { -- | @commit@: the hash of the commit that was compiled.
     _infoCommit :: !Text,
@@ -320,6 +617,7 @@ data Config = Config
     _configInfo :: {-# UNPACK #-} !Info,
     _configProbability :: {-# UNPACK #-} !Probability,
     _configProperty :: {-# UNPACK #-} !ConfProperty,
+    _configGarbageGenerator :: {-# UNPACK #-} !GeneratorOpts,
     _configSimulators :: [SimDescription],
     _configSynthesisers :: [SynthDescription]
   }
@@ -339,14 +637,17 @@ $(makeLenses ''ConfEMI)
 
 $(makeLenses ''ConfProperty)
 
+$(makeLenses ''GeneratorOpts)
+
 $(makeLenses ''Info)
 
 $(makeLenses ''Config)
 
-defaultValue ::
-  a ->
-  TomlCodec a ->
-  TomlCodec a
+$(makePrisms ''CategoricalProbability)
+
+$(makePrisms ''NumberProbability)
+
+defaultValue :: a -> TomlCodec a -> TomlCodec a
 defaultValue x = Toml.dimap Just (fromMaybe x) . Toml.dioptional
 
 fromXST :: XST -> SynthDescription
@@ -392,6 +693,7 @@ defaultConfig =
     (Info (pack $(gitHash)) (pack $ showVersion version))
     (Probability defModItem defStmnt defExpr defMod)
     (ConfProperty 20 Nothing 3 2 5 "random" 10 False 0 1 Nothing)
+    defGeneratorOpts
     []
     [fromYosys defaultYosys, fromVivado defaultVivado]
   where
@@ -429,6 +731,71 @@ twoKey a b = Toml.Key (a :| [b])
 
 int :: Toml.Piece -> Toml.Piece -> TomlCodec Int
 int a = Toml.int . twoKey a
+
+catProbCodec :: TomlCodec CategoricalProbability
+catProbCodec =
+  Toml.dimatch (firstOf _CPDiscrete) CPDiscrete (Toml.arrayNonEmptyOf Toml._Double "Discrete")
+    <|> Toml.table
+      ( liftA2
+          CPBiasedUniform
+          ( defaultValue [] (Toml.list (Toml.pair (Toml.double "weight") (Toml.int "value")) "biases")
+              .= _CPBUBiases
+          )
+          (Toml.double "weight" .= _CPBUUniformWeight)
+      )
+      "BiasedUniform"
+
+numProbCodec :: TomlCodec NumberProbability
+numProbCodec =
+  Toml.dimatch
+    (firstOf _NPUniform)
+    (uncurry NPUniform)
+    (Toml.table (Toml.pair (defaultValue 0 $ Toml.int "low") (Toml.int "high")) "Uniform")
+    <|> Toml.dimatch
+      (firstOf _NPBinomial)
+      (uncurry3 NPBinomial)
+      ( Toml.table
+          ( Toml.triple
+              (defaultValue 0 (Toml.int "offset"))
+              (Toml.int "trials")
+              (Toml.double "succesRate")
+          )
+          "Binomial"
+      )
+    <|> Toml.dimatch
+      (firstOf _NPNegativeBinomial)
+      (uncurry3 NPNegativeBinomial)
+      ( Toml.table
+          ( Toml.triple
+              (defaultValue 0 (Toml.int "offset"))
+              (Toml.double "failureRate")
+              (Toml.int "numberOfFailures")
+          )
+          "NegativeBinomial"
+      )
+    <|> Toml.dimatch
+      (firstOf _NPNegativeBinomial)
+      (uncurry3 NPNegativeBinomial)
+      ( Toml.table
+          ( Toml.triple
+              (defaultValue 0 (Toml.int "offset"))
+              (Toml.double "failureRate")
+              (pure 1)
+          )
+          "Geometric"
+      )
+    <|> Toml.dimatch
+      (firstOf _NPPoisson)
+      (uncurry NPPoisson)
+      (Toml.table (Toml.pair (defaultValue 0 (Toml.int "offset")) (Toml.double "lambda")) "Poisson")
+    <|> Toml.dimatch
+      (firstOf _NPDiscrete)
+      NPDiscrete
+      (Toml.nonEmpty (Toml.pair (Toml.double "weight") (Toml.int "value")) "Discrete")
+    <|> Toml.dimatch
+      (firstOf _NPLinearComb)
+      NPLinearComb
+      (Toml.nonEmpty (Toml.pair (Toml.double "weight") numProbCodec) "LinearCombination")
 
 exprCodec :: TomlCodec ProbExpr
 exprCodec =
@@ -544,6 +911,133 @@ propCodec =
   where
     defProp i = defaultConfig ^. configProperty . i
 
+garbageCodec :: TomlCodec GeneratorOpts
+garbageCodec =
+  -- TODO HERE: hierarchise elements (`/".* "`)
+  GeneratorOpts
+    <$> Toml.dioptional (Toml.read "seed") .= _goSeed
+    <*> pure 1
+    <*> pure 1
+    <*> pure 1
+    <*> dfield _goExprRecAttenuation "expr.recAttenuation"
+    <*> dfield _goAttribRecAttenuation "attribute.recAttenuation"
+    <*> dfield _goStmtRecAttenuation "statement.recAttenuation"
+    <*> dfield _goOptionalElement "optionalElement"
+    <*> tfield _goConfigs numProbCodec "config.count"
+    <*> tfield _goConfigItems numProbCodec "config.items"
+    <*> tfield _goDesigns numProbCodec "config.designs"
+    <*> dfield _goCell_Inst "config.cell_inst"
+    <*> dfield _goLiblist_Use "config.liblist_use"
+    <*> tfield _goPrimitives numProbCodec "primitive.count"
+    <*> dfield _goSequential_Combinatorial "primitive.seq_comb"
+    <*> tfield _goTableRows numProbCodec "primitive.table.row.count"
+    <*> dfield _goPortInitialisation "primitive.portInitialisation"
+    <*> tfield _goPrimitiveInitialisation catProbCodec "primitive.initialisation"
+    <*> dfield _goEdgeSensitiveRow "primitive.table.row.edgeSensitive"
+    <*> tfield _goTableInLevel catProbCodec "primitive.table.inLevel"
+    <*> tfield _goTableOutLevel catProbCodec "primitive.table.outLevel"
+    <*> dfield _goEdgeSimple "primitive.table.edge.simple"
+    <*> dfield _goEdgePos_Neg "primitive.table.edge.pos_neg"
+    <*> tfield _goModules numProbCodec "module.count"
+    <*> tfield _goParameters numProbCodec "parameters"
+    <*> tfield _goLocalParameters numProbCodec "localParameters"
+    <*> tfield _goParameterOverrides numProbCodec "parameterOverrides"
+    <*> tfield _goDeclarations numProbCodec "declarations"
+    <*> tfield _goOtherItems numProbCodec "otherItems"
+    <*> tfield _goArguments numProbCodec "arguments"
+    <*> tfield _goModuleItems numProbCodec "module.item.count"
+    <*> tfield _goModuleItem catProbCodec "module.item.distrib"
+    <*> tfield _goPortType catProbCodec "module.port"
+    <*> dfield _goModuleCell "module.cell"
+    <*> tfield _goUnconnectedDrive catProbCodec "module.unconnectedDrive"
+    <*> tfield _goTimeMagnitude catProbCodec "module.timeMagnitude"
+    <*> tfield _goSpecifyItems numProbCodec "specify.items"
+    <*> tfield _goSpecifyItem catProbCodec "specify.item"
+    <*> tfield _goSpecifyParameters numProbCodec "specify.parameters"
+    <*> dfield _goInitialisation_PathPulse "specify.initialisation_pathPulse"
+    <*> tfield _goModulePathCondition catProbCodec "specify.path.condition"
+    <*> tfield _goPathDelayCount catProbCodec "specify.path.delayCount"
+    <*> dfield _goPathFull_Parallel "specify.path.full_parallel"
+    <*> tfield _goFullPathTerms numProbCodec "specify.path.fullTerms"
+    <*> dfield _goPulseEvent_Detect "specify.pulsestyleEvent_detect"
+    <*> dfield _goShowCancelled "specify.show_cancelled"
+    <*> tfield _goPolarity catProbCodec "specify.path.polarity"
+    <*> tfield _goEdgeSensitivity catProbCodec "specify.path.edgeSensitivity"
+    <*> tfield _goSystemTimingCheck catProbCodec "specify.STC.distrib"
+    <*> dfield _goTimingTransition "specify.STC.edge"
+    <*> dfield _goTimingCheckNeg_Pos "specify.STC.neg_pos"
+    <*> dfield _goGenerateSingle_Block "generate.single_block"
+    <*> tfield _goGenerateItem catProbCodec "generate.item"
+    <*> tfield _goModGenItem catProbCodec "modgen.item.distrib"
+    <*> tfield _goModGenDeclaration catProbCodec "modgen.declaration.distrib"
+    <*> dfield _goDimension_Initialisation "modgen.declaration.dim_init"
+    <*> dfield _goAutomatic "automatic"
+    <*> tfield _goStatement catProbCodec "statement.distrib"
+    <*> dfield _goTypeAbstract_Concrete "type.abstract_concrete"
+    <*> tfield _goAbstractType catProbCodec "type.abstract"
+    <*> tfield _goBlockDeclType catProbCodec "type.block"
+    <*> tfield _goNetType catProbCodec "type.net.distrib"
+    <*> dfield _goNet_Tri "type.net.net_tri"
+    <*> tfield _goVectoring catProbCodec "type.net.vectoring"
+    <*> dfield _goRegister "type.taskfun.register"
+    <*> tfield _goDirection catProbCodec "type.taskfun.direction"
+    <*> tfield _goDriveStrength catProbCodec "driveStrength"
+    <*> tfield _goChargeStrength catProbCodec "chargeStrength"
+    <*> tfield _goNInpGate catProbCodec "modgen.item.gate.nInputGate"
+    <*> tfield _goLoopStatement catProbCodec "statement.loop"
+    <*> tfield _goCaseStatement catProbCodec "statement.case"
+    <*> tfield _goProcContAssign catProbCodec "statement.PCA.distrib"
+    <*> dfield _goPCAVar_Net "statement.PCA.var_net "
+    <*> tfield _goGate catProbCodec "modgen.item.gate.distrib"
+    <*> dfield _goGateReverse "modgen.item.gate.reverse"
+    <*> dfield _goGate1_0 "modgen.item.gate.1_0"
+    <*> tfield _goDelayEvent catProbCodec "statement.delayEvent"
+    <*> tfield _goEvents numProbCodec "statement.event.count"
+    <*> tfield _goEvent catProbCodec "statement.event.distrib"
+    <*> tfield _goEventPrefix catProbCodec "statement.event.prefix"
+    <*> dfield _goNamed_Positional "modgen.item.modinstNamed_positional"
+    <*> dfield _goBlockPar_Seq "statement.block.par_seq"
+    <*> dfield _goAssignmentBlocking "statement.assignment.blocking"
+    <*> tfield _goCaseBranches numProbCodec "caseBranches"
+    <*> tfield _goLValues numProbCodec "lvalues"
+    <*> tfield _goAttributes numProbCodec "attribute.count"
+    <*> tfield _goPaths numProbCodec "paths"
+    <*> tfield _goDelay catProbCodec "delay.length"
+    <*> dfield _goMinTypMax "expr.Mtm_single"
+    <*> tfield _goRangeExpr catProbCodec "expr.range.distrib"
+    <*> dfield _goRangeOffsetPos_Neg "expr.range.offsetPos_Neg "
+    <*> tfield _goDimensions numProbCodec "dimensions"
+    <*> dfield _goSignedness "signedness"
+    <*> tfield _goExpression catProbCodec "expr.distrib"
+    <*> tfield _goConcatenations numProbCodec "expr.concatLength"
+    <*> tfield _goUnaryOperation catProbCodec "expr.unary"
+    <*> tfield _goBinaryOperation catProbCodec "expr.binary"
+    <*> tfield _goPrimary catProbCodec "expr.primary.distrib"
+    <*> tfield _goIntRealIdent catProbCodec "delay.base"
+    <*> dfield _goEscaped_Simple "ident.escaped_simple"
+    <*> tfield _goSimpleLetters numProbCodec "ident.simple.length"
+    <*> tfield _goSimpleLetter catProbCodec "ident.simple.character"
+    <*> tfield _goEscapedLetters numProbCodec "ident.escaped.length"
+    <*> tfield _goEscapedLetter catProbCodec "ident.escaped.character"
+    <*> tfield _goSystemLetters numProbCodec "ident.system.length"
+    <*> tfield _goLiteralWidth catProbCodec "expr.primary.width"
+    <*> tfield _goStringCharacters numProbCodec "expr.primary.string.length"
+    <*> tfield _goStringCharacter catProbCodec "expr.primary.string.character"
+    <*> dfield _goFixed_Floating "expr.primary.real.fixed_floating"
+    <*> tfield _goExponentSign catProbCodec "expr.primary.real.exponentSign"
+    <*> dfield _goX_Z "expr.primary.X_Z"
+    <*> tfield _goBinarySymbols numProbCodec "expr.primary.binary.length"
+    <*> tfield _goBinarySymbol catProbCodec "expr.primary.binary.digit"
+    <*> tfield _goOctalSymbols numProbCodec "expr.primary.octal.length"
+    <*> tfield _goOctalSymbol catProbCodec "expr.primary.octal.digit"
+    <*> tfield _goDecimalSymbols numProbCodec "expr.primary.decimal.length"
+    <*> tfield _goDecimalSymbol catProbCodec "expr.primary.decimal.digit"
+    <*> tfield _goHexadecimalSymbols numProbCodec "expr.primary.hexadecimal.length"
+    <*> tfield _goHexadecimalSymbol catProbCodec "expr.primary.hexadecimal.digit"
+  where
+    tfield p c n = defaultValue (p $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
+    dfield p n = defaultValue (p $ _configGarbageGenerator defaultConfig) (Toml.double n) .= p
+
 simulator :: TomlCodec SimDescription
 simulator = Toml.textBy pprint parseIcarus "name"
   where
@@ -606,6 +1100,10 @@ configCodec =
       (defaultConfig ^. configProperty)
       (Toml.table propCodec "property")
     .= _configProperty
+    <*> defaultValue
+      (defaultConfig ^. configGarbageGenerator)
+      (Toml.table garbageCodec "invalid_generator")
+    .= _configGarbageGenerator
     <*> defaultValue
       (defaultConfig ^. configSimulators)
       (Toml.list simulator "simulator")

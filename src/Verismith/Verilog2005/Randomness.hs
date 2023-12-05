@@ -8,11 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Verismith.Verilog2005.Randomness
-  ( NumberProbability (..),
-    CategoricalProbability (..),
-    uniformCP,
-    -- Bare sampler
-    sampleCategoricalProbability,
+  ( sampleCategoricalProbability,
     sampleNumberProbability,
     sampleIn,
     sampleInString,
@@ -41,10 +37,12 @@ import Control.Monad.Reader
 import qualified Data.ByteString as B
 import Data.List
 import Data.List.NonEmpty (NonEmpty (..), toList)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Vector as V
 import Data.Vector.Mutable (PrimMonad, PrimState, RealWorld)
 import Data.Word
 import System.Random.MWC.Probability
+import Verismith.Config (CategoricalProbability (..), NumberProbability (..), uniformCP)
 import Verismith.Utils (nonEmpty)
 
 infixl 4 <.>
@@ -54,38 +52,6 @@ infixl 4 <.>
 
 icast :: (Integral a, Num b) => a -> b
 icast = fromIntegral . toInteger
-
-data NumberProbability
-  = NPUniform
-      { _NPULow :: !Int,
-        _NPUHigh :: !Int
-      }
-  | NPBinomial
-      { _NPBOffset :: !Int,
-        _NPBTrials :: !Int,
-        _NPBPSuccess :: !Double
-      }
-  | NPNegativeBinomial -- Geometric is negative binomial with 1 failure
-      { _NPNBOffset :: !Int,
-        _NPNBFailRate :: !Double,
-        _NPNBFailure :: !Int
-      }
-  | NPPoisson
-      { _NPPOffset :: !Int,
-        _NPPParam :: !Double
-      }
-  | NPDiscrete ![(Double, Int)] -- Weight, outcome index
-  | NPLinearComb ![(Double, NumberProbability)]
-
-data CategoricalProbability
-  = CPDiscrete ![Double]
-  | CPBiasedUniform
-      { _CPBUBiases :: ![(Double, Int)],
-        _CPBUUniformWeight :: Double
-      }
-
-uniformCP :: CategoricalProbability
-uniformCP = CPBiasedUniform [] 1
 
 avoid :: [Int] -> Int -> Int
 avoid l x = case l of
@@ -108,7 +74,7 @@ sampleCategoricalProbability ::
   PrimMonad m => Int -> Gen (PrimState m) -> CategoricalProbability -> m Int
 sampleCategoricalProbability t gen d = case d of
   CPDiscrete l ->
-    let ll = take (t + 1) l
+    let ll = NE.take (t + 1) l
      in case ll of
           [] -> error "Probability vector cannot be empty"
           [x] -> return 0
@@ -224,7 +190,7 @@ sampleFiltered p t l = do
   case d of
     CPDiscrete l ->
       avoid ll
-        <$> sample (discrete $ deleteFirstOrdered snd id (zip (take (t + 1) l) [0 .. t]) ll) gen
+        <$> sample (discrete $ deleteFirstOrdered snd id (zip (NE.take (t + 1) l) [0 .. t]) ll) gen
     CPBiasedUniform l' b ->
       let ll' = deleteFirstOrdered snd id (clean t l') ll
           uw = icast (t - length ll - length ll') * b

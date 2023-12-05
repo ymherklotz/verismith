@@ -5,14 +5,20 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
+{-# LANGUAGE TemplateHaskell #-}
 
 module Verismith.Verilog2005.PrettyPrinter
   ( genSource,
     LocalCompDir (..),
     lcdDefault,
+    lcdTimescale,
+    lcdCell,
+    lcdPull,
+    lcdDefNetType,
   )
 where
 
+import Control.Lens.TH
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import Data.ByteString.Internal
@@ -30,26 +36,26 @@ import Verismith.Verilog2005.Utils
 
 -- | All locally applicable properties controlled by compiler directives
 data LocalCompDir = LocalCompDir
-  { _LCDTimescale :: Maybe (Int, Int),
-    _LCDCell :: Bool,
-    _LCDPull :: Maybe Bool,
-    _LCDDefNetType :: Maybe NetType
+  { _lcdTimescale :: Maybe (Int, Int),
+    _lcdCell :: Bool,
+    _lcdPull :: Maybe Bool,
+    _lcdDefNetType :: Maybe NetType
   }
 
-lcdDefault =
-  LocalCompDir
-    { _LCDTimescale = Nothing,
-      _LCDCell = False,
-      _LCDPull = Nothing,
-      _LCDDefNetType = Just NTWire
-    }
+$(makeLenses ''LocalCompDir)
 
+lcdDefault :: LocalCompDir
+lcdDefault = LocalCompDir Nothing False Nothing $ Just NTWire
+
+-- | Generates a string from a line length limit and a Verilog AST
 genSource :: Maybe Word -> Verilog2005 -> LB.ByteString
 genSource mw = layout mw . prettyVerilog2005
 
+-- | Comma separated concatenation
 (<.>) :: Doc -> Doc -> Doc
 (<.>) a b = a <> comma <+> b
 
+-- | [] {} ()
 brk :: Doc -> Doc
 brk = encl lbracket rbracket
 
@@ -59,12 +65,21 @@ brc = encl lbrace rbrace
 par :: Doc -> Doc
 par = encl lparen rparen
 
+-- | Print only if boolean is false
 piff :: Doc -> Bool -> Doc
 piff d c = if c then mempty else d
 
+-- | Print only if boolean is true
 pift :: Doc -> Bool -> Doc
 pift d c = if c then d else mempty
 
+-- | Print a list of stuff by grouping the consecutive ones if they can
+-- | first argument is the combination function for elements that cannot be grouped
+-- | second is the printing for a group
+-- | third is the creation of a group from a single element
+-- | fourth is the addition of an element in a group
+-- | fifth is the list of elements
+-- TODO: Reverse the order by using foldr
 prettyXregroup ::
   Foldable f =>
   (Doc -> Doc -> Doc) ->
@@ -85,38 +100,66 @@ prettyXregroup g c mk f =
   where
     collapse md a = let d' = c a in maybe d' (g d') md
 
+-- | Same as above but groups are separated by a line break
 prettyregroup :: Foldable f => (y -> Doc) -> (x -> y) -> (x -> y -> Maybe y) -> f x -> Doc
 prettyregroup = prettyXregroup (<#>)
 
+-- | The core difficulty of this pretty printer:
+-- | Identifier can be escaped, escaped identifiers require a space or newline after them
+-- | but I want to avoid double [spaces/line breaks] and spaces at the end of a line
+-- | And this problem creeps in every AST node with possible identifier printed at the end
+-- | like expressions
+-- | So a prettyprinter that takes an AST node of type `a` has this type
+-- | The first argument is the space that could follow the non-escaped identifier
+-- | The second element of the result pair is the thing follows the first element
+-- | unless what is next is a space or a newline
 type PrettyIdent a = Doc -> a -> (Doc, Doc)
 
+-- | Evaluates a PrettyIdent and collapse the last character
+-- | This version asks for a breakable space
 psp :: PrettyIdent a -> a -> Doc
 psp f = uncurry (<>) . f newline
 
+-- | This version asks for a breakable non-space
 padj :: PrettyIdent a -> a -> Doc
 padj f = uncurry (<>) . f softline
 
+-- | This version inserts a group from which the last space is excluded
+-- | Useful to separate the break priority of the inside and outside space
 gpsp :: PrettyIdent a -> a -> Doc
 gpsp f = uncurry ((<>) . group) . f newline
 
+-- | Same
 gpadj :: PrettyIdent a -> a -> Doc
 gpadj f = uncurry ((<>) . group) . f softline
 
+-- | In this version the group asks for raising the indentation level
 ngpadj :: PrettyIdent a -> a -> Doc
 ngpadj f = uncurry ((<>) . ng) . f softline
 
+-- | Just inserts a group before the last space of a PrettyIdent
+-- | Useful to separate the break priority of the inside and outside space
 mkg :: PrettyIdent x -> PrettyIdent x
 mkg f s = first group . f s
 
+-- | In this version the group asks for raising the indentation level
 mkng :: PrettyIdent x -> PrettyIdent x
 mkng f s = first ng . f s
 
+-- | Print a comma separated list, haskell style: `a, b, c` or
+-- | ```
+-- | a
+-- | , b
+-- | , c
+-- | ```
 csl :: Foldable f => Doc -> Doc -> (a -> Doc) -> f a -> Doc
 csl = pf $ \a b -> a </> comma <+> b
 
+-- TODO: use foldr
 csl1 :: (a -> Doc) -> NonEmpty a -> Doc
 csl1 f (h :| t) = foldl (\b a -> b </> comma <+> f a) (f h) t
 
+-- TODO: remove and use the non reversed version
 rcsl :: Foldable f => Doc -> Doc -> (a -> Doc) -> f a -> Doc
 rcsl = pf $ \a b -> b </> comma <+> a
 
@@ -161,7 +204,13 @@ prettyHierIdent s (HierIdent p i) =
 
 prettyDot1Ident :: PrettyIdent Dot1Ident
 prettyDot1Ident s (Dot1Ident h t) =
-  maybe (prettyIdent s h) (first (\i -> padj prettyIdent h <> dot <> i) . prettyIdent s) t
+  ( case h of
+      Nothing -> ft
+      Just h -> padj prettyIdent h <> dot <> ft,
+    st
+  )
+  where
+    (ft, st) = prettyIdent s t
 
 pidWith :: PrettyIdent a -> Doc -> Doc -> PrettyIdent a
 pidWith f si d so i = if nullDoc d then f so i else (uncurry (<>) (f si i) <> d, so)
@@ -1486,7 +1535,7 @@ prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a i pi pd params lp d sp
               ( \(Attributed na (SpecParam nrng d)) (Attributed a (rng, l)) ->
                   if na == a && nrng == rng then Just $ Attributed a (rng, d <| l) else Nothing
               )
-              sp
+              (reverse sp)
             <?#> prettyPortDecls pd
             <?#> prettyModGenDecls d
             <?#> prettyModuleItems b
@@ -1519,7 +1568,7 @@ prettySeqRows l@(h :| t) =
               msl >>= \sl ->
                 if totallength sr /= tl
                   then Nothing
-                  else case _SRowInput sr of
+                  else case _srowInput sr of
                     SISeq l0 e l1 ->
                       let w = edgeprintsize e
                           spliceputat n l =
@@ -1543,7 +1592,7 @@ prettySeqRows l@(h :| t) =
                        in spliceputat (length l0) sl
                     SIComb l -> Just sl
           )
-          ( Just $ case _SRowInput h of
+          ( Just $ case _srowInput h of
               SISeq l0 e l1 -> [Left $ length l0, Right $ edgeprintsize e, Left $ length l1]
               SIComb l -> [Left $ length l]
           )

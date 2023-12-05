@@ -7,21 +7,21 @@
 -- Portability : POSIX
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-
--- {-# LANGUAGE TemplateHaskell #-} for lenses, later
--- {-# LANGUAGE TypeFamilies #-} for lenses, later
+{-# LANGUAGE TemplateHaskell #-}
 
 module Verismith.Verilog2005.AST
   ( GenMinTypMax (..),
     MinTypMax,
     CMinTypMax,
     Identified (..),
+    identIdent,
     defaultIdM,
     UnaryOperator (..),
     BinaryOperator (..),
     Number (..),
     GenPrim (..),
     HierIdent (..),
+    hiPath,
     GenDimRange (..),
     DimRange (..),
     CDimRange (..),
@@ -31,6 +31,7 @@ module Verismith.Verilog2005.AST
     Attribute (..),
     Attributed (..),
     AttrIded (..),
+    aiData,
     Dir (..),
     Range2 (..),
     GenRangeExpr (..),
@@ -78,6 +79,7 @@ module Verismith.Verilog2005.AST
     SpecPath (..),
     SpecifyItem (..),
     ParamOver (..),
+    poIdent,
     SpecParamDecl (..),
     SpecParam (..),
     NetKind (..),
@@ -94,6 +96,7 @@ module Verismith.Verilog2005.AST
     GenerateItem (..),
     GenerateBlock (..),
     ModuleBlock (..),
+    mbIdent,
     SigLevel (..),
     ZOX (..),
     CombRow (..),
@@ -102,10 +105,14 @@ module Verismith.Verilog2005.AST
     SeqRow (..),
     PrimTable (..),
     PrimitiveBlock (..),
+    pbIdent,
     Dot1Ident (..),
     LLU (..),
     ConfigItem (..),
+    ciCell_inst,
     ConfigBlock (..),
+    cbIdent,
+    cbBody,
     Verilog2005 (..),
     SourceInfo (..),
     SystemFunction (..),
@@ -117,9 +124,10 @@ module Verismith.Verilog2005.AST
   )
 where
 
+import Control.Lens
 import Data.ByteString (ByteString)
-import Data.ByteString.Internal
 import Data.Data
+import Data.Data.Lens
 import qualified Data.HashMap.Strict as HashMap
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Vector.Unboxed as V
@@ -142,10 +150,10 @@ type CMinTypMax = GenMinTypMax CExpr
 type MinTypMax = GenMinTypMax Expr
 
 -- | Quickly add an identifier to all members of a sum type, other uses are discouraged
-data Identified t = Identified {_IdentIdent :: !ByteString, _IdentData :: !t}
+data Identified t = Identified {_identIdent :: !ByteString, _identData :: !t}
   deriving (Show, Eq, Ord, Data, Generic)
 
-defaultIdM = Identified {_IdentIdent = "", _IdentData = Nothing}
+defaultIdM = Identified "" Nothing
 
 -- | Unary operators
 data UnaryOperator
@@ -268,7 +276,7 @@ data GenPrim i r
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Hierarchical identifier
-data HierIdent = HierIdent {_HIPath :: ![Identified (Maybe CExpr)], _HIIdent :: !ByteString}
+data HierIdent = HierIdent {_hiPath :: ![Identified (Maybe CExpr)], _hiIdent :: !ByteString}
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Indexing for dimension and range
@@ -280,12 +288,6 @@ newtype DimRange = DimRange (GenDimRange Expr)
 
 newtype CDimRange = CDimRange (GenDimRange CExpr)
   deriving (Show, Eq, Ord, Data, Generic)
-
--- $(makePlates ''GenPrim)
-
--- $(makePlates ''GenExpr)
-
--- $(makePlates ''GenDimRange)
 
 -- | Parametric expression
 data GenExpr i r
@@ -318,17 +320,11 @@ newtype Expr = Expr (GenExpr HierIdent (Maybe DimRange))
 -- | Attributes which can be set to various nodes in the AST.
 type Attribute = Identified (Maybe CExpr)
 
-data Attributed t = Attributed {_AttrAttr :: ![Attribute], _AttrData :: !t}
+data Attributed t = Attributed {_attrAttr :: ![Attribute], _attrData :: !t}
   deriving (Show, Eq, Ord, Data, Generic)
 
-data AttrIded t = AttrIded {_AIAttr :: ![Attribute], _AIIdent :: !ByteString, _AIData :: !t}
+data AttrIded t = AttrIded {_aiAttr :: ![Attribute], _aiIdent :: !ByteString, _aiData :: !t}
   deriving (Show, Eq, Ord, Data, Generic)
-
--- $(makePlates ''Identified)
-
--- $(makePlates ''Attributed)
-
--- $(makePlates ''AttrIded)
 
 -- | Directions
 data Dir = DirIn | DirOut | DirInOut
@@ -485,8 +481,6 @@ type NetLValue = LValue CDimRange
 
 type VarLValue = LValue DimRange
 
--- $(makePlates ''LValue)
-
 -- | Net assignment
 data NetAssign = NetAssign {_NALValue :: !NetLValue, _NAValue :: !Expr}
   deriving (Show, Eq, Ord, Data, Generic)
@@ -535,16 +529,6 @@ data ProcContAssign
   | PCAForce !(Either VarAssign NetAssign)
   | PCARelease !(Either VarLValue NetLValue)
   deriving (Show, Eq, Ord, Data, Generic)
-
--- $(makePlates ''NetAssign)
-
--- $(makePlates ''VarAssign)
-
--- $(makePlates ''ParamAssign)
-
--- $(makePlates ''PortAssign)
-
--- $(makePlates ''ProcContAssign)
 
 -- | Loop statement
 data LoopStatement
@@ -616,10 +600,6 @@ data Statement
 type AttrStmt = Attributed Statement
 
 type MybStmt = Attributed (Maybe Statement)
-
--- $(makePlates ''CaseItem)
-
--- $(makePlates ''Statement)
 
 -- | N-input logic gate types
 data NInputType = NITAnd | NITOr | NITXor
@@ -814,9 +794,9 @@ data SpecifyItem
 
 -- | Parameter override
 data ParamOver = ParamOver
-  { _POAttr :: ![Attribute],
-    _POIdent :: !HierIdent,
-    _POValue :: !CMinTypMax
+  { _poAttr :: ![Attribute],
+    _poIdent :: !HierIdent,
+    _poValue :: !CMinTypMax
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
@@ -968,6 +948,9 @@ data ModGenItem
       }
   deriving (Show, Eq, Ord, Data, Generic)
 
+instance Plated ModGenItem where
+  plate = uniplate
+
 -- | Module item: body of module
 data ModuleItem
   = MIMGI !(Attributed ModGenItem)
@@ -978,22 +961,12 @@ data ModuleItem
       }
   deriving (Show, Eq, Ord, Data, Generic)
 
--- $(makePlates ''BlockDecl)
-
--- $(makePlates ''ModGenDecl)
-
--- $(makePlates ''GenCaseItem)
-
--- $(makePlates ''ModGenItem)
-
--- $(makePlates ''ModuleItem)
-
 -- | Parameter
 data Parameter = Parameter
-  { _ParamAttr :: ![Attribute],
-    _ParamIdent :: !ByteString,
-    _ParamType :: !FunParType,
-    _ParamValue :: !CMinTypMax
+  { _paramAttr :: ![Attribute],
+    _paramIdent :: !ByteString,
+    _paramType :: !FunParType,
+    _paramValue :: !CMinTypMax
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
@@ -1030,8 +1003,6 @@ data GenerateRegion = GenerateRegion
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
--- $(makePlates ''GenerateRegion)
-
 instance Semigroup GenerateRegion where
   (<>) gra grb =
     GenerateRegion
@@ -1052,41 +1023,43 @@ data GenerateItem
   | GIMGI !(NonEmpty (Attributed ModGenItem))
   deriving (Show, Eq, Ord, Data, Generic)
 
--- $(makePlates ''GenerateItem)
-
 -- | GenerateBlock
 data GenerateBlock = GBSingle !GenerateItem | GBBlock !(Identified GenerateRegion)
   deriving (Show, Eq, Ord, Data, Generic)
 
+-- TODO upwards
+
+-- $(makeLenses '')
+
+-- $(makePrisms '')
+
 -- | Module block
 data ModuleBlock = ModuleBlock
-  { _MBAttr :: ![Attribute],
-    _MBIdent :: !ByteString,
-    _MBPortInter :: ![Identified [Identified (Maybe CRangeExpr)]],
-    _MBPortDecl :: ![AttrIded PortDecl],
-    _MBParam :: ![Parameter],
-    _MBLocalParam :: ![Parameter],
-    _MBDecl :: ![AttrIded ModGenDecl],
-    _MBSpecParam :: ![Attributed SpecParam],
-    _MBBody :: ![ModuleItem],
-    _MBTimescale :: !(Maybe (Int, Int)),
-    _MBCell :: !Bool,
-    _MBPull :: !(Maybe Bool),
-    _MBDefNetType :: !(Maybe NetType)
+  { _mbAttr :: ![Attribute],
+    _mbIdent :: !ByteString,
+    _mbPortInter :: ![Identified [Identified (Maybe CRangeExpr)]],
+    _mbPortDecl :: ![AttrIded PortDecl],
+    _mbParam :: ![Parameter],
+    _mbLocalParam :: ![Parameter],
+    _mbDecl :: ![AttrIded ModGenDecl],
+    _mbSpecParam :: ![Attributed SpecParam],
+    _mbBody :: ![ModuleItem],
+    _mbTimescale :: !(Maybe (Int, Int)),
+    _mbCell :: !Bool,
+    _mbPull :: !(Maybe Bool),
+    _mbDefNetType :: !(Maybe NetType)
   }
   deriving (Show, Eq, Ord, Data, Generic)
-
--- $(makePlates ''ModuleBlock)
 
 instance Semigroup ModuleBlock where
   (<>) mba mbb =
     mba
-      { _MBPortDecl = _MBPortDecl mba <> _MBPortDecl mbb,
-        _MBParam = _MBParam mba <> _MBParam mbb,
-        _MBLocalParam = _MBLocalParam mba <> _MBLocalParam mbb,
-        _MBDecl = _MBDecl mba <> _MBDecl mbb,
-        _MBSpecParam = _MBSpecParam mba <> _MBSpecParam mbb,
-        _MBBody = _MBBody mba <> _MBBody mbb
+      { _mbPortDecl = _mbPortDecl mba <> _mbPortDecl mbb,
+        _mbParam = _mbParam mba <> _mbParam mbb,
+        _mbLocalParam = _mbLocalParam mba <> _mbLocalParam mbb,
+        _mbDecl = _mbDecl mba <> _mbDecl mbb,
+        _mbSpecParam = _mbSpecParam mba <> _mbSpecParam mbb,
+        _mbBody = _mbBody mba <> _mbBody mbb
       }
 
 instance Monoid ModuleBlock where
@@ -1100,7 +1073,7 @@ instance Show SigLevel where
   show x = case x of L0 -> "0"; L1 -> "1"; LX -> "x"; LQ -> "?"; LB -> "b"
 
 -- | Combinatorial table row
-data CombRow = CombRow {_CRInput :: !(NonEmpty SigLevel), _CROutput :: !ZOX}
+data CombRow = CombRow {_crInput :: !(NonEmpty SigLevel), _crOutput :: !ZOX}
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Edge specifier
@@ -1130,9 +1103,9 @@ instance Show SeqIn where
 
 -- | Sequential table row
 data SeqRow = SeqRow
-  { _SRowInput :: !SeqIn,
-    _SRowState :: !SigLevel,
-    _SRowNext :: !(Maybe ZOX)
+  { _srowInput :: !SeqIn,
+    _srowState :: !SigLevel,
+    _srowNext :: !(Maybe ZOX)
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
@@ -1140,75 +1113,95 @@ data SeqRow = SeqRow
 data PrimTable
   = CombTable !(NonEmpty CombRow)
   | SeqTable
-      { _STReg :: !(Either CExpr [Attribute]),
-        _STInit :: !(Maybe ZOX),
-        _STRow :: !(NonEmpty SeqRow)
+      { _stReg :: !(Either CExpr [Attribute]),
+        _stInit :: !(Maybe ZOX),
+        _stRow :: !(NonEmpty SeqRow)
       }
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Primitive block
 data PrimitiveBlock = PrimitiveBlock
-  { _PBAttr :: ![Attribute],
-    _PBIdent :: !ByteString,
-    _PBOutput :: !([Attribute], ByteString),
-    _PBInput :: !(NonEmpty ([Attribute], ByteString)),
-    _PBBody :: !PrimTable
+  { _pbAttr :: ![Attribute],
+    _pbIdent :: !ByteString,
+    _pbOutput :: !([Attribute], ByteString),
+    _pbInput :: !(NonEmpty ([Attribute], ByteString)),
+    _pbBody :: !PrimTable
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
-data Dot1Ident = Dot1Ident ByteString (Maybe ByteString)
+data Dot1Ident = Dot1Ident {_d1iLib :: !(Maybe ByteString), _d1iCell :: !ByteString}
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Liblist or Use
 data LLU
   = LLULiblist ![ByteString]
   | LLUUse
-      { _LLUUIdent :: !Dot1Ident,
-        _LLUUConfig :: !Bool
+      { _lluUIdent :: !Dot1Ident,
+        _lluUConfig :: !Bool
       }
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Items in a config block
 data ConfigItem = ConfigItem
-  { _CICell_inst :: !(Either Dot1Ident (NonEmpty ByteString)),
-    _CILLU :: !LLU
+  { _ciCell_inst :: !(Either Dot1Ident (NonEmpty ByteString)),
+    _ciLLU :: !LLU
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Config Block: Identifier, Design lines, Configuration items
 data ConfigBlock = ConfigBlock
-  { _CBIdent :: !ByteString,
-    _CBDesign :: ![Dot1Ident],
-    _CBBody :: ![ConfigItem],
-    _CBDef :: ![ByteString]
+  { _cbIdent :: !ByteString,
+    _cbDesign :: ![Dot1Ident],
+    _cbBody :: ![ConfigItem],
+    _cbDef :: ![ByteString]
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Internal representation of Verilog2005 AST
 data Verilog2005 = Verilog2005
-  { _VModule :: ![ModuleBlock],
-    _VDefParam :: ![ParamOver],
-    _VPrimitive :: ![PrimitiveBlock],
-    _VConfig :: ![ConfigBlock]
+  { _vModule :: ![ModuleBlock],
+    _vDefParam :: ![ParamOver],
+    _vPrimitive :: ![PrimitiveBlock],
+    _vConfig :: ![ConfigBlock]
   }
   deriving (Show, Eq, Ord, Data, Generic)
 
 instance Semigroup Verilog2005 where
   (<>) v2a v2b =
-    Verilog2005
-      { _VModule = _VModule v2a <> _VModule v2b,
-        _VDefParam = _VDefParam v2a <> _VDefParam v2b,
-        _VPrimitive = _VPrimitive v2a <> _VPrimitive v2b,
-        _VConfig = _VConfig v2a <> _VConfig v2b
+    v2a
+      { _vModule = _vModule v2a <> _vModule v2b,
+        _vDefParam = _vDefParam v2a <> _vDefParam v2b,
+        _vPrimitive = _vPrimitive v2a <> _vPrimitive v2b,
+        _vConfig = _vConfig v2a <> _vConfig v2b
       }
 
 instance Monoid Verilog2005 where
   mempty = Verilog2005 [] [] [] []
 
 data SourceInfo = SourceInfo
-  { _SrcTopModule :: ByteString,
-    _SrcSource :: Verilog2005
+  { _srcTopModule :: ByteString,
+    _srcSource :: Verilog2005
   }
+
+$(makeLenses ''Identified)
+$(makeLenses ''HierIdent)
+$(makeLenses ''Attributed)
+$(makeLenses ''AttrIded)
+$(makeLenses ''ParamOver)
+$(makeLenses ''Parameter)
+$(makeLenses ''ModuleBlock)
+$(makeLenses ''CombRow)
+$(makeLenses ''SeqRow)
+$(makeLenses ''PrimTable)
+$(makePrisms ''PrimTable)
+$(makeLenses ''PrimitiveBlock)
+$(makeLenses ''Dot1Ident)
+$(makeLenses ''LLU)
+$(makePrisms ''LLU)
+$(makeLenses ''ConfigItem)
+$(makeLenses ''ConfigBlock)
+$(makeLenses ''Verilog2005)
+$(makeLenses ''SourceInfo)
 
 data Logic = LAnd | LOr | LNand | LNor
   deriving (Eq, Data)

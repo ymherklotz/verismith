@@ -19,6 +19,7 @@ module Verismith.Utils
     liftA4,
     liftA5,
     mkpair,
+    uncurry3,
     safe,
     showT,
     showBS,
@@ -74,6 +75,9 @@ liftA5 f a b c d e = liftA4 f a b c d <*> e
 
 mkpair :: Applicative f => f a -> f b -> f (a, b)
 mkpair = liftA2 (,)
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (a, b, c) = f a b c
 
 generateByteString :: (Maybe Int) -> Int -> Int -> IO [ByteString]
 generateByteString mseed size n = do
