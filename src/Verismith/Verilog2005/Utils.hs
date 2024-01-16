@@ -6,95 +6,386 @@
 -- Stability   : experimental
 -- Portability : POSIX
 
+{-# LANGUAGE OverloadedLists #-}
+
 module Verismith.Verilog2005.Utils
-  ( stmtDanglingElse,
-    genDanglingElse,
-    hierIdentFirst,
-    getModuleParamTopNames,
+  ( regroup,
+    addAttributed,
+    genexprnumber,
+    constifyIdent,
+    trConstifyGenExpr,
+    constifyExpr,
+    constifyLV,
+    expr2netlv,
+    netlv2expr,
+    toStatement,
+    fromStatement,
+    fromMybStmt,
+    toMGIBlockDecl,
+    fromMGIBlockDecl1,
+    fromMGIBlockDecl_add,
+    toStdBlockDecl,
+    toBlockedItem,
+    fromBlockedItem1,
+    fromBlockedItem_add,
+    fromBlockedItem,
   )
 where
 
-import Control.Lens
+import Numeric.Natural
+import Data.Functor.Compose
+import Data.Functor.Identity
 import qualified Data.ByteString as BS
 import qualified Data.HashSet as HS
-import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty (..), (<|))
+import qualified Data.List.NonEmpty as NE
 import Verismith.Verilog2005.AST
+import Verismith.Utils (foldrMap1)
+
 
 -- AST utils
 
--- | Checks if there is a dangling else
-stmtDanglingElse :: MybStmt -> MybStmt -> Bool
-stmtDanglingElse fb (Attributed _ tb) = case tb of
-  Just (SProcTimingControl _ s) -> stmtDanglingElse fb s
-  Just (SWait _ s) -> stmtDanglingElse fb s
-  Just (SLoop _ (Attributed a s)) -> stmtDanglingElse fb $ Attributed a $ Just s
-  Just (SIf _ _ tfb) -> (fb == Attributed [] Nothing) /= (tfb == Attributed [] Nothing)
-  _ -> False
+-- | Groups `x`s into `y`s by converting a single `x` and merging previous `x`s to the result
+regroup :: (x -> y) -> (x -> y -> Maybe y) -> NonEmpty x -> NonEmpty y
+regroup mk add = foldrMap1 ((:|[]) . mk) (\e (h :| t) -> maybe (mk e :| h : t) (:| t) $ add e h)
 
-genDanglingElse :: Maybe GenerateBlock -> Maybe GenerateBlock -> Bool
-genDanglingElse fb tb = case tb of
-  Just (GBSingle (GIMGI (Attributed _ (MGILoopGen _ _ _ s) :| []))) -> genDanglingElse fb $ Just s
-  Just (GBSingle (GIMGI (Attributed _ (MGIIf _ _ tfb) :| []))) -> (fb == Nothing) /= (tfb == Nothing)
-  _ -> False
+-- | Merges `Attributed x`s if we can merge `x`s
+addAttributed :: (x -> y -> Maybe y) -> Attributed x -> Attributed y -> Maybe (Attributed y)
+addAttributed f (Attributed na x) (Attributed a y) =
+  if a /= na then Nothing else Attributed a <$> f x y
 
--- | Access the first name of a hierarchical identifier
-hierIdentFirst :: Lens' HierIdent BS.ByteString
-hierIdentFirst =
-  lens
-    (\(HierIdent p i) -> case p of [] -> i; Identified h _ : _ -> h)
-    ( \(HierIdent p i) x -> case p of
-        [] -> HierIdent p x
-        Identified h m : t -> HierIdent (Identified x m : t) i
-    )
+-- | Makes a Verilog2005 expression out of a number
+genexprnumber :: Natural -> GenExpr i r
+genexprnumber = ExprPrim . PrimNumber Nothing False . NDecimal
 
-addGBParamTopNames :: HS.HashSet BS.ByteString -> GenerateBlock -> HS.HashSet BS.ByteString
-addGBParamTopNames s mgi = case mgi of
-  GBSingle gi -> case gi of
-    GIParam lp -> foldl' (\s p -> HS.insert (_paramIdent p) s) s lp
-    GIMGD lmgd -> foldl' addMGDParamTopNames s lmgd
-    GIMGI lmgi -> foldl' (\s (Attributed _ mgi) -> addMGIParamTopNames s mgi) s lmgi
-    _ -> s
-  GBBlock (Identified n gr) -> if BS.null n then addGRParamTopNames s gr else HS.insert n s
+-- | converts HierIdent into Identifier
+constifyIdent :: HierIdent -> Maybe Identifier
+constifyIdent (HierIdent p i) = case p of [] -> Just i; _ -> Nothing
 
-addGRParamTopNames :: HS.HashSet BS.ByteString -> GenerateRegion -> HS.HashSet BS.ByteString
-addGRParamTopNames s (GenerateRegion _ _ d b) =
-  foldl' addMGDParamTopNames (foldl' (\s (Attributed _ mgi) -> addMGIParamTopNames s mgi) s b) d
+-- | the other way
+unconstIdent :: Identifier -> HierIdent
+unconstIdent = HierIdent []
 
-addMGIParamTopNames :: HS.HashSet BS.ByteString -> ModGenItem -> HS.HashSet BS.ByteString
-addMGIParamTopNames s mgi = case mgi of
-  MGIModInst _ _ n _ _ -> HS.insert n s
-  MGIUnknownInst _ _ n _ _ _ -> HS.insert n s
-  MGILoopGen _ _ _ gb -> addGBParamTopNames s gb
-  MGIIf _ tgb fgb -> fromMGB (fromMGB s fgb) tgb
-  MGICase _ lgci mgb -> foldl' (\s (GenCaseItem _ mgb) -> fromMGB s mgb) (fromMGB s mgb) lgci
-  _ -> s
+-- | converts Prim into GenPrim i r
+constifyGenPrim ::
+  (HierIdent -> Maybe i) ->
+  (Maybe DimRange -> Maybe r) ->
+  GenPrim HierIdent (Maybe DimRange) ->
+  Maybe (GenPrim i r)
+constifyGenPrim fi fr x = case x of
+  PrimNumber s b n -> Just $ PrimNumber s b n
+  PrimReal s -> Just $ PrimReal s
+  PrimIdent s rng -> PrimIdent <$> fi s <*> fr rng
+  PrimConcat e -> PrimConcat <$> mapM ce e
+  PrimMultConcat m e -> PrimMultConcat m <$> mapM ce e
+  PrimFun s a e -> PrimFun <$> fi s <*> pure a <*> mapM ce e
+  PrimSysFun s e -> PrimSysFun s <$> mapM ce e
+  PrimMinTypMax (MTMSingle e) -> PrimMinTypMax . MTMSingle <$> ce e
+  PrimMinTypMax (MTMFull l t h) -> PrimMinTypMax <$> (MTMFull <$> ce l <*> ce t <*> ce h)
+  PrimString s -> Just $ PrimString s
   where
-    fromMGB s mgb = case mgb of
-      Nothing -> s
-      Just gb -> addGBParamTopNames s gb
+    ce = trConstifyGenExpr fi fr
 
-addMGDParamTopNames :: HS.HashSet BS.ByteString -> AttrIded ModGenDecl -> HS.HashSet BS.ByteString
-addMGDParamTopNames s (AttrIded _ n mgd) = case mgd of
-  MGDTask _ _ _ _ _ _ -> HS.insert n s
-  MGDFunc _ _ _ _ _ _ _ -> HS.insert n s
-  _ -> s
+-- | the other way
+unconstPrim :: GenPrim Identifier (Maybe CRangeExpr) -> GenPrim HierIdent (Maybe DimRange)
+unconstPrim x = case x of
+  PrimNumber s b n -> PrimNumber s b n
+  PrimReal s -> PrimReal s
+  PrimIdent s rng -> PrimIdent (unconstIdent s) (GenDimRange [] . unconstRange <$> rng)
+  PrimConcat e -> PrimConcat (NE.map trUnconstExpr e)
+  PrimMultConcat m e -> PrimMultConcat m (NE.map trUnconstExpr e)
+  PrimFun s a e -> PrimFun (unconstIdent s) a (map trUnconstExpr e)
+  PrimSysFun s e -> PrimSysFun s (map trUnconstExpr e)
+  PrimMinTypMax (MTMSingle e) -> PrimMinTypMax (MTMSingle (trUnconstExpr e))
+  PrimMinTypMax (MTMFull l t h) ->
+    PrimMinTypMax $ MTMFull (trUnconstExpr l) (trUnconstExpr t) (trUnconstExpr h)
+  PrimString s -> PrimString s
 
-getModuleParamTopNames :: ModuleBlock -> HS.HashSet BS.ByteString
-getModuleParamTopNames (ModuleBlock _ _ _ _ p _ d _ b _ _ _ _) =
-  foldl'
-    (\s p -> HS.insert (_paramIdent p) s)
-    ( foldl'
-        addMGDParamTopNames
-        ( foldl'
-            ( \s mi -> case mi of
-                MIMGI (Attributed _ mgi) -> addMGIParamTopNames s mgi
-                MIGenReg gr -> addGRParamTopNames s gr
-                _ -> s
-            )
-            HS.empty
-            b
-        )
-        d
-    )
-    p
+-- | converts Expr's `GenExpr` into `GenExpr i r`
+trConstifyGenExpr ::
+  (HierIdent -> Maybe i) ->
+  (Maybe DimRange -> Maybe r) ->
+  GenExpr HierIdent (Maybe DimRange) ->
+  Maybe (GenExpr i r)
+trConstifyGenExpr fi fr x = case x of
+  ExprPrim p -> ExprPrim <$> constifyGenPrim fi fr p
+  ExprUnOp op a p -> ExprUnOp op a <$> constifyGenPrim fi fr p
+  ExprBinOp lhs op a rhs -> ExprBinOp <$> ce lhs <*> pure op <*> pure a <*> ce rhs
+  ExprCond c a t f -> ExprCond <$> ce c <*> pure a <*> ce t <*> ce f
+  where
+    ce = trConstifyGenExpr fi fr
+
+-- | converts Expr's `GenExpr` into CExpr `GenExpr`
+trConstifyExpr ::
+  GenExpr HierIdent (Maybe DimRange) -> Maybe (GenExpr Identifier (Maybe CRangeExpr))
+trConstifyExpr = trConstifyGenExpr constifyIdent $
+  maybe (Just Nothing) $
+    \(GenDimRange l r) -> if null l then Just <$> constifyRange r else Nothing
+
+-- | the other way
+trUnconstExpr :: GenExpr Identifier (Maybe CRangeExpr) -> GenExpr HierIdent (Maybe DimRange)
+trUnconstExpr x = case x of
+  ExprPrim p -> ExprPrim (unconstPrim p)
+  ExprUnOp op a p -> ExprUnOp op a (unconstPrim p)
+  ExprBinOp lhs op a rhs -> ExprBinOp (trUnconstExpr lhs) op a (trUnconstExpr rhs)
+  ExprCond c a t f -> ExprCond (trUnconstExpr c) a (trUnconstExpr t) (trUnconstExpr f)
+
+-- | converts Expr to CExpr
+constifyExpr :: Expr -> Maybe CExpr
+constifyExpr (Expr e) = CExpr <$> trConstifyExpr e
+
+-- | the other way
+unconstExpr :: CExpr -> Expr
+unconstExpr (CExpr e) = Expr (trUnconstExpr e)
+
+-- | converts RangeExpr into CRangeExpr
+constifyRange :: RangeExpr -> Maybe CRangeExpr
+constifyRange x = case x of
+  GRESingle e -> GRESingle <$> constifyExpr e
+  GREPair r2 -> Just $ GREPair r2
+  GREBaseOff b mp o -> (\cb -> GREBaseOff cb mp o) <$> constifyExpr b
+
+-- | the other way
+unconstRange :: CRangeExpr -> RangeExpr
+unconstRange x = case x of
+  GRESingle e -> GRESingle (unconstExpr e)
+  GREPair r2 -> GREPair r2
+  GREBaseOff b mp o -> GREBaseOff (unconstExpr b) mp o
+
+-- | converts DimRange into CDimRange
+constifyDR :: GenDimRange Expr -> Maybe (GenDimRange CExpr)
+constifyDR (GenDimRange dim rng) = GenDimRange <$> mapM constifyExpr dim <*> constifyRange rng
+
+-- | the other way
+unconstDR :: GenDimRange CExpr -> GenDimRange Expr
+unconstDR (GenDimRange dim rng) = GenDimRange (map unconstExpr dim) (unconstRange rng)
+
+-- | converts variable lvalue into net lvalue
+constifyLV :: VarLValue -> Maybe NetLValue
+constifyLV v = case v of
+  LVSingle hi mdr -> LVSingle hi <$> maybe (Just Nothing) (fmap Just . constifyDR) mdr
+  LVConcat l -> LVConcat <$> mapM constifyLV l
+
+-- | the other way
+unconstLV :: NetLValue -> VarLValue
+unconstLV n = case n of
+  LVSingle hi dr -> LVSingle hi (unconstDR <$> dr)
+  LVConcat l -> LVConcat (NE.map unconstLV l)
+
+-- | converts expression into net lvalue
+expr2netlv :: Expr -> Maybe NetLValue
+expr2netlv (Expr x) = aux x
+  where
+    aux x = case x of
+      ExprPrim (PrimConcat c) -> LVConcat <$> mapM aux c
+      ExprPrim (PrimIdent s sub) -> LVSingle s <$> maybe (Just Nothing) (Just . constifyDR) sub
+      _ -> Nothing
+
+-- | the other way
+netlv2expr :: NetLValue -> Expr
+netlv2expr = Expr . aux
+  where
+    aux x = case x of
+      LVConcat e -> ExprPrim $ PrimConcat $ NE.map aux e
+      LVSingle s dr -> ExprPrim $ PrimIdent s $ unconstDR <$> dr
+
+-- | Converts Function statements to statements
+toStatement :: FunctionStatement -> Statement
+toStatement x = case x of
+  FSBlockAssign va -> SBlockAssign True va Nothing
+  FSCase zox e l d -> SCase zox e (map (\(FCaseItem p v) -> CaseItem p $ mybf v) l) (mybf d)
+  FSIf e t f -> SIf e (mybf t) (mybf f)
+  FSDisable hi -> SDisable hi
+  FSLoop ls b -> SLoop ls $ toStatement <$> b
+  FSBlock h ps b -> SBlock h ps $ fmap toStatement <$> b
+  where mybf = fmap $ fmap toStatement
+
+-- | the other way
+fromStatement :: Statement -> Maybe FunctionStatement
+fromStatement x = case x of
+  SBlockAssign True va Nothing -> Just $ FSBlockAssign va
+  SCase zox e l d -> FSCase zox e <$> traverse (\(CaseItem p v) -> FCaseItem p <$> mybf v) l <*> mybf d
+  SIf e t f -> FSIf e <$> mybf t <*> mybf f
+  SDisable hi -> Just $ FSDisable hi
+  SLoop ls b -> FSLoop ls <$> traverse fromStatement b
+  SBlock h ps b -> FSBlock h ps <$> traverse (traverse fromStatement) b
+  _ -> Nothing
+  where mybf s = traverse (traverse fromStatement) s
+
+-- | Converts MybStmt to AttrStmt
+fromMybStmt :: MybStmt -> AttrStmt
+fromMybStmt x = case x of
+  Attributed _ Nothing -> Attributed [] $ SIf (Expr $ genexprnumber 1) x $ Attributed [] Nothing
+  Attributed a (Just s) -> Attributed a s
+
+type BD f t = BlockDecl (Compose f Identified) t
+
+-- | Converts ModGenSingleItem's `BlockDecl` into ModGenBlockedItem's `BlockDecl`
+toMGIBlockDecl :: BD NonEmpty t -> NonEmpty (BD Identity t)
+toMGIBlockDecl x = case x of
+  BDReg sr d -> conv (BDReg sr) d
+  BDInt d -> conv BDInt d
+  BDReal d -> conv BDReal d
+  BDTime d -> conv BDTime d
+  BDRealTime d -> conv BDRealTime d
+  BDEvent d -> conv BDEvent d
+  BDLocalParam t d -> conv (BDLocalParam t) d
+  where
+    conv ::
+      (Compose Identity f x -> BD Identity t) -> Compose NonEmpty f x -> NonEmpty (BD Identity t)
+    conv f = fmap (f . Compose . Identity) . getCompose
+
+-- | Converts one ModGenBlockedItem's `BlockDecl` into ModGenSingleItem's `BlockDecl`
+fromMGIBlockDecl1 :: BD Identity t -> BD NonEmpty t
+fromMGIBlockDecl1 x = case x of
+  BDReg sr d -> conv (BDReg sr) d
+  BDInt d -> conv BDInt d
+  BDReal d -> conv BDReal d
+  BDTime d -> conv BDTime d
+  BDRealTime d -> conv BDRealTime d
+  BDEvent d -> conv BDEvent d
+  BDLocalParam t d -> conv (BDLocalParam t) d
+  where
+    conv :: (Compose NonEmpty f x -> BD NonEmpty t) -> Compose Identity f x -> BD NonEmpty t
+    conv f = f . Compose . (:|[]) . runIdentity . getCompose
+
+-- | Merges one ModGenBlockedItem's `BlockDecl` with one ModGenSingleItem's `BlockDecl`
+fromMGIBlockDecl_add :: BD Identity t -> BD NonEmpty t -> Maybe (BD NonEmpty t)
+fromMGIBlockDecl_add x y = case (x, y) of
+  (BDReg nsr d, BDReg sr l) | nsr == sr -> add (BDReg sr) d l
+  (BDInt d, BDInt l) -> add BDInt d l
+  (BDReal d, BDReal l) -> add BDReal d l
+  (BDTime d, BDTime l) -> add BDTime d l
+  (BDRealTime d, BDRealTime l) -> add BDRealTime d l
+  (BDEvent d, BDEvent l) -> add BDEvent d l
+  (BDLocalParam nt d, BDLocalParam t l) | nt == t -> add (BDLocalParam t) d l
+  _ -> Nothing
+  where
+    add ::
+      (Compose NonEmpty f x -> BD NonEmpty t) ->
+      Compose Identity f x ->
+      Compose NonEmpty f x ->
+      Maybe (BD NonEmpty t)
+    add f x l = Just $ f $ Compose $ runIdentity (getCompose x) <| getCompose l
+
+-- | Converts ModGenSingleItem like `BlockDecl` into StdBlockDecl `BlockDecl`
+toStdBlockDecl :: BD NonEmpty t -> NonEmpty (Identified (BlockDecl Identity t))
+toStdBlockDecl x = case x of
+  BDReg sr d -> conv (BDReg sr) d
+  BDInt d -> conv BDInt d
+  BDReal d -> conv BDReal d
+  BDTime d -> conv BDTime d
+  BDRealTime d -> conv BDRealTime d
+  BDEvent d -> conv BDEvent d
+  BDLocalParam t d -> conv (BDLocalParam t) d
+  where
+    conv ::
+      (Identity x -> BlockDecl Identity t) ->
+      Compose NonEmpty Identified x ->
+      NonEmpty (Identified (BlockDecl Identity t))
+    conv f = fmap (fmap $ f . Identity) . getCompose
+
+-- | Converts ModGenBlockedItem's `BlockDecl` into ModGenSingleItem's `BlockDecl`
+toBlockedItem :: ModGenSingleItem -> NonEmpty ModGenBlockedItem
+toBlockedItem x = case x of
+  MGINetInit nt ds np ni -> conv (MGINetInit nt ds np) ni
+  MGINetDecl nt np nd -> conv (MGINetDecl nt np) nd
+  MGITriD ds np ni -> conv (MGITriD ds np) ni
+  MGITriC cs np nd -> conv (MGITriC cs np) nd
+  MGIBlockDecl d -> fmap MGIBlockDecl $ toMGIBlockDecl d
+  MGIGenVar i -> conv MGIGenVar i
+  MGITask b i d s -> [MGITask b i d s]
+  MGIFunc b t i d s -> [MGIFunc b t i d s]
+  MGIDefParam po -> conv MGIDefParam po
+  MGIContAss ds d3 na -> conv (MGIContAss ds d3) na
+  MGICMos r d3 l -> conv (MGICMos r d3) l
+  MGIEnable r b ds d3 l -> conv (MGIEnable r b ds d3) l
+  MGIMos r np d3 l -> conv (MGIMos r np d3) l
+  MGINIn nt n ds d2 l -> conv (MGINIn nt n ds d2) l
+  MGINOut r ds d2 l -> conv (MGINOut r ds d2) l
+  MGIPassEn r b d2 l -> conv (MGIPassEn r b d2) l
+  MGIPass r l -> conv (MGIPass r) l
+  MGIPull b ds l -> conv (MGIPull b ds) l
+  MGIUDPInst udp ds d2 i -> conv (MGIUDPInst udp ds d2) i
+  MGIModInst mod pa i -> conv (MGIModInst mod pa) i
+  MGIUnknownInst t p i -> conv (MGIUnknownInst t p) i
+  MGIInitial s -> [MGIInitial s]
+  MGIAlways s -> [MGIAlways s]
+  MGILoopGen ii iv c ui uv b -> [MGILoopGen ii iv c ui uv b]
+  MGIIf e t f -> [MGIIf e t f]
+  MGICase e b d -> [MGICase e b d]
+  where
+    conv :: (Identity x -> ModGenBlockedItem) -> NonEmpty x -> NonEmpty ModGenBlockedItem
+    conv f = fmap (f . Identity)
+
+fromBlockedItem1 :: ModGenBlockedItem -> ModGenSingleItem
+fromBlockedItem1 x = case x of
+  MGINetInit nt ds np ni -> conv (MGINetInit nt ds np) ni
+  MGINetDecl nt np nd -> conv (MGINetDecl nt np) nd
+  MGITriD ds np ni -> conv (MGITriD ds np) ni
+  MGITriC cs np nd -> conv (MGITriC cs np) nd
+  MGIBlockDecl d -> MGIBlockDecl $ fromMGIBlockDecl1 d
+  MGIGenVar i -> conv MGIGenVar i
+  MGITask b i d s -> MGITask b i d s
+  MGIFunc b t i d s -> MGIFunc b t i d s
+  MGIDefParam po -> conv MGIDefParam po
+  MGIContAss ds d3 na -> conv (MGIContAss ds d3) na
+  MGICMos r d3 i -> conv (MGICMos r d3) i
+  MGIEnable r b ds d3 i -> conv (MGIEnable r b ds d3) i
+  MGIMos r np d3 i -> conv (MGIMos r np d3) i
+  MGINIn nt n ds d2 i -> conv (MGINIn nt n ds d2) i
+  MGINOut r ds d2 i -> conv (MGINOut r ds d2) i
+  MGIPassEn r b d2 i -> conv (MGIPassEn r b d2) i
+  MGIPass r i -> conv (MGIPass r) i
+  MGIPull b ds i -> conv (MGIPull b ds) i
+  MGIUDPInst udp ds d2 i -> conv (MGIUDPInst udp ds d2) i
+  MGIModInst mod pa i -> conv (MGIModInst mod pa) i
+  MGIUnknownInst t p i -> conv (MGIUnknownInst t p) i
+  MGIInitial s -> MGIInitial s
+  MGIAlways s -> MGIAlways s
+  MGILoopGen ii iv c ui uv b -> MGILoopGen ii iv c ui uv b
+  MGIIf e t f -> MGIIf e t f
+  MGICase e b d -> MGICase e b d
+  where
+    conv :: (NonEmpty x -> ModGenSingleItem) -> Identity x -> ModGenSingleItem
+    conv f = f . (:|[]) . runIdentity
+
+fromBlockedItem_add :: ModGenBlockedItem -> ModGenSingleItem -> Maybe ModGenSingleItem
+fromBlockedItem_add x y = case (x, y) of
+  (MGINetInit nnt nds nnp ni, MGINetInit nt ds np l) | nnt == nt && nds == ds && nnp == np ->
+    add (MGINetInit nt ds np) ni l
+  (MGINetDecl nnt nnp nd, MGINetDecl nt np l) | nnt == nt && nnp == np ->
+    add (MGINetDecl nt np) nd l
+  (MGITriD nds nnp ni, MGITriD ds np l) | nds == ds && nnp == np -> add (MGITriD ds np) ni l
+  (MGITriC ncs nnp nd, MGITriC cs np l) | ncs == cs && nnp == np -> add (MGITriC cs np) nd l
+  (MGIBlockDecl d, MGIBlockDecl l) -> MGIBlockDecl <$> fromMGIBlockDecl_add d l
+  (MGIGenVar i, MGIGenVar l) -> add MGIGenVar i l
+  (MGIDefParam po, MGIDefParam l) -> add MGIDefParam po l
+  (MGIContAss nds nd3 na, MGIContAss ds d3 l) | nds == ds && nd3 == d3 ->
+    add (MGIContAss ds d3) na l
+  (MGICMos nr nd3 i, MGICMos r d3 l) | nr == r && nd3 == d3 -> add (MGICMos r d3) i l
+  (MGIEnable nr nb nds nd3 i, MGIEnable r b ds d3 l)
+   | nr == r && nb == b && nds == ds && nd3 == d3 -> add (MGIEnable r b ds d3) i l
+  (MGIMos nr nnp nd3 i, MGIMos r np d3 l) | nr == r && nnp == np && nd3 == d3 ->
+    add (MGIMos r np d3) i l
+  (MGINIn nnt nn nds nd2 i, MGINIn nt n ds d2 l)
+    | nnt == nt && nn == n && nds == ds && nd2 == d2 -> add (MGINIn nt n ds d2) i l
+  (MGINOut nr nds nd2 i, MGINOut r ds d2 l) | nr == r && nds == ds && nd2 == d2 ->
+    add (MGINOut r ds d2) i l
+  (MGIPassEn nr nb nd2 i, MGIPassEn r b d2 l) | nr == r && nb == b && nd2 == d2 ->
+    add (MGIPassEn r b d2) i l
+  (MGIPass nr i, MGIPass r l) | nr == r -> add (MGIPass r) i l
+  (MGIPull nb nds i, MGIPull b ds l) | nb == b && nds == ds -> add (MGIPull b ds) i l
+  (MGIUDPInst nudp nds nd2 i, MGIUDPInst udp ds d2 l)
+    | nudp == udp && nds == ds && nd2 == d2 -> add (MGIUDPInst udp ds d2) i l
+  (MGIModInst nmod npa i, MGIModInst mod pa l) | nmod == mod && npa == pa ->
+    add (MGIModInst mod pa) i l
+  (MGIUnknownInst nt np i, MGIUnknownInst t p l) | nt == t && np == p ->
+    add (MGIUnknownInst t p) i l
+  _ -> Nothing
+  where
+    add :: (NonEmpty x -> ModGenSingleItem) -> Identity x -> NonEmpty x -> Maybe ModGenSingleItem
+    add f x y = Just $ f $ runIdentity x <| y
+
+fromBlockedItem :: NonEmpty (Attributed ModGenBlockedItem) -> NonEmpty (Attributed ModGenSingleItem)
+fromBlockedItem = regroup (fmap fromBlockedItem1) (addAttributed fromBlockedItem_add)

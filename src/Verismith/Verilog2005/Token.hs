@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
 -- Module      : Verismith.Verilog2005.Token
 -- Description : Tokens for Verilog 2005 lexing and parsing.
 -- Copyright   : (c) 2023 Quentin Corradi
@@ -6,12 +5,14 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass, DeriveDataTypeable, DeriveGeneric #-}
 
 module Verismith.Verilog2005.Token
   ( PosToken (..),
     Position (..),
+    PSource (..),
+    helperShowPositions,
+    showWithPosition,
     Token (..),
     AFRNP (..),
     BXZ (..),
@@ -25,26 +26,62 @@ where
 import Control.DeepSeq (NFData)
 import qualified Data.ByteString as B
 import Data.ByteString.Internal
+import qualified Data.ByteString.Lazy as LBS
 import Data.Data (Data)
+import Data.List.NonEmpty (NonEmpty (..))
 import GHC.Generics (Generic)
 import Numeric.Natural
 import Text.Printf (printf)
+import Verismith.Utils
 
 data PosToken = PosToken
-  { _PTPos :: !Position,
-    _PTToken :: !Token
+  { _ptPos :: ![Position],
+    _ptToken :: !Token
   }
   deriving (Eq)
 
 instance Show PosToken where
   show (PosToken _ t) = show t
 
-data Position = Nowhere | Somewhere !Int !Int
+data Position = Position
+  { _posLine :: !Word,
+    _posColumn :: !Word,
+    _posSource :: !PSource
+  }
   deriving (Eq)
 
+data PSource
+  = PSFile !String
+  | PSDefine !LBS.ByteString
+  | PSLine
+    { _pslFile :: !String,
+      _pslEntering :: !Bool
+    }
+  deriving (Eq)
+
+instance Show PSource where
+  show x = case x of
+    PSFile f -> " of file " ++ f
+    PSDefine t -> " of a macro replacement \"" ++ map w2c (LBS.unpack t) ++ "\""
+    PSLine f _ -> " of file " ++ f
+
 instance Show Position where
-  show Nowhere = "undefined position"
-  show (Somewhere l c) = printf "%d:%d" l c
+  show (Position l c s) = printf "line %d, column %d" l c ++ show s
+
+helperShowPositions :: NonEmpty Position -> String
+helperShowPositions =
+  foldrMap1
+    show
+    $ \a@(Position _ _ s) b -> show a
+        ++ case s of {PSFile _ -> " included"; PSDefine _ -> ""; PSLine _ _ -> " set"}
+        ++ " from "
+        ++ b
+
+showWithPosition :: PosToken -> String
+showWithPosition (PosToken p t) =
+  show t ++ case p of
+    [] -> ""
+    h : t -> " at " ++ helperShowPositions (h :| t)
 
 data AFRNP = AFRNPA | AFRNPF | AFRNPR | AFRNPN | AFRNPP
   deriving (Eq, Ord, Data, Generic, NFData)
@@ -200,7 +237,7 @@ data Token
   | CDCelldefine
   | CDDefaultnettype
   | CDEndcelldefine
-  | CDLine
+  | CDInclude
   | CDNounconnecteddrive
   | CDResetall
   | CDTimescale
@@ -406,7 +443,6 @@ instance Show Token where
     CDCelldefine -> "`celldefine"
     CDDefaultnettype -> "`default_nettype"
     CDEndcelldefine -> "`endcelldefine"
-    CDLine -> "`line"
     CDNounconnecteddrive -> "`nounconnected_drive"
     CDResetall -> "`resetall"
     CDTimescale -> "`timescale"

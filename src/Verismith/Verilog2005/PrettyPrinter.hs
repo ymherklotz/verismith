@@ -6,6 +6,8 @@
 -- Stability   : experimental
 -- Portability : POSIX
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Verismith.Verilog2005.PrettyPrinter
   ( genSource,
@@ -20,6 +22,8 @@ where
 
 import Control.Lens.TH
 import Data.Bifunctor (first)
+import Data.Functor.Compose
+import Data.Functor.Identity
 import qualified Data.ByteString as B
 import Data.ByteString.Internal
 import qualified Data.ByteString.Lazy as LB
@@ -65,6 +69,9 @@ brc = encl lbrace rbrace
 par :: Doc -> Doc
 par = encl lparen rparen
 
+gpar :: Doc -> Doc
+gpar = group . par
+
 -- | Print only if boolean is false
 piff :: Doc -> Bool -> Doc
 piff d c = if c then mempty else d
@@ -73,36 +80,15 @@ piff d c = if c then mempty else d
 pift :: Doc -> Bool -> Doc
 pift d c = if c then d else mempty
 
--- | Print a list of stuff by grouping the consecutive ones if they can
--- | first argument is the combination function for elements that cannot be grouped
--- | second is the printing for a group
--- | third is the creation of a group from a single element
--- | fourth is the addition of an element in a group
--- | fifth is the list of elements
--- TODO: Reverse the order by using foldr
-prettyXregroup ::
-  Foldable f =>
+-- | Regroup and prettyprint
+prettyregroup ::
   (Doc -> Doc -> Doc) ->
   (y -> Doc) ->
   (x -> y) ->
   (x -> y -> Maybe y) ->
-  f x ->
+  NonEmpty x ->
   Doc
-prettyXregroup g c mk f =
-  nonEmpty
-    mempty
-    ( \(h :| t) ->
-        uncurry
-          collapse
-          (foldl (\(d, a) e -> maybe (Just $ collapse d a, mk e) ((,) d) $ f e a) (Nothing, mk h) t)
-    )
-    . toList
-  where
-    collapse md a = let d' = c a in maybe d' (g d') md
-
--- | Same as above but groups are separated by a line break
-prettyregroup :: Foldable f => (y -> Doc) -> (x -> y) -> (x -> y -> Maybe y) -> f x -> Doc
-prettyregroup = prettyXregroup (<#>)
+prettyregroup g p mk add l = pl g p $ regroup mk add l
 
 -- | The core difficulty of this pretty printer:
 -- | Identifier can be escaped, escaped identifiers require a space or newline after them
@@ -110,41 +96,36 @@ prettyregroup = prettyXregroup (<#>)
 -- | And this problem creeps in every AST node with possible identifier printed at the end
 -- | like expressions
 -- | So a prettyprinter that takes an AST node of type `a` has this type
--- | The first argument is the space that could follow the non-escaped identifier
--- | The second element of the result pair is the thing follows the first element
--- | unless what is next is a space or a newline
-type PrettyIdent a = Doc -> a -> (Doc, Doc)
+-- | The second element of the result pair is the type of space that follows the first element
+-- | unless what is next is a space or a newline, in which case it can be ignored and replaced
+type PrettyIdent a = a -> (Doc, Doc)
+
+-- | The `pure/return` of prettyIdent
+mkid :: PrettyIdent Doc
+mkid x = (x, softline)
 
 -- | Evaluates a PrettyIdent and collapse the last character
--- | This version asks for a breakable space
-psp :: PrettyIdent a -> a -> Doc
-psp f = uncurry (<>) . f newline
-
--- | This version asks for a breakable non-space
 padj :: PrettyIdent a -> a -> Doc
-padj f = uncurry (<>) . f softline
+padj p = uncurry (<>) . p
 
--- | This version inserts a group from which the last space is excluded
--- | Useful to separate the break priority of the inside and outside space
-gpsp :: PrettyIdent a -> a -> Doc
-gpsp f = uncurry ((<>) . group) . f newline
+-- | Adds stuff before the last character
+fpadj :: (Doc -> Doc) -> PrettyIdent a -> a -> Doc
+fpadj f p = uncurry (<>) . first f . p
 
--- | Same
 gpadj :: PrettyIdent a -> a -> Doc
-gpadj f = uncurry ((<>) . group) . f softline
+gpadj = fpadj group
 
--- | In this version the group asks for raising the indentation level
 ngpadj :: PrettyIdent a -> a -> Doc
-ngpadj f = uncurry ((<>) . ng) . f softline
+ngpadj = fpadj ng
 
 -- | Just inserts a group before the last space of a PrettyIdent
 -- | Useful to separate the break priority of the inside and outside space
 mkg :: PrettyIdent x -> PrettyIdent x
-mkg f s = first group . f s
+mkg f = first group . f
 
 -- | In this version the group asks for raising the indentation level
 mkng :: PrettyIdent x -> PrettyIdent x
-mkng f s = first ng . f s
+mkng f = first ng . f
 
 -- | Print a comma separated list, haskell style: `a, b, c` or
 -- | ```
@@ -155,25 +136,14 @@ mkng f s = first ng . f s
 csl :: Foldable f => Doc -> Doc -> (a -> Doc) -> f a -> Doc
 csl = pf $ \a b -> a </> comma <+> b
 
--- TODO: use foldr
 csl1 :: (a -> Doc) -> NonEmpty a -> Doc
-csl1 f (h :| t) = foldl (\b a -> b </> comma <+> f a) (f h) t
-
--- TODO: remove and use the non reversed version
-rcsl :: Foldable f => Doc -> Doc -> (a -> Doc) -> f a -> Doc
-rcsl = pf $ \a b -> b </> comma <+> a
+csl1 f = foldrMap1 f $ \a b -> f a </> comma <+> b
 
 cslid1 :: PrettyIdent a -> PrettyIdent (NonEmpty a)
-cslid1 f s = foldrMap1 (f s) $ \a -> first $ \b -> padj f a <.> b
+cslid1 f = foldrMap1 f $ \a -> first (padj f a <.>)
 
 cslid :: Foldable f => Doc -> Doc -> PrettyIdent a -> f a -> Doc
 cslid a b f = nonEmpty mempty (\l -> a <> padj (cslid1 f) l <> b) . toList
-
-rcslid1 :: PrettyIdent a -> PrettyIdent (NonEmpty a)
-rcslid1 f s (h :| t) = foldl (\b a -> first (\b -> padj f a <.> b) b) (f s h) t
-
-rcslid :: Foldable f => Doc -> Doc -> PrettyIdent a -> f a -> Doc
-rcslid a b f = nonEmpty mempty (\l -> a <> padj (rcslid1 f) l <> b) . toList
 
 bcslid1 :: PrettyIdent a -> NonEmpty a -> Doc
 bcslid1 f = brc . nest . padj (cslid1 $ mkg f)
@@ -181,55 +151,54 @@ bcslid1 f = brc . nest . padj (cslid1 $ mkg f)
 pcslid :: Foldable f => PrettyIdent a -> f a -> Doc
 pcslid f = cslid (lparen <> softspace) rparen $ mkg f
 
-prettyIdent :: PrettyIdent B.ByteString
-prettyIdent s i = (raw i, if B.head i == c2w '\\' then newline else s)
+prettyBS :: PrettyIdent B.ByteString
+prettyBS i = (raw i, if B.head i == c2w '\\' then newline else softline)
 
-prettyHierIdent :: PrettyIdent HierIdent
-prettyHierIdent s (HierIdent p i) =
-  first
-    ( \i ->
-        nest $
-          foldr
-            ( \(Identified s r) b ->
-                ngpadj
-                  (pidWith prettyIdent softline $ pm (group . brk . padj prettyCExpr) r)
-                  s
-                  <> dot
-                  <> b
-            )
-            i
-            p
-    )
-    $ prettyIdent s i
+prettyIdent :: PrettyIdent Identifier
+prettyIdent (Identifier i) = prettyBS i
 
-prettyDot1Ident :: PrettyIdent Dot1Ident
-prettyDot1Ident s (Dot1Ident h t) =
-  ( case h of
-      Nothing -> ft
-      Just h -> padj prettyIdent h <> dot <> ft,
-    st
-  )
-  where
-    (ft, st) = prettyIdent s t
+rawId :: Identifier -> Doc
+rawId (Identifier i) = raw i
 
-pidWith :: PrettyIdent a -> Doc -> Doc -> PrettyIdent a
-pidWith f si d so i = if nullDoc d then f so i else (uncurry (<>) (f si i) <> d, so)
+-- | Somehow the six next function are very common patterns
+pspWith :: PrettyIdent a -> Doc -> PrettyIdent a
+pspWith f d i = if nullDoc d then f i else mkid $ fst (f i) <> newline <> d
 
-pIdentified :: Doc -> (r -> Doc) -> PrettyIdent (Identified r)
-pIdentified si f so (Identified i r) = pidWith prettyIdent si (f r) so i
+padjWith :: PrettyIdent a -> Doc -> PrettyIdent a
+padjWith f d i = if nullDoc d then f i else mkid $ padj f i <> d
 
-pRanged :: PrettyIdent r -> PrettyIdent (Identified r)
-pRanged f = pIdentified softline (group . brk . padj f)
+prettyEq :: Doc -> (Doc, Doc) -> (Doc, Doc)
+prettyEq i = first $ \x -> ng $ group i <=> equals <+> group x
 
-prettySpecTerm :: PrettyIdent SpecTerm
-prettySpecTerm = pIdentified softline $ pm prettyCRangeExpr
+prettyAttrng :: [Attribute] -> Doc -> Doc
+prettyAttrng a x = prettyAttr a <?=> ng x
 
-prettyA :: PrettyIdent Attribute
-prettyA s (Identified i e) =
-  maybe (prettyIdent s i) (first (\x -> ng $ raw i <=> equals <+> x) . prettyCExpr s) e
+prettyItem :: [Attribute] -> Doc -> Doc
+prettyItem a x = prettyAttrng a x <> semi
+
+prettyItems :: Doc -> (a -> Doc) -> NonEmpty a -> Doc
+prettyItems h f b = group h <=> group (csl1 (ng . f) b) <> semi
+
+prettyItemsid :: Doc -> PrettyIdent a -> NonEmpty a -> Doc
+prettyItemsid h f b = group h <=> gpadj (cslid1 $ mkng f) b <> semi
 
 prettyAttr :: [Attribute] -> Doc
-prettyAttr = nonEmpty mempty (\l -> group $ "(* " <> psp (cslid1 prettyA) l <> "*)")
+prettyAttr = nonEmpty mempty $ \l -> group $ "(* " <> fst (cslid1 pa l) <=> "*)"
+  where
+    pa (Attribute i e) = maybe (prettyBS i) (prettyEq (raw i) . prettyCExpr) e
+
+prettyHierIdent :: PrettyIdent HierIdent
+prettyHierIdent (HierIdent p i) = first (\i -> nest $ foldr addId i p) $ prettyIdent i
+  where
+    addId (s, r) acc =
+      ngpadj (padjWith prettyIdent (pm (group . brk . padj prettyCExpr) r)) s <> dot <> acc
+
+prettyDot1Ident :: PrettyIdent Dot1Ident
+prettyDot1Ident (Dot1Ident h t) =
+  first (\ft -> case h of Nothing -> ft; Just h -> padj prettyBS h <> dot <> ft) $ prettyIdent t
+
+prettySpecTerm :: PrettyIdent SpecTerm
+prettySpecTerm (SpecTerm i r) = padjWith prettyIdent (pm prettyCRangeExpr r) i
 
 prettyNumber :: Number -> Doc
 prettyNumber x = case x of
@@ -240,29 +209,27 @@ prettyNumber x = case x of
   NXZ b -> if b then "dx" else "dz"
 
 prettyNumIdent :: PrettyIdent NumIdent
-prettyNumIdent s x = case x of
-  NIIdent i -> prettyIdent s i
-  NIReal r -> (raw r, s)
-  NINumber n -> (viaShow n, s)
+prettyNumIdent x = case x of
+  NIIdent i -> prettyIdent i
+  NIReal r -> mkid $ raw r
+  NINumber n -> mkid $ viaShow n
 
 prettyPrim :: PrettyIdent i -> (r -> Doc) -> PrettyIdent (GenPrim i r)
-prettyPrim ppid ppr s x = case x of
-  PrimNumber Nothing True (NDecimal i) -> (viaShow i, s)
+prettyPrim ppid ppr x = case x of
+  PrimNumber Nothing True (NDecimal i) -> mkid $ viaShow i
   PrimNumber w b n ->
-    ( nest $
+    mkid $
+      nest $
         pm (\w -> viaShow w <> softline) w
-          <> group ((if b then "'s" else squote) <> prettyNumber n),
-      s
-    )
-  PrimReal r -> (raw r, s)
-  PrimIdent i r -> first nest $ pidWith ppid softline (group $ ppr r) s i
-  PrimConcat l -> (bcslid1 pexpr l, s)
-  PrimMultConcat e l -> (brc $ nest $ gpadj prettyCExpr e <> bcslid1 pexpr l, s)
-  PrimFun i a l ->
-    pidWith ppid (if null a then softline else space) (prettyAttr a <?=> pcslid pexpr l) s i
-  PrimSysFun i l -> first (nest . ("$" <>)) $ pidWith prettyIdent softline (pcslid pexpr l) s i
-  PrimMinTypMax m -> (par $ padj (prettyGMTM pexpr) m, s)
-  PrimString x -> (raw x, s)
+          <> group ((if b then "'s" else squote) <> prettyNumber n)
+  PrimReal r -> mkid $ raw r
+  PrimIdent i r -> first nest $ padjWith ppid (group $ ppr r) i
+  PrimConcat l -> mkid $ bcslid1 pexpr l
+  PrimMultConcat e l -> mkid $ brc $ nest $ gpadj prettyCExpr e <> bcslid1 pexpr l
+  PrimFun i a l -> (if null a then padjWith else pspWith) ppid (prettyAttr a <?=> pcslid pexpr l) i
+  PrimSysFun i l -> first (\x -> nest $ "$" <> x) $ padjWith prettyBS (pcslid pexpr l) i
+  PrimMinTypMax m -> mkid $ par $ padj (prettyGMTM pexpr) m
+  PrimString x -> mkid $ raw x
   where
     pexpr = prettyGExpr ppid ppr 12
 
@@ -294,47 +261,39 @@ preclevel b = case b of
   BinLOr -> 11
 
 prettyGExpr :: PrettyIdent i -> (r -> Doc) -> Int -> PrettyIdent (GenExpr i r)
-prettyGExpr ppid ppr l s e = case e of
-  ExprPrim e -> first group $ prettyPrim ppid ppr s e
+prettyGExpr ppid ppr l e = case e of
+  ExprPrim e -> first group $ prettyPrim ppid ppr e
   ExprUnOp op a e ->
     first
-      ( \x ->
-          ng $
-            viaShow op <> (if null a then mempty else space <> prettyAttr a <> newline) <> x
-      )
-      $ prettyPrim ppid ppr s e
+      (\x -> ng $ viaShow op <> (if null a then mempty else space <> prettyAttr a <> newline) <> x)
+      $ prettyPrim ppid ppr e
   ExprBinOp el op a r ->
     let p = preclevel op
-        x = psp (pexpr p) el <> viaShow op
+        x = psexpr p el <=> viaShow op
         da = prettyAttr a
         pp = pexpr $ p - 1
      in case compare l p of
-          LT -> (ng $ par $ x <+> (da <?=> padj pp r), s)
-          EQ -> first (\y -> x <+> (da <?=> y)) $ pp s r
-          GT -> first (\y -> ng $ x <+> (da <?=> y)) $ pp s r
+          LT -> mkid $ ng $ par $ x <+> (da <?=> padj pp r)
+          EQ -> first (\y -> x <+> (da <?=> y)) $ pp r
+          GT -> first (\y -> ng $ x <+> (da <?=> y)) $ pp r
   ExprCond ec a et ef ->
-    let pp s =
-          first
-            ( \x ->
-                nest $
-                  group (psp (pexpr 11) ec <> nest ("?" <?+> prettyAttr a))
-                    <=> group (psp (pexpr 12) et <> colon <+> x)
-            )
-            $ pexpr 12 s ef
-     in if l < 12 then (ng $ par $ uncurry (<>) $ pp softline, s) else pp s
+    let pc c t f = nest $ group (c <=> nest ("?" <?+> prettyAttr a)) <=> group (t <=> colon <+> f)
+        pp = first (pc (psexpr 11 ec) (psexpr 12 et)) $ pexpr 12 ef
+     in if l < 12 then mkid $ gpar $ uncurry (<>) $ pp else pp
   where
     pexpr = prettyGExpr ppid ppr
+    psexpr n = fst . pexpr n
 
 prettyExpr :: PrettyIdent Expr
-prettyExpr s (Expr e) = prettyGExpr prettyHierIdent (pm prettyDimRange) 12 s e
+prettyExpr (Expr e) = prettyGExpr prettyHierIdent (pm prettyDimRange) 12 e
 
 prettyCExpr :: PrettyIdent CExpr
-prettyCExpr s (CExpr e) = prettyGExpr prettyIdent (pm prettyCRangeExpr) 12 s e
+prettyCExpr (CExpr e) = prettyGExpr prettyIdent (pm prettyCRangeExpr) 12 e
 
 prettyGMTM :: PrettyIdent et -> PrettyIdent (GenMinTypMax et)
-prettyGMTM pp s x = case x of
-  MTMSingle e -> pp s e
-  MTMFull l t h -> first (\x -> gpadj pp l <> colon <-> gpadj pp t <> colon <-> group x) $ pp s h
+prettyGMTM pp x = case x of
+  MTMSingle e -> pp e
+  MTMFull l t h -> first (\x -> gpadj pp l <> colon <-> gpadj pp t <> colon <-> group x) $ pp h
 
 prettyMTM :: PrettyIdent MinTypMax
 prettyMTM = prettyGMTM prettyExpr
@@ -346,7 +305,7 @@ prettyRange2 :: Range2 -> Doc
 prettyRange2 (Range2 m l) = brk $ gpadj prettyCExpr m <> colon <-> gpadj prettyCExpr l
 
 prettyR2s :: [Range2] -> Doc
-prettyR2s = pf (</>) mempty mempty $ group . prettyRange2
+prettyR2s = pl (</>) $ group . prettyRange2
 
 prettyRangeExpr :: PrettyIdent e -> GenRangeExpr e -> Doc
 prettyRangeExpr pp x = case x of
@@ -363,16 +322,18 @@ prettyGDR pp (GenDimRange d r) =
   foldr ((</>) . group . brk . padj pp) (group $ prettyRangeExpr pp r) d
 
 prettyDimRange :: DimRange -> Doc
-prettyDimRange (DimRange dr) = prettyGDR prettyExpr dr
+prettyDimRange = prettyGDR prettyExpr
 
 prettyCDimRange :: CDimRange -> Doc
-prettyCDimRange (CDimRange dr) = prettyGDR prettyCExpr dr
+prettyCDimRange = prettyGDR prettyCExpr
 
 prettySignRange :: SignRange -> Doc
 prettySignRange (SignRange s r) = pift "signed" s <?=> pm (group . prettyRange2) r
 
-prettyFPT :: FunParType -> Doc
-prettyFPT x = case x of FPTComType ct -> viaShow ct; FPTSignRange sr -> prettySignRange sr
+prettyComType :: (d -> Doc) -> ComType d -> Doc
+prettyComType f x = case x of
+  CTAbstract t -> viaShow t
+  CTConcrete e sr -> group $ f e <?=> prettySignRange sr
 
 prettyDriveStrength :: DriveStrength -> Doc
 prettyDriveStrength x = case x of
@@ -381,347 +342,58 @@ prettyDriveStrength x = case x of
   DSHighZ False s -> par $ "highz0" </> comma <+> viaShow s <> "1"
   DSHighZ True s -> par $ viaShow s <> "0" </> comma <+> "highz1"
 
-prettyDelay3 :: Delay3 -> Doc
+prettyDelay3 :: PrettyIdent Delay3
 prettyDelay3 x =
-  "#" <> case x of
-    D3Base ni -> fst $ prettyNumIdent mempty ni
-    D31 m -> par $ padj prettyMTM m
-    D32 m1 m2 -> par $ ngpadj prettyMTM m1 <.> ngpadj prettyMTM m2
-    D33 m1 m2 m3 -> par $ ngpadj prettyMTM m1 <.> ngpadj prettyMTM m2 <.> ngpadj prettyMTM m3
+  first ("#" <>) $ case x of
+    D3Base ni -> prettyNumIdent ni
+    D31 m -> mkid $ par $ padj prettyMTM m
+    D32 m1 m2 -> mkid $ par $ ngpadj prettyMTM m1 <.> ngpadj prettyMTM m2
+    D33 m1 m2 m3 -> mkid $ par $ ngpadj prettyMTM m1 <.> ngpadj prettyMTM m2 <.> ngpadj prettyMTM m3
 
-prettyDelay2 :: Delay2 -> Doc
+prettyDelay2 :: PrettyIdent Delay2
 prettyDelay2 x =
-  "#" <> case x of
-    D2Base ni -> fst $ prettyNumIdent mempty ni
-    D21 m -> par $ padj prettyMTM m
-    D22 m1 m2 -> par $ ngpadj prettyMTM m1 <.> ngpadj prettyMTM m2
+  first ("#" <>) $ case x of
+    D2Base ni -> prettyNumIdent ni
+    D21 m -> mkid $ par $ padj prettyMTM m
+    D22 m1 m2 -> mkid $ par $ ngpadj prettyMTM m1 <.> ngpadj prettyMTM m2
 
-prettyDelay1 :: Delay1 -> Doc
+prettyDelay1 :: PrettyIdent Delay1
 prettyDelay1 x =
-  "#" <> case x of
-    D1Base ni -> fst $ prettyNumIdent mempty ni
-    D11 m -> par $ padj prettyMTM m
+  first ("#" <>) $ case x of
+    D1Base ni -> prettyNumIdent ni
+    D11 m -> mkid $ par $ padj prettyMTM m
 
 prettyLValue :: (dr -> Doc) -> PrettyIdent (LValue dr)
-prettyLValue f s x = case x of
-  LVSingle hi r -> first nest $ pidWith prettyHierIdent softline (pm f r) s hi
-  LVConcat l -> (bcslid1 (prettyLValue f) l, s)
+prettyLValue f x = case x of
+  LVSingle hi r -> first nest $ padjWith prettyHierIdent (pm (group . f) r) hi
+  LVConcat l -> mkid $ bcslid1 (prettyLValue f) l
 
 prettyNetLV :: PrettyIdent NetLValue
-prettyNetLV = prettyLValue $ group . prettyCDimRange
+prettyNetLV = prettyLValue prettyCDimRange
 
 prettyVarLV :: PrettyIdent VarLValue
-prettyVarLV = prettyLValue $ group . prettyDimRange
+prettyVarLV = prettyLValue prettyDimRange
+
+prettyAssign :: (dr -> Doc) -> PrettyIdent (Assign dr)
+prettyAssign f (Assign l e) = prettyEq (fst $ prettyLValue f l) $ prettyExpr e
 
 prettyNetAssign :: PrettyIdent NetAssign
-prettyNetAssign s (NetAssign l e) =
-  first (\x -> nest $ psp prettyNetLV l <> equals <+> group x) $ prettyExpr s e
+prettyNetAssign = prettyAssign prettyCDimRange
 
 prettyVarAssign :: PrettyIdent VarAssign
-prettyVarAssign s (VarAssign l e) =
-  first (\x -> nest $ psp prettyVarLV l <> equals <+> group x) $ prettyExpr s e
+prettyVarAssign = prettyAssign prettyDimRange
 
-prettyEventControl :: EventControl -> Doc
+prettyEventControl :: PrettyIdent EventControl
 prettyEventControl x =
-  "@" <> case x of
-    ECDeps -> "*"
-    ECIdent hi -> nest $ fst $ prettyHierIdent mempty hi
-    ECExpr l ->
-      par $
-        padj
-          ( cslid1 $ \s (EventPrim p e) ->
-              first
-                (\x -> ng $ case p of { EPAny -> mempty; EPPos -> "posedge"; EPNeg -> "negedge" } <?=> group x)
-                $ prettyExpr s e
-          )
-          l
-
-prettyStatement :: Statement -> Doc
-prettyStatement x = case x of
-  SBlockAssign b (VarAssign lv v) dec ->
-    nest $
-      gpsp prettyVarLV lv
-        <> group
-          ( piff langle b <> equals
-              <+> pm
-                ( \x -> case x of
-                    DECRepeat e ev -> group ("repeat" <=> par (padj prettyExpr e)) <=> prettyEventControl ev
-                    DECDelay d -> prettyDelay1 d
-                    DECEvent e -> prettyEventControl e
-                )
-                dec
-              <=> gpadj prettyExpr v
-          )
-        <> semi
-  SProcContAssign pca -> nest $
-    (<> semi) $ case pca of
-      PCAAssign va -> "assign" <=> padj prettyVarAssign va
-      PCADeassign lv -> "deassign" <=> padj prettyVarLV lv
-      PCAForce lv -> "force" <=> either (padj prettyVarAssign) (padj prettyNetAssign) lv
-      PCARelease lv -> "release" <=> either (padj prettyVarLV) (padj prettyNetLV) lv
-  SCase zox e b s ->
-    block
-      ( nest $
-          "case" <> case zox of ZOXZ -> "z"; ZOXO -> mempty; ZOXX -> "x"
-            <=> group (par $ padj prettyExpr e)
-      )
-      "endcase"
-      $ pf
-        (flip (<#>))
-        mempty
-        mempty
-        ( \(CaseItem p v) ->
-            gpadj (cslid1 prettyExpr) p <> colon <+> ng (prettyMybStmt v)
-        )
-        b
-        <?#> piff (nest $ "default:" <?=> prettyMybStmt s) (s == Attributed [] Nothing)
-  SIf c t f ->
-    let head = "if" <=> group (par $ padj prettyExpr c)
-     in (if stmtDanglingElse f t then block (ng head <=> "begin") "end" else ng . (group head <=>))
-          (prettyMybStmt t)
-          <?#> case f of
-            Attributed [] Nothing -> mempty
-            Attributed _ (Just (SIf _ _ _)) -> group $ "else" <=> prettyMybStmt f
-            _ -> ng $ "else" <=> prettyMybStmt f
-  SDisable hi -> nest $ "disable" <=> padj prettyHierIdent hi <> semi
-  SProcTimingControl c s ->
-    nest $ group (either prettyDelay1 prettyEventControl c) <=> prettyMybStmt s
-  SEventTrigger hi e ->
-    nest $
-      "->" <+> padj prettyHierIdent hi
-        <> pf (</>) mempty mempty (group . brk . padj prettyExpr) e
-        <> semi
-  SWait e s -> nest $ group ("wait" <=> par (padj prettyExpr e)) <=> prettyMybStmt s
-  SLoop ls s -> nest $
-    (<=> prettyAttrStmt s) $ case ls of
-      LSForever -> "forever"
-      LSRepeat e -> ng $ "repeat" <=> par (padj prettyExpr e)
-      LSWhile e -> ng $ "while" <=> par (padj prettyExpr e)
-      LSFor i c u ->
-        ng $
-          "for"
-            <=> par
-              (gpadj prettyVarAssign i <> semi <+> gpadj prettyExpr c <> semi <+> gpadj prettyVarAssign u)
-  SBlock h ps s ->
-    block
-      (nest $ (if ps then "fork" else "begin") <?/> pm (\(s, _, _, _) -> colon <+> raw s) h)
-      (if ps then "join" else "end")
-      $ maybe mempty (\(_, p, lp, d) -> prettyParamStd p lp d) h
-        <?#> pf (<#>) mempty mempty prettyAttrStmt s
-  SSysTaskEnable s a ->
-    nest $ "$" <> padj prettyIdent s <> pcslid (\s -> maybe (mempty, s) $ prettyExpr s) a <> semi
-  STaskEnable hi a -> nest $ padj prettyHierIdent hi <> pcslid prettyExpr a <> semi
-
-prettyAttrStmt :: AttrStmt -> Doc
-prettyAttrStmt (Attributed a s) = prettyAttr a <?=> prettyStatement s
-
-prettyMybStmt :: MybStmt -> Doc
-prettyMybStmt (Attributed a s) = prettyAttr a <?=> maybe semi prettyStatement s
-
-data GateInst'
-  = GI'CMos Bool (Maybe Delay3) (NonEmpty (Identified (Maybe Range2, NetLValue, Expr, Expr, Expr)))
-  | GI'Enable
-      Bool
-      Bool
-      DriveStrength
-      (Maybe Delay3)
-      (NonEmpty (Identified (Maybe Range2, NetLValue, Expr, Expr)))
-  | GI'Mos Bool Bool (Maybe Delay3) (NonEmpty (Identified (Maybe Range2, NetLValue, Expr, Expr)))
-  | GI'NIn
-      NInputType
-      Bool
-      DriveStrength
-      (Maybe Delay2)
-      (NonEmpty (Identified (Maybe Range2, NetLValue, NonEmpty Expr)))
-  | GI'NOut
-      Bool
-      DriveStrength
-      (Maybe Delay2)
-      (NonEmpty (Identified (Maybe Range2, NonEmpty NetLValue, Expr)))
-  | GI'PassEn
-      Bool
-      Bool
-      (Maybe Delay2)
-      (NonEmpty (Identified (Maybe Range2, NetLValue, NetLValue, Expr)))
-  | GI'Pass Bool (NonEmpty (Identified (Maybe Range2, NetLValue, NetLValue)))
-  | GI'Pull Bool DriveStrength (NonEmpty (Identified (Maybe Range2, NetLValue)))
-
-mkgi' :: B.ByteString -> Maybe Range2 -> GateInst -> GateInst'
-mkgi' s rng gi = case gi of
-  GICMos r d3 lv inp nc pc -> GI'CMos r d3 $ Identified s (rng, lv, inp, nc, pc) :| []
-  GIEnable r oz ds d3 lv inp en -> GI'Enable r oz ds d3 $ Identified s (rng, lv, inp, en) :| []
-  GIMos r np d3 lv inp en -> GI'Mos r np d3 $ Identified s (rng, lv, inp, en) :| []
-  GINIn nin n ds d2 lv inp -> GI'NIn nin n ds d2 $ Identified s (rng, lv, inp) :| []
-  GINOut r ds d2 lv inp -> GI'NOut r ds d2 $ Identified s (rng, lv, inp) :| []
-  GIPassEn r oz d2 llv rlv en -> GI'PassEn r oz d2 $ Identified s (rng, llv, rlv, en) :| []
-  GIPass r llv rlv -> GI'Pass r $ Identified s (rng, llv, rlv) :| []
-  GIPull ud ds lv -> GI'Pull ud ds $ Identified s (rng, lv) :| []
-
-ppGI' :: GateInst' -> Doc
-ppGI' x = case x of
-  GI'CMos r d3 l ->
-    group (pift "r" r <> "cmos" <?=> pm prettyDelay3 d3)
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, lv, inp, nc, pc)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp
-                            <.> ngpadj prettyExpr nc
-                            <.> ngpadj prettyExpr pc
-                      )
-            )
-            l
-        )
-  GI'Enable r oz ds d3 l ->
-    group
-      ( (if r then "not" else "buf") <> "if" <> (if oz then "1" else "0")
-          <?=> prettyDriveStrength ds
-          <?=> pm prettyDelay3 d3
-      )
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, lv, inp, en)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr en
-                      )
-            )
-            l
-        )
-  GI'Mos r np d3 l ->
-    group (pift "r" r <> (if np then "n" else "p") <> "mos" <?=> pm prettyDelay3 d3)
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, lv, inp, en)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr en
-                      )
-            )
-            l
-        )
-  GI'NIn nin n ds d2 l ->
-    group
-      ( (if nin == NITXor then "x" <> pift "n" n <> "or" else pift "n" n <> viaShow nin)
-          <?=> prettyDriveStrength ds
-          <?=> pm prettyDelay2 d2
-      )
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, lv, inp)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          ngpadj prettyNetLV lv <.> padj (cslid1 $ \s -> first ng . prettyExpr s) inp
-                      )
-            )
-            l
-        )
-  GI'NOut r ds d2 l ->
-    group ((if r then "not" else "buf") <?=> prettyDriveStrength ds <?=> pm prettyDelay2 d2)
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, lv, inp)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          padj (cslid1 $ \s -> first ng . prettyNetLV s) lv <.> ngpadj prettyExpr inp
-                      )
-            )
-            l
-        )
-  GI'PassEn r oz d2 l ->
-    group (pift "r" r <> "tranif" <> (if oz then "1" else "0") <?=> pm prettyDelay2 d2)
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, llv, rlv, en)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          ngpadj prettyNetLV llv <.> ngpadj prettyNetLV rlv <.> ngpadj prettyExpr en
-                      )
-            )
-            l
-        )
-  GI'Pass r l ->
-    pift "r" r <> "tran"
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, llv, rlv)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          ngpadj prettyNetLV llv <.> ngpadj prettyNetLV rlv
-                      )
-            )
-            l
-        )
-  GI'Pull ud ds l ->
-    group ("pull" <> (if ud then "up" else "down") <?=> prettyDriveStrength ds)
-      <=> group
-        ( csl1
-            ( \(Identified s (rng, lv)) ->
-                ng $
-                  pidr s rng
-                    <> group
-                      ( par $
-                          gpadj prettyNetLV lv
-                      )
-            )
-            l
-        )
+  first ("@" <>) $ case x of
+    ECDeps -> ("*", newline)
+    ECIdent hi -> first ng $ prettyHierIdent hi
+    ECExpr l -> (gpar $ padj (cslid1 pEP) l, newline)
   where
-    pidr s r =
-      piff
-        ( let i = padj prettyIdent s
-           in maybe i (\r -> group (i <> prettyRange2 r) <> newline) r
-        )
-        $ B.null s
-
-prettyGateInsts :: Attributed (NonEmpty (Identified (Maybe Range2, GateInst))) -> Doc
-prettyGateInsts (Attributed a l) =
-  prettyregroup
-    (\x -> prettyAttr a <?=> nest (ppGI' x) <> semi)
-    (\(Identified s (rng, gi)) -> mkgi' s rng gi)
-    ( \(Identified s (rng, gi)) gi' -> case (gi', gi) of
-        (GI'CMos r' d3' l, GICMos r d3 lv inp nc pc)
-          | r == r' && d3 == d3' ->
-            Just $ GI'CMos r' d3' $ Identified s (rng, lv, inp, nc, pc) <| l
-        (GI'Enable r' oz' ds' d3' l, GIEnable r oz ds d3 lv inp en)
-          | r == r' && oz == oz' && ds == ds' && d3 == d3' ->
-            Just $ GI'Enable r' oz' ds' d3' $ Identified s (rng, lv, inp, en) <| l
-        (GI'Mos r' np' d3' l, GIMos r np d3 lv inp en)
-          | r == r' && np == np' && d3 == d3' ->
-            Just $ GI'Mos r' np' d3' $ Identified s (rng, lv, inp, en) <| l
-        (GI'NIn nin' n' ds' d2' l, GINIn nin n ds d2 lv inp)
-          | nin == nin' && n == n' && ds == ds' && d2 == d2' ->
-            Just $ GI'NIn nin' n' ds' d2' $ Identified s (rng, lv, inp) <| l
-        (GI'NOut r' ds' d2' l, GINOut r ds d2 lv inp)
-          | r == r' && ds == ds' && d2 == d2' ->
-            Just $ GI'NOut r' ds' d2' $ Identified s (rng, lv, inp) <| l
-        (GI'PassEn r' oz' d2' l, GIPassEn r oz d2 llv rlv en)
-          | r == r' && oz == oz' && d2 == d2' ->
-            Just $ GI'PassEn r' oz' d2' $ Identified s (rng, llv, rlv, en) <| l
-        (GI'Pass r' l, GIPass r llv rlv)
-          | r == r' ->
-            Just $ GI'Pass r' $ Identified s (rng, llv, rlv) <| l
-        (GI'Pull ud' ds' l, GIPull ud ds lv)
-          | ud == ud' && ds == ds' ->
-            Just $ GI'Pull ud' ds' $ Identified s (rng, lv) <| l
-        _ -> Nothing
-    )
-    l
+    pEP (EventPrim p e) =
+      first
+        (\x -> ng $ case p of { EPAny -> mempty; EPPos -> "posedge"; EPNeg -> "negedge" } <?=> x)
+        $ prettyExpr e
 
 prettyEdgeDesc :: EdgeDesc -> Doc
 prettyEdgeDesc x =
@@ -730,83 +402,521 @@ prettyEdgeDesc x =
     else
       if x == V.fromList [False, False, False, True, True, False, True, False, False, False]
         then "negedge"
-        else
-          group $
-            "edge"
-              <=> brk
-                ( csl mempty mempty raw $
-                    V.ifoldl'
-                      ( \l i b ->
-                          if b
-                            then
-                              ( case i of
-                                  0 -> "01"
-                                  1 -> "0x"
-                                  2 -> "0z"
-                                  3 -> "10"
-                                  4 -> "1x"
-                                  5 -> "1z"
-                                  6 -> "x0"
-                                  7 -> "x1"
-                                  8 -> "z0"
-                                  9 -> "z1"
-                              ) :
-                              l
-                            else l
-                      )
-                      []
-                      x
-                )
-
-prettySTC :: SystemTimingCheck -> Doc
-prettySTC x = case x of
-  STCSetup (STCArgs d r e n) -> "$setup" </> ppA (STCArgs r d e n)
-  STCHold a -> "$hold" </> ppA a
-  STCSetupHold a aa -> "$setuphold" </> ppAA a aa
-  STCRecovery a -> "$recovery" </> ppA a
-  STCRemoval a -> "$removal" </> ppA a
-  STCRecrem a aa -> "$recrem" </> ppAA a aa
-  STCSkew a -> "$skew" </> ppA a
-  STCTimeSkew (STCArgs de re tcl n) meb mra ->
-    "$timeskew"
-      </> par
-        ( pTCE re <.> pTCE de
-            <.> trailoptcat (<.>) [pexpr tcl, pid n, pm (gpadj prettyCExpr) meb, pm (gpadj prettyCExpr) mra]
-        )
-  STCFullSkew (STCArgs de re tcl0 n) tcl1 meb mra ->
-    "$fullskew"
-      </> par
-        ( pTCE re <.> pTCE de <.> pexpr tcl0
-            <.> trailoptcat
-              (<.>)
-              [pexpr tcl1, pid n, pm (gpadj prettyCExpr) meb, pm (gpadj prettyCExpr) mra]
-        )
-  STCPeriod re tcl n -> "$period" </> par (pCTCE re <.> pexpr tcl <> prid n)
-  STCWidth re tcl mt n ->
-    "$width"
-      </> par
-        (pCTCE re <.> trailoptcat (<.>) [pexpr tcl, pm (gpadj prettyCExpr) mt, pid n])
-  STCNoChange re de so eo n ->
-    "$nochange"
-      </> par
-        (pTCE re <.> pTCE de <.> ngpadj prettyMTM so <.> ngpadj prettyMTM eo <> prid n)
+        else group $ "edge" <=> brk (csl mempty mempty raw $ V.ifoldr pED [] x)
   where
-    prid s = piff (comma <+> padj prettyIdent s) $ B.null s
-    pid s = piff (padj prettyIdent s) $ B.null s
+    pED i b =
+      if b
+        then (:) $ case i of
+          0 -> "01"
+          1 -> "0x"
+          2 -> "0z"
+          3 -> "10"
+          4 -> "1x"
+          5 -> "1z"
+          6 -> "x0"
+          7 -> "x1"
+          8 -> "z0"
+          9 -> "z1"
+        else id
+
+prettyXparam :: Doc -> ComType () -> NonEmpty (Identified CMinTypMax) -> Doc
+prettyXparam pre t =
+  prettyItemsid (pre <=> prettyComType (const mempty) t) $
+    \(Identified i v) -> prettyEq (rawId i) $ prettyCMTM v
+
+type EDI = Either [Range2] CExpr
+
+data AllBlockDecl
+  = ABDReg SignRange (NonEmpty (Identified EDI))
+  | ABDInt (NonEmpty (Identified EDI))
+  | ABDReal (NonEmpty (Identified EDI))
+  | ABDTime (NonEmpty (Identified EDI))
+  | ABDRealTime (NonEmpty (Identified EDI))
+  | ABDEvent (NonEmpty (Identified [Range2]))
+  | ABDLocalParam (ComType ()) (NonEmpty (Identified CMinTypMax))
+  | ABDParameter (ComType ()) (NonEmpty (Identified CMinTypMax))
+  | ABDPort Dir (ComType Bool) (NonEmpty Identifier)
+
+fromBlockDecl ::
+  (forall x. f x -> NonEmpty (Identified x)) -> (t -> EDI) -> BlockDecl f t -> AllBlockDecl
+fromBlockDecl ff ft bd = case bd of
+  BDReg sr x -> convt (ABDReg sr) x
+  BDInt x -> convt ABDInt x
+  BDReal x -> convt ABDReal x
+  BDTime x -> convt ABDTime x
+  BDRealTime x -> convt ABDRealTime x
+  BDEvent r2 -> conv ABDEvent r2
+  BDLocalParam t v -> conv (ABDLocalParam t) v
+  where
+    conv c = c . ff
+    convt c = c . NE.map (\(Identified i x) -> Identified i $ ft x) . ff
+
+fromStdBlockDecl :: AttrIded StdBlockDecl -> Attributed AllBlockDecl
+fromStdBlockDecl (AttrIded a i sbd) =
+  Attributed a $ case sbd of
+    SBDParameter (Parameter t v) -> ABDParameter t [Identified i v]
+    SBDBlockDecl bd -> fromBlockDecl ((:|[]) . Identified i . runIdentity) Left bd
+    
+prettyAllBlockDecl :: AllBlockDecl -> Doc
+prettyAllBlockDecl x = case x of
+  ABDReg sr l -> mkedi ("reg" <?=> prettySignRange sr) l
+  ABDInt l -> mkedi "integer" l
+  ABDReal l -> mkedi "real" l
+  ABDTime l -> mkedi "time" l
+  ABDRealTime l -> mkedi "realtime" l
+  ABDEvent l ->
+    prettyItemsid "event" (\(Identified i r) -> padjWith prettyIdent (prettyR2s r) i) l
+  ABDLocalParam t l -> prettyXparam "localparam" t l
+  ABDParameter t l -> prettyXparam "parameter" t l
+  ABDPort d t l -> prettyItemsid (viaShow d <?=> prettyComType (pift "reg") t) prettyIdent l
+  where
+    mkedi h l =
+      prettyItemsid
+        h
+        ( \(Identified i edi) -> case edi of
+            Left r2 -> padjWith prettyIdent (group $ prettyR2s r2) i
+            Right ce -> prettyEq (rawId i) $ prettyCExpr ce
+        )
+        l
+
+prettyAllBlockDecls :: [Attributed AllBlockDecl] -> Doc
+prettyAllBlockDecls =
+  nonEmpty mempty $
+    prettyregroup
+      (<#>)
+      (\(Attributed a abd) -> prettyAttrng a $ prettyAllBlockDecl abd)
+      id
+      (addAttributed $ \x y -> case (x, y) of
+        (ABDReg nsr nl, ABDReg sr l) | nsr == sr -> Just $ ABDReg sr $ nl <> l
+        (ABDInt nl, ABDInt l) -> Just $ ABDInt $ nl <> l
+        (ABDReal nl, ABDReal l) -> Just $ ABDReal $ nl <> l
+        (ABDTime nl, ABDTime l) -> Just $ ABDTime $ nl <> l
+        (ABDRealTime nl, ABDRealTime l) -> Just $ ABDRealTime $ nl <> l
+        (ABDEvent nl, ABDEvent l) -> Just $ ABDEvent $ nl <> l
+        (ABDLocalParam nt nl, ABDLocalParam t l) | nt == t -> Just $ ABDLocalParam t $ nl <> l
+        (ABDParameter nt nl, ABDParameter t l) | nt == t -> Just $ ABDParameter t $ nl <> l
+        (ABDPort nd nt nl, ABDPort d t l) | nd == d && nt == t -> Just $ ABDPort d t $ nl <> l
+        _ -> Nothing
+      )
+
+prettyStdBlockDecls :: [AttrIded StdBlockDecl] -> Doc
+prettyStdBlockDecls = prettyAllBlockDecls . map fromStdBlockDecl
+
+prettyTFBlockDecls :: (d -> Dir) -> [AttrIded (TFBlockDecl d)] -> Doc
+prettyTFBlockDecls f =
+  prettyAllBlockDecls
+    . map
+      ( \(AttrIded a i x) -> case x of
+          TFBDPort d t -> Attributed a $ ABDPort (f d) t [i]
+          TFBDStd sbd -> fromStdBlockDecl (AttrIded a i sbd)
+      )
+
+prettyStatement :: Statement -> Doc
+prettyStatement x = case x of
+  SBlockAssign b (Assign lv v) dec ->
+    let delevctl x = case x of
+          DECRepeat e ev ->
+            group ("repeat" <=> gpar (padj prettyExpr e)) <=> fst (prettyEventControl ev)
+          DECDelay d -> fst $ prettyDelay1 d
+          DECEvent e -> fst $ prettyEventControl e
+     in ng $
+          group (fst $ prettyVarLV lv)
+            <=> group (piff langle b <> equals <+> pm delevctl dec <?=> gpadj prettyExpr v)
+            <> semi
+  SCase zox e b s ->
+    block
+      ( nest $
+          "case" <> case zox of {ZOXZ -> "z"; ZOXO -> mempty; ZOXX -> "x"}
+            <=> gpar (padj prettyExpr e)
+      )
+      "endcase"
+      $ pl
+        (<#>)
+        (\(CaseItem p v) -> gpadj (cslid1 prettyExpr) p <> colon <+> ng (prettyMybStmt v))
+        b
+        <?#> piff (nest $ "default:" <=> prettyMybStmt s) (s == Attributed [] Nothing)
+  SIf c t f ->
+    let head = "if" <=> gpar (padj prettyExpr c)
+        truebranch = prettyRMybStmt t
+     in case f of
+          Attributed [] Nothing -> ng head <> truebranch
+          -- `else` and `begin`/`fork` at same indentation level
+          Attributed [] (Just x@(SBlock _ _ _)) ->
+            ng (group head <> truebranch) <#> "else" <=> prettyStatement x
+          Attributed [] (Just x@(SIf _ _ _)) -> -- `if` and `else if` at same indentation level
+            ng (group head <> truebranch) <#> "else" <=> prettyStatement x
+          _ -> ng (group head <> truebranch) <#> nest ("else" <> prettyRMybStmt f)
+  SDisable hi -> group $ "disable" <=> padj prettyHierIdent hi <> semi
+  SEventTrigger hi e ->
+    group $
+      "->" <+> padj prettyHierIdent hi
+        <> pl (</>) (group . brk . padj prettyExpr) e
+        <> semi
+  SLoop ls s ->
+    let pva = gpadj prettyVarAssign
+        head = case ls of
+          LSForever -> "forever"
+          LSRepeat e -> "repeat" <=> gpar (padj prettyExpr e)
+          LSWhile e -> "while" <=> gpar (padj prettyExpr e)
+          LSFor i c u -> "for" <=> gpar (pva i <> semi <+> gpadj prettyExpr c <> semi <+> pva u)
+     in ng head <=> prettyAttrStmt s
+  SProcContAssign pca ->
+    (<> semi) $ group $ case pca of
+      PCAAssign va -> "assign" <=> padj prettyVarAssign va
+      PCADeassign lv -> "deassign" <=> padj prettyVarLV lv
+      PCAForce lv -> "force" <=> either (padj prettyVarAssign) (padj prettyNetAssign) lv
+      PCARelease lv -> "release" <=> either (padj prettyVarLV) (padj prettyNetLV) lv
+  SProcTimingControl dec s ->
+    group (fst $ either prettyDelay1 prettyEventControl dec) <=> prettyMybStmt s
+  SBlock h ps s ->
+    block
+      (nest $ (if ps then "fork" else "begin") <?/> pm (\(s, _) -> colon <+> rawId s) h)
+      (if ps then "join" else "end")
+      $ maybe mempty (prettyStdBlockDecls . snd) h <?#> pl (<#>) prettyAttrStmt s
+  SSysTaskEnable s a ->
+    group ("$" <> padj prettyBS s <> pcslid (maybe (mkid mempty) prettyExpr) a) <> semi
+  STaskEnable hi a -> group (padj prettyHierIdent hi <> pcslid prettyExpr a) <> semi
+  SWait e s -> ng ("wait" <=> gpar (padj prettyExpr e)) <> prettyRMybStmt s
+
+prettyAttrStmt :: AttrStmt -> Doc
+prettyAttrStmt (Attributed a s) = prettyAttr a <?=> nest (prettyStatement s)
+
+prettyMybStmt :: MybStmt -> Doc
+prettyMybStmt (Attributed a s) = case s of
+  Nothing -> prettyAttr a <> semi
+  Just s -> prettyAttr a <?=> prettyStatement s
+
+prettyRMybStmt :: MybStmt -> Doc
+prettyRMybStmt (Attributed a s) =
+  case a of {[] -> mempty; _ -> newline <> prettyAttr a}
+    <> maybe semi (\x -> newline <> prettyStatement x) s
+
+prettyPortAssign :: PortAssign -> Doc
+prettyPortAssign x = case x of
+  PortPositional l ->
+    cslid
+      mempty
+      mempty
+      ( \(Attributed a e) -> case e of
+          Nothing -> mkid $ prettyAttr a
+          Just e -> first (\x -> group $ prettyAttrng a x) $ prettyExpr e
+      )
+      l
+  PortNamed l ->
+    csl
+      mempty
+      softline
+      ( \(AttrIded a i e) ->
+          group $ prettyAttrng a $ dot <> padj prettyIdent i <> gpar (pm (padj prettyExpr) e)
+      )
+      l
+
+prettyModGenSingleItem :: ModGenSingleItem -> Doc
+prettyModGenSingleItem x = case x of
+  MGINetInit nt ds np l -> prettyItemsid (viaShow nt <?=> prettyDriveStrength ds <?=> com np) pide l
+  MGINetDecl nt np l -> prettyItemsid (viaShow nt <?=> com np) pidd l
+  MGITriD ds np l -> prettyItemsid ("trireg" <?=> prettyDriveStrength ds <?=> com np) pide l
+  MGITriC cs np l ->
+    prettyItemsid ("trireg" <?=> piff (viaShow cs) (cs == CSMedium) <?=> com np) pidd l
+  MGIBlockDecl bd -> prettyAllBlockDecl $ fromBlockDecl getCompose id bd
+  MGIGenVar l -> prettyItemsid "genvar" prettyIdent l
+  MGITask aut s d b ->
+    block
+      (ng $ group ("task" <?=> mauto aut) <=> padj prettyIdent s <> semi)
+      "endtask"
+      (prettyTFBlockDecls id d <?#> nest (prettyMybStmt b))
+  MGIFunc aut t s d b ->
+    block
+      ( ng $
+          group ("function" <?=> mauto aut <?=> pm (prettyComType $ const mempty) t)
+            <=> padj prettyIdent s
+            <> semi
+      )
+      "endfunction"
+      (prettyTFBlockDecls (const DirIn) d <?#> nest (prettyStatement $ toStatement b))
+  MGIDefParam l ->
+    prettyItemsid
+      "defparam"
+      (\(ParamOver hi v) -> prettyEq (fst $ prettyHierIdent hi) $ prettyCMTM v)
+      l
+  MGIContAss ds d3 l ->
+    prettyItemsid ("assign" <?=> prettyDriveStrength ds <?=> pm (fst . prettyDelay3) d3) prettyNetAssign l
+  MGICMos r d3 l ->
+    prettyItems
+      (pift "r" r <> "cmos" <?=> pm (fst . prettyDelay3) d3)
+      ( \(GICMos s rng lv inp nc pc) ->
+          pidr s rng
+            <> gpar
+              ( ngpadj prettyNetLV lv
+                  <.> ngpadj prettyExpr inp
+                  <.> ngpadj prettyExpr nc
+                  <.> ngpadj prettyExpr pc
+              )
+      )
+      l
+  MGIEnable r oz ds d3 l ->
+    prettyItems
+      ( (if r then "not" else "buf") <> "if" <> (if oz then "1" else "0")
+          <?=> prettyDriveStrength ds
+          <?=> pm (fst . prettyDelay3) d3
+      )
+      ( \(GIEnable s r lv inp e) ->
+          pidr s r <> gpar (ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr e)
+      )
+      l
+  MGIMos r np d3 l ->
+    prettyItems
+      (pift "r" r <> (if np then "n" else "p") <> "mos" <?=> pm (fst . prettyDelay3) d3)
+      ( \(GIMos s r lv inp e) ->
+          pidr s r <> gpar (ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr e)
+      )
+      l
+  MGINIn nin n ds d2 l ->
+    prettyItems
+      ( (if nin == NITXor then "x" <> pift "n" n <> "or" else pift "n" n <> viaShow nin)
+          <?=> prettyDriveStrength ds
+          <?=> pm (fst . prettyDelay2) d2
+      )
+      ( \(GINIn s rng lv inp) ->
+          pidr s rng <> gpar (ngpadj prettyNetLV lv <.> padj (cslid1 $ mkng prettyExpr) inp)
+      )
+      l
+  MGINOut r ds d2 l ->
+    prettyItems
+      ((if r then "not" else "buf") <?=> prettyDriveStrength ds <?=> pm (fst . prettyDelay2) d2)
+      ( \(GINOut s rng lv inp) ->
+          pidr s rng <> gpar (padj (cslid1 $ mkng prettyNetLV) lv <.> ngpadj prettyExpr inp)
+      )
+      l
+  MGIPassEn r oz d2 l ->
+    prettyItems
+      (pift "r" r <> "tranif" <> (if oz then "1" else "0") <?=> pm (fst . prettyDelay2) d2)
+      ( \(GIPassEn s r ll rl e) ->
+          pidr s r <> gpar (ngpadj prettyNetLV ll <.> ngpadj prettyNetLV rl <.> ngpadj prettyExpr e)
+      )
+      l
+  MGIPass r l ->
+    prettyItems
+      (pift "r" r <> "tran")
+      (\(GIPass s r ll rl) -> pidr s r <> gpar (ngpadj prettyNetLV ll <.> ngpadj prettyNetLV rl))
+      l
+  MGIPull ud ds l ->
+    prettyItems
+      ("pull" <> (if ud then "up" else "down") <?=> prettyDriveStrength ds)
+      (\(GIPull s rng lv) -> pidr s rng <> gpar (gpadj prettyNetLV lv))
+      l
+  MGIUDPInst kind ds d2 l ->
+    prettyItems
+      (rawId kind <?=> prettyDriveStrength ds <?=> pm (fst . prettyDelay2) d2)
+      ( \(UDPInst s rng lv args) ->
+          pidr s rng <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
+      )
+      l
+  MGIModInst kind param l ->
+    prettyItems
+      ( rawId kind <?=> case param of
+          ParamPositional l -> cslid ("#(" <> softspace) rparen (mkng prettyExpr) l
+          ParamNamed l ->
+            csl
+              ("#(" <> softspace)
+              (softline <> rparen)
+              (\(Identified i e) -> ng $ dot <> padj prettyIdent i <> gpar (pm (padj prettyMTM) e))
+              l
+      )
+      (\(ModInst s rng args) -> pidr s rng <> gpar (prettyPortAssign args))
+      l
+  MGIUnknownInst kind param l ->
+    prettyItems
+      ( rawId kind <?=> case param of
+          Nothing -> mempty
+          Just (Left e) -> "#" <> par (padj prettyExpr e)
+          Just (Right (e0, e1)) -> "#" <> par (gpadj prettyExpr e0 <.> gpadj prettyExpr e1)
+      )
+      ( \(UknInst s rng lv args) ->
+          pidr s rng <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
+      )
+      l
+  MGIInitial s -> "initial" <=> prettyAttrStmt s
+  MGIAlways s -> "always" <=> prettyAttrStmt s
+  MGILoopGen si vi cond su vu s ->
+    let pas i = gpadj $ prettyEq (rawId i) . prettyCExpr
+        head = "for" <=> gpar (pas si vi <> semi <+> ngpadj prettyCExpr cond <> semi <+> pas su vu)
+     in case s of
+          GBSingle (Attributed a x) ->
+            ng $ group head <=> prettyAttr a <?=> prettyModGenSingleItem x
+          GBBlock s r -> ng head <=> prettyGBlock s r
+  MGIIf c t f ->
+    let head = "if" <=> gpar (padj prettyCExpr c)
+     in ( case t of
+            Nothing -> head <> semi
+            Just t -> case t of
+              GBSingle (Attributed a x) ->
+                ng $ group head <=> prettyAttr a <?=> prettyModGenSingleItem x
+              GBBlock s r -> ng head <=> prettyGBlock s r
+        )
+        <?#> case f of
+          Nothing -> mempty
+          -- `else` and `begin` at same indentation level
+          Just (GBBlock s r) -> "else" <=> prettyGBlock s r
+          -- `if` and `else if` at same indentation level
+          Just (GBSingle (Attributed [] x@(MGIIf _ _ _))) -> "else" <=> prettyModGenSingleItem x
+          Just (GBSingle (Attributed a x)) ->
+            nest $ "else" <=> prettyAttr a <?=> prettyModGenSingleItem x
+  MGICase c b md ->
+    block
+      (ng $ "case" <=> gpar (padj prettyCExpr c))
+      "endcase"
+      $ pl
+        (<#>)
+        ( \(GenCaseItem p v) ->
+            gpadj (cslid1 prettyCExpr) p <> colon <+> ng (maybe semi prettyGenerateBlock v)
+        )
+        b
+        <?#> pm (\d -> nest $ "default:" <=> prettyGenerateBlock d) md
+  where
+    pidr (Identifier i) r =
+      piff (gpadj (padjWith prettyBS $ pm prettyRange2 r) i) $ B.null i
+    mauto b = pift "automatic" b
+    pidd (NetDecl i d) = padjWith prettyIdent (prettyR2s d) i
+    pide (NetInit i e) = prettyEq (rawId i) $ prettyExpr e
+    sign b = pift "signed" b
+    com (NetProp b vs d3) =
+      maybe
+        (sign b)
+        ( \(vs, r2) ->
+            pm (\b -> if b then "vectored" else "scalared") vs <?=> sign b <?=> prettyRange2 r2
+        )
+        vs
+        <?=> pm (fst . prettyDelay3) d3
+
+prettySpecParams :: Maybe Range2 -> NonEmpty SpecParamDecl -> Doc
+prettySpecParams rng =
+  prettyItemsid
+    ("specparam" <?=> pm prettyRange2 rng)
+    $ \d -> case d of
+      SPDAssign i v -> prettyEq (rawId i) $ prettyCMTM v
+      SPDPathPulse i o r e ->
+        prettyEq
+          (pathpulse i o)
+          (mkid $ par $ ngpadj prettyCMTM r <> piff (comma <+> ngpadj prettyCMTM e) (r == e))
+  where
+    pathpulse i@(SpecTerm (Identifier j) m) o@(SpecTerm (Identifier k) _) =
+      -- The ambiguous junk known as `PATHPULSE$` or `PATHPULSE$j[m]$k[e]`
+      -- The decision to print the middle `$` depends on whether there is a `k`
+      -- and whether `j$k` got lexed as a single identifier
+      -- This second part is impossible when `[m]` exists or `j` is escaped
+      "PATHPULSE$" <> ngpadj prettySpecTerm i
+        <> piff "$" (B.null k || (m == Nothing && maybe True ((c2w '\\' /=) . fst) (B.uncons j)))
+        <> ng (fst $ prettySpecTerm o)
+
+-- Damn, the choice to inline the old SISystemTimingCheck was bad
+data SpecifyItem'
+  = SI'SpecParam (Maybe Range2) (NonEmpty SpecParamDecl)
+  | SI'PulsestyleOnevent (NonEmpty SpecTerm)
+  | SI'PulsestyleOndetect (NonEmpty SpecTerm)
+  | SI'Showcancelled (NonEmpty SpecTerm)
+  | SI'Noshowcancelled (NonEmpty SpecTerm)
+  | SI'PathDecl
+    ModulePathCondition
+    SpecPath
+    (Maybe Bool)
+    (Maybe (Expr, Maybe Bool))
+    (NonEmpty CMinTypMax)
+  | SI'Setup STCArgs
+  | SI'Hold STCArgs
+  | SI'SetupHold STCArgs STCAddArgs
+  | SI'Recovery STCArgs
+  | SI'Removal STCArgs
+  | SI'Recrem STCArgs STCAddArgs
+  | SI'Skew STCArgs
+  | SI'TimeSkew STCArgs (Maybe CExpr) (Maybe CExpr)
+  | SI'FullSkew STCArgs Expr (Maybe CExpr) (Maybe CExpr)
+  | SI'Period ControlledTimingCheckEvent Expr Identifier
+  | SI'Width ControlledTimingCheckEvent Expr (Maybe CExpr) Identifier
+  | SI'NoChange TimingCheckEvent TimingCheckEvent MinTypMax MinTypMax Identifier
+
+prettyPathDecl :: SpecPath -> Maybe Bool -> Maybe (Expr, Maybe Bool) -> Doc
+prettyPathDecl p pol eds =
+  gpar $
+    -- maybe edge then source(s)
+    ng (pm (pm (\e -> if e then "posedge" else "negedge") . snd) eds <?=> group cin)
+      <=> pift po noedge <> (if pf then "=>" else "*>")
+      -- destination(s) or '(' destination(s) then maybe polarity ':' data ')'
+      <+> ng (maybe cout (\(e, _) -> par $ cout <> po <> colon <+> padj prettyExpr e) eds)
+  where
+    ppSTs = cslid1 $ mkng prettySpecTerm
+    -- polarity
+    po = pm (\p -> if p then "+" else "-") pol
+    -- edge sensitive path polarity isn't at the same place as non edge sensitive
+    noedge = eds == Nothing
+    fne = if noedge then uncurry (<>) else \x -> fst x <> newline
+    -- parallel or full, source(s), destination(s)
+    (pf, (cin, _), cout) = case p of
+      SPParallel i o -> (True, prettySpecTerm i, fne $ prettySpecTerm o)
+      SPFull i o -> (False, ppSTs i, fne $ ppSTs o)
+
+prettySpecifyItem :: SpecifyItem' -> Doc
+prettySpecifyItem x =
+  nest $ case x of
+    SI'SpecParam r l -> prettySpecParams r l
+    SI'PulsestyleOnevent o -> prettyItemsid "pulsestyle_onevent" prettySpecTerm o
+    SI'PulsestyleOndetect o -> prettyItemsid "pulsestyle_ondetect" prettySpecTerm o
+    SI'Showcancelled o -> prettyItemsid "showcancelled" prettySpecTerm o
+    SI'Noshowcancelled o -> prettyItemsid "noshowcancelled" prettySpecTerm o
+    SI'PathDecl mpc p pol eds l ->
+      ( case mpc of
+          MPCCond e -> group $ "if" <=> gpar (padj (prettyGExpr prettyIdent (const mempty) 12) e)
+          MPCAlways -> mempty
+          MPCNone -> "ifnone"
+      )
+        <?=> padj (prettyEq (prettyPathDecl p pol eds) . cslid1 (mkng prettyCMTM)) l
+        <> semi
+    SI'Setup (STCArgs d r e n) -> "$setup" </> ppA (STCArgs r d e n) <> semi
+    SI'Hold a -> "$hold" </> ppA a <> semi
+    SI'SetupHold a aa -> "$setuphold" </> ppAA a aa <> semi
+    SI'Recovery a -> "$recovery" </> ppA a <> semi
+    SI'Removal a -> "$removal" </> ppA a <> semi
+    SI'Recrem a aa -> "$recrem" </> ppAA a aa <> semi
+    SI'Skew a -> "$skew" </> ppA a <> semi
+    SI'TimeSkew (STCArgs de re tcl n) meb mra ->
+      "$timeskew"
+        </> gpar
+          ( pTCE re <.> pTCE de
+              <.> toc [pexpr tcl, pid n, pm (gpadj prettyCExpr) meb, pm (gpadj prettyCExpr) mra]
+          )
+        <> semi
+    SI'FullSkew (STCArgs de re tcl0 n) tcl1 meb mra ->
+      "$fullskew"
+        </> gpar
+          ( pTCE re <.> pTCE de <.> pexpr tcl0
+              <.> toc [pexpr tcl1, pid n, pm (gpadj prettyCExpr) meb, pm (gpadj prettyCExpr) mra]
+          )
+        <> semi
+    SI'Period re tcl n -> "$period" </> par (pCTCE re <.> pexpr tcl <> prid n) <> semi
+    SI'Width re tcl mt n ->
+      "$width" </> gpar (pCTCE re <.> toc [pexpr tcl, pm (gpadj prettyCExpr) mt, pid n]) <> semi
+    SI'NoChange re de so eo n ->
+      "$nochange"
+        </> gpar (pTCE re <.> pTCE de <.> ngpadj prettyMTM so <.> ngpadj prettyMTM eo <> prid n)
+        <> semi
+  where
+    toc :: [Doc] -> Doc
+    toc = trailoptcat (<.>)
+    prid (Identifier s) = piff (comma <+> padj prettyBS s) $ B.null s
+    pid (Identifier s) = piff (padj prettyBS s) $ B.null s
     pexpr = gpadj prettyExpr
     pTCC (b, e) = "&&&" <+> pift "~" b <?+> gpadj prettyExpr e
     pTCE (TimingCheckEvent ev st tc) =
-      ng $ pm prettyEdgeDesc ev <?=> gpadj (pidWith prettySpecTerm newline $ pm pTCC tc) st
+      ng $ pm prettyEdgeDesc ev <?=> gpadj (pspWith prettySpecTerm $ pm pTCC tc) st
     pCTCE (ControlledTimingCheckEvent ev st tc) =
-      ng $ prettyEdgeDesc ev <?=> gpadj (pidWith prettySpecTerm newline $ pm pTCC tc) st
-    ppA (STCArgs de re tcl n) = par $ pTCE re <.> pTCE de <.> pexpr tcl <> prid n
+      ng $ prettyEdgeDesc ev <?=> gpadj (pspWith prettySpecTerm $ pm pTCC tc) st
+    ppA (STCArgs de re tcl n) = gpar $ pTCE re <.> pTCE de <.> pexpr tcl <> prid n
     pIMTM (Identified i mr) =
-      ngpadj (pidWith prettyIdent softline $ pm (group . brk . padj prettyCMTM) mr) i
+      ngpadj (padjWith prettyIdent $ pm (group . brk . padj prettyCMTM) mr) i
     ppAA (STCArgs de re tcl0 n) (STCAddArgs tcl1 msc mtc mdr mdd) =
-      par $
+      gpar $
         pTCE re <.> pTCE de <.> pexpr tcl0
-          <.> trailoptcat
-            (<.>)
+          <.> toc
             [ pexpr tcl1,
               pid n,
               pm (ngpadj prettyMTM) msc,
@@ -815,913 +925,287 @@ prettySTC x = case x of
               pIMTM mdd
             ]
 
-data SpecifyItem'
-  = SI'Pulsestyle Bool (NonEmpty SpecTerm)
-  | SI'Showcancelled Bool (NonEmpty SpecTerm)
-  | SI'SystemTimingCheck SystemTimingCheck
-  | SI'PathDecl ModulePathCondition SpecPath (Maybe Bool) (Maybe (Expr, Maybe Bool)) (NonEmpty CMinTypMax)
-
-prettySpecifyItems :: [SpecifyItem] -> Doc
-prettySpecifyItems =
-  prettyregroup
-    ( \x -> nest $
-        (<> semi) $ case x of
-          SI'Pulsestyle ed o -> "pulsestyle_on" <> (if ed then "event" else "detect") <=> padj rppSTs o
-          SI'Showcancelled c o -> piff "no" c <> "showcancelled" <=> padj rppSTs o
-          SI'PathDecl cond conn pol edep v ->
-            let po = pm (\p -> if p then "+" else "-") pol
-                nedge = edep == Nothing
-                (pf, (cin, _), cout) = case conn of
-                  SPParallel i o ->
-                    ( True,
-                      prettySpecTerm newline i,
-                      uncurry (<>) $ prettySpecTerm (if nedge then softline else newline) o
-                    )
-                  SPFull i o ->
-                    ( False,
-                      ppSTs newline i,
-                      uncurry (<>) $ ppSTs (if nedge then softline else newline) o
-                    )
-             in nest $
-                  ( case cond of
-                      MPCCond e -> group $ "if" <=> par (padj (prettyGExpr prettyIdent (const mempty) 12) e)
-                      MPCAlways -> mempty
-                      MPCNone -> "ifnone"
-                  )
-                    <?=> ng
-                      ( group
-                          ( par $
-                              ng (pm (pm (\e -> if e then "posedge" else "negedge") . snd) edep <?=> group cin)
-                                <=> pift po nedge <> (if pf then "=>" else "*>")
-                                <+> ng (maybe cout (\(e, _) -> par $ cout <> po <> colon <+> padj prettyExpr e) edep)
-                          )
-                          <=> equals <+> group (padj (cslid1 $ \s -> first ng . prettyCMTM s) v)
-                      )
-          SI'SystemTimingCheck stc -> prettySTC stc
-    )
-    ( \si -> case si of
-        SIPulsestyle b s -> SI'Pulsestyle b $ s :| []
-        SIShowcancelled b s -> SI'Showcancelled b $ s :| []
-        SISystemTimingCheck s -> SI'SystemTimingCheck s
-        SIPathDeclaration mpd sp mb meb v -> SI'PathDecl mpd sp mb meb v
-    )
-    ( \si si' -> case (si', si) of
-        (SI'Pulsestyle b' s', SIPulsestyle b s) | b == b' -> Just $ SI'Pulsestyle b' $ s <| s'
-        (SI'Showcancelled b' s', SIShowcancelled b s) | b == b' -> Just $ SI'Showcancelled b' $ s <| s'
-        _ -> Nothing
-    )
-  where
-    ppSTs = cslid1 $ mkng prettySpecTerm
-    rppSTs = rcslid1 $ mkng prettySpecTerm
-
-prettyEDI :: Doc -> Either [Range2] CExpr -> (Doc, Doc, Doc)
-prettyEDI s x = case x of
-  Left r2 -> (softline, group $ prettyR2s r2, s)
-  Right ce -> let (x, d) = prettyCExpr s ce in (newline, equals <+> group x, d)
-
-data BlockDecl' t
-  = BD'Reg SignRange (NonEmpty (Identified t))
-  | BD'Int (NonEmpty (Identified t))
-  | BD'Real (NonEmpty (Identified t))
-  | BD'Time (NonEmpty (Identified t))
-  | BD'RealTime (NonEmpty (Identified t))
-  | BD'Event (NonEmpty (Identified [Range2]))
-
-mkbd' :: B.ByteString -> BlockDecl t -> BlockDecl' t
-mkbd' s bd = case bd of
-  BDReg sr x -> BD'Reg sr $ Identified s x :| []
-  BDInt x -> BD'Int $ Identified s x :| []
-  BDReal x -> BD'Real $ Identified s x :| []
-  BDTime x -> BD'Time $ Identified s x :| []
-  BDRealTime x -> BD'RealTime $ Identified s x :| []
-  BDEvent r2 -> BD'Event $ Identified s r2 :| []
-
-prettyBD' :: (Doc -> t -> (Doc, Doc, Doc)) -> BlockDecl' t -> Doc
-prettyBD' f x = nest $
-  (<> semi) $ case x of
-    BD'Reg sr l -> group ("reg" <?=> prettySignRange sr) <=> pl' l
-    BD'Int l -> "integer" <=> pl' l
-    BD'Real l -> "real" <=> pl' l
-    BD'Time l -> "time" <=> pl' l
-    BD'RealTime l -> "realtime" <=> pl' l
-    BD'Event l -> "event" <=> gpadj (cslid1 $ pIdentified softline prettyR2s) l
-  where
-    pl' = gpadj $
-      cslid1 $ \s (Identified i x) ->
-        let (si, d, so) = f s x in mkg (pidWith prettyIdent si d) so i
-
-prettyMGDBlockDecl :: Attributed (NonEmpty (Identified (BlockDecl (Either [Range2] CExpr)))) -> Doc
-prettyMGDBlockDecl (Attributed a l) =
-  prettyregroup
-    (\x -> prettyAttr a <?=> prettyBD' prettyEDI x)
-    (\(Identified s bd) -> mkbd' s bd)
-    ( \(Identified s bd) bd' -> case (bd', bd) of
-        (BD'Reg sr' l, BDReg sr x) | sr == sr' -> Just $ BD'Reg sr' $ Identified s x <| l
-        (BD'Int l, BDInt x) -> Just $ BD'Int $ Identified s x <| l
-        (BD'Real l, BDReal x) -> Just $ BD'Real $ Identified s x <| l
-        (BD'Time l, BDTime x) -> Just $ BD'Time $ Identified s x <| l
-        (BD'RealTime l, BDRealTime x) -> Just $ BD'RealTime $ Identified s x <| l
-        (BD'Event l, BDEvent r2) -> Just $ BD'Event $ Identified s r2 <| l
-        _ -> Nothing
-    )
-    l
-
-prettyStdBlockDecl :: StdBlockDecl -> Doc
-prettyStdBlockDecl =
-  prettyregroup
-    (\(Attributed a bd') -> prettyAttr a <?=> prettyBD' (\s _ -> (mempty, mempty, s)) bd')
-    (\(AttrIded a s bd) -> Attributed a $ mkbd' s bd)
-    ( \(AttrIded na s bd) (Attributed a bd') ->
-        if na /= a
-          then Nothing
-          else case (bd', bd) of
-            (BD'Reg sr' l, BDReg sr x)
-              | sr == sr' ->
-                Just $ Attributed a $ BD'Reg sr' $ Identified s x <| l
-            (BD'Int l, BDInt x) -> Just $ Attributed a $ BD'Int $ Identified s x <| l
-            (BD'Real l, BDReal x) -> Just $ Attributed a $ BD'Real $ Identified s x <| l
-            (BD'Time l, BDTime x) -> Just $ Attributed a $ BD'Time $ Identified s x <| l
-            (BD'RealTime l, BDRealTime x) -> Just $ Attributed a $ BD'RealTime $ Identified s x <| l
-            (BD'Event l, BDEvent r2) -> Just $ Attributed a $ BD'Event $ Identified s r2 <| l
-            _ -> Nothing
-    )
-
-data NetKind'
-  = NK'NetA NetType DriveStrength (NonEmpty (Identified Expr))
-  | NK'NetD NetType (NonEmpty (Identified [Range2]))
-  | NK'TriA DriveStrength (NonEmpty (Identified Expr))
-  | NK'TriC ChargeStrength (NonEmpty (Identified [Range2]))
-
-prettyNetDecls ::
-  Attributed (Bool, Maybe (Maybe Bool, Range2), Maybe Delay3, NonEmpty (Identified NetKind)) ->
-  Doc
-prettyNetDecls (Attributed a (b, vs, d3, l)) =
-  prettyregroup
-    ( \nk' ->
-        prettyAttr a
-          <?=> ng
-            ( (<> semi) $ case nk' of
-                NK'NetA nt ds l -> group (viaShow nt <?=> prettyDriveStrength ds <?=> com) <?=> pide l
-                NK'NetD nt l -> group (viaShow nt <?=> com) <?=> pidd l
-                NK'TriA ds l -> group ("trireg" <?=> prettyDriveStrength ds <?=> com) <?=> pide l
-                NK'TriC cs l -> group ("trireg" <?=> piff (viaShow cs) (cs == CSMedium) <?=> com) <?=> pidd l
-            )
-    )
-    ( \(Identified s nk) -> case nk of
-        NKNet nt edsi -> case edsi of
-          Left r2 -> NK'NetD nt $ Identified s r2 :| []
-          Right (ds, e) -> NK'NetA nt ds $ Identified s e :| []
-        NKTriD ds e -> NK'TriA ds $ Identified s e :| []
-        NKTriC cs r2 -> NK'TriC cs $ Identified s r2 :| []
-    )
-    ( \(Identified s nk) nk' -> case (nk', nk) of
-        (NK'NetD nt' l, NKNet nt (Left r2))
-          | nt == nt' ->
-            Just $ NK'NetD nt' $ Identified s r2 <| l
-        (NK'NetA nt' ds' l, NKNet nt (Right (ds, e)))
-          | nt == nt' && ds == ds' ->
-            Just $ NK'NetA nt' ds' $ Identified s e <| l
-        (NK'TriA ds' l, NKTriD ds e) | ds == ds' -> Just $ NK'TriA ds' $ Identified s e <| l
-        (NK'TriC cs' l, NKTriC cs r2) | cs == cs' -> Just $ NK'TriC cs' $ Identified s r2 <| l
-        _ -> Nothing
-    )
-    l
-  where
-    pidd = gpadj $ cslid1 $ \s -> first ng . pIdentified softline prettyR2s s
-    pide = gpadj $
-      cslid1 $ \s (Identified i e) ->
-        first (\x -> ng $ raw i <=> equals <+> x) $ prettyExpr s e
-    sign = pift "signed" b
-    com =
-      maybe
-        sign
-        ( \(vs, r2) ->
-            pm (\b -> if b then "vectored" else "scalared") vs <?=> sign <?=> prettyRange2 r2
-        )
-        vs
-        <?=> pm prettyDelay3 d3
-
-prettyXparam :: Doc -> [Parameter] -> Doc
-prettyXparam pre =
-  prettyregroup
-    ( \(Attributed a (t, l)) ->
-        prettyAttr a
-          <?=> ng
-            ( group (pre <=> prettyFPT t)
-                <?=> padj
-                  ( cslid1 $
-                      \s (i, v) -> first (\x -> ng $ raw i <=> equals <+> group x) $ prettyCMTM s v
-                  )
-                  l
-            )
-          <> semi
-    )
-    (\(Parameter a s t v) -> Attributed a (t, (s, v) :| []))
-    ( \(Parameter na s nt v) (Attributed a (t, l)) ->
-        if na == a && nt == t then Just $ Attributed a (t, (s, v) <| l) else Nothing
-    )
-
-prettyParamStd :: [Parameter] -> [Parameter] -> StdBlockDecl -> Doc
-prettyParamStd p lp d =
-  prettyXparam "parameter" p <?#> prettyXparam "localparam" lp <?#> prettyStdBlockDecl d
-
-data ModGenDecl'
-  = MGD'BlockDecl (NonEmpty (Identified (BlockDecl (Either [Range2] CExpr))))
-  | MGD'Net Bool (Maybe (Maybe Bool, Range2)) (Maybe Delay3) (NonEmpty (Identified NetKind))
-  | MGD'GenVar (NonEmpty B.ByteString)
-  | MGD'Task
-      Bool
-      B.ByteString
-      [AttrIded (Dir, TaskFunType)]
-      [Parameter]
-      [Parameter]
-      StdBlockDecl
-      MybStmt
-  | MGD'Func
-      Bool
-      (Maybe FunParType)
-      B.ByteString
-      [AttrIded TaskFunType]
-      [Parameter]
-      [Parameter]
-      StdBlockDecl
-      Statement
-
-prettyModGenDecls :: [AttrIded ModGenDecl] -> Doc
-prettyModGenDecls =
-  prettyregroup
-    ( \(Attributed a x) -> case x of
-        MGD'BlockDecl l -> prettyMGDBlockDecl $ Attributed a $ NE.reverse l
-        MGD'Net b v d l -> prettyNetDecls $ Attributed a (b, v, d, NE.reverse l)
-        MGD'GenVar l -> prettyAttr a <?=> ng ("genvar" <=> padj (cslid1 prettyIdent) l) <> semi
-        MGD'Task aut s port param lp d b ->
-          prettyAttr a
-            <?=> block
-              ( group ("task" <?=> mauto aut)
-                  <=> ng
-                    ( padj prettyIdent s
-                        <> group
-                          ( par $
-                              prettyXregroup
-                                (<.>)
-                                pPort
-                                (\(AttrIded a s (d, t)) -> Attributed a (d, t, s :| []))
-                                ( \(AttrIded na s (nd, nt)) (Attributed a (d, t, l)) ->
-                                    if na == a && nd == d && nt == t
-                                      then Just $ Attributed a (d, t, s <| l)
-                                      else Nothing
-                                )
-                                port
-                          )
-                    )
-                    <> semi
-              )
-              "endtask"
-              (prettyParamStd param lp d <?#> prettyMybStmt b)
-        MGD'Func aut t s port param lp d b ->
-          prettyAttr a
-            <?=> block
-              ( group ("function" <?=> mauto aut <?=> pm prettyFPT t)
-                  <=> ng
-                    ( padj prettyIdent s
-                        <> group
-                          ( par $
-                              prettyXregroup
-                                (<.>)
-                                (\(Attributed a (t, l)) -> pPort $ Attributed a (DirIn, t, l))
-                                (\(AttrIded a s t) -> Attributed a (t, s :| []))
-                                ( \(AttrIded na s nt) (Attributed a (t, l)) ->
-                                    if na /= a || nt /= t
-                                      then Nothing
-                                      else Just $ Attributed a (t, s <| l)
-                                )
-                                port
-                          )
-                    )
-                    <> semi
-              )
-              "endfunction"
-              (prettyParamStd param lp d <?#> prettyStatement b)
-    )
-    ( \(AttrIded a s mgd) -> Attributed a $ case mgd of
-        MGDBlockDecl bd -> MGD'BlockDecl $ Identified s bd :| []
-        MGDNet nk b v d -> MGD'Net b v d $ Identified s nk :| []
-        MGDGenVar -> MGD'GenVar $ s :| []
-        MGDTask a port param lp d b -> MGD'Task a s port param lp d b
-        MGDFunc a t port param lp d b -> MGD'Func a t s port param lp d b
-    )
-    ( \(AttrIded na s mgd) (Attributed a mgd') ->
-        if na /= a
-          then Nothing
-          else case (mgd', mgd) of
-            (MGD'BlockDecl l, MGDBlockDecl bd) ->
-              Just $ Attributed a $ MGD'BlockDecl $ Identified s bd <| l
-            (MGD'Net b' v' d' l, MGDNet nk b v d)
-              | b == b' && v == v' && d == d' ->
-                Just $ Attributed a $ MGD'Net b' v' d' $ Identified s nk <| l
-            (MGD'GenVar l, MGDGenVar) -> Just $ Attributed a $ MGD'GenVar $ s <| l
-            _ -> Nothing
-    )
-  where
-    mauto b = pift "automatic" b
-    pPort (Attributed a (d, t, l)) =
-      prettyAttr a
-        <?=> nest
-          ( group
-              ( viaShow d <=> case t of
-                  TFTRegSignRange r sr -> group (pift "reg" r <?=> prettySignRange sr)
-                  TFTComType t -> viaShow t
-              )
-              <=> padj (cslid1 prettyIdent) l
-          )
-
-data ModGenItem'
-  = MGI'ContAss DriveStrength (Maybe Delay3) (NonEmpty NetAssign)
-  | MGI'GateInst (NonEmpty (Identified (Maybe Range2, GateInst)))
-  | MGI'UDPInst
-      B.ByteString
-      DriveStrength
-      (Maybe Delay2)
-      (NonEmpty (Identified (Maybe Range2, NetLValue, NonEmpty Expr)))
-  | MGI'ModInst B.ByteString ParamAssign (NonEmpty (Identified (Maybe Range2, PortAssign)))
-  | MGI'UnknownInst
-      B.ByteString
-      (Maybe (Either Expr (Expr, Expr)))
-      (NonEmpty (Identified (Maybe Range2, NetLValue, NonEmpty Expr)))
-  | MGI'Initial AttrStmt
-  | MGI'Always AttrStmt
-  | MGI'LoopGen (Identified CExpr) CExpr (Identified CExpr) GenerateBlock
-  | MGI'If CExpr (Maybe GenerateBlock) (Maybe GenerateBlock)
-  | MGI'Case CExpr [GenCaseItem] (Maybe GenerateBlock)
-
-mkmgi' :: ModGenItem -> ModGenItem'
-mkmgi' mgi = case mgi of
-  MGIContAss ds d3 ass -> MGI'ContAss ds d3 $ ass :| []
-  MGIGateInst s rng gi -> MGI'GateInst $ Identified s (rng, gi) :| []
-  MGIUDPInst kind ds d2 s rng lv args -> MGI'UDPInst kind ds d2 $ Identified s (rng, lv, args) :| []
-  MGIModInst kind param s rng args -> MGI'ModInst kind param $ Identified s (rng, args) :| []
-  MGIUnknownInst kind param s rng lv args ->
-    MGI'UnknownInst kind param $ Identified s (rng, lv, args) :| []
-  MGIInitial s -> MGI'Initial s
-  MGIAlways s -> MGI'Always s
-  MGILoopGen ini cond upd s -> MGI'LoopGen ini cond upd s
-  MGIIf c t f -> MGI'If c t f
-  MGICase c b d -> MGI'Case c b d
-
-ppMGI' :: Attributed ModGenItem' -> Doc
-ppMGI' (Attributed a x) = case x of
-  MGI'ContAss ds d3 l ->
-    prettyAttr a
-      <?=> ng
-        ( group
-            ( "assign" <?=> prettyDriveStrength ds
-                <?=> pm prettyDelay3 d3
-            )
-            <=> gpadj (cslid1 prettyNetAssign) l
-        )
-      <> semi
-  MGI'GateInst l -> prettyGateInsts (Attributed a $ NE.reverse l)
-  MGI'UDPInst kind ds d2 l ->
-    prettyAttr a
-      <?=> ng
-        ( group (raw kind <?=> prettyDriveStrength ds <?=> pm prettyDelay2 d2)
-            <=> csl1
-              ( \(Identified s (rng, lv, args)) ->
-                  ng $
-                    pidr s rng
-                      <> group
-                        ( par $
-                            gpadj prettyNetLV lv <.> padj (rcslid1 $ mkg prettyExpr) args
-                        )
-              )
-              l
-        )
-      <> semi
-  MGI'ModInst kind param l ->
-    prettyAttr a
-      <?=> ng
-        ( group
-            ( raw kind <?=> case param of
-                ParamPositional l -> cslid ("#(" <> softspace) rparen (\s -> first ng . prettyExpr s) l
-                ParamNamed l ->
-                  csl
-                    ("#(" <> softspace)
-                    (softline <> rparen)
-                    ( \(Identified i e) ->
-                        ng $ dot <> padj prettyIdent i <> group (par $ pm (padj prettyMTM) e)
-                    )
-                    l
-            )
-            <=> csl1
-              ( \(Identified s (rng, args)) ->
-                  ng $
-                    pidr s rng
-                      <> par
-                        ( case args of
-                            PortPositional l ->
-                              rcslid
-                                mempty
-                                mempty
-                                ( \s (Attributed a e) ->
-                                    first ((prettyAttr a <?=>) . ng) $ maybe (mempty, s) (prettyExpr s) e
-                                )
-                                l
-                            PortNamed l ->
-                              rcsl
-                                mempty
-                                softline
-                                ( \(AttrIded a i e) ->
-                                    group $
-                                      prettyAttr a
-                                        <?=> dot <> ng (padj prettyIdent i <> group (par $ pm (padj prettyExpr) e))
-                                )
-                                l
-                        )
-              )
-              l
-        )
-      <> semi
-  MGI'UnknownInst kind param l ->
-    prettyAttr a
-      <?=> ng
-        ( group
-            ( raw kind
-                <?=> pm
-                  ( ("#" <>)
-                      . either
-                        (\e -> par $ padj prettyExpr e)
-                        (\(e0, e1) -> par $ gpadj prettyExpr e0 <.> gpadj prettyExpr e1)
-                  )
-                  param
-            )
-            <=> csl1
-              ( \(Identified s (rng, lv, args)) ->
-                  ng $
-                    pidr s rng
-                      <> group (par $ gpadj prettyNetLV lv <.> padj (rcslid1 $ mkg prettyExpr) args)
-              )
-              l
-        )
-      <> semi
-  MGI'Initial s -> prettyAttr a <?=> ng ("initial" <=> prettyAttrStmt s)
-  MGI'Always s -> prettyAttr a <?=> ng ("always" <=> prettyAttrStmt s)
-  MGI'LoopGen (Identified si vi) cond (Identified su vu) s ->
-    prettyAttr a
-      <?=> ng
-        ( group
-            ( "for"
-                <=> group
-                  ( par $
-                      let (di, li) = prettyCExpr softline vi
-                          (du, lu) = prettyCExpr softline vu
-                       in ng (raw si <=> equals <+> group di) <> li
-                            <> semi <+> ngpadj prettyCExpr cond
-                            <> semi <+> ng (raw su <=> equals <+> group du)
-                            <> lu
-                  )
-            )
-            <=> prettyGenerateBlock s
-        )
-  MGI'If c t f ->
-    let head = "if" <=> group (par $ padj prettyCExpr c)
-     in ( if genDanglingElse f t
-            then block (prettyAttr a <?=> ng head <=> "begin") "end"
-            else \x -> prettyAttr a <?=> ng (group head <=> x)
-        )
-          (maybe semi prettyGenerateBlock t)
-          <?#> pm
-            ( \f -> case f of
-                GBSingle (GIMGI (Attributed _ (MGIIf _ _ _) :| [])) -> group $ "else" <=> prettyGenerateBlock f
-                _ -> ng $ "else" <=> prettyGenerateBlock f
-            )
-            f
-  MGI'Case c b md ->
-    block
-      (prettyAttr a <?=> nest ("case" <=> group (par $ padj prettyCExpr c)))
-      "endcase"
-      $ pf
-        (flip (<#>))
-        mempty
-        mempty
-        ( \(GenCaseItem p v) ->
-            gpadj (cslid1 prettyCExpr) p <> colon <+> ng (maybe semi prettyGenerateBlock v)
-        )
-        b
-        <?#> pm (\d -> nest $ "default:" <=> prettyGenerateBlock d) md
-  where
-    pidr i r = piff (gpadj (pidWith prettyIdent softline $ pm prettyRange2 r) i) $ B.null i
-
-prettyModGenItems :: Foldable f => f (Attributed ModGenItem) -> Doc
-prettyModGenItems =
-  prettyregroup
-    ppMGI'
-    (\(Attributed a mgi) -> Attributed a $ mkmgi' mgi)
-    ( \(Attributed na mgi) (Attributed a mgi') ->
-        if na /= a
-          then Nothing
-          else case (mgi', mgi) of
-            (MGI'ContAss ds' d3' l, MGIContAss ds d3 ass)
-              | ds == ds' && d3 == d3' ->
-                Just $ Attributed a $ MGI'ContAss ds' d3' $ ass <| l
-            (MGI'GateInst l, MGIGateInst s rng gi) ->
-              Just $ Attributed a $ MGI'GateInst $ Identified s (rng, gi) <| l
-            (MGI'UDPInst k' ds' d2' l, MGIUDPInst k ds d2 s rng lv arg)
-              | k == k' && ds == ds' && d2 == d2' ->
-                Just $ Attributed a $ MGI'UDPInst k' ds' d2' $ Identified s (rng, lv, arg) <| l
-            (MGI'ModInst k' p' l, MGIModInst k p s rng arg)
-              | k == k' && p == p' ->
-                Just $ Attributed a $ MGI'ModInst k' p' $ Identified s (rng, arg) <| l
-            (MGI'UnknownInst k' p' l, MGIUnknownInst k p s rng lv arg)
-              | k == k' && p == p' ->
-                Just $ Attributed a $ MGI'UnknownInst k' p' $ Identified s (rng, lv, arg) <| l
-            _ -> Nothing
-    )
-
-prettyParamOvers :: Foldable f => f ParamOver -> Doc
-prettyParamOvers =
-  prettyregroup
-    ( \(Attributed a l) ->
-        prettyAttr a
-          <?=> ng
-            ( "defparam"
-                <=> padj
-                  ( cslid1 $ \s (hi, v) ->
-                      first (\x -> group $ psp prettyHierIdent hi <> equals <+> x) $ prettyCMTM s v
-                  )
-                  l
-                  <> semi
-            )
-    )
-    (\(ParamOver a hi v) -> Attributed a $ (hi, v) :| [])
-    ( \(ParamOver na hi v) (Attributed a l) ->
-        if na == a then Just $ Attributed a $ (hi, v) <| l else Nothing
-    )
-
-prettySpecParamDecls :: Maybe Range2 -> NonEmpty SpecParamDecl -> Doc
-prettySpecParamDecls rng l =
-  nest $
-    group ("specparam" <?=> pm prettyRange2 rng)
-      <=> gpadj
-        ( cslid1 $ \s d -> first ng $ case d of
-            SPDPathPulse i@(Identified j m) o@(Identified k _) rej err ->
-              ( group
-                  ( "PATHPULSE$" <> ngpadj prettySpecTerm i
-                      <> piff "$" ((m == Nothing && maybe True ((c2w '\\' /=) . fst) (B.uncons j)) || B.null k)
-                      <> ng (fst $ prettySpecTerm mempty o)
-                  )
-                  <=> equals
-                    <+> group
-                      ( par $
-                          ngpadj prettyCMTM rej
-                            <> piff (comma <+> ngpadj prettyCMTM err) (rej == err)
-                      ),
-                s
-              )
-            SPDAssign (Identified i v) ->
-              first (\x -> raw i <=> equals <+> ng x) $ prettyCMTM s v
-        )
-        l
-        <> semi
-  where
-    pnid f x@(Identified s _) = piff (f x) (B.null s)
-
 data ModuleItem'
-  = MI'MGI (NonEmpty (Attributed ModGenItem))
-  | MI'GenReg GenerateRegion
-  | MI'SpecBlock [SpecParam] [SpecifyItem]
+  = MI'MGI (Attributed ModGenSingleItem)
+  | MI'Port [Attribute] Dir SignRange (NonEmpty Identifier)
+  | MI'Parameter [Attribute] (ComType ()) (NonEmpty (Identified CMinTypMax))
+  | MI'GenReg [Attributed ModGenSingleItem]
+  | MI'SpecParam [Attribute] (Maybe Range2) (NonEmpty SpecParamDecl)
+  | MI'SpecBlock [SpecifyItem']
 
 prettyModuleItems :: [ModuleItem] -> Doc
 prettyModuleItems =
-  prettyregroup
-    ( \x -> case x of
-        MI'MGI mgi -> prettyModGenItems $ NE.reverse mgi
-        MI'GenReg gr -> block "generate" "endgenerate" $ prettyGenerateRegion gr
-        MI'SpecBlock sp si ->
-          block "specify" "endspecify" $
-            prettyregroup
-              (uncurry prettySpecParamDecls)
-              (\(SpecParam rng d) -> (rng, d :| []))
-              (\(SpecParam nrng d) (rng, l) -> if nrng == rng then Just $ (rng, d <| l) else Nothing)
-              sp
-              <?#> prettySpecifyItems si
-    )
-    ( \mi -> case mi of
-        MIMGI mgi -> MI'MGI $ mgi :| []
-        MIGenReg gr -> MI'GenReg gr
-        MISpecBlock sp si -> MI'SpecBlock sp si
-    )
-    ( \mi mi' -> case (mi', mi) of
-        (MI'MGI l, MIMGI mgi) -> Just $ MI'MGI $ mgi <| l
-        _ -> Nothing
-    )
-
-data PortDecl'
-  = PD'In (Maybe NetType) SignRange (NonEmpty B.ByteString)
-  | PD'InOut (Maybe NetType) SignRange (NonEmpty B.ByteString)
-  | PD'Out (Maybe NetType) SignRange (NonEmpty B.ByteString)
-  | PD'OutReg SignRange (NonEmpty (Identified (Maybe CExpr)))
-  | PD'OutVar Bool (NonEmpty (Identified (Maybe CExpr)))
-
-prettyPortDecls :: [AttrIded PortDecl] -> Doc
-prettyPortDecls =
-  prettyregroup
-    ( \(Attributed a x) ->
-        prettyAttr a
-          <?=> ng
-            ( ( case x of
-                  PD'In nt sr l ->
-                    group ("input" <?=> pnt nt <?=> prettySignRange sr) <=> gpadj (cslid1 prettyIdent) l
-                  PD'InOut nt sr l ->
-                    group ("inout" <?=> pnt nt <?=> prettySignRange sr) <=> gpadj (cslid1 prettyIdent) l
-                  PD'Out nt sr l ->
-                    group ("output" <?=> pnt nt <?=> prettySignRange sr) <=> gpadj (cslid1 prettyIdent) l
-                  PD'OutReg sr l -> group ("output" <=> "reg" <?=> prettySignRange sr) <=> gpadj (cslid1 pmv) l
-                  PD'OutVar it l ->
-                    group ("output" <=> if it then "integer" else "time") <=> gpadj (cslid1 pmv) l
-              )
-            )
-          <> semi
-    )
-    ( \(AttrIded a s pd) -> Attributed a $ case pd of
-        PDIn nt sr -> PD'In nt sr $ s :| []
-        PDInOut nt sr -> PD'InOut nt sr $ s :| []
-        PDOut nt sr -> PD'Out nt sr $ s :| []
-        PDOutReg sr e -> PD'OutReg sr $ Identified s e :| []
-        PDOutVar it e -> PD'OutVar it $ Identified s e :| []
-    )
-    ( \(AttrIded na s pd) (Attributed a pd') ->
-        if na /= a
-          then Nothing
-          else case (pd', pd) of
-            (PD'In nt' sr' l, PDIn nt sr)
-              | nt == nt' && sr == sr' ->
-                Just $ Attributed a $ PD'In nt' sr' $ s <| l
-            (PD'InOut nt' sr' l, PDInOut nt sr)
-              | nt == nt' && sr == sr' ->
-                Just $ Attributed a $ PD'InOut nt' sr' $ s <| l
-            (PD'Out nt' sr' l, PDOut nt sr)
-              | nt == nt' && sr == sr' ->
-                Just $ Attributed a $ PD'Out nt' sr' $ s <| l
-            (PD'OutReg sr' l, PDOutReg sr v)
-              | sr == sr' ->
-                Just $ Attributed a $ PD'OutReg sr' $ Identified s v <| l
-            (PD'OutVar it' l, PDOutVar it v)
-              | it == it' ->
-                Just $ Attributed a $ PD'OutVar it' $ Identified s v <| l
+  nonEmpty mempty $
+    prettyregroup
+      (<#>)
+      ( \x -> case x of
+        MI'MGI (Attributed a i) -> prettyAttr a <?=> prettyModGenSingleItem i
+        MI'Port a d sr l ->
+          prettyAttrng a $ prettyItemsid (viaShow d <?=> prettySignRange sr) prettyIdent l
+        MI'Parameter a t l -> prettyAttrng a $ prettyXparam "parameter" t l
+        MI'GenReg l ->
+          block "generate" "endgenerate" $
+            pl (<#>) (\(Attributed a i) -> prettyAttr a <?=> prettyModGenSingleItem i) l
+        MI'SpecParam a r l -> prettyAttrng a $ prettySpecParams r l
+        MI'SpecBlock l -> block "specify" "endspecify" $ pl (<#>) prettySpecifyItem l
+      )
+      ( \x -> case x of
+        MIMGI i -> MI'MGI $ fromBlockedItem1 <$> i
+        MIPort (AttrIded a i (d, sr)) -> MI'Port a d sr [i]
+        MIParameter (AttrIded a i (Parameter t v)) -> MI'Parameter a t [Identified i v]
+        MIGenReg l -> MI'GenReg $ nonEmpty [] (toList . fromBlockedItem) l
+        MISpecParam (Attributed a (SpecParam r spd)) -> MI'SpecParam a r [spd]
+        MISpecBlock l -> MI'SpecBlock $ flip (nonEmpty []) l $ toList . regroup
+          ( \x -> case x of
+            SISpecParam (SpecParam r spd) -> SI'SpecParam r [spd]
+            SIPulsestyleOnevent s -> SI'PulsestyleOnevent [s]
+            SIPulsestyleOndetect s -> SI'PulsestyleOndetect [s]
+            SIShowcancelled s -> SI'Showcancelled [s]
+            SINoshowcancelled s -> SI'Noshowcancelled [s]
+            SIPathDeclaration mpc p b eds l -> SI'PathDecl mpc p b eds l
+            SISetup a -> SI'Setup a
+            SIHold a -> SI'Hold a
+            SISetupHold a aa -> SI'SetupHold a aa
+            SIRecovery a -> SI'Recovery a
+            SIRemoval a -> SI'Removal a
+            SIRecrem a aa -> SI'Recrem a aa
+            SISkew a -> SI'Skew a
+            SITimeSkew a eb ra -> SI'TimeSkew a eb ra
+            SIFullSkew a tcl eb ra -> SI'FullSkew a tcl eb ra
+            SIPeriod ctce tcl n -> SI'Period ctce tcl n
+            SIWidth ctce tcl t n -> SI'Width ctce tcl t n
+            SINoChange re de se ee n -> SI'NoChange re de se ee n
+          )
+          (\x y -> case (x, y) of
+            (SISpecParam (SpecParam nr spd), SI'SpecParam r l) | nr == r ->
+              Just $ SI'SpecParam r $ spd <| l
+            (SIPulsestyleOnevent s, SI'PulsestyleOnevent l) -> Just $ SI'PulsestyleOnevent $ s <| l
+            (SIPulsestyleOndetect s, SI'PulsestyleOndetect l) ->
+              Just $ SI'PulsestyleOndetect $ s <| l
+            (SIShowcancelled s, SI'Showcancelled l) -> Just $ SI'Showcancelled $ s <| l
+            (SINoshowcancelled s, SI'Noshowcancelled l) -> Just $ SI'Noshowcancelled $ s <| l
             _ -> Nothing
-    )
-  where
-    pnt = maybe mempty viaShow
-    pmv s (Identified i mv) =
-      maybe (prettyIdent s i) (\v -> first (\x -> ng $ raw i <=> equals <+> x) $ prettyCExpr s v) mv
+          )
+      )
+      ( \mi mi' -> case (mi, mi') of
+        (MIMGI mgi, MI'MGI l) -> MI'MGI <$> (addAttributed fromBlockedItem_add) mgi l
+        (MIPort (AttrIded na i (nd, nsr)), MI'Port a d sr l) | na == a && nd == d && nsr == sr ->
+          Just $ MI'Port a d sr $ i <| l
+        (MIParameter (AttrIded na i (Parameter nt v)), MI'Parameter a t l) | na == a && nt == t ->
+          Just $ MI'Parameter a t $ Identified i v <| l
+        (MISpecParam (Attributed na (SpecParam nr spd)), MI'SpecParam a r l) | na == a && nr == r ->
+          Just $ MI'SpecParam a r $ spd <| l
+        _ -> Nothing
+      )
 
-prettyGenerateRegion :: GenerateRegion -> Doc
-prettyGenerateRegion (GenerateRegion lp po d b) =
-  prettyXparam "localparam" lp
-    <?#> prettyParamOvers po
-    <?#> prettyModGenDecls d
-    <?#> prettyModGenItems b
+prettyGBlock :: Identifier -> [Attributed ModGenBlockedItem] -> Doc
+prettyGBlock (Identifier s) r =
+  block ("begin" <> piff (colon <=> raw s) (B.null s)) "end" $
+    pl (<#>) (\(Attributed a x) -> prettyAttr a <?=> prettyModGenSingleItem x) $
+      nonEmpty [] (toList . fromBlockedItem) r
 
 prettyGenerateBlock :: GenerateBlock -> Doc
 prettyGenerateBlock x = case x of
-  GBSingle i -> case i of -- assumes items can be regrouped
-    GIParam lp -> prettyXparam "localparam" $ NE.toList lp
-    GIParamOver l -> prettyParamOvers $ NE.toList l
-    GIMGD l -> prettyModGenDecls $ NE.toList l
-    GIMGI l -> prettyModGenItems $ NE.toList l
-  GBBlock (Identified s r) ->
-    block ("begin" <> piff (colon <=> raw s) (B.null s)) "end" $ prettyGenerateRegion r
+  GBSingle (Attributed a x) -> prettyAttr a <?=> prettyModGenSingleItem x
+  GBBlock s r -> prettyGBlock s r
+
+prettyPortInter :: [Identified [Identified (Maybe CRangeExpr)]] -> Doc
+prettyPortInter =
+  cslid mempty mempty $
+    \(Identified i@(Identifier ii) l) -> case l of
+      [Identified i' x] | i == i' -> first group $ prettySpecTerm (SpecTerm i x)
+      _ ->
+        if B.null ii
+          then portexpr l
+          else mkid $ dot <> padj prettyIdent i <> gpar (padj portexpr l)
+  where
+    pst (Identified i x) = prettySpecTerm $ SpecTerm i x
+    portexpr :: PrettyIdent [Identified (Maybe CRangeExpr)]
+    portexpr l = case l of
+      [] -> (mempty, mempty)
+      [x] -> pst x
+      _ -> mkid $ cslid (lbrace <> softspace) rbrace pst l
 
 prettyModuleBlock :: LocalCompDir -> ModuleBlock -> (Doc, LocalCompDir)
-prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a i pi pd params lp d sp b mts mc mp mdn) =
+prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a i pi b mts mc mp mdn) =
   ( piff (let (a, b) = fromJust mts in "`timescale" <+> tsval a <+> "/" <+> tsval b) (ts == mts)
       <?#> piff (if mc then "`celldefine" else "`endcelldefine") (c == mc)
       <?#> piff
-        ( maybe
-            "`nounconnected_drive"
-            (\b -> "`unconnected_drive pull" <> if b then "1" else "0")
-            mp
+        ( case mp of
+            Nothing -> "`nounconnected_drive"
+            Just b -> "`unconnected_drive pull" <> if b then "1" else "0"
         )
         (p == mp)
       <?#> piff ("`default_nettype" <+> maybe "none" viaShow mdn) (dn == mdn)
       <?#> block
-        ( let (d, s) = prettyIdent softline i
-           in prettyAttr a
-                <?=> ng
-                  ( group ("module" <=> d)
-                      <> s
-                      <> group
-                        ( par $
-                            rcslid
-                              mempty
-                              mempty
-                              ( \s (Identified i l) -> case l of
-                                  [p@(Identified i' _)] | i == i' -> mkg prettySpecTerm s p
-                                  _ ->
-                                    if B.null i
-                                      then portexpr s l
-                                      else (dot <> padj prettyIdent i <> par (padj portexpr l), s)
-                              )
-                              pi
-                        )
-                  )
-                <> semi
+        ( prettyItem a $
+            fpadj (\d -> group $ "module" <=> d) prettyIdent i <> gpar (prettyPortInter pi)
         )
         "endmodule"
-        ( prettyXparam "parameter" params <?#> prettyXparam "localparam" lp
-            <?#> prettyregroup
-              (\(Attributed a (rng, l)) -> prettyAttr a <?=> ng (prettySpecParamDecls rng (NE.reverse l)))
-              (\(Attributed a (SpecParam rng d)) -> Attributed a (rng, d :| []))
-              ( \(Attributed na (SpecParam nrng d)) (Attributed a (rng, l)) ->
-                  if na == a && nrng == rng then Just $ Attributed a (rng, d <| l) else Nothing
-              )
-              (reverse sp)
-            <?#> prettyPortDecls pd
-            <?#> prettyModGenDecls d
-            <?#> prettyModuleItems b
-        ),
+        (prettyModuleItems b),
     LocalCompDir mts mc mp mdn
   )
   where
-    portexpr s l = case l of
-      [] -> (mempty, mempty)
-      [p] -> prettySpecTerm s p
-      _ -> (cslid (lbrace <> softspace) rbrace prettySpecTerm l, s)
     tsval i =
       let (u, v) = divMod i 3
        in case v of 0 -> "1"; 1 -> "10"; 2 -> "100"
             <> case u of 0 -> "s"; -1 -> "ms"; -2 -> "us"; -3 -> "ns"; -4 -> "ps"; -5 -> "fs"
 
-prettySeqRows :: NonEmpty SeqRow -> Doc
-prettySeqRows l@(h :| t) =
-  pf
-    (<#>)
-    mempty
-    mempty
-    ( maybe
-        -- fallback prettyprinting because aligned is better but not always possible
-        (\(SeqRow si s ns) -> nest $ viaShow si <=> prettyend s ns)
-        -- aligned prettyprinting
-        (\ll (SeqRow si s ns) -> nest $ prettystart ll si <=> prettyend s ns)
-        $ foldl
-          ( \msl sr ->
-              msl >>= \sl ->
-                if totallength sr /= tl
-                  then Nothing
-                  else case _srowInput sr of
-                    SISeq l0 e l1 ->
-                      let w = edgeprintsize e
-                          spliceputat n l =
-                            nonEmpty
-                              Nothing
-                              ( \(h :| t) ->
-                                  either
-                                    ( \m ->
-                                        if m <= n
-                                          then (Left m :) <$> spliceputat (n - m) t
-                                          else Just $ Left n : Right w : Left (m - n - 1) : t
-                                    )
-                                    ( \w' ->
-                                        if 0 < n
-                                          then (Right w' :) <$> spliceputat (n - 1) t
-                                          else Just $ Right (max w w') : t
-                                    )
-                                    h
-                              )
-                              l
-                       in spliceputat (length l0) sl
-                    SIComb l -> Just sl
-          )
-          ( Just $ case _srowInput h of
-              SISeq l0 e l1 -> [Left $ length l0, Right $ edgeprintsize e, Left $ length l1]
-              SIComb l -> [Left $ length l]
-          )
-          t
+prettyPrimPorts :: ([Attribute], PrimPort, NonEmpty Identifier) -> Doc
+prettyPrimPorts (a, d, l) =
+  prettyItem a $
+    ( case d of
+       PPInput -> "input"
+       PPOutput -> "output"
+       PPReg -> "reg"
+       PPOutReg _ -> "output reg"
     )
-    l
+    <=> gpadj (cslid1 prettyIdent) l
+    <?=> case d of PPOutReg (Just e) -> equals <+> gpadj prettyCExpr e; _ -> mempty
+
+-- | Analyses the column size of all lines and returns a list of either
+-- | number of successive non-edge columns or the width of a column that contain edges
+seqrowAlignment :: NonEmpty SeqRow -> [Either Int Int]
+seqrowAlignment =
+  maybe [] fst . foldrMapM1
+    ( \sr@(SeqRow sri _ _) -> Just (case sri of
+        SISeq l0 e l1 -> [Left $ length l0, Right $ edgeprintsize e, Left $ length l1]
+        SIComb l -> [Left $ length l],
+      totallength sr)
+    )
+    ( \sr@(SeqRow sri _ _) (sl, tl) ->
+        if totallength sr /= tl
+          then Nothing
+          else case sri of
+            SISeq l0 e l1 -> (,) <$> spliceputat (edgeprintsize e) (length l0) sl <*> pure tl
+            SIComb l -> Just (sl, tl)
+    )
   where
-    tl = totallength h
-    totallength (SeqRow si _ _) =
-      case si of SIComb l -> length l; SISeq l0 e l1 -> 1 + length l0 + length l1
-    edgeprintsize x = case x of
-      EdgePos_neg _ -> 1
-      EdgeDesc _ _ -> 4
+    totallength sr =
+      case _srowInput sr of SIComb l -> length l; SISeq l0 e l1 -> 1 + length l0 + length l1
+    edgeprintsize x = case x of EdgePos_neg _ -> 1; EdgeDesc _ _ -> 4
+    -- Searches and splices a streak of non edge columns and puts an edge column
+    spliceputat w n l = case l of
+      [] -> Nothing
+      Right w' : t ->
+        if 0 < n
+          then (Right w' :) <$> spliceputat w (n - 1) t
+          else Just $ Right (max w w') : t
+      Left m : t -> case compare m (n + 1) of
+        LT -> (Left m :) <$> spliceputat w (n - m) t
+        EQ -> Just $ Left n : Right w : t
+        GT -> Just $ Left n : Right w : Left (m - n - 1) : t
+
+-- | Prints levels or edges in an aligned way using analysis results
+-- | the second part of the accumulation is Right if there is an edge, Left otherwise
+prettySeqIn :: SeqIn -> [Either Int Int] -> Doc
+prettySeqIn si =
+  fst . foldl'
+    ( \(d, si) e -> case (e, si) of
+        (Left n, Left l') ->
+          let (l0, l1) = splitAt n l'
+           in (d <> concat viaShow l0, Left l1)
+        (Right w, Left (h : t)) -> (d <> prettylevelwithwidth h w, Left t)
+        (Left n, Right (l0, e, l1)) ->
+          let (l00, l01) = splitAt n l0
+           in (d <> concat viaShow l00, Right (l01, e, l1))
+        (Right w, Right ([], e, l1)) ->
+          (d <> viaShow e <> pift sp3 (edgeprintsize e < w), Left l1)
+        (Right w, Right (h : t, e, l')) -> (d <> prettylevelwithwidth h w, Right (t, e, l'))
+    )
+    (mempty, case si of SIComb l -> Left $ NE.toList l; SISeq a b c -> Right (a, b, c))
+  where
+    edgeprintsize x = case x of EdgePos_neg _ -> 1; EdgeDesc _ _ -> 4
     sp3 = raw "   "
-    prettyend s ns = group (colon <+> viaShow s <=> colon <+> maybe "-" viaShow ns) <> semi
     prettylevelwithwidth l w = viaShow l <> pift sp3 (w == 4)
-    concat = pf (<>) mempty mempty
-    prettystart ll si =
-      snd $
-        foldl
-          ( \(si, d) e -> case (e, si) of
-              (Left n, Left l') ->
-                let (l0, l1) = splitAt n l'
-                 in (Left l1, d <> concat viaShow l0)
-              (Right w, Left (h : t)) -> (Left t, d <> prettylevelwithwidth h w)
-              (Left n, Right (l0, e, l1)) ->
-                let (l00, l01) = splitAt n l0
-                 in (Right (l01, e, l1), d <> concat viaShow l00)
-              (Right w, Right ([], e, l1)) -> (Left l1, d <> viaShow e <> pift sp3 (edgeprintsize e < w))
-              (Right w, Right (h : t, e, l')) -> (Right (t, e, l'), d <> prettylevelwithwidth h w)
-          )
-          (case si of SIComb l -> Left $ NE.toList l; SISeq a b c -> Right (a, b, c), mempty)
-          ll
+    concat = pl (<>)
+
+-- | Prints a table in a singular block with aligned columns, or just prints it if not possible
+prettySeqRows :: NonEmpty SeqRow -> Doc
+prettySeqRows l =
+  pl (<#>) (case seqrowAlignment l of
+    -- fallback prettyprinting because aligned is better but not always possible
+    [] -> \(SeqRow si s ns) -> nest $ viaShow si <=> prettyend s ns
+    -- aligned prettyprinting
+    colws -> \(SeqRow si s ns) -> nest $ prettySeqIn si colws <=> prettyend s ns
+  ) l
+  where
+    prettyend s ns = group (colon <+> viaShow s <=> colon <+> maybe "-" viaShow ns) <> semi
+
+prettyPrimTable :: Doc -> PrimTable -> Doc
+prettyPrimTable od b = case b of
+  CombTable l ->
+    block "table" "endtable" $
+      pl
+        (<#>)
+        (\(CombRow i o) -> nest $ fromString (concatMap show i) <=> colon <+> viaShow o <> semi)
+        l
+  SeqTable mi l ->
+    pm
+      ( \iv ->
+          nest $
+            group ("initial" <=> od)
+              <=> equals <+> case iv of { ZOXX -> "1'bx"; ZOXZ -> "0"; ZOXO -> "1" } <> semi
+      )
+      mi
+      <?#> block "table" "endtable" (prettySeqRows l)
 
 prettyPrimitiveBlock :: PrimitiveBlock -> Doc
-prettyPrimitiveBlock (PrimitiveBlock a s (oa, oi) i b) =
+prettyPrimitiveBlock (PrimitiveBlock a s o i pd b) =
   block
-    ( prettyAttr a
-        <?=> ng
-          ( group ("primitive" <=> od) <> os
-              <> group
-                ( par $
-                    od <> os <.> padj (cslid1 $ \s -> prettyIdent s . snd) i
-                )
-          )
-        <> semi
+    ( prettyItem a $
+        fpadj (\x -> group $ "primitive" <=> x) prettyIdent s
+          <> gpar (od <> ol <.> padj (cslid1 prettyIdent) i)
     )
     "endprimitive"
-    $ ( prettyAttr oa
-          <?=> ( case b of
-                   SeqTable (Left e) _ _ ->
-                     ng $ group ("output" <=> "reg" <=> od) <=> equals <+> gpadj prettyCExpr e
-                   SeqTable (Right a') _ _ | a' == oa -> ng $ "output reg" <=> od <> os
-                   SeqTable (Right a') _ _
-                     | a' /= oa ->
-                       ng ("output" <=> od <> os) <> semi
-                         <#> prettyAttr a' <?=> ng ("reg" <=> od <> os)
-                   _ -> ng $ "output" <=> od <> os
-               )
-          <> semi
+    $ prettyregroup
+      (<#>)
+      prettyPrimPorts
+      (\(AttrIded a i p) -> (a, p, [i]))
+      ( \(AttrIded na i np) (a, p, l) -> case (np, p) of
+          (PPInput, PPInput) | na == a -> Just (a, p, i <| l)
+          _ -> Nothing
       )
-      <#> prettyregroup
-        (\(a, l) -> prettyAttr a <?=> ng ("input" <=> gpadj (cslid1 prettyIdent) l) <> semi)
-        (\(a, i) -> (a, i :| []))
-        (\(na, i) (a, l) -> if na /= a then Nothing else Just (a, i <| l))
-        i
-      <#> case b of
-        CombTable l ->
-          block "table" "endtable" $
-            pf
-              (<#>)
-              mempty
-              mempty
-              (\(CombRow i o) -> nest $ fromString (concatMap show i) <=> colon <+> viaShow o <> semi)
-              l
-        SeqTable _ mi l ->
-          pm
-            ( \iv ->
-                nest $
-                  group ("initial" <=> od)
-                    <=> equals <+> case iv of { ZOXX -> "1'bx"; ZOXZ -> "0"; ZOXO -> "1" } <> semi
-            )
-            mi
-            <?#> block "table" "endtable" (prettySeqRows l)
+      pd
+      <#> prettyPrimTable od b
   where
-    (od, os) = prettyIdent softline oi
-    (d, l) = prettyIdent softline s
+    (od, ol) = prettyIdent o
+
+prettyConfigItem :: ConfigItem -> Doc
+prettyConfigItem (ConfigItem ci llu) =
+  nest $
+    ng
+      ( case ci of
+          CICell c -> "cell" <=> fst (prettyDot1Ident c)
+          CIInst i ->
+            "instance" <=> foldrMap1 (fst . prettyIdent) (\a b -> padj prettyIdent a <> dot <> b) i
+      )
+      <=> ng
+        ( case llu of
+            LLULiblist ls -> "liblist" <?=> catid prettyBS ls
+            LLUUse s c -> "use" <=> padj prettyDot1Ident s <> pift ":config" c
+        )
+      <> semi
+  where
+    catid :: PrettyIdent a -> [a] -> Doc
+    catid f = foldrMap1' mempty (gpadj f) $ (<=>) . fst . f
 
 prettyVerilog2005 :: Verilog2005 -> Doc
-prettyVerilog2005 (Verilog2005 mb po pb cb) =
-  fst (foldr (\m (d, lcd) -> first (d <##>) $ prettyModuleBlock lcd m) (mempty, lcdDefault) mb)
-    <##> pl prettyPrimitiveBlock pb
+prettyVerilog2005 (Verilog2005 mb pb cb) =
+  fst (foldl' (\(d, lcd) m -> first (d <##>) $ prettyModuleBlock lcd m) (mempty, lcdDefault) mb)
+    <##> pl (<##>) prettyPrimitiveBlock pb
     <##> pl
+      (<##>)
       ( \(ConfigBlock i des b def) ->
           block
             (nest $ "config" <=> padj prettyIdent i <> semi)
             "endconfig"
-            $ nest ("design" <?=> catid prettyDot1Ident des <> semi)
-              <#> pf
-                (flip (<#>))
-                mempty
-                mempty
-                ( \(ConfigItem ci llu) ->
-                    nest $
-                      ng
-                        ( case ci of
-                            Right i -> "instance" <=> foldrMap1 (padj prettyIdent) (\a b -> padj prettyIdent a <> dot <> b) i
-                            Left c -> "cell" <=> fst (prettyDot1Ident mempty c)
-                        )
-                        <=> ng
-                          ( case llu of
-                              LLUUse s c -> "use" <=> padj prettyDot1Ident s <> pift ":config" c
-                              LLULiblist ls -> "liblist" <?=> catid prettyIdent ls
-                          )
-                        <> semi
-                )
-                b
-              <#> nest ("default liblist" <?=> catid prettyIdent def) <> semi
+            $ nest ("design" <?=> catid prettyDot1Ident des) <> semi
+              <#> pl (<#>) prettyConfigItem b
+              <?#> nest ("default liblist" <?=> catid prettyBS def) <> semi
       )
       cb
-    <##> nonEmpty
-      mempty
-      (block "module ___all_parameter_override___;" "endmodule" . prettyParamOvers)
-      po
   where
-    catid :: PrettyIdent a -> [a] -> Doc
-    catid f =
-      nonEmpty mempty $
-        foldrMap1 (gpadj f) $ (<>) . gpsp f
     (<##>) = mkopt $ \a b -> a <#> mempty <#> b
-    pl :: (a -> Doc) -> [a] -> Doc
-    pl = pf (flip (<##>)) mempty mempty
+    catid :: PrettyIdent a -> [a] -> Doc
+    catid f = foldrMap1' mempty (gpadj f) $ (<=>) . fst . f

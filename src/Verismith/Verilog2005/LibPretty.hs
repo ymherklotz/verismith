@@ -53,6 +53,7 @@ module Verismith.Verilog2005.LibPretty
     block,
     pm,
     pf,
+    pl,
     layout,
   )
 where
@@ -70,7 +71,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Semigroup
 import Data.String
-import Verismith.Utils (foldrMap1, nonEmpty)
+import Verismith.Utils hiding (comma)
 
 infixr 6 <+>
 
@@ -371,7 +372,10 @@ pf ::
   (a -> Doc' w) ->
   f a ->
   Doc' w
-pf g l r f = nonEmpty emptyDoc (\(h :| t) -> l <> foldl (\a -> g a . f) (f h) t <> r) . toList
+pf g l r f = nonEmpty emptyDoc (\x -> l <> foldrMap1 f (g . f) x <> r) . toList
+
+pl :: (Foldable f, DocLength w) => (Doc' w -> Doc' w -> Doc' w) -> (a -> Doc' w) -> f a -> Doc' w
+pl g f = foldrMap1' emptyDoc f (g . f) . toList
 
 instance Enum w => Enum (Sum w) where
   toEnum = Sum . toEnum
@@ -388,6 +392,7 @@ flatten =
     )
     (\a b -> a <> "\n" <> b)
 
+-- | Add max line length data to the doc
 preprocess :: DocLength w => Doc' v -> (Any, Doc' w)
 preprocess =
   foldDoc
@@ -404,7 +409,7 @@ preprocess =
 
 breakLine :: DocLength w => Word -> Line w -> (Any, Doc' w)
 breakLine i l = case l of
-  Concat _ a b -> liftA2 (<>) (breakLine i a) (breakLine i b)
+  Concat _ a b -> (<>) <$> breakLine i a <*> breakLine i b
   Token s -> pure $ Line i $ Token s
   Alt _ d -> (Any True, d)
   Group _ l -> (Any True, Line i l)
@@ -412,7 +417,8 @@ breakLine i l = case l of
 
 breakDoc :: DocLength w => w -> Doc' w -> Doc' w
 breakDoc w d = case d of
-  Line i l | w < linelength i l -> let (Any b, d) = breakLine i l in if b then breakDoc w d else d
+  Line i l | w < linelength i l && toEnum (4*(fromEnum i)) < w ->
+    let (Any b, d) = breakLine i l in if b then breakDoc w d else d
   Lines w' a b | w < w' -> breakDoc w a <#> breakDoc w b
   _ -> d
 

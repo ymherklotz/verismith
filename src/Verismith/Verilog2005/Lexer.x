@@ -3,31 +3,37 @@
 -- Copyright   : (c) 2023 Quentin Corradi
 -- License     : GPL-3
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
--- Stability   : abandonned
+-- Stability   : experimental
 -- Portability : POSIX
 
 {
 {-# OPTIONS_GHC -w #-}
 
 module Verismith.Verilog2005.Lexer
-  ( alexScanTokens
+  ( scanTokens
   , parseDecimal
   , isKW
   )
 where
 
-import Verismith.Verilog2005.Token
-import qualified Data.ByteString as SBS
-import Data.ByteString.Internal (c2w)
-import qualified Data.HashMap.Strict as HashMap
+import Data.Bits
+import Data.Word (Word8)
+import Numeric.Natural
+import GHC.Natural
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (mapMaybe)
 import Text.Printf (printf)
-import Numeric.Natural
-
+import Control.Monad.State.Strict
+import Control.Monad.Except
+import Control.Exception
+import qualified Data.ByteString as SBS
+import qualified Data.ByteString.Lazy as LBS
+import Data.ByteString.Internal (c2w, w2c, unpackChars)
+import qualified Data.HashMap.Strict as HashMap
+import Verismith.Verilog2005.Token
 }
 
 %encoding "latin1"
-%wrapper "monad-bytestring"
 
 $white = [\ \t\n\f]
 $all = [\0-\255]
@@ -84,76 +90,76 @@ tokens :-
     $white+ ;
     @blockComment ;
     @oneLineComment ;
+    @compilerDirective { cdcident }
   }
 
   <0> {
-    @simpleIdentifier  { toa kwident  }
-    @escapedIdentifier { to escSimpleIdent }
-    @systemIdentifier  { to (IdSystem . SBS.tail) }
-    @compilerDirective { toa (cdcident . SBS.tail) }
     @real   { to LitReal   }
     @string { to LitString }
+    @simpleIdentifier  { toa kwident }
+    @escapedIdentifier { to escSimpleIdent }
+    @systemIdentifier  { to (IdSystem . SBS.tail) }
     \'[sS]?[bB] { toa (numberBase BBin) }
     \'[sS]?[oO] { toa (numberBase BOct) }
     \'[sS]?[dD] { toa (numberBase BDec) }
     \'[sS]?[hH] { toa (numberBase BHex) }
-    & { tok AmAmp }
+    & { tok AmAmp  }
     ! { tok UnBang }
-    = { tok SymEq }
-    @ { tok SymAt }
-    \| { tok AmBar     }
-    \^ { tok AmHat     }
-    \~ { tok UnTilde   }
-    \/ { tok BinSlash  }
-    \% { tok BinPercent }
-    \< { tok BinLt     }
-    \> { tok BinGt     }
-    \{ { tok SymBraceL }
-    \} { tok SymBraceR }
-    \+ { tok SymPlus   }
+    = { tok SymEq  }
+    @ { tok SymAt  }
+    \| { tok AmBar       }
+    \^ { tok AmHat       }
+    \~ { tok UnTilde     }
+    \/ { tok BinSlash    }
+    \% { tok BinPercent  }
+    \< { tok BinLt       }
+    \> { tok BinGt       }
+    \{ { tok SymBraceL   }
+    \} { tok SymBraceR   }
+    \+ { tok SymPlus     }
     \? { tok SymQuestion }
-    \# { tok SymPound  }
-    \* { tok SymAster  }
-    \. { tok SymDot    }
-    \$ { tok SymDollar }
-    "^~" { tok AmTildeHat } -- Sorry
-    "~^" { tok AmTildeHat }
-    "~&" { tok UnTildeAmp }
-    "~|" { tok UnTildeBar }
-    "==" { tok BinEqEq    }
-    "!=" { tok BinBangEq  }
-    "&&" { tok BinAmpAmp  }
-    "||" { tok BinBarBar  }
+    \# { tok SymPound    }
+    \* { tok SymAster    }
+    \. { tok SymDot      }
+    \$ { tok SymDollar   }
+    "^~" { tok AmTildeHat    } -- Sorry
+    "~^" { tok AmTildeHat    }
+    "~&" { tok UnTildeAmp    }
+    "~|" { tok UnTildeBar    }
+    "==" { tok BinEqEq       }
+    "!=" { tok BinBangEq     }
+    "&&" { tok BinAmpAmp     }
+    "||" { tok BinBarBar     }
     "**" { tok BinAsterAster }
-    ">=" { tok BinGtEq    }
-    "<<" { tok BinLtLt    }
-    ">>" { tok BinGtGt    }
+    ">=" { tok BinGtEq       }
+    "<<" { tok BinLtLt       }
+    ">>" { tok BinGtGt       }
     "(*" { tok SymParenAster }
     "*)" { tok SymAsterParen }
-    "<=" { tok SymLtEq    }
-    "+:" { tok SymPlusColon }
-    "-:" { tok SymDashColon }
-    "->" { tok SymDashGt  }
-    "=>" { tok SymEqGt    }
-    "*>" { tok SymAsterGt }
-    "===" { tok BinEqEqEq }
-    "!==" { tok BinBangEqEq }
-    "<<<" { tok BinLtLtLt }
-    ">>>" { tok BinGtGtGt }
+    "<=" { tok SymLtEq       }
+    "+:" { tok SymPlusColon  }
+    "-:" { tok SymDashColon  }
+    "->" { tok SymDashGt     }
+    "=>" { tok SymEqGt       }
+    "*>" { tok SymAsterGt    }
+    "===" { tok BinEqEqEq    }
+    "!==" { tok BinBangEqEq  }
+    "<<<" { tok BinLtLtLt    }
+    ">>>" { tok BinGtGtGt    }
     "&&&" { tok SymAmpAmpAmp }
   }
 
-  <ts0> @tsvalue { andBegin (to tsValue) ts1 }
-  <ts1> @tsunit  { andBegin (to tsUnit)  ts2 }
-  <ts2> \/       { begin                 ts3 }
-  <ts3> @tsvalue { andBegin (to tsValue) ts4 }
-  <ts4> @tsunit  { andBegin (to tsUnit)  0   }
+  <ts0> @tsvalue { startcode ts1 (to tsValue) }
+  <ts1> @tsunit  { startcode ts2 (to tsUnit)  }
+  <ts2> \/       { \_ _ -> sc ts3 >> scan     }
+  <ts3> @tsvalue { startcode ts4 (to tsValue) }
+  <ts4> @tsunit  { startcode 0   (to tsUnit)  }
 
-  <pre2>    @binValue { andBegin (to binary)  0 }
-  <pre8>    @octValue { andBegin (to octal)   0 }
-  <pre16>   @hexValue { andBegin (to hex)     0 }
-  <pre10>   @xzValue  { andBegin (to xz)      0 }
-  <0,pre10> @unsigned { andBegin (to decimal) 0 }
+  <pre2>    @binValue { startcode 0 (to binary)  }
+  <pre8>    @octValue { startcode 0 (to octal)   }
+  <pre16>   @hexValue { startcode 0 (to hex)     }
+  <pre10>   @xzValue  { startcode 0 (to xz)      }
+  <0,pre10> @unsigned { startcode 0 (to decimal) }
 
 
   <0,table> {
@@ -166,7 +172,7 @@ tokens :-
   <0,edge> {
     \, { tok SymComma  }
     \[ { tok SymBrackL }
-    \] { andBegin (tok SymBrackR) 0 }
+    \] { startcode 0 (tok SymBrackR) }
   }
 
   -- Reusing token constructors
@@ -175,88 +181,196 @@ tokens :-
     $tableout  { to tableOut }
     $tablein   { to tableIn  }
     $tableedge { to tableEdge }
-    "endtable" { andBegin (tok KWEndtable) 0 }
+    "endtable" { startcode 0 (tok KWEndtable) }
   }
 
 {
+-- not using any wrapper so I have to define things myself
 
-alexEOF :: Alex PosToken
-alexEOF = return PosToken { _PTPos = Nowhere, _PTToken = TokEof }
+data AlexInput = AlexInput
+  { _aiPosition  :: !Position,
+    _aiPrevChar  :: !Char,
+    _aiInput     :: !LBS.ByteString
+  }
 
-gets :: AlexInput -> Int64 -> SBS.ByteString
-gets (_, _, s, _) l = ByteString.toStrict $ ByteString.take l s
+alexGetByte :: AlexInput -> Maybe (Word8, AlexInput)
+alexGetByte (AlexInput (Position ln cl s) _ inp) = case LBS.uncons inp of
+  Nothing -> Nothing
+  Just (b, inp) -> Just (b, let c = w2c b in AlexInput
+      ( case c of
+          '\t' -> Position ln ((cl .|. 3) + 1) s
+          '\n' -> Position (ln + 1) 1 s
+          _ -> Position ln (cl + 1) s
+      )
+      c
+      inp
+    )
 
-tok :: Token -> AlexAction PosToken
-tok t (AlexPn _ l c, _, _, _) _ = return PosToken { _PTPos = Somewhere l c, _PTToken = t }
+alexInputPrevChar :: AlexInput -> Char
+alexInputPrevChar = _aiPrevChar
 
-to :: (SBS.ByteString -> Token) -> AlexAction PosToken
-to f ai s = tok (f (gets ai s)) ai s
+-- above was mandatory declarations for alex, below is the interesting stuff
 
-toa :: (SBS.ByteString -> Alex Token) -> AlexAction PosToken
-toa f ai s = do
-  token <- f $ gets ai s
-  tok token ai s
+data AlexState = AlexState
+  { _asStartCode  :: !Int,
+    _asInput      :: !AlexInput,
+    -- LATER: User defined compiler directives support, the value (as in key/value) type is wrong
+    _asDefines    :: !(HashMap.HashMap SBS.ByteString LBS.ByteString),
+    _asSavedInput :: ![(Position, LBS.ByteString)]
+  }
+
+type Alex = StateT AlexState (ExceptT String IO)
+
+scan :: Alex (Maybe PosToken)
+scan = get >>= \(AlexState sc inp d si) -> case alexScan inp sc of
+  AlexEOF -> case si of
+    [] -> return Nothing
+    (p, i) : t -> put (AlexState sc (AlexInput p (_aiPrevChar inp) i) d t) >> scan
+  AlexError (AlexInput p pc i) ->
+    throwError $
+      printf
+        "lexical error between %s and %s"
+        (show p)
+        (helperShowPositions $ _aiPosition inp :| map fst si)
+  AlexSkip inp' _ -> modify' (\s -> s { _asInput = inp' }) >> scan
+  AlexToken inp' n action -> do
+    modify' $ \s -> s { _asInput = inp' }
+    action (_aiPosition inp) $ LBS.toStrict $ LBS.take (toEnum n) $ _aiInput inp
+
+scanTokens :: String -> IO (Either String [PosToken])
+scanTokens f = do
+  inp <- LBS.readFile f
+  runExceptT $
+    evalStateT loop $
+      AlexState 0 (AlexInput (Position 1 1 $ PSFile f) '\n' inp) HashMap.empty []
+  where
+    loop = scan >>= maybe (pure []) (\x -> (x :) <$> loop)
+
+type AlexAction = Position -> SBS.ByteString -> Alex (Maybe PosToken)
+
+mkPos :: Position -> Token -> Alex (Maybe PosToken)
+mkPos p t = (\l -> Just $ PosToken (p : map fst l) t) <$> gets _asSavedInput
+
+tok :: Token -> AlexAction
+tok t p _ = mkPos p t
+
+to :: (SBS.ByteString -> Token) -> AlexAction
+to f p = mkPos p . f
+
+toa :: (SBS.ByteString -> Alex Token) -> AlexAction
+toa f p s = f s >>= mkPos p
+
+sc :: Int -> Alex ()
+sc n = modify' $ \s -> s { _asStartCode = n }
+
+startcode :: Int -> AlexAction -> AlexAction
+startcode n f p s = sc n >> f p s
+
+alexError :: Position -> String -> Alex a
+alexError p s = do
+  si <- gets _asSavedInput
+  throwError $ s ++ " at " ++ helperShowPositions (p :| map fst si)
+
+-- Lexer actions
 
 tsValue :: SBS.ByteString -> Token
 tsValue s = CDTSInt (SBS.length s - 1)
+
 tsUnit :: SBS.ByteString -> Token
-tsUnit s = CDTSUnit
-  $ case s of { "s" -> 0 ; "ms" -> -3 ; "us" -> -6 ; "ns" -> -9 ; "ps" -> -12 ; "fs" -> -15 }
+tsUnit s =
+  CDTSUnit $
+    case s of "s" -> 0 ; "ms" -> -3 ; "us" -> -6 ; "ns" -> -9 ; "ps" -> -12 ; "fs" -> -15
 
 numberBase :: Base -> SBS.ByteString -> Alex Token
 numberBase ba bs = do
-  alexSetStartCode (case ba of { BBin -> pre2 ; BOct -> pre8 ; BDec -> pre10 ; BHex -> pre16 })
+  sc (case ba of BBin -> pre2 ; BOct -> pre8 ; BDec -> pre10 ; BHex -> pre16)
   return $ NumberBase (SBS.length bs == 3) ba
 
 binary :: SBS.ByteString -> Token
-binary s = LitBinary $ mapMaybe (\c -> case () of
-  () | c == c2w '0' -> Just BXZ0
-  () | c == c2w '1' -> Just BXZ1
-  () | c == c2w 'x' || c == c2w 'X' -> Just BXZX
-  () | c == c2w 'z' || c == c2w 'Z' || c == c2w '?' -> Just BXZZ
-  () -> Nothing) $ SBS.unpack s
+binary s = LitBinary $ mapMaybe (\c -> case c of
+  '0' -> Just BXZ0
+  '1' -> Just BXZ1
+  'x' -> Just BXZX
+  'X' -> Just BXZX
+  'z' -> Just BXZZ
+  'Z' -> Just BXZZ
+  '?' -> Just BXZZ
+  _ -> Nothing) $ unpackChars s
+
 octal :: SBS.ByteString -> Token
-octal s = LitOctal $ mapMaybe (\c -> case () of
-  () | c2w '0' <= c && c <= c2w '7' -> Just $ toEnum $ fromIntegral $ c - c2w '0'
-  () | c == c2w 'x' || c == c2w 'X' -> Just OXZX
-  () | c == c2w 'z' || c == c2w 'Z' || c == c2w '?' -> Just OXZZ
-  () -> Nothing) $ SBS.unpack s
+octal s = LitOctal $ mapMaybe (\c -> case c of
+  'x' -> Just OXZX
+  'X' -> Just OXZX
+  'z' -> Just OXZZ
+  'Z' -> Just OXZZ
+  '?' -> Just OXZZ
+  _ | '0' <= c && c <= '7' -> Just $ toEnum $ fromEnum c - fromEnum '0'
+  _ -> Nothing) $ unpackChars s
+
 hex :: SBS.ByteString -> Token
-hex s = LitHex $ mapMaybe (\c -> case () of
-  () | c2w '0' <= c && c <= c2w '9' -> Just $ toEnum $ fromIntegral $ c - c2w '0'
-  () | c2w 'a' <= c && c <= c2w 'f' -> Just $ toEnum $ fromIntegral $ c + 10 - c2w 'a'
-  () | c2w 'A' <= c && c <= c2w 'F' -> Just $ toEnum $ fromIntegral $ c + 10 - c2w 'A'
-  () | c == c2w 'x' || c == c2w 'X' -> Just HXZX
-  () | c == c2w 'z' || c == c2w 'Z' || c == c2w '?' -> Just HXZZ
-  () -> Nothing) $ SBS.unpack s
+hex s = LitHex $ mapMaybe (\c -> case c of
+  'x' -> Just HXZX
+  'X' -> Just HXZX
+  'z' -> Just HXZZ
+  'Z' -> Just HXZZ
+  '?' -> Just HXZZ
+  _ | '0' <= c && c <= '9' -> Just $ toEnum $ fromEnum c - fromEnum '0'
+  _ | 'a' <= c && c <= 'f' -> Just $ toEnum $ fromEnum c + 10 - fromEnum 'a'
+  _ | 'A' <= c && c <= 'F' -> Just $ toEnum $ fromEnum c + 10 - fromEnum 'A'
+  _ -> Nothing) $ unpackChars s
+
 xz :: SBS.ByteString -> Token
 xz s = LitXZ $ let c = SBS.head s in c == c2w 'x' || c == c2w 'X'
+
 parseDecimal :: SBS.ByteString -> Natural
-parseDecimal = fromInteger .  SBS.foldl
-  (\acc d -> if c2w '0' <= d && d <= c2w '9' then 10*acc + toInteger (d - c2w '0') else acc) 0
+parseDecimal =
+  fromInteger . SBS.foldl
+    (\acc d -> if c2w '0' <= d && d <= c2w '9' then 10*acc + toInteger (d - c2w '0') else acc)
+    0
+
 decimal :: SBS.ByteString -> Token
 decimal = LitDecimal . parseDecimal
 
 unbxz :: SBS.ByteString -> BXZ
-unbxz s = case s of
-  { "0" -> BXZ0 ; "1" -> BXZ1 ; "x" -> BXZX ; "X" -> BXZX ; "z" -> BXZZ ; "Z" -> BXZZ }
+unbxz s = case s of "0" -> BXZ0; "1" -> BXZ1; "x" -> BXZX; "X" -> BXZX; "z" -> BXZZ; "Z" -> BXZZ
+
 edgeDesc :: SBS.ByteString -> Token
 edgeDesc s = EdgeEdge (unbxz $ SBS.init s) (unbxz $ SBS.tail s)
-tableOut :: SBS.ByteString -> Token
-tableOut s = TableOut $ case s of { "0" -> ZOXZ ; "1" -> ZOXO ; "x" -> ZOXX ; "X" -> ZOXX }
-tableIn :: SBS.ByteString -> Token
-tableIn s = TableIn $ case s of { "b" -> True ; "B" -> True ; "?" -> False }
-tableEdge :: SBS.ByteString -> Token
-tableEdge s = TableEdge $ case s of
-  { "*" -> AFRNPA ; "f" -> AFRNPF ; "F" -> AFRNPF ; "r" -> AFRNPR ; "R" -> AFRNPR
-  ; "n" -> AFRNPN ; "N" -> AFRNPN ; "p" -> AFRNPP ; "P" -> AFRNPP }
 
-cdcident :: SBS.ByteString -> Alex Token
-cdcident s = HashMap.findWithDefault
-  (alexError $ printf "Compiler directive %s not supported, preprocess input file" $ show s) s cdMap
-  -- the default case should look at defined identifiers and add to the input
-  -- then send the result of running alexMonadScan
-  -- or fail as is done currently if the identifier is not defined
+tableOut :: SBS.ByteString -> Token
+tableOut s = TableOut $ case s of "0" -> ZOXZ; "1" -> ZOXO; "x" -> ZOXX; "X" -> ZOXX
+
+tableIn :: SBS.ByteString -> Token
+tableIn s = TableIn $ case s of "b" -> True; "B" -> True; "?" -> False
+
+tableEdge :: SBS.ByteString -> Token
+tableEdge s =
+  TableEdge $ case s of
+    "*" -> AFRNPA
+    "f" -> AFRNPF
+    "F" -> AFRNPF
+    "r" -> AFRNPR
+    "R" -> AFRNPR
+    "n" -> AFRNPN
+    "N" -> AFRNPN
+    "p" -> AFRNPP
+    "P" -> AFRNPP
+
+cdcident :: AlexAction
+cdcident p s = case HashMap.lookup (SBS.tail s) cdMap of
+  Just a -> a p
+  Nothing -> do
+    defs <- gets _asDefines
+    case HashMap.lookup s defs of
+      Nothing ->
+        alexError p $
+          printf "Compiler directive %s not declared nor supported, preprocess input file" $
+            show s
+      Just i ->
+        alexError p $
+          printf
+            "User defined compiler directive replacement in not implemented, %s was encountered"
+            (show s)
 
 kwident :: SBS.ByteString -> Alex Token
 kwident s = case SBS.stripPrefix "PATHPULSE$" s of
@@ -265,43 +379,91 @@ kwident s = case SBS.stripPrefix "PATHPULSE$" s of
 
 escSimpleIdent :: SBS.ByteString -> Token
 escSimpleIdent s = case SBS.uncons ss of
-  Just (c, t) | testfirst c && not (isKW ss)
-    && SBS.all (\c -> testfirst c || (c2w '0' <= c && c <= c2w '9') || c == c2w '$') t
+  Just (c, t)
+    | testfirst c
+      && not (isKW ss)
+      && SBS.all (\c -> testfirst c || (c2w '0' <= c && c <= c2w '9') || c == c2w '$') t
     -> IdSimple ss
   _ -> IdEscaped s
   where
     testfirst c = (c2w 'A' <= c && c <= c2w 'Z') || (c2w 'a' <= c && c <= c2w 'z') || c == c2w '_'
     ss = SBS.tail s
 
-cdMap :: HashMap.HashMap SBS.ByteString (Alex Token)
-cdMap = HashMap.fromList
-  $ ("timescale", alexSetStartCode ts0 >> return CDTimescale)
-  -- `include would go here and change state or parse the next token immediately
-  -- `define would also go here and change state to store input as is in a map
-  : map (\(x, y) -> (x, return y))
-  [ ("celldefine", CDCelldefine)
-  , ("default_nettype", CDDefaultnettype)
-  -- , ("default_decay_time", CDUnknown)
-  -- , ("default_trireg_strength", CDUnknown)
-  -- , ("delay_mode_distributed", CDUnknown)
-  -- , ("delay_mode_path", CDUnknown)
-  -- , ("delay_mode_unit", CDUnknown)
-  -- , ("delay_mode_zero", CDUnknown)
-  , ("endcelldefine", CDEndcelldefine)
-  , ("line", CDLine)
-  , ("nounconnected_drive", CDNounconnecteddrive)
-  -- , ("pragma", CDPragma) -- Another layer of hell
-  , ("resetall", CDResetall)
-  , ("unconnected_drive", CDUnconnecteddrive)
-  ]
+cdMap :: HashMap.HashMap SBS.ByteString (Position -> Alex (Maybe PosToken))
+cdMap = HashMap.fromList $
+  ("include", includecompdir)
+  -- LATER: `define would go here and change state to store input as is in _asDefines
+  : ("line", linecompdir)
+  : map (\(x, y) -> (x, \p -> y >>= mkPos p))
+    ( ("timescale", sc ts0 >> return CDTimescale)
+      : ("resetall", modify' (\s -> s { _asDefines = HashMap.empty }) >> return CDResetall)
+      : map (\(x, y) -> (x, return y))
+        [ ("celldefine", CDCelldefine)
+        , ("default_nettype", CDDefaultnettype)
+        -- , ("default_decay_time", CDUnknown)
+        -- , ("default_trireg_strength", CDUnknown)
+        -- , ("delay_mode_distributed", CDUnknown)
+        -- , ("delay_mode_path", CDUnknown)
+        -- , ("delay_mode_unit", CDUnknown)
+        -- , ("delay_mode_zero", CDUnknown)
+        , ("endcelldefine", CDEndcelldefine)
+        , ("nounconnected_drive", CDNounconnecteddrive)
+        -- , ("pragma", CDPragma) -- Another layer of hell
+        , ("unconnected_drive", CDUnconnecteddrive)
+        ]
+    )
+
+includecompdir :: Position -> Alex (Maybe PosToken)
+includecompdir _ = do
+  AlexState oldsc (AlexInput oldp _ _) _ _ <- get
+  sc 0
+  t <- scan
+  case t of
+    Nothing -> return Nothing
+    Just (PosToken _ (LitString s)) -> do
+      let f = tail $ unpackChars $ SBS.init s
+      -- LATER: search for file
+      i <- liftIO $ LBS.readFile f
+      modify' $ \(AlexState _ (AlexInput p pc bs) d si) ->
+        AlexState oldsc (AlexInput (Position 1 1 $ PSFile f) pc i) d $ (p, bs) : si
+      scan
+    _ -> alexError oldp "Expected a filename to include"
+
+linecompdir :: Position -> Alex (Maybe PosToken)
+linecompdir _ = do
+  AlexState oldsc (AlexInput oldp _ _) _ _ <- get
+  sc 0
+  l <- scan
+  f <- scan
+  c <- scan
+  case l >>= \ll -> f >>= \ff -> c >>= \cc -> pure (ll, ff, cc) of
+    Nothing -> return Nothing
+    Just (PosToken _ (LitDecimal l), PosToken _ (LitString s), PosToken _ (LitDecimal n))
+      | n < 3 -> do
+        modify' $ \(AlexState _ (AlexInput p pc bs) d si) ->
+          AlexState
+            oldsc
+            (AlexInput (Position (naturalToWord l - 1) 1 $ PSLine (unpackChars s) (n == 1)) pc bs)
+            d
+            ((p, "") : if n /= 2 then si else smashline si)
+        scan
+    _ -> alexError
+      oldp
+      "Expected a number, a filename and a number between 0 and 2 to override position"
+  where
+    smashline l =
+      case dropWhile (\(p, _) -> case _posSource p of PSLine _ b -> not b; _ -> False) l of
+        (Position _ _ (PSLine _ True), _) : t -> t
+        ll -> ll
 
 isKW :: SBS.ByteString -> Bool
 isKW s = HashMap.member s kwMap
+
 kwMap :: HashMap.HashMap SBS.ByteString (Alex Token)
 kwMap = HashMap.fromList
-  $ ("edge", alexSetStartCode edge >> return KWEdge)
-  : ("endtable", alexSetStartCode 0 >> return KWEndtable)
-  : ("table", alexSetStartCode table >> return KWTable)
+  $ ("edge", sc edge >> return KWEdge)
+  : ("endtable", sc 0 >> return KWEndtable)
+  : ("table", sc table >> return KWTable)
   : map (\(x, y) -> (x, return y))
   [ ("always", KWAlways)
   , ("and", KWAnd)
@@ -425,12 +587,5 @@ kwMap = HashMap.fromList
   , ("xnor", KWXnor)
   , ("xor", KWXor)
   ]
-
-alexScanTokens :: ByteString.ByteString -> Either String [PosToken]
-alexScanTokens bs = runAlex bs $ loop []
-  where
-    loop tks = do
-      tk <- alexMonadScan
-      if _PTToken tk == TokEof then return $ reverse tks else loop $ tk : tks
 
 }

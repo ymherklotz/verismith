@@ -119,6 +119,7 @@ library
                , containers
                , unordered-containers
                , mwc-probability
+               , primitive
                , vector
   default-extensions: OverloadedStrings
 

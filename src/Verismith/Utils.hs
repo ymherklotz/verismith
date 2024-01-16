@@ -12,12 +12,6 @@ module Verismith.Utils
     foldrMap1,
     foldrMap1',
     foldrMapM1,
-    rmapM,
-    nermapM,
-    rmap',
-    rmap,
-    liftA4,
-    liftA5,
     mkpair,
     uncurry3,
     safe,
@@ -32,7 +26,6 @@ import Control.Applicative
 import Data.ByteString (ByteString, pack)
 import Data.ByteString.Builder (byteStringHex, toLazyByteString)
 import qualified Data.ByteString.Lazy as L
-import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty (..), (<|))
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
@@ -53,25 +46,6 @@ foldrMap1' d f g = nonEmpty d (foldrMap1 f g)
 
 foldrMapM1 :: (Applicative m, Monad m) => (a -> m b) -> (a -> b -> m b) -> NonEmpty a -> m b
 foldrMapM1 f g (h :| t) = nonEmpty (f h) (\x -> foldrMapM1 f g x >>= g h) t
-
-rmapM :: Monad m => (a -> m b) -> [a] -> m [b]
-rmapM f = foldl' (\acc e -> do y <- acc; x <- f e; return $ x : y) $ return []
-
-nermapM :: Monad m => (a -> m b) -> NonEmpty a -> m (NonEmpty b)
-nermapM f (x :| l) =
-  foldl' (\acc e -> do y <- acc; x <- f e; return $ x <| y) ((:| []) <$> f x) l
-
-rmap' :: (a -> b) -> [b] -> [a] -> [b]
-rmap' f = foldl' (\acc e -> f e : acc)
-
-rmap :: (a -> b) -> [a] -> [b]
-rmap f = rmap' f []
-
-liftA4 :: Applicative f => (a -> b -> c -> d -> e) -> f a -> f b -> f c -> f d -> f e
-liftA4 f a b c d = liftA3 f a b c <*> d
-
-liftA5 :: Applicative f => (a -> b -> c -> d -> e -> z) -> f a -> f b -> f c -> f d -> f e -> f z
-liftA5 f a b c d e = liftA4 f a b c d <*> e
 
 mkpair :: Applicative f => f a -> f b -> f (a, b)
 mkpair = liftA2 (,)

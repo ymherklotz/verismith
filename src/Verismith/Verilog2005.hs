@@ -10,12 +10,9 @@ module Verismith.Verilog2005
   ( parseVerilog2005,
     genSource,
     runGarbageGeneration,
-    GeneratorOpts,
     NumberProbability,
     CategoricalProbability,
-    defGeneratorOpts,
     Verilog2005 (..),
-    SourceInfo (..),
     renameTopItems,
   )
 where

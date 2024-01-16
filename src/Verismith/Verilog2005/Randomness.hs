@@ -3,7 +3,7 @@
 -- Copyright   : (c) 2023 Quentin Corradi
 -- License     : GPL-3
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
--- Stability   : experimental
+-- Stability   : stable
 -- Portability : POSIX
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -39,19 +39,16 @@ import Data.List
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Vector as V
-import Data.Vector.Mutable (PrimMonad, PrimState, RealWorld)
+import Control.Monad.Primitive (PrimMonad, PrimState, RealWorld)
 import Data.Word
 import System.Random.MWC.Probability
 import Verismith.Config (CategoricalProbability (..), NumberProbability (..), uniformCP)
-import Verismith.Utils (nonEmpty)
+import Verismith.Utils (nonEmpty, foldrMap1)
 
 infixl 4 <.>
 
 (<.>) :: (Monad m, Applicative m) => m (a -> m b) -> m a -> m b
 (<.>) mf mx = join $ mf <*> mx
-
-icast :: (Integral a, Num b) => a -> b
-icast = fromIntegral . toInteger
 
 avoid :: [Int] -> Int -> Int
 avoid l x = case l of
@@ -59,10 +56,11 @@ avoid l x = case l of
   _ -> x
 
 uniq :: Ord b => (a -> b) -> (a -> a -> a) -> [a] -> [a]
-uniq f m l = case sortBy (\x y -> compare (f y) (f x)) l of
-  [] -> []
-  h : t ->
-    toList $ foldl' (\(x :| a) e -> if f x == f e then (m x e) :| a else e :| x : a) (h :| []) t
+uniq f m =
+  nonEmpty [] $ toList
+    . foldrMap1 (:|[]) (\e (x :| a) -> if f x == f e then (m x e) :| a else e :| x : a)
+    . NE.sortWith f
+    
 
 clean :: Int -> [(Double, Int)] -> [(Double, Int)]
 clean t =
@@ -81,7 +79,7 @@ sampleCategoricalProbability t gen d = case d of
           _ -> sample (categorical ll) gen
   CPBiasedUniform l b ->
     let ll = clean t l
-        uw = icast (t + 1 - length ll) * b
+        uw = fromIntegral (t + 1 - length ll) * b
      in nonEmpty
           (return Nothing)
           (flip sample gen . discrete . ((uw, Nothing) :) . map (\(x, y) -> (x, Just y)) . toList)
@@ -193,7 +191,7 @@ sampleFiltered p t l = do
         <$> sample (discrete $ deleteFirstOrdered snd id (zip (NE.take (t + 1) l) [0 .. t]) ll) gen
     CPBiasedUniform l' b ->
       let ll' = deleteFirstOrdered snd id (clean t l') ll
-          uw = icast (t - length ll - length ll') * b
+          uw = fromIntegral (t - length ll - length ll') * b
        in sample (discrete $ (uw, Nothing) : map (\(x, y) -> (x, Just y)) ll') gen
             >>= maybe
               ( avoid (merge ll $ map snd ll')

@@ -21,32 +21,32 @@ import Verismith.Verilog2005.Utils
 
 -- | Rename all top-level scopes and everything depending on their name
 renameTopItems :: (ByteString -> ByteString) -> Verilog2005 -> Verilog2005
-renameTopItems f (Verilog2005 m po p c) =
+renameTopItems fb (Verilog2005 m p c) =
   Verilog2005
     ( map
         ( (mbIdent %~ f)
             . ( transformOn biplate $ \mgi -> case mgi of
-                  MGIUDPInst t s d i r l a -> MGIUDPInst (nmap t) s d i r l a
-                  MGIModInst t p i r a -> MGIModInst (nmap t) p i r a
-                  MGIUnknownInst t p i r a0 a -> MGIUnknownInst (nmap t) p i r a0 a
-                  _ -> mgi
+                  MGIUDPInst t s d l -> MGIUDPInst (nmap t) s d l
+                  MGIModInst t p l -> MGIModInst (nmap t) p l
+                  MGIUnknownInst t p l -> MGIUnknownInst (nmap t) p l
+                  _ -> mgi :: ModGenBlockedItem
               )
-            . (biplate . hierIdentFirst %~ nmap)
+            . (biplate . hiPath . _head . _1 %~ nmap)
         )
         m
     )
-    (po & each . poIdent . hierIdentFirst %~ nmap)
     (p & each . pbIdent %~ f)
     ( map
         ( (cbIdent %~ f)
-            . (biplate %~ \(Dot1Ident l c) -> Dot1Ident l $ case l of Nothing -> nmap c; Just _ -> c)
-            . (cbBody . each . ciCell_inst . _Right %~ \(h :| t) -> nmap h :| t)
+            . (biplate %~ \(Dot1Ident l c) -> Dot1Ident l $ nmap c)
+            . (cbBody . each . ciCell_inst . _CIInst %~ \(h :| t) -> nmap h :| t)
         )
         c
     )
   where
-    nmap x = HashMap.findWithDefault x x mapmap
+    f (Identifier b) = Identifier $ fb b
+    nmap (Identifier x) = Identifier $ HashMap.findWithDefault x x mapmap
     mapmap =
       HashMap.fromList $
-        map (\x -> (x, f x)) $
+        map (\(Identifier x) -> (x, fb x)) $
           m ^.. each . mbIdent ++ p ^.. each . pbIdent ++ c ^.. each . cbIdent

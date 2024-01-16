@@ -5,34 +5,44 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, StandaloneDeriving, QuantifiedConstraints #-}
+{-# LANGUAGE UndecidableInstances, FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- TODO:
+-- ModGenSingleItem is useless? as they are implicitely in a block except `else if`
+-- so one solution is GenerateBlock are (Identifier, [ModGenBlockedItem])
+--   and MGIIf have a list of `if` branches
+-- dangling stuff is not well handled as inserting a block changes the hierarchy of `else if`s
+--   the correct solution is to add `else ;`
+-- This should simplify prettyprinting and complexify parsing...
+-- Also track the number of generate blocks when parsing and give the block a name when it's missing
+-- Also do more grouping in pretty-printing and add flags to not group!
+-- Maybe eliminate generate blocks that have default name but that requires counting
+--   so fold or mapM with StateT
+-- Also the method to detect dangling else is wrong if `else ;` is equivalent to nothing
+--   so maybe pass-in/return a boolean in the printer/parser to detect these cases
 module Verismith.Verilog2005.AST
   ( GenMinTypMax (..),
-    MinTypMax,
     CMinTypMax,
+    MinTypMax,
+    Identifier (..),
     Identified (..),
-    identIdent,
     defaultIdM,
     UnaryOperator (..),
     BinaryOperator (..),
     Number (..),
     GenPrim (..),
     HierIdent (..),
-    hiPath,
     GenDimRange (..),
-    DimRange (..),
-    CDimRange (..),
+    DimRange,
+    CDimRange,
     GenExpr (..),
-    Expr (..),
     CExpr (..),
+    Expr (..),
     Attribute (..),
     Attributed (..),
     AttrIded (..),
-    aiData,
-    Dir (..),
     Range2 (..),
     GenRangeExpr (..),
     RangeExpr,
@@ -42,10 +52,11 @@ module Verismith.Verilog2005.AST
     Delay2 (..),
     Delay1 (..),
     SignRange (..),
-    EventPrefix (..),
     SpecTerm (..),
+    EventPrefix (..),
+    Dir (..),
+    AbsType (..),
     ComType (..),
-    FunParType (..),
     NetType (..),
     Strength (..),
     DriveStrength (..),
@@ -54,8 +65,11 @@ module Verismith.Verilog2005.AST
     LValue (..),
     NetLValue,
     VarLValue,
-    NetAssign (..),
-    VarAssign (..),
+    Assign (..),
+    NetAssign,
+    VarAssign,
+    Parameter (..),
+    ParamOver (..),
     ParamAssign (..),
     PortAssign (..),
     EventPrim (..),
@@ -63,40 +77,49 @@ module Verismith.Verilog2005.AST
     DelayEventControl (..),
     ProcContAssign (..),
     LoopStatement (..),
+    FCaseItem (..),
     CaseItem (..),
+    FunctionStatement (..),
+    AttrFStmt,
+    MybFStmt,
     Statement (..),
     AttrStmt,
     MybStmt,
     NInputType (..),
-    GateInst (..),
     EdgeDesc (..),
+    GICMos (..),
+    GIEnable (..),
+    GIMos (..),
+    GINIn (..),
+    GINOut (..),
+    GIPassEn (..),
+    GIPass (..),
+    GIPull (..),
     TimingCheckEvent (..),
     ControlledTimingCheckEvent (..),
     STCArgs (..),
     STCAddArgs (..),
-    SystemTimingCheck (..),
     ModulePathCondition (..),
     SpecPath (..),
     SpecifyItem (..),
-    ParamOver (..),
-    poIdent,
     SpecParamDecl (..),
     SpecParam (..),
-    NetKind (..),
+    NetProp (..),
+    NetDecl (..),
+    NetInit (..),
     BlockDecl (..),
-    StdBlockDecl,
-    TaskFunType (..),
-    ModGenDecl (..),
+    StdBlockDecl (..),
+    TFBlockDecl (..),
     GenCaseItem (..),
+    UDPInst (..),
+    ModInst (..),
+    UknInst (..),
     ModGenItem (..),
+    ModGenBlockedItem,
+    ModGenSingleItem,
     ModuleItem (..),
-    Parameter (..),
-    PortDecl (..),
-    GenerateRegion (..),
-    GenerateItem (..),
     GenerateBlock (..),
     ModuleBlock (..),
-    mbIdent,
     SigLevel (..),
     ZOX (..),
     CombRow (..),
@@ -104,30 +127,39 @@ module Verismith.Verilog2005.AST
     SeqIn (..),
     SeqRow (..),
     PrimTable (..),
+    PrimPort (..),
     PrimitiveBlock (..),
-    pbIdent,
     Dot1Ident (..),
+    Cell_inst (..),
     LLU (..),
     ConfigItem (..),
-    ciCell_inst,
     ConfigBlock (..),
-    cbIdent,
-    cbBody,
     Verilog2005 (..),
-    SourceInfo (..),
     SystemFunction (..),
     Logic (..),
     sfMap,
     BXZ (..),
     OXZ (..),
     HXZ (..),
+    hiPath,
+    mbIdent,
+    pbIdent,
+    _CIInst,
+    ciCell_inst,
+    cbIdent,
+    cbBody,
   )
 where
 
 import Control.Lens
+import Data.Functor.Compose
+import Data.Functor.Classes
 import Data.ByteString (ByteString)
+import Data.ByteString.Internal (packChars)
 import Data.Data
 import Data.Data.Lens
+import Data.String (IsString (..))
+import Text.Show (showListWith)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Vector.Unboxed as V
@@ -139,21 +171,40 @@ import Verismith.Verilog2005.Token (BXZ (..), HXZ (..), OXZ (..), ZOX (..))
 data GenMinTypMax et
   = MTMSingle !et
   | MTMFull
-      { _MTMMin :: !et,
-        _MTMTyp :: !et,
-        _MTMMax :: !et
+      { _mtmMin :: !et,
+        _mtmTyp :: !et,
+        _mtmMax :: !et
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 type CMinTypMax = GenMinTypMax CExpr
 
 type MinTypMax = GenMinTypMax Expr
 
--- | Quickly add an identifier to all members of a sum type, other uses are discouraged
-data Identified t = Identified {_identIdent :: !ByteString, _identData :: !t}
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Identifier, do not use for other things (like a string literal), used for biplate
+newtype Identifier = Identifier ByteString
+  deriving (Show, Eq, Data, Generic)
 
-defaultIdM = Identified "" Nothing
+instance IsString Identifier where
+  fromString = Identifier . packChars
+
+-- | Quickly add an identifier to all members of a sum type, other uses are discouraged
+data Identified t = Identified {_identIdent :: !Identifier, _identData :: !t}
+  deriving (Show, Eq, Data, Generic)
+
+instance Functor Identified where
+  fmap f (Identified i x) = Identified i $ f x
+
+showHelper :: (Int -> a -> ShowS) -> Identified a -> ShowS
+showHelper fp (Identified i x) = showString "Identified " . shows i . showChar ' ' . fp 0 x
+
+instance Show1 Identified where
+  liftShowsPrec fp _ p = showHelper fp
+  liftShowList fp _ = showListWith $ showHelper fp
+instance Eq1 Identified where
+  liftEq f (Identified ia a) (Identified ib b) = ia == ib && f a b
+
+defaultIdM = Identified (Identifier "") Nothing
 
 -- | Unary operators
 data UnaryOperator
@@ -167,7 +218,7 @@ data UnaryOperator
   | UnNor
   | UnXor
   | UnXNor
-  deriving (Eq, Ord, Data, Generic, Enum, Bounded)
+  deriving (Eq, Data, Generic, Enum, Bounded)
 
 instance Show UnaryOperator where
   show x = case x of
@@ -208,7 +259,7 @@ data BinaryOperator
   | BinLSR
   | BinASL
   | BinASR
-  deriving (Eq, Ord, Data, Generic, Enum, Bounded)
+  deriving (Eq, Data, Generic, Enum, Bounded)
 
 instance Show BinaryOperator where
   show x = case x of
@@ -243,110 +294,121 @@ data Number
   | NDecimal !Natural
   | NHex !(NonEmpty HXZ)
   | NXZ !Bool
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Parametric primary expression
 data GenPrim i r
   = PrimNumber
-      { _PNSize :: !(Maybe Natural),
-        _PNSigned :: !Bool,
-        _PNValue :: !Number
+      { _pnSize :: !(Maybe Natural),
+        _pnSigned :: !Bool,
+        _pnValue :: !Number
       }
   | PrimReal !ByteString
   | PrimIdent
-      { _PIIdent :: !i,
-        _PISub :: !r
+      { _piIdent :: !i,
+        _piSub :: !r
       }
   | PrimConcat !(NonEmpty (GenExpr i r))
   | PrimMultConcat
-      { _PMCMul :: !CExpr,
-        _PMCExpr :: !(NonEmpty (GenExpr i r))
+      { _pmcMul :: !CExpr,
+        _pmcExpr :: !(NonEmpty (GenExpr i r))
       }
   | PrimFun
-      { _PFIdent :: !i,
-        _PFAttr :: ![Attribute],
-        _PFArg :: ![GenExpr i r]
+      { _pfIdent :: !i,
+        _pfAttr :: ![Attribute],
+        _pfArg :: ![GenExpr i r]
       }
   | PrimSysFun
-      { _PSFIdent :: !ByteString,
-        _PSFArg :: ![GenExpr i r]
+      { _psfIdent :: !ByteString,
+        _psfArg :: ![GenExpr i r]
       }
   | PrimMinTypMax !(GenMinTypMax (GenExpr i r))
   | PrimString !ByteString
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Hierarchical identifier
-data HierIdent = HierIdent {_hiPath :: ![Identified (Maybe CExpr)], _hiIdent :: !ByteString}
-  deriving (Show, Eq, Ord, Data, Generic)
+data HierIdent = HierIdent {_hiPath :: ![(Identifier, Maybe CExpr)], _hiIdent :: !Identifier}
+  deriving (Show, Eq, Data, Generic)
 
 -- | Indexing for dimension and range
-data GenDimRange e = GenDimRange {_GDRDim :: ![e], _GDRRange :: !(GenRangeExpr e)}
-  deriving (Show, Eq, Ord, Data, Generic)
+data GenDimRange e = GenDimRange {_gdrDim :: ![e], _gdrRange :: !(GenRangeExpr e)}
+  deriving (Show, Eq, Data, Generic)
 
-newtype DimRange = DimRange (GenDimRange Expr)
-  deriving (Show, Eq, Ord, Data, Generic)
+type DimRange = GenDimRange Expr
 
-newtype CDimRange = CDimRange (GenDimRange CExpr)
-  deriving (Show, Eq, Ord, Data, Generic)
+type CDimRange = GenDimRange CExpr
 
 -- | Parametric expression
 data GenExpr i r
   = ExprPrim !(GenPrim i r)
   | ExprUnOp
-      { _EUOp :: !UnaryOperator,
-        _EUAttr :: ![Attribute],
-        _EUPrim :: !(GenPrim i r)
+      { _euOp :: !UnaryOperator,
+        _euAttr :: ![Attribute],
+        _euPrim :: !(GenPrim i r)
       }
   | ExprBinOp
-      { _EBLhs :: !(GenExpr i r),
-        _EBOp :: !BinaryOperator,
-        _EBAttr :: ![Attribute],
-        _EBRhs :: !(GenExpr i r)
+      { _ebLhs :: !(GenExpr i r),
+        _ebOp :: !BinaryOperator,
+        _ebAttr :: ![Attribute],
+        _ebRhs :: !(GenExpr i r)
       }
   | ExprCond
-      { _ECCond :: !(GenExpr i r),
-        _ECAttr :: ![Attribute],
-        _ECTrue :: !(GenExpr i r),
-        _ECFalse :: !(GenExpr i r)
+      { _ecCond :: !(GenExpr i r),
+        _ecAttr :: ![Attribute],
+        _ecTrue :: !(GenExpr i r),
+        _ecFalse :: !(GenExpr i r)
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
-newtype CExpr = CExpr (GenExpr ByteString (Maybe CRangeExpr))
-  deriving (Show, Eq, Ord, Data, Generic)
+instance (Data i, Data r) => Plated (GenExpr i r) where
+  plate = uniplate
+
+newtype CExpr = CExpr (GenExpr Identifier (Maybe CRangeExpr))
+  deriving (Show, Eq, Data, Generic)
 
 newtype Expr = Expr (GenExpr HierIdent (Maybe DimRange))
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Attributes which can be set to various nodes in the AST.
-type Attribute = Identified (Maybe CExpr)
+data Attribute = Attribute {_attrIdent :: !ByteString, _attrValue :: !(Maybe CExpr)}
+  deriving (Show, Eq, Data, Generic)
 
 data Attributed t = Attributed {_attrAttr :: ![Attribute], _attrData :: !t}
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
-data AttrIded t = AttrIded {_aiAttr :: ![Attribute], _aiIdent :: !ByteString, _aiData :: !t}
-  deriving (Show, Eq, Ord, Data, Generic)
+instance Functor Attributed where
+  fmap f (Attributed a x) = Attributed a $ f x
 
--- | Directions
-data Dir = DirIn | DirOut | DirInOut
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+instance Applicative Attributed where
+  pure = Attributed []
+  (<*>) (Attributed a1 f) (Attributed a2 x) = Attributed (a1 <> a2) $ f x
 
-instance Show Dir where
-  show x = case x of DirIn -> "input"; DirOut -> "output"; DirInOut -> "inout"
+instance Foldable Attributed where
+  foldMap f (Attributed _ x) = f x
+
+instance Traversable Attributed where
+  sequenceA (Attributed a x) = fmap (Attributed a) x
+
+data AttrIded t = AttrIded {_aiAttr :: ![Attribute], _aiIdent :: !Identifier, _aiData :: !t}
+  deriving (Show, Eq, Data, Generic)
+
+instance Functor AttrIded where
+  fmap f (AttrIded a s x) = AttrIded a s $ f x
 
 -- | Range2
-data Range2 = Range2 {_R2MSB :: !CExpr, _R2LSB :: !CExpr}
-  deriving (Show, Eq, Ord, Data, Generic)
+data Range2 = Range2 {_r2MSB :: !CExpr, _r2LSB :: !CExpr}
+  deriving (Show, Eq, Data, Generic)
 
 -- | Range expressions
 data GenRangeExpr e
   = GRESingle !e
   | GREPair !Range2
   | GREBaseOff
-      { _GREBase :: !e,
-        _GREMin_plus :: !Bool,
-        _GREOffset :: !CExpr
+      { _greBase :: !e,
+        _greMin_plus :: !Bool,
+        _greOffset :: !CExpr
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 type RangeExpr = GenRangeExpr Expr
 
@@ -354,10 +416,10 @@ type CRangeExpr = GenRangeExpr CExpr
 
 -- | Number or Identifier
 data NumIdent
-  = NIIdent !ByteString
+  = NIIdent !Identifier
   | NIReal !ByteString
   | NINumber !Natural
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Delay3
 data Delay3
@@ -365,48 +427,59 @@ data Delay3
   | D31 !MinTypMax
   | D32 !MinTypMax !MinTypMax
   | D33 !MinTypMax !MinTypMax !MinTypMax
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Delay2
 data Delay2
   = D2Base !NumIdent
   | D21 !MinTypMax
   | D22 !MinTypMax !MinTypMax
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Delay1
 data Delay1
   = D1Base !NumIdent
   | D11 !MinTypMax
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Signedness and range are often together
-data SignRange = SignRange {_SRSign :: !Bool, _SRRange :: !(Maybe Range2)}
-  deriving (Show, Eq, Ord, Data, Generic)
+data SignRange = SignRange {_srSign :: !Bool, _srRange :: !(Maybe Range2)}
+  deriving (Show, Eq, Data, Generic)
+
+-- | Specify terminal
+data SpecTerm = SpecTerm {_stIdent :: !Identifier, _stRange :: !(Maybe CRangeExpr)}
+  deriving (Show, Eq, Data, Generic)
 
 -- | Event expression prefix
 data EventPrefix = EPAny | EPPos | EPNeg
-  deriving (Show, Eq, Ord, Bounded, Enum, Data, Generic)
+  deriving (Show, Eq, Bounded, Enum, Data, Generic)
 
--- | Specify terminal
-type SpecTerm = Identified (Maybe CRangeExpr)
+-- | Port datatransfer directions
+data Dir = DirIn | DirOut | DirInOut
+  deriving (Eq, Bounded, Enum, Data, Generic)
 
--- | Common types for variables, parameters, functions and tasks
-data ComType = CTInteger | CTReal | CTRealtime | CTTime
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+instance Show Dir where
+  show x = case x of DirIn -> "input"; DirOut -> "output"; DirInOut -> "inout"
 
-instance Show ComType where
+-- | Abstract types for variables, parameters, functions and tasks
+data AbsType = ATInteger | ATReal | ATRealtime | ATTime
+  deriving (Eq, Bounded, Enum, Data, Generic)
+
+instance Show AbsType where
   show x = case x of
-    CTInteger -> "integer"
-    CTReal -> "real"
-    CTRealtime -> "realtime"
-    CTTime -> "time"
+    ATInteger -> "integer"
+    ATReal -> "real"
+    ATRealtime -> "realtime"
+    ATTime -> "time"
 
--- | Function and Parameter type
-data FunParType
-  = FPTComType !ComType
-  | FPTSignRange !SignRange
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Function, parameter and task type
+data ComType t
+  = CTAbstract !AbsType
+  | CTConcrete
+    { _ctcExtra :: !t,
+      _ctcSignRange :: !SignRange
+    }
+  deriving (Show, Eq, Data, Generic)
 
 -- | Net type
 data NetType
@@ -421,7 +494,7 @@ data NetType
   | NTWire
   | NTWAnd
   | NTWOr
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+  deriving (Eq, Bounded, Enum, Data, Generic)
 
 instance Show NetType where
   show x = case x of
@@ -439,7 +512,7 @@ instance Show NetType where
 
 -- | Net drive strengths
 data Strength = StrSupply | StrStrong {-default-} | StrPull | StrWeak
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+  deriving (Eq, Bounded, Enum, Data, Generic)
 
 instance Show Strength where
   show x = case x of
@@ -450,20 +523,20 @@ instance Show Strength where
 
 data DriveStrength
   = DSNormal
-      { _DS0 :: !Strength,
-        _DS1 :: !Strength
+      { _ds0 :: !Strength,
+        _ds1 :: !Strength
       }
   | DSHighZ
-      { _DSHZ :: !Bool,
-        _DSStr :: !Strength
+      { _dsHZ :: !Bool,
+        _dsStr :: !Strength
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
-dsDefault = DSNormal {_DS0 = StrStrong, _DS1 = StrStrong}
+dsDefault = DSNormal {_ds0 = StrStrong, _ds1 = StrStrong}
 
 -- | Capacitor charge
 data ChargeStrength = CSSmall | CSMedium {-default-} | CSLarge
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+  deriving (Eq, Bounded, Enum, Data, Generic)
 
 instance Show ChargeStrength where
   show x = case x of CSSmall -> "(small)"; CSMedium -> "(medium)"; CSLarge -> "(large)"
@@ -471,56 +544,63 @@ instance Show ChargeStrength where
 -- | Left side of assignments
 data LValue dr
   = LVSingle
-      { _LVIdent :: !HierIdent,
-        _LVDimRange :: !(Maybe dr)
+      { _lvIdent :: !HierIdent,
+        _lvDimRange :: !(Maybe dr)
       }
   | LVConcat !(NonEmpty (LValue dr))
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 type NetLValue = LValue CDimRange
 
 type VarLValue = LValue DimRange
 
--- | Net assignment
-data NetAssign = NetAssign {_NALValue :: !NetLValue, _NAValue :: !Expr}
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Assignment
+data Assign dr = Assign {_aLValue :: !(LValue dr), _aValue :: !Expr}
+  deriving (Show, Eq, Data, Generic)
 
--- | Variable assignment
-data VarAssign = VarAssign {_VALValue :: !VarLValue, _VAValue :: !Expr}
-  deriving (Show, Eq, Ord, Data, Generic)
+type NetAssign = Assign CDimRange
+type VarAssign = Assign DimRange
+
+-- | Parameter
+data Parameter = Parameter {_paramType :: !(ComType ()), _paramValue :: !CMinTypMax}
+  deriving (Show, Eq, Data, Generic)
+
+-- | DefParam assignment
+data ParamOver = ParamOver {_poIdent :: !HierIdent, _poValue :: !CMinTypMax}
+  deriving (Show, Eq, Data, Generic)
 
 -- | Parameter assignment list
 data ParamAssign
   = ParamPositional ![Expr]
   | ParamNamed ![Identified (Maybe MinTypMax)]
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Port assignment list
 data PortAssign
   = PortNamed ![AttrIded (Maybe Expr)]
   | PortPositional ![Attributed (Maybe Expr)]
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Event primitive
-data EventPrim = EventPrim {_EPOp :: !EventPrefix, _EPExpr :: !Expr}
-  deriving (Show, Eq, Ord, Data, Generic)
+data EventPrim = EventPrim {_epOp :: !EventPrefix, _epExpr :: !Expr}
+  deriving (Show, Eq, Data, Generic)
 
 -- | Event control
 data EventControl
   = ECIdent !HierIdent
   | ECExpr !(NonEmpty EventPrim)
   | ECDeps
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Delay or Event control
 data DelayEventControl
   = DECDelay !Delay1
   | DECEvent !EventControl
   | DECRepeat
-      { _DECRExpr :: !Expr,
-        _DECREvent :: !EventControl
+      { _decrExpr :: !Expr,
+        _decrEvent :: !EventControl
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Procedural continuous assignment
 data ProcContAssign
@@ -528,7 +608,7 @@ data ProcContAssign
   | PCADeassign !VarLValue
   | PCAForce !(Either VarAssign NetAssign)
   | PCARelease !(Either VarLValue NetLValue)
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Loop statement
 data LoopStatement
@@ -536,66 +616,104 @@ data LoopStatement
   | LSRepeat !Expr
   | LSWhile !Expr
   | LSFor
-      { _LSFInit :: !VarAssign,
-        _LSFCond :: !Expr,
-        _LSFUpd :: !VarAssign
+      { _lsfInit :: !VarAssign,
+        _lsfCond :: !Expr,
+        _lsfUpd :: !VarAssign
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Case item
-data CaseItem = CaseItem {_CIPat :: !(NonEmpty Expr), _CIVal :: !MybStmt}
-  deriving (Show, Eq, Ord, Data, Generic)
+data FCaseItem = FCaseItem {_fciPat :: !(NonEmpty Expr), _fciVal :: !MybFStmt}
+  deriving (Show, Eq, Data, Generic)
+data CaseItem = CaseItem {_ciPat :: !(NonEmpty Expr), _ciVal :: !MybStmt}
+  deriving (Show, Eq, Data, Generic)
+
+-- | Function statement, more limited than general statement because they are purely combinational
+data FunctionStatement
+  = FSBlockAssign !VarAssign
+  | FSCase
+      { _fscType :: !ZOX,
+        _fscExpr :: !Expr,
+        _fscBody :: ![FCaseItem],
+        _fscDef :: !MybFStmt
+      }
+  | FSIf
+      { _fsiExpr :: !Expr,
+        _fsiTrue :: !MybFStmt,
+        _fsiFalse :: !MybFStmt
+      }
+  | FSDisable !HierIdent
+  | FSLoop
+      { _fslHead :: !LoopStatement,
+        _fslBody :: !AttrFStmt
+      }
+  | FSBlock
+      { _fsbHeader :: !(Maybe (Identifier, [AttrIded StdBlockDecl])),
+        _fsbPar_seq :: !Bool,
+        _fsbStmt :: ![AttrFStmt]
+      }
+  deriving (Show, Eq, Data, Generic)
+
+instance Plated FunctionStatement where
+  plate = uniplate
+
+type AttrFStmt = Attributed FunctionStatement
+
+type MybFStmt = Attributed (Maybe FunctionStatement)
 
 -- | Statement
 data Statement
   = SBlockAssign
-      { _SBABlock :: !Bool,
-        _SBAAssign :: !VarAssign,
-        _SBADelev :: !(Maybe DelayEventControl)
+      { _sbaBlock :: !Bool,
+        _sbaAssign :: !VarAssign,
+        _sbaDelev :: !(Maybe DelayEventControl)
       }
-  | SProcContAssign !ProcContAssign
   | SCase
-      { _SCType :: !ZOX,
-        _SCExpr :: !Expr,
-        _SCBody :: ![CaseItem],
-        _SCDef :: !MybStmt
+      { _scType :: !ZOX,
+        _scExpr :: !Expr,
+        _scBody :: ![CaseItem],
+        _scDef :: !MybStmt
       }
   | SIf
-      { _SIExpr :: !Expr,
-        _SITrue :: !MybStmt,
-        _SIFalse :: !MybStmt
+      { _siExpr :: !Expr,
+        _siTrue :: !MybStmt,
+        _siFalse :: !MybStmt
       }
   | SDisable !HierIdent
-  | SProcTimingControl
-      { _SPTCControl :: !(Either Delay1 EventControl),
-        _SPTCStmt :: !MybStmt
-      }
   | SEventTrigger
-      { _SETIdent :: !HierIdent,
-        _SETIndex :: ![Expr]
-      }
-  | SWait
-      { _SWExpr :: !Expr,
-        _SWStmt :: !MybStmt
+      { _setIdent :: !HierIdent,
+        _setIndex :: ![Expr]
       }
   | SLoop
-      { _SLHead :: !LoopStatement,
-        _SLBody :: !AttrStmt
+      { _slHead :: !LoopStatement,
+        _slBody :: !AttrStmt
+      }
+  | SProcContAssign !ProcContAssign
+  | SProcTimingControl
+      { _sptcControl :: !(Either Delay1 EventControl),
+        _sptcStmt :: !MybStmt
       }
   | SBlock
-      { _SBHeader :: !(Maybe (ByteString, [Parameter], [Parameter], StdBlockDecl)),
-        _SBPar_seq :: !Bool,
-        _SBStmt :: ![AttrStmt]
+      { _sbHeader :: !(Maybe (Identifier, [AttrIded StdBlockDecl])),
+        _sbPar_seq :: !Bool,
+        _sbStmt :: ![AttrStmt]
       }
   | SSysTaskEnable
-      { _SSTEIdent :: !ByteString,
-        _SSTEArgs :: ![Maybe Expr]
+      { _ssteIdent :: !ByteString,
+        _ssteArgs :: ![Maybe Expr]
       }
   | STaskEnable
-      { _STEIdent :: !HierIdent,
-        _STEArgs :: ![Expr]
+      { _steIdent :: !HierIdent,
+        _steArgs :: ![Expr]
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  | SWait
+      { _swExpr :: !Expr,
+        _swStmt :: !MybStmt
+      }
+  deriving (Show, Eq, Data, Generic)
+
+instance Plated Statement where
+  plate = uniplate
 
 type AttrStmt = Attributed Statement
 
@@ -603,498 +721,502 @@ type MybStmt = Attributed (Maybe Statement)
 
 -- | N-input logic gate types
 data NInputType = NITAnd | NITOr | NITXor
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+  deriving (Eq, Bounded, Enum, Data, Generic)
 
 instance Show NInputType where
   show x = case x of NITAnd -> "and"; NITOr -> "or"; NITXor -> "xor"
 
--- | Gate instantiation
-data GateInst
-  = GICMos
-      { _GICMR :: !Bool,
-        _GICMDelay :: !(Maybe Delay3),
-        _GICMOutput :: !NetLValue,
-        _GICMInput :: !Expr,
-        _GICMNControl :: !Expr,
-        _GICMPControl :: !Expr
-      }
-  | GIEnable
-      { _GIER :: !Bool,
-        _GIE1_0 :: !Bool,
-        _GIEStrength :: !DriveStrength,
-        _GIEDelay :: !(Maybe Delay3),
-        _GIEOutput :: !NetLValue,
-        _GIEInput :: !Expr,
-        _GIEEnable :: !Expr
-      }
-  | GIMos
-      { _GIMR :: !Bool,
-        _GIMN_P :: !Bool,
-        _GIMDelay :: !(Maybe Delay3),
-        _GIMOutput :: !NetLValue,
-        _GIMInput :: !Expr,
-        _GIMEnable :: !Expr
-      }
-  | GINIn
-      { _GINIType :: !NInputType,
-        _GININ :: !Bool,
-        _GINIStrength :: !DriveStrength,
-        _GINIDelay :: !(Maybe Delay2),
-        _GINIOutput :: !NetLValue,
-        _GINIInput :: !(NonEmpty Expr)
-      }
-  | GINOut
-      { _GINOR :: !Bool,
-        _GINOStrength :: !DriveStrength,
-        _GINODelay :: !(Maybe Delay2),
-        _GINOOutput :: !(NonEmpty NetLValue),
-        _GINOInput :: !Expr
-      }
-  | GIPassEn
-      { _GIPER :: !Bool,
-        _GIPE1_0 :: !Bool,
-        _GIPEDelay :: !(Maybe Delay2),
-        _GIPELhs :: !NetLValue,
-        _GIPERhs :: !NetLValue,
-        _GIPEEnable :: !Expr
-      }
-  | GIPass
-      { _GIPR :: !Bool,
-        _GIPLhs :: !NetLValue,
-        _GIPRhs :: !NetLValue
-      }
-  | GIPull
-      { _GIPUp_down :: !Bool,
-        _GIPStrength :: !DriveStrength,
-        _GIPOutput :: !NetLValue
-      }
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Gate instances
+data GICMos = GICMos
+  { _gicmIdent :: !Identifier,
+    _gicmRange :: !(Maybe Range2),
+    _gicmOutput :: !NetLValue,
+    _gicmInput :: !Expr,
+    _gicmNControl :: !Expr,
+    _gicmPControl :: !Expr
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GIEnable = GIEnable
+  { _gieIdent :: !Identifier,
+    _gieRange :: !(Maybe Range2),
+    _gieOutput :: !NetLValue,
+    _gieInput :: !Expr,
+    _gieEnable :: !Expr
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GIMos = GIMos
+  { _gimIdent :: !Identifier,
+    _gimRange :: !(Maybe Range2),
+    _gimOutput :: !NetLValue,
+    _gimInput :: !Expr,
+    _gimEnable :: !Expr
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GINIn = GINIn
+  { _giniIdent :: !Identifier,
+    _giniRange :: !(Maybe Range2),
+    _giniOutput :: !NetLValue,
+    _giniInput :: !(NonEmpty Expr)
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GINOut = GINOut
+  { _ginoIdent :: !Identifier,
+    _ginoRange :: !(Maybe Range2),
+    _ginoOutput :: !(NonEmpty NetLValue),
+    _ginoInput :: !Expr
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GIPassEn = GIPassEn
+  { _gipeIdent :: !Identifier,
+    _gipeRange :: !(Maybe Range2),
+    _gipeLhs :: !NetLValue,
+    _gipeRhs :: !NetLValue,
+    _gipeEnable :: !Expr
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GIPass = GIPass
+  { _gipsIdent :: !Identifier,
+    _gipsRange :: !(Maybe Range2),
+    _gipsLhs :: !NetLValue,
+    _gipsRhs :: !NetLValue
+  }
+  deriving (Show, Eq, Data, Generic)
+
+data GIPull = GIPull
+  { _giplIdent :: !Identifier,
+    _giplRange :: !(Maybe Range2),
+    _giplOutput :: !NetLValue
+  }
+  deriving (Show, Eq, Data, Generic)
 
 -- | Edge descriptor, a 10 Bool array (01, 0x, 0z, 10, 1x, 1z, x0, x1, z0, z1)
 type EdgeDesc = V.Vector Bool
 
 -- | Timing check (controlled) event
 data TimingCheckEvent = TimingCheckEvent
-  { _TCEEvCtl :: !(Maybe EdgeDesc),
-    _TCESpecTerm :: !SpecTerm,
-    _TCETimChkCond :: !(Maybe (Bool, Expr))
+  { _tceEvCtl :: !(Maybe EdgeDesc),
+    _tceSpecTerm :: !SpecTerm,
+    _tceTimChkCond :: !(Maybe (Bool, Expr))
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 data ControlledTimingCheckEvent = ControlledTimingCheckEvent
-  { _CTCEEvCtl :: !EdgeDesc,
-    _CTCESpecTerm :: !SpecTerm,
-    _CTCETimChkCond :: !(Maybe (Bool, Expr))
+  { _ctceEvCtl :: !EdgeDesc,
+    _ctceSpecTerm :: !SpecTerm,
+    _ctceTimChkCond :: !(Maybe (Bool, Expr))
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | System timing check common arguments
 data STCArgs = STCArgs
-  { _STCADataEvent :: !TimingCheckEvent,
-    _STCARefEvent :: !TimingCheckEvent,
-    _STCATimChkLim :: !Expr,
-    _STCANotifier :: !ByteString
+  { _stcaDataEvent :: !TimingCheckEvent,
+    _stcaRefEvent :: !TimingCheckEvent,
+    _stcaTimChkLim :: !Expr,
+    _stcaNotifier :: !Identifier
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Setuphold and Recrem additionnal arguments
 data STCAddArgs = STCAddArgs
-  { _STCAATimChkLim :: !Expr,
-    _STCAAStampCond :: !(Maybe MinTypMax),
-    _STCAAChkTimCond :: !(Maybe MinTypMax),
-    _STCAADelayedRef :: !(Identified (Maybe CMinTypMax)),
-    _STCAADelayedData :: !(Identified (Maybe CMinTypMax))
+  { _stcaaTimChkLim :: !Expr,
+    _stcaaStampCond :: !(Maybe MinTypMax),
+    _stcaaChkTimCond :: !(Maybe MinTypMax),
+    _stcaaDelayedRef :: !(Identified (Maybe CMinTypMax)),
+    _stcaaDelayedData :: !(Identified (Maybe CMinTypMax))
   }
-  deriving (Show, Eq, Ord, Data, Generic)
-
--- | System timing check
-data SystemTimingCheck
-  = STCSetup !STCArgs
-  | STCHold !STCArgs
-  | STCSetupHold
-      { _STCSHArgs :: !STCArgs,
-        _STCSHAddArgs :: !STCAddArgs
-      }
-  | STCRecovery !STCArgs
-  | STCRemoval !STCArgs
-  | STCRecrem
-      { _STCRArgs :: !STCArgs,
-        _STCRAddArgs :: !STCAddArgs
-      }
-  | STCSkew !STCArgs
-  | STCTimeSkew
-      { _STCTSArgs :: !STCArgs,
-        _STCTSEvBased :: !(Maybe CExpr),
-        _STCTSRemActive :: !(Maybe CExpr)
-      }
-  | STCFullSkew
-      { _STCFSArgs :: !STCArgs,
-        _STCFSTimChkLim :: !Expr,
-        _STCFSEvBased :: !(Maybe CExpr),
-        _STCFSRemActive :: !(Maybe CExpr)
-      }
-  | STCPeriod
-      { _STCPCRefEvent :: !ControlledTimingCheckEvent,
-        _STCPTimCtlLim :: !Expr,
-        _STCPNotif :: !ByteString
-      }
-  | STCWidth
-      { _STCWRefEvent :: !ControlledTimingCheckEvent,
-        _STCWTimCtlLim :: !Expr,
-        _STCWThresh :: !(Maybe CExpr),
-        _STCWNotif :: !ByteString
-      }
-  | STCNoChange
-      { _STCNCRefEvent :: !TimingCheckEvent,
-        _STCNCDataEvent :: !TimingCheckEvent,
-        _STCNCStartEdgeOff :: !MinTypMax,
-        _STCNCEndEdgeOff :: !MinTypMax,
-        _STCNCNotif :: !ByteString
-      }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Module path condition
 data ModulePathCondition
-  = MPCCond !(GenExpr ByteString ())
+  = MPCCond !(GenExpr Identifier ())
   | MPCNone
   | MPCAlways
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Specify path declaration
 data SpecPath
   = SPParallel
-      { _SPPInput :: !SpecTerm,
-        _SPPOutput :: !SpecTerm
+      { _sppInput :: !SpecTerm,
+        _sppOutput :: !SpecTerm
       }
   | SPFull
-      { _SPFInput :: !(NonEmpty SpecTerm),
-        _SPFOutput :: !(NonEmpty SpecTerm)
+      { _spfInput :: !(NonEmpty SpecTerm),
+        _spfOutput :: !(NonEmpty SpecTerm)
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Specify block item
 data SpecifyItem
-  = SIPulsestyle
-      { _SIPEvent_detect :: !Bool,
-        _SIPPathOutput :: !SpecTerm
-      }
-  | SIShowcancelled
-      { _SISCancelled :: !Bool,
-        _SISPathOutput :: !SpecTerm
-      }
+  = SISpecParam !SpecParam
+  | SIPulsestyleOnevent !SpecTerm
+  | SIPulsestyleOndetect !SpecTerm
+  | SIShowcancelled !SpecTerm
+  | SINoshowcancelled !SpecTerm
   | SIPathDeclaration
-      { _SIPDCond :: !ModulePathCondition,
-        _SIPDConn :: !SpecPath,
-        _SIPDPolarity :: !(Maybe Bool),
-        _SIPDEDS :: !(Maybe (Expr, Maybe Bool)),
-        _SIPDValue :: !(NonEmpty CMinTypMax) -- length 1, 2, 3, 6 or 12
+      { _sipdCond :: !ModulePathCondition,
+        _sipdConn :: !SpecPath,
+        _sipdPolarity :: !(Maybe Bool),
+        _sipdEDS :: !(Maybe (Expr, Maybe Bool)),
+        _sipdValue :: !(NonEmpty CMinTypMax) -- length 1, 2, 3, 6 or 12
       }
-  | SISystemTimingCheck !SystemTimingCheck
-  deriving (Show, Eq, Ord, Data, Generic)
-
--- | Parameter override
-data ParamOver = ParamOver
-  { _poAttr :: ![Attribute],
-    _poIdent :: !HierIdent,
-    _poValue :: !CMinTypMax
-  }
-  deriving (Show, Eq, Ord, Data, Generic)
+  | SISetup !STCArgs
+  | SIHold !STCArgs
+  | SISetupHold
+      { _sishArgs :: !STCArgs,
+        _sishAddArgs :: !STCAddArgs
+      }
+  | SIRecovery !STCArgs
+  | SIRemoval !STCArgs
+  | SIRecrem
+      { _sirArgs :: !STCArgs,
+        _sirAddArgs :: !STCAddArgs
+      }
+  | SISkew !STCArgs
+  | SITimeSkew
+      { _sitsArgs :: !STCArgs,
+        _sitsEvBased :: !(Maybe CExpr),
+        _sitsRemActive :: !(Maybe CExpr)
+      }
+  | SIFullSkew
+      { _sifsArgs :: !STCArgs,
+        _sifsTimChkLim :: !Expr,
+        _sifsEvBased :: !(Maybe CExpr),
+        _sifsRemActive :: !(Maybe CExpr)
+      }
+  | SIPeriod
+      { _sipCRefEvent :: !ControlledTimingCheckEvent,
+        _sipTimCtlLim :: !Expr,
+        _sipNotif :: !Identifier
+      }
+  | SIWidth
+      { _siwRefEvent :: !ControlledTimingCheckEvent,
+        _siwTimCtlLim :: !Expr,
+        _siwThresh :: !(Maybe CExpr),
+        _siwNotif :: !Identifier
+      }
+  | SINoChange
+      { _sincRefEvent :: !TimingCheckEvent,
+        _sincDataEvent :: !TimingCheckEvent,
+        _sincStartEdgeOff :: !MinTypMax,
+        _sincEndEdgeOff :: !MinTypMax,
+        _sincNotif :: !Identifier
+      }
+  deriving (Show, Eq, Data, Generic)
 
 -- | Specparam declaration
 data SpecParamDecl
-  = SPDAssign !(Identified CMinTypMax)
+  = SPDAssign
+    { _spdaIdent :: !Identifier,
+      _spdaValue :: !CMinTypMax
+    }
   | SPDPathPulse -- Not accurate input/output as it is ambiguous
-      { _SPDPInput :: !SpecTerm,
-        _SPDPOutput :: !SpecTerm,
-        _SPDPReject :: !CMinTypMax,
-        _SPDPError :: !CMinTypMax
+      { _spdpInput :: !SpecTerm,
+        _spdpOutput :: !SpecTerm,
+        _spdpReject :: !CMinTypMax,
+        _spdpError :: !CMinTypMax
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Module or Generate specify parameters
-data SpecParam = SpecParam
-  { _SPRange :: !(Maybe Range2),
-    _SPParam :: !SpecParamDecl
-  }
-  deriving (Show, Eq, Ord, Data, Generic)
+data SpecParam = SpecParam {_spRange :: !(Maybe Range2), _spParam :: !SpecParamDecl}
+  deriving (Show, Eq, Data, Generic)
 
--- | Net type + trireg variants
-data NetKind
-  = NKNet
-      { _NKNType :: !NetType,
-        _NKNDrive :: !(Either [Range2] (DriveStrength, Expr))
-      }
-  | NKTriD
-      { _NKTDDrive :: !DriveStrength,
-        _NKTDValue :: !Expr
-      }
-  | NKTriC
-      { _NKTCCharge :: !ChargeStrength,
-        _NKTCDim :: ![Range2]
-      }
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Net common properties
+data NetProp = NetProp
+  { _npSigned :: !Bool,
+    _npVector :: !(Maybe (Maybe Bool, Range2)),
+    _npDelay :: !(Maybe Delay3)
+  }
+  deriving (Show, Eq, Data, Generic)
+
+-- | Net declaration
+data NetDecl = NetDecl {_ndIdent :: !Identifier, _ndDim :: ![Range2]}
+  deriving (Show, Eq, Data, Generic)
+
+-- | Net initialisation
+data NetInit = NetInit {_niIdent :: !Identifier, _niValue :: !Expr}
+  deriving (Show, Eq, Data, Generic)
 
 -- | Block declaration
-data BlockDecl t
+-- | t is used to abstract between block_decl and modgen_decl
+-- | f is used to abstract between the separated and grouped modgen_item
+data BlockDecl f t
   = BDReg
-      { _BDRgSR :: !SignRange,
-        _BDRgData :: !t
-      }
-  | BDInt !t
-  | BDReal !t
-  | BDTime !t
-  | BDRealTime !t
-  | BDEvent ![Range2]
-  deriving (Show, Eq, Ord, Data, Generic)
+    { _bdrgSR :: !SignRange,
+      _bdrgData :: !(f t)
+    }
+  | BDInt !(f t)
+  | BDReal !(f t)
+  | BDTime !(f t)
+  | BDRealTime !(f t)
+  | BDEvent !(f [Range2])
+  | BDLocalParam
+    { _bdlpType :: !(ComType ()),
+      _bdlpValue :: !(f CMinTypMax)
+    }
 
-type StdBlockDecl = [AttrIded (BlockDecl [Range2])]
+deriving instance (Show t, forall a. Show a => Show (f a)) => Show (BlockDecl f t)
+deriving instance (Eq t, forall a. Eq a => Eq (f a)) => Eq (BlockDecl f t)
+deriving instance (Typeable t, Data t, Typeable f, forall a. Data a => Data (f a)) => Data (BlockDecl f t)
+deriving instance (Generic t, forall a. Generic a => Generic (f a)) => Generic (BlockDecl f t)
 
--- | Task and Function argument types
-data TaskFunType
-  = TFTRegSignRange
-      { _TFTRSRReg :: !Bool,
-        _TFTRSRSignRange :: !SignRange
-      }
-  | TFTComType !ComType
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Block item declaration (for statement blocks [begin/fork], tasks, and functions)
+data StdBlockDecl
+  = SBDBlockDecl !(BlockDecl Identity [Range2])
+  | SBDParameter !Parameter
+  deriving (Show, Eq, Data, Generic)
 
--- | Module or Generate declaration
-data ModGenDecl
-  = MGDBlockDecl !(BlockDecl (Either [Range2] CExpr))
-  | MGDNet
-      { _MGDNType :: !NetKind,
-        _MGDNSigned :: !Bool,
-        _MGDNVector :: !(Maybe (Maybe Bool, Range2)),
-        _MGDNDelay :: !(Maybe Delay3)
-      }
-  | MGDGenVar
-  | MGDTask
-      { _MGDTAuto :: !Bool,
-        _MGDTPort :: ![AttrIded (Dir, TaskFunType)],
-        _MGDTParam :: ![Parameter],
-        _MGDTLocalParam :: ![Parameter],
-        _MGDTDecl :: !StdBlockDecl,
-        _MGDTBody :: !MybStmt
-      }
-  | -- TODO: Function statement because they're restricted
-    MGDFunc
-      { _MGDFAuto :: !Bool,
-        _MGDFType :: !(Maybe FunParType),
-        _MGDFPort :: ![AttrIded TaskFunType],
-        _MGDFParam :: ![Parameter],
-        _MGDFLocalParam :: ![Parameter],
-        _MGDFDecl :: !StdBlockDecl,
-        _MGDFBody :: !Statement
-      }
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Task and Function block declaration
+data TFBlockDecl t
+  = TFBDStd !StdBlockDecl
+  | TFBDPort
+    { _tfbdpDir :: !t,
+      _tfbdpType :: !(ComType Bool)
+    }
+  deriving (Show, Eq, Data, Generic)
 
 -- | Case generate branch
-data GenCaseItem = GenCaseItem {_GCIPat :: !(NonEmpty CExpr), _GCIVal :: !(Maybe GenerateBlock)}
-  deriving (Show, Eq, Ord, Data, Generic)
+data GenCaseItem = GenCaseItem {_gciPat :: !(NonEmpty CExpr), _gciVal :: !(Maybe GenerateBlock)}
+  deriving (Show, Eq, Data, Generic)
+
+-- | UDP named instantiation
+data UDPInst = UDPInst
+  { _udpiIdent :: !Identifier,
+    _udpiRange :: !(Maybe Range2),
+    _udpiLValue :: !NetLValue,
+    _udpiArgs :: !(NonEmpty Expr)
+  }
+  deriving (Show, Eq, Data, Generic)
+
+-- | Module named instantiation
+data ModInst = ModInst
+  { _miIdent :: !Identifier,
+    _miRange :: !(Maybe Range2),
+    _miPort :: !PortAssign
+  }
+  deriving (Show, Eq, Data, Generic)
+
+-- | Unknown named instantiation
+data UknInst = UknInst
+  { _uiIdent :: !Identifier,
+    _uiRange :: !(Maybe Range2),
+    _uiArg0 :: !NetLValue,
+    _uiArgs :: !(NonEmpty Expr)
+  }
+  deriving (Show, Eq, Data, Generic)
 
 -- | Module or Generate item
-data ModGenItem
-  = MGIContAss
-      { _MGICAStrength :: !DriveStrength,
-        _MGICADelay :: !(Maybe Delay3),
-        _MGICAAssign :: !NetAssign
+-- | f is either Identity or NonEmpty
+-- | it is used to abstract between several modgen items in a block and a single comma separated one
+data ModGenItem f
+  = MGINetInit
+      { _mginiType :: !NetType,
+        _mginiDrive :: !DriveStrength,
+        _mginiProp :: !NetProp,
+        _mginiInit :: !(f NetInit)
       }
-  | MGIGateInst
-      { _MGIGIIdent :: !ByteString,
-        _MGIGIRange :: !(Maybe Range2),
-        _MGIGIInst :: !GateInst
+  | MGINetDecl
+      { _mgindType :: !NetType,
+        _mgindProp :: !NetProp,
+        _mgindDecl :: !(f NetDecl)
+      }
+  | MGITriD
+      { _mgitdDrive :: !DriveStrength,
+        _mgitdProp :: !NetProp,
+        _mgitdInit :: !(f NetInit)
+      }
+  | MGITriC
+      { _mgitcCharge :: !ChargeStrength,
+        _mgitcProp :: !NetProp,
+        _mgitcDecl :: !(f NetDecl)
+      }
+  | MGIBlockDecl !(BlockDecl (Compose f Identified) (Either [Range2] CExpr))
+  | MGIGenVar !(f Identifier)
+  | MGITask
+      { _mgitAuto :: !Bool,
+        _mgitIdent :: !Identifier,
+        _mgitDecl :: ![AttrIded (TFBlockDecl Dir)],
+        _mgitBody :: !MybStmt
+      }
+  | MGIFunc
+      { _mgifAuto :: !Bool,
+        _mgifType :: !(Maybe (ComType ())),
+        _mgifIdent :: !Identifier,
+        _mgifDecl :: ![AttrIded (TFBlockDecl ())],
+        _mgifBody :: !FunctionStatement
+      }
+  | MGIDefParam !(f ParamOver)
+  | MGIContAss
+      { _mgicaStrength :: !DriveStrength,
+        _mgicaDelay :: !(Maybe Delay3),
+        _mgicaAssign :: !(f NetAssign)
+      }
+  | MGICMos
+      { _mgicmR :: !Bool,
+        _mgicmDelay :: !(Maybe Delay3),
+        _mgicmInst :: !(f GICMos)
+      }
+  | MGIEnable
+      { _mgieR :: !Bool,
+        _mgie1_0 :: !Bool,
+        _mgieStrength :: !DriveStrength,
+        _mgieDelay :: !(Maybe Delay3),
+        _mgieInst :: !(f GIEnable)
+      }
+  | MGIMos
+      { _mgimR :: !Bool,
+        _mgimN_P :: !Bool,
+        _mgimDelay :: !(Maybe Delay3),
+        _mgimInst :: !(f GIMos)
+      }
+  | MGINIn
+      { _mgininType :: !NInputType,
+        _mgininN :: !Bool,
+        _mgininStrength :: !DriveStrength,
+        _mgininDelay :: !(Maybe Delay2),
+        _mgininInst :: !(f GINIn)
+      }
+  | MGINOut
+      { _mginoR :: !Bool,
+        _mginoStrength :: !DriveStrength,
+        _mginoDelay :: !(Maybe Delay2),
+        _mginoInst :: !(f GINOut)
+      }
+  | MGIPassEn
+      { _mgipeR :: !Bool,
+        _mgipe1_0 :: !Bool,
+        _mgipeDelay :: !(Maybe Delay2),
+        _mgipeInst :: !(f GIPassEn)
+      }
+  | MGIPass
+      { _mgipsR :: !Bool,
+        _mgipsInst :: !(f GIPass)
+      }
+  | MGIPull
+      { _mgiplUp_down :: !Bool,
+        _mgiplStrength :: !DriveStrength,
+        _mgiplInst :: !(f GIPull)
       }
   | MGIUDPInst
-      { _MGIUDPIUDP :: !ByteString,
-        _MGIUDPIStrength :: !DriveStrength,
-        _MGIUDPIDelay :: !(Maybe Delay2),
-        _MGIUDPIIdent :: !ByteString,
-        _MGIUDPIRange :: !(Maybe Range2),
-        _MGIUDPILValue :: !NetLValue,
-        _MGIUDPIArgs :: !(NonEmpty Expr)
+      { _mgiudpiUDP :: !Identifier,
+        _mgiudpiStrength :: !DriveStrength,
+        _mgiudpiDelay :: !(Maybe Delay2),
+        _mgiudpiInst :: !(f UDPInst)
       }
   | MGIModInst
-      { _MGIMIMod :: !ByteString,
-        _MGIMIParams :: !ParamAssign,
-        _MGIMIIdent :: !ByteString,
-        _MGIMIRange :: !(Maybe Range2),
-        _MGIMIPort :: !PortAssign
+      { _mgimiMod :: !Identifier,
+        _mgimiParams :: !ParamAssign,
+        _mgimiInst :: !(f ModInst)
       }
   | MGIUnknownInst -- Sometimes identifying what is instantiated is impossible
-      { _MGIUIType :: !ByteString,
-        _MGIUIParam :: !(Maybe (Either Expr (Expr, Expr))),
-        _MGIUIIdent :: !ByteString,
-        _MGIUIRange :: !(Maybe Range2),
-        _MGIUIArg0 :: !NetLValue,
-        _MGIUIArgs :: !(NonEmpty Expr)
+      { _mgiuiType :: !Identifier,
+        _mgiuiParam :: !(Maybe (Either Expr (Expr, Expr))),
+        _mgiuiInst :: !(f UknInst)
       }
   | MGIInitial !AttrStmt
   | MGIAlways !AttrStmt
   | MGILoopGen
-      { _MGILGInit :: !(Identified CExpr),
-        _MGILGCond :: !CExpr,
-        _MGILGUpd :: !(Identified CExpr),
-        _MGILGBody :: !GenerateBlock
+      { _mgilgInitIdent :: !Identifier,
+        _mgilgInitValue :: !CExpr,
+        _mgilgCond :: !CExpr,
+        _mgilgUpdIdent :: !Identifier,
+        _mgilgUpdValue :: !CExpr,
+        _mgilgBody :: !GenerateBlock
       }
   | MGIIf
-      { _MGIIExpr :: !CExpr,
-        _MGIITrue :: !(Maybe GenerateBlock),
-        _MGIIFalse :: !(Maybe GenerateBlock)
+      { _mgiiExpr :: !CExpr,
+        _mgiiTrue :: !(Maybe GenerateBlock),
+        _mgiiFalse :: !(Maybe GenerateBlock)
       }
   | MGICase
-      { _MGICExpr :: !CExpr,
-        _MGICBranch :: ![GenCaseItem],
-        _MGICDefault :: !(Maybe GenerateBlock)
+      { _mgicExpr :: !CExpr,
+        _mgicBranch :: ![GenCaseItem],
+        _mgicDefault :: !(Maybe GenerateBlock)
       }
-  deriving (Show, Eq, Ord, Data, Generic)
 
-instance Plated ModGenItem where
+deriving instance (Show1 f, forall a. Show a => Show (f a)) => Show (ModGenItem f)
+deriving instance (Eq1 f, forall a. Eq a => Eq (f a)) => Eq (ModGenItem f)
+deriving instance (Typeable f, forall a. Data a => Data (f a)) => Data (ModGenItem f)
+deriving instance (forall a. Generic a => Generic (f a)) => Generic (ModGenItem f)
+
+type ModGenBlockedItem = ModGenItem Identity
+type ModGenSingleItem = ModGenItem NonEmpty
+
+instance Plated ModGenBlockedItem where
   plate = uniplate
 
 -- | Module item: body of module
+-- | Caution: if MIPort sign is False then it can be overriden by a MGINetDecl/Init
 data ModuleItem
-  = MIMGI !(Attributed ModGenItem)
-  | MIGenReg !GenerateRegion
-  | MISpecBlock
-      { _MISBSpecParam :: ![SpecParam],
-        _MISBBody :: ![SpecifyItem]
-      }
-  deriving (Show, Eq, Ord, Data, Generic)
-
--- | Parameter
-data Parameter = Parameter
-  { _paramAttr :: ![Attribute],
-    _paramIdent :: !ByteString,
-    _paramType :: !FunParType,
-    _paramValue :: !CMinTypMax
-  }
-  deriving (Show, Eq, Ord, Data, Generic)
-
--- | Module port declaration
-data PortDecl
-  = PDIn
-      { _PDIType :: !(Maybe NetType),
-        _PDISR :: !SignRange
-      }
-  | PDInOut
-      { _PDIOType :: !(Maybe NetType),
-        _PDIOSR :: !SignRange
-      }
-  | PDOut
-      { _PDOType :: !(Maybe NetType),
-        _PDOSR :: !SignRange
-      }
-  | PDOutReg
-      { _PDORSR :: !SignRange,
-        _PDORVal :: !(Maybe CExpr)
-      }
-  | PDOutVar
-      { _PDOVInt_time :: !Bool,
-        _PDOVVal :: !(Maybe CExpr)
-      }
-  deriving (Show, Eq, Ord, Data, Generic)
-
--- | Generate block without name
-data GenerateRegion = GenerateRegion
-  { _GRLocalParam :: ![Parameter],
-    _GRDefParam :: ![ParamOver],
-    _GRDecl :: ![AttrIded ModGenDecl],
-    _GRBody :: ![Attributed ModGenItem]
-  }
-  deriving (Show, Eq, Ord, Data, Generic)
-
-instance Semigroup GenerateRegion where
-  (<>) gra grb =
-    GenerateRegion
-      { _GRLocalParam = _GRLocalParam gra <> _GRLocalParam grb,
-        _GRDefParam = _GRDefParam gra <> _GRDefParam grb,
-        _GRDecl = _GRDecl gra <> _GRDecl grb,
-        _GRBody = _GRBody gra <> _GRBody grb
-      }
-
-instance Monoid GenerateRegion where
-  mempty = GenerateRegion [] [] [] []
-
--- | Generate region single item
-data GenerateItem
-  = GIParam !(NonEmpty Parameter)
-  | GIParamOver !(NonEmpty ParamOver)
-  | GIMGD !(NonEmpty (AttrIded ModGenDecl))
-  | GIMGI !(NonEmpty (Attributed ModGenItem))
-  deriving (Show, Eq, Ord, Data, Generic)
+  = MIMGI !(Attributed ModGenBlockedItem)
+  | MIPort !(AttrIded (Dir, SignRange))
+  | MIParameter !(AttrIded Parameter)
+  | MIGenReg ![Attributed ModGenBlockedItem]
+  | MISpecParam !(Attributed SpecParam)
+  | MISpecBlock ![SpecifyItem]
+  deriving (Show, Eq, Data, Generic)
 
 -- | GenerateBlock
-data GenerateBlock = GBSingle !GenerateItem | GBBlock !(Identified GenerateRegion)
-  deriving (Show, Eq, Ord, Data, Generic)
+data GenerateBlock
+  = GBSingle !(Attributed ModGenSingleItem)
+  | GBBlock
+    { _gbbIdent :: !Identifier,
+      _gbbItem  :: ![Attributed ModGenBlockedItem]
+    }
+  deriving (Show, Eq, Data, Generic)
 
--- TODO upwards
-
--- $(makeLenses '')
-
--- $(makePrisms '')
+instance Plated GenerateBlock where
+  plate = uniplate
 
 -- | Module block
 data ModuleBlock = ModuleBlock
   { _mbAttr :: ![Attribute],
-    _mbIdent :: !ByteString,
+    _mbIdent :: !Identifier,
     _mbPortInter :: ![Identified [Identified (Maybe CRangeExpr)]],
-    _mbPortDecl :: ![AttrIded PortDecl],
-    _mbParam :: ![Parameter],
-    _mbLocalParam :: ![Parameter],
-    _mbDecl :: ![AttrIded ModGenDecl],
-    _mbSpecParam :: ![Attributed SpecParam],
     _mbBody :: ![ModuleItem],
     _mbTimescale :: !(Maybe (Int, Int)),
     _mbCell :: !Bool,
     _mbPull :: !(Maybe Bool),
     _mbDefNetType :: !(Maybe NetType)
   }
-  deriving (Show, Eq, Ord, Data, Generic)
-
-instance Semigroup ModuleBlock where
-  (<>) mba mbb =
-    mba
-      { _mbPortDecl = _mbPortDecl mba <> _mbPortDecl mbb,
-        _mbParam = _mbParam mba <> _mbParam mbb,
-        _mbLocalParam = _mbLocalParam mba <> _mbLocalParam mbb,
-        _mbDecl = _mbDecl mba <> _mbDecl mbb,
-        _mbSpecParam = _mbSpecParam mba <> _mbSpecParam mbb,
-        _mbBody = _mbBody mba <> _mbBody mbb
-      }
-
-instance Monoid ModuleBlock where
-  mempty = ModuleBlock [] "" [] [] [] [] [] [] [] Nothing False Nothing (Just NTWire)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Signal level
 data SigLevel = L0 | L1 | LX | LQ | LB
-  deriving (Eq, Ord, Bounded, Enum, Data, Generic)
+  deriving (Eq, Bounded, Enum, Data, Generic)
 
 instance Show SigLevel where
   show x = case x of L0 -> "0"; L1 -> "1"; LX -> "x"; LQ -> "?"; LB -> "b"
 
 -- | Combinatorial table row
 data CombRow = CombRow {_crInput :: !(NonEmpty SigLevel), _crOutput :: !ZOX}
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Edge specifier
 data Edge
   = EdgePos_neg !Bool
   | EdgeDesc
-      { _EDFrom :: !SigLevel,
-        _EDTo :: !SigLevel
+      { _edFrom :: !SigLevel,
+        _edTo :: !SigLevel
       }
-  deriving (Eq, Ord, Data, Generic)
+  deriving (Eq, Data, Generic)
 
 instance Show Edge where
   show x = case x of
     EdgePos_neg b -> if b then "p" else "n"
-    EdgeDesc {_EDFrom = f, _EDTo = t} -> '(' : show f ++ show t ++ ")"
+    EdgeDesc {_edFrom = f, _edTo = t} -> '(' : show f ++ show t ++ ")"
 
 -- | Seqential table inputs: a list of input levels with at most 1 edge specifier
 data SeqIn
   = SIComb !(NonEmpty SigLevel)
   | SISeq ![SigLevel] !Edge ![SigLevel]
-  deriving (Eq, Ord, Data, Generic)
+  deriving (Eq, Data, Generic)
 
 instance Show SeqIn where
   show x = case x of
@@ -1107,30 +1229,45 @@ data SeqRow = SeqRow
     _srowState :: !SigLevel,
     _srowNext :: !(Maybe ZOX)
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Primitive transition table
 data PrimTable
   = CombTable !(NonEmpty CombRow)
   | SeqTable
-      { _stReg :: !(Either CExpr [Attribute]),
-        _stInit :: !(Maybe ZOX),
+      { _stInit :: !(Maybe ZOX),
         _stRow :: !(NonEmpty SeqRow)
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
+
+-- | Primitive port type
+data PrimPort
+  = PPInput
+  | PPOutput
+  | PPReg
+  | PPOutReg !(Maybe CExpr) -- no sem
+  deriving (Show, Eq, Data, Generic)
 
 -- | Primitive block
 data PrimitiveBlock = PrimitiveBlock
   { _pbAttr :: ![Attribute],
-    _pbIdent :: !ByteString,
-    _pbOutput :: !([Attribute], ByteString),
-    _pbInput :: !(NonEmpty ([Attribute], ByteString)),
+    _pbIdent :: !Identifier,
+    _pbOutput :: !Identifier,
+    _pbInput :: !(NonEmpty Identifier),
+    _pbPortDecl :: !(NonEmpty (AttrIded PrimPort)),
     _pbBody :: !PrimTable
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
-data Dot1Ident = Dot1Ident {_d1iLib :: !(Maybe ByteString), _d1iCell :: !ByteString}
-  deriving (Show, Eq, Ord, Data, Generic)
+-- | Library prefixed cell
+data Dot1Ident = Dot1Ident {_d1iLib :: !(Maybe ByteString), _d1iCell :: !Identifier}
+  deriving (Show, Eq, Data, Generic)
+
+-- | Cell or instance
+data Cell_inst
+  = CICell !Dot1Ident
+  | CIInst !(NonEmpty Identifier)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Liblist or Use
 data LLU
@@ -1139,69 +1276,49 @@ data LLU
       { _lluUIdent :: !Dot1Ident,
         _lluUConfig :: !Bool
       }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Items in a config block
 data ConfigItem = ConfigItem
-  { _ciCell_inst :: !(Either Dot1Ident (NonEmpty ByteString)),
+  { _ciCell_inst :: !Cell_inst,
     _ciLLU :: !LLU
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Config Block: Identifier, Design lines, Configuration items
 data ConfigBlock = ConfigBlock
-  { _cbIdent :: !ByteString,
+  { _cbIdent :: !Identifier,
     _cbDesign :: ![Dot1Ident],
     _cbBody :: ![ConfigItem],
     _cbDef :: ![ByteString]
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 -- | Internal representation of Verilog2005 AST
 data Verilog2005 = Verilog2005
   { _vModule :: ![ModuleBlock],
-    _vDefParam :: ![ParamOver],
     _vPrimitive :: ![PrimitiveBlock],
     _vConfig :: ![ConfigBlock]
   }
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Data, Generic)
 
 instance Semigroup Verilog2005 where
   (<>) v2a v2b =
     v2a
       { _vModule = _vModule v2a <> _vModule v2b,
-        _vDefParam = _vDefParam v2a <> _vDefParam v2b,
         _vPrimitive = _vPrimitive v2a <> _vPrimitive v2b,
         _vConfig = _vConfig v2a <> _vConfig v2b
       }
 
 instance Monoid Verilog2005 where
-  mempty = Verilog2005 [] [] [] []
+  mempty = Verilog2005 [] [] []
 
-data SourceInfo = SourceInfo
-  { _srcTopModule :: ByteString,
-    _srcSource :: Verilog2005
-  }
-
-$(makeLenses ''Identified)
 $(makeLenses ''HierIdent)
-$(makeLenses ''Attributed)
-$(makeLenses ''AttrIded)
-$(makeLenses ''ParamOver)
-$(makeLenses ''Parameter)
 $(makeLenses ''ModuleBlock)
-$(makeLenses ''CombRow)
-$(makeLenses ''SeqRow)
-$(makeLenses ''PrimTable)
-$(makePrisms ''PrimTable)
 $(makeLenses ''PrimitiveBlock)
-$(makeLenses ''Dot1Ident)
-$(makeLenses ''LLU)
-$(makePrisms ''LLU)
+$(makePrisms ''Cell_inst)
 $(makeLenses ''ConfigItem)
 $(makeLenses ''ConfigBlock)
-$(makeLenses ''Verilog2005)
-$(makeLenses ''SourceInfo)
 
 data Logic = LAnd | LOr | LNand | LNor
   deriving (Eq, Data)
@@ -1317,10 +1434,14 @@ data SystemFunction
   | SFTestplusargs
   | SFValueplusargs
   | SFPla
-      { _SFPSync :: !Bool,
-        _SFPLogic :: !Logic,
-        _SFPPla_arr :: !Bool
+      { _sfpSync :: !Bool,
+        _sfpLogic :: !Logic,
+        _sfpPla_arr :: !Bool
       }
+  | SFSVPast
+  | SFSVStable
+  | SFSVRose
+  | SFSVFell
   deriving (Eq, Data)
 
 instance Show SystemFunction where
@@ -1431,22 +1552,26 @@ instance Show SystemFunction where
     SFAtanh -> "atanh"
     SFTestplusargs -> "test$plusargs"
     SFValueplusargs -> "value$plusargs"
-    SFPla {_SFPSync = True, _SFPLogic = LAnd, _SFPPla_arr = False} -> "sync$and$array"
-    SFPla {_SFPSync = True, _SFPLogic = LAnd, _SFPPla_arr = True} -> "sync$and$plane"
-    SFPla {_SFPSync = True, _SFPLogic = LOr, _SFPPla_arr = False} -> "sync$or$array"
-    SFPla {_SFPSync = True, _SFPLogic = LOr, _SFPPla_arr = True} -> "sync$or$plane"
-    SFPla {_SFPSync = True, _SFPLogic = LNand, _SFPPla_arr = False} -> "sync$nand$array"
-    SFPla {_SFPSync = True, _SFPLogic = LNand, _SFPPla_arr = True} -> "sync$nand$plane"
-    SFPla {_SFPSync = True, _SFPLogic = LNor, _SFPPla_arr = False} -> "sync$nor$array"
-    SFPla {_SFPSync = True, _SFPLogic = LNor, _SFPPla_arr = True} -> "sync$nor$plane"
-    SFPla {_SFPSync = False, _SFPLogic = LAnd, _SFPPla_arr = False} -> "async$and$array"
-    SFPla {_SFPSync = False, _SFPLogic = LAnd, _SFPPla_arr = True} -> "async$and$plane"
-    SFPla {_SFPSync = False, _SFPLogic = LOr, _SFPPla_arr = False} -> "async$or$array"
-    SFPla {_SFPSync = False, _SFPLogic = LOr, _SFPPla_arr = True} -> "async$or$plane"
-    SFPla {_SFPSync = False, _SFPLogic = LNand, _SFPPla_arr = False} -> "async$nand$array"
-    SFPla {_SFPSync = False, _SFPLogic = LNand, _SFPPla_arr = True} -> "async$nand$plane"
-    SFPla {_SFPSync = False, _SFPLogic = LNor, _SFPPla_arr = False} -> "async$nor$array"
-    SFPla {_SFPSync = False, _SFPLogic = LNor, _SFPPla_arr = True} -> "async$nor$plane"
+    SFPla {_sfpSync = True, _sfpLogic = LAnd, _sfpPla_arr = False} -> "sync$and$array"
+    SFPla {_sfpSync = True, _sfpLogic = LAnd, _sfpPla_arr = True} -> "sync$and$plane"
+    SFPla {_sfpSync = True, _sfpLogic = LOr, _sfpPla_arr = False} -> "sync$or$array"
+    SFPla {_sfpSync = True, _sfpLogic = LOr, _sfpPla_arr = True} -> "sync$or$plane"
+    SFPla {_sfpSync = True, _sfpLogic = LNand, _sfpPla_arr = False} -> "sync$nand$array"
+    SFPla {_sfpSync = True, _sfpLogic = LNand, _sfpPla_arr = True} -> "sync$nand$plane"
+    SFPla {_sfpSync = True, _sfpLogic = LNor, _sfpPla_arr = False} -> "sync$nor$array"
+    SFPla {_sfpSync = True, _sfpLogic = LNor, _sfpPla_arr = True} -> "sync$nor$plane"
+    SFPla {_sfpSync = False, _sfpLogic = LAnd, _sfpPla_arr = False} -> "async$and$array"
+    SFPla {_sfpSync = False, _sfpLogic = LAnd, _sfpPla_arr = True} -> "async$and$plane"
+    SFPla {_sfpSync = False, _sfpLogic = LOr, _sfpPla_arr = False} -> "async$or$array"
+    SFPla {_sfpSync = False, _sfpLogic = LOr, _sfpPla_arr = True} -> "async$or$plane"
+    SFPla {_sfpSync = False, _sfpLogic = LNand, _sfpPla_arr = False} -> "async$nand$array"
+    SFPla {_sfpSync = False, _sfpLogic = LNand, _sfpPla_arr = True} -> "async$nand$plane"
+    SFPla {_sfpSync = False, _sfpLogic = LNor, _sfpPla_arr = False} -> "async$nor$array"
+    SFPla {_sfpSync = False, _sfpLogic = LNor, _sfpPla_arr = True} -> "async$nor$plane"
+    SFSVPast -> "past"
+    SFSVStable -> "stable"
+    SFSVRose -> "rose"
+    SFSVFell -> "fell"
 
 sfMap :: HashMap.HashMap ByteString SystemFunction
 sfMap =
@@ -1557,20 +1682,24 @@ sfMap =
       ("atanh", SFAtanh),
       ("test$plusargs", SFTestplusargs),
       ("value$plusargs", SFValueplusargs),
-      ("sync$and$array", SFPla {_SFPSync = True, _SFPLogic = LAnd, _SFPPla_arr = False}),
-      ("sync$and$plane", SFPla {_SFPSync = True, _SFPLogic = LAnd, _SFPPla_arr = True}),
-      ("sync$or$array", SFPla {_SFPSync = True, _SFPLogic = LOr, _SFPPla_arr = False}),
-      ("sync$or$plane", SFPla {_SFPSync = True, _SFPLogic = LOr, _SFPPla_arr = True}),
-      ("sync$nand$array", SFPla {_SFPSync = True, _SFPLogic = LNand, _SFPPla_arr = False}),
-      ("sync$nand$plane", SFPla {_SFPSync = True, _SFPLogic = LNand, _SFPPla_arr = True}),
-      ("sync$nor$array", SFPla {_SFPSync = True, _SFPLogic = LNor, _SFPPla_arr = False}),
-      ("sync$nor$plane", SFPla {_SFPSync = True, _SFPLogic = LNor, _SFPPla_arr = True}),
-      ("async$and$array", SFPla {_SFPSync = False, _SFPLogic = LAnd, _SFPPla_arr = False}),
-      ("async$and$plane", SFPla {_SFPSync = False, _SFPLogic = LAnd, _SFPPla_arr = True}),
-      ("async$or$array", SFPla {_SFPSync = False, _SFPLogic = LOr, _SFPPla_arr = False}),
-      ("async$or$plane", SFPla {_SFPSync = False, _SFPLogic = LOr, _SFPPla_arr = True}),
-      ("async$nand$array", SFPla {_SFPSync = False, _SFPLogic = LNand, _SFPPla_arr = False}),
-      ("async$nand$plane", SFPla {_SFPSync = False, _SFPLogic = LNand, _SFPPla_arr = True}),
-      ("async$nor$array", SFPla {_SFPSync = False, _SFPLogic = LNor, _SFPPla_arr = False}),
-      ("async$nor$plane", SFPla {_SFPSync = False, _SFPLogic = LNor, _SFPPla_arr = True})
+      ("sync$and$array", SFPla {_sfpSync = True, _sfpLogic = LAnd, _sfpPla_arr = False}),
+      ("sync$and$plane", SFPla {_sfpSync = True, _sfpLogic = LAnd, _sfpPla_arr = True}),
+      ("sync$or$array", SFPla {_sfpSync = True, _sfpLogic = LOr, _sfpPla_arr = False}),
+      ("sync$or$plane", SFPla {_sfpSync = True, _sfpLogic = LOr, _sfpPla_arr = True}),
+      ("sync$nand$array", SFPla {_sfpSync = True, _sfpLogic = LNand, _sfpPla_arr = False}),
+      ("sync$nand$plane", SFPla {_sfpSync = True, _sfpLogic = LNand, _sfpPla_arr = True}),
+      ("sync$nor$array", SFPla {_sfpSync = True, _sfpLogic = LNor, _sfpPla_arr = False}),
+      ("sync$nor$plane", SFPla {_sfpSync = True, _sfpLogic = LNor, _sfpPla_arr = True}),
+      ("async$and$array", SFPla {_sfpSync = False, _sfpLogic = LAnd, _sfpPla_arr = False}),
+      ("async$and$plane", SFPla {_sfpSync = False, _sfpLogic = LAnd, _sfpPla_arr = True}),
+      ("async$or$array", SFPla {_sfpSync = False, _sfpLogic = LOr, _sfpPla_arr = False}),
+      ("async$or$plane", SFPla {_sfpSync = False, _sfpLogic = LOr, _sfpPla_arr = True}),
+      ("async$nand$array", SFPla {_sfpSync = False, _sfpLogic = LNand, _sfpPla_arr = False}),
+      ("async$nand$plane", SFPla {_sfpSync = False, _sfpLogic = LNand, _sfpPla_arr = True}),
+      ("async$nor$array", SFPla {_sfpSync = False, _sfpLogic = LNor, _sfpPla_arr = False}),
+      ("async$nor$plane", SFPla {_sfpSync = False, _sfpLogic = LNor, _sfpPla_arr = True}),
+      ("past", SFSVPast),
+      ("stable", SFSVStable),
+      ("rose", SFSVRose),
+      ("fell", SFSVFell)
     ]
