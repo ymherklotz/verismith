@@ -93,7 +93,7 @@ Some external packages are required to use Verismith properly:
 
 A stable version of Verismith is available on [hackage](https://hackage.haskell.org/package/verismith) and can be installed using cabal directly without having to build the project from the repository:
 
-**Note**: Only **GHC 8.6.5-8.8.2** are currently supported.
+**Note**: A recent version of GHC is recommended, such as GHC 9.6.4.
 
 ``` shell
 cabal install verismith

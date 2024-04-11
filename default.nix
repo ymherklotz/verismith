@@ -2,7 +2,7 @@
 let
   pinnedPkg = builtins.fetchGit {
     url = https://github.com/nixos/nixpkgs/;
-    rev = "ee01de29d2f58d56b1be4ae24c24bd91c5380cea";
+    rev = "d6b3ddd253c578a7ab98f8011e59990f21dc3932";
   };
   npkgs = if nixpkgs == null
           then import pinnedPkg {}

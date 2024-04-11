@@ -9,7 +9,7 @@ license: GPL-3
 license-file: LICENSE
 author: Yann Herklotz
 maintainer: yann [at] yannherklotz [dot] com
-copyright: 2018-2020 Yann Herklotz
+copyright: 2018-2020, 2024 Yann Herklotz
 category: Hardware
 build-type: Simple
 cabal-version: >=1.10
@@ -94,27 +94,27 @@ library
                , cryptonite >=0.25 && <0.31
                , deepseq >= 1.4.3.0 && <1.5
                , exceptions >=0.10.0 && <0.11
-               , fgl >=5.6 && <5.8
+               , fgl >=5.6 && <5.9
                , fgl-visualize >=0.1 && <0.2
                , filepath >=1.4.2 && <1.5
                , gitrev >= 1.3.1 && <1.4
-               , hedgehog >=1.0 && <1.2
-               , lens >=4.16.1 && <5.2
+               , hedgehog >=1.0 && <1.5
+               , lens >=4.16.1 && <5.3
                , lifted-base >=0.2.3 && <0.3
-               , memory >=0.14 && <0.18
+               , memory >=0.14 && <0.20
                , monad-control >=1.0.2 && <1.1
-               , mtl >=2.2.2 && <2.3
+               , mtl >=2.2.2 && <2.4
                , optparse-applicative >=0.14 && <0.17
                , parsec >=3.1 && <3.2
                , prettyprinter >=1.2.0.1 && <1.8
                , random >=1.1 && <1.3
                , recursion-schemes >=5.0.2 && <5.3
                , shelly >=1.8.0 && <1.11
-               , template-haskell >=2.13.0 && <2.19
-               , text >=1.2 && <1.3
+               , template-haskell >=2.13.0 && <2.21
+               , text >=1.2 && <2.1
                , time >= 1.8.0.2 && <1.10
                , tomland >=1.3.2 && <1.4
-               , transformers >=0.5 && <0.6
+               , transformers >=0.5 && <0.7
                , transformers-base >=0.4.5 && <0.5
                , containers
                , unordered-containers
@@ -156,14 +156,14 @@ test-suite test
                , Distance
   build-depends: base >=4 && <5
                , verismith
-               , fgl >=5.6 && <5.8
-               , hedgehog >=1.0 && <1.2
-               , lens >=4.16.1 && <5.2
+               , fgl >=5.6 && <5.9
+               , hedgehog >=1.0 && <1.5
+               , lens >=4.16.1 && <5.3
                , parsec >= 3.1 && < 3.2
                , tasty >=1.0.1.1 && <1.5
                , tasty-hedgehog >=1.0 && <1.2
                , tasty-hunit >=0.10 && <0.11
-               , text >=1.2 && <1.3
+               , text >=1.2 && <2.1
   default-extensions: OverloadedStrings
 
 --test-suite doctest
