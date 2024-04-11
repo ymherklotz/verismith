@@ -11,4 +11,4 @@ jobs:
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - run: sudo apt update && sudo apt install -y cabal-install
-    - run: nix-shell --command cabal build
+    - run: nix-shell --command "cabal build"
