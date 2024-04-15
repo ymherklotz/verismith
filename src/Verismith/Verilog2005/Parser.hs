@@ -727,8 +727,8 @@ eventControl = fpbranch $ \p t -> case t of
   IdSimple s -> Just $ ECIdent <$> trHierIdent False s
   IdEscaped s -> Just $ ECIdent <$> trHierIdent False s
   SymParenL ->
-    Just $
-      (consume SymAster *> pure ECDeps <|> ECExpr . NE.fromList <$> eventexpr)
+    Just $ consume SymAsterParen *> pure ECDeps -- yeah, f*** that
+      <|> (consume SymAster *> pure ECDeps <|> ECExpr . NE.fromList <$> eventexpr)
         <* closeConsume p SymParenL SymParenR
   _ -> Nothing
   where
@@ -1477,8 +1477,10 @@ edgeDesc = fbranch $ \t -> case t of
 -- | If you think it's absurd and you have a parser the size of this file,
 -- | you're right but your parser idea is still likely wrong
 timingCheckCond :: Parser (Bool, Expr)
-timingCheckCond =
-  consume SymAmpAmpAmp >> (try (consume UnTilde >> (,) True <$> expr) <|> (,) False <$> expr)
+timingCheckCond = do
+  consume SymAmpAmpAmp
+  try ((consume UnTilde >> (,) True <$> expr) <|> (,) False <$> expr)
+    <|> (consume UnTilde >> (,) True <$> expr)
 
 timingCheckEvent :: Parser TimingCheckEvent
 timingCheckEvent =

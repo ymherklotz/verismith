@@ -1297,8 +1297,8 @@ garbageExprCodec =
     <$> garbageAttenuationCodec "attenuation" .= _geoAttenuation
     <*> tfield _geoItem "item" catProbCodec
     <*> tfield _geoPrimary "primary" catProbCodec
-    <*> tfield _geoUnary "unary" catProbCodec
-    <*> tfield _geoBinary "binary" catProbCodec
+    <*> tfield _geoUnary "op.unary" catProbCodec
+    <*> tfield _geoBinary "op.binary" catProbCodec
     <*> dfield _geoMinTypMax "minTypMax"
     <*> dfield _geoDimRange "dimRange"
     <*> tfield _geoRange "range.kind" catProbCodec
