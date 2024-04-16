@@ -1,9 +1,9 @@
-name: "Build Verismith"
+name: "build"
 on:
   pull_request:
   push:
 jobs:
-  tests:
+  build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
