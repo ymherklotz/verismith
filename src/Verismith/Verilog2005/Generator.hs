@@ -126,7 +126,7 @@ garbageBS =
     (i _gioEscaped_Simple)
     ( B.pack . (c2w '\\' :) <$> sampleN
         (i _gioEscapedLetters)
-        (toEnum <$> sampleSegment (i _gioEscapedLetter) 33 127)
+        (toEnum <$> sampleSegment (i _gioEscapedLetter) 33 126)
     )
     ( avoidKW <$> sampleFromString (i _gioSimpleLetter) (B.take 53 idSimpleLetter)
         <.> sampleString (i _gioSimpleLetters) (i _gioSimpleLetter) idSimpleLetter

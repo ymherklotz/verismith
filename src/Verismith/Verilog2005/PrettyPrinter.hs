@@ -421,7 +421,7 @@ prettyEdgeDesc x =
 
 prettyXparam :: Doc -> ComType () -> NonEmpty (Identified CMinTypMax) -> Doc
 prettyXparam pre t =
-  prettyItemsid (pre <=> prettyComType (const mempty) t) $
+  prettyItemsid (pre <?=> prettyComType (const mempty) t) $
     \(Identified i v) -> prettyEq (rawId i) $ prettyCMTM v
 
 type EDI = Either [Range2] CExpr
@@ -905,11 +905,12 @@ prettySpecifyItem x =
     prid (Identifier s) = piff (comma <+> padj prettyBS s) $ B.null s
     pid (Identifier s) = piff (padj prettyBS s) $ B.null s
     pexpr = gpadj prettyExpr
-    pTCC (b, e) = "&&&" <+> pift "~" b <?+> gpadj prettyExpr e
-    pTCE (TimingCheckEvent ev st tc) =
-      ng $ pm prettyEdgeDesc ev <?=> gpadj (pspWith prettySpecTerm $ pm pTCC tc) st
-    pCTCE (ControlledTimingCheckEvent ev st tc) =
-      ng $ prettyEdgeDesc ev <?=> gpadj (pspWith prettySpecTerm $ pm pTCC tc) st
+    pTCC st mbe = case mbe of
+      Nothing -> gpadj prettySpecTerm st
+      Just (b, e) ->
+        group $ group (fst $ prettySpecTerm st) <=> "&&&" <+> pift "~" b <?+> gpadj prettyExpr e
+    pTCE (TimingCheckEvent ev st tc) = ng $ pm prettyEdgeDesc ev <?=> pTCC st tc
+    pCTCE (ControlledTimingCheckEvent ev st tc) = ng $ prettyEdgeDesc ev <?=> pTCC st tc
     ppA (STCArgs de re tcl n) = gpar $ pTCE re <.> pTCE de <.> pexpr tcl <> prid n
     pIMTM (Identified i mr) =
       ngpadj (padjWith prettyIdent $ pm (group . brk . padj prettyCMTM) mr) i
@@ -1060,8 +1061,8 @@ prettyPrimPorts (a, d, l) =
        PPReg -> "reg"
        PPOutReg _ -> "output reg"
     )
-    <=> gpadj (cslid1 prettyIdent) l
-    <?=> case d of PPOutReg (Just e) -> equals <+> gpadj prettyCExpr e; _ -> mempty
+    <=> case d of PPOutReg (Just e) -> ids <=> equals <+> gpadj prettyCExpr e; _ -> ids <> s
+  where (ids, s) = cslid1 prettyIdent l
 
 -- | Analyses the column size of all lines and returns a list of either
 -- | number of successive non-edge columns or the width of a column that contain edges
