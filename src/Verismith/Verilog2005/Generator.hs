@@ -881,5 +881,6 @@ garbageVerilog2005 =
 
 runGarbageGeneration :: Config -> IO Verilog2005
 runGarbageGeneration c = do
-  gen <- maybe createSystemRandom initialize $ c ^. configGarbageGenerator . goSeed
-  runReaderT garbageVerilog2005 (defGarbageOpts, gen)
+  let conf = _configGarbageGenerator c
+  gen <- maybe createSystemRandom initialize $ _goSeed conf
+  runReaderT garbageVerilog2005 (conf, gen)
