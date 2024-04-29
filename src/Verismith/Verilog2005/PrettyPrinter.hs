@@ -185,7 +185,8 @@ prettyItemsid h f b = group h <=> gpadj (cslid1 $ mkng f) b <> semi
 prettyAttr :: [Attribute] -> Doc
 prettyAttr = nonEmpty mempty $ \l -> group $ "(* " <> fst (cslid1 pa l) <=> "*)"
   where
-    pa (Attribute i e) = maybe (prettyBS i) (prettyEq (raw i) . prettyCExpr) e
+    pa (Attribute i e) = maybe (prettyBS i) (prettyEq (raw i) . pca) e
+    pca = prettyGExpr prettyIdent (pm prettyCRangeExpr) (const mempty) 12
 
 prettyHierIdent :: PrettyIdent HierIdent
 prettyHierIdent (HierIdent p i) = first (\i -> nest $ foldr addId i p) $ prettyIdent i
@@ -214,8 +215,8 @@ prettyNumIdent x = case x of
   NIReal r -> mkid $ raw r
   NINumber n -> mkid $ viaShow n
 
-prettyPrim :: PrettyIdent i -> (r -> Doc) -> PrettyIdent (GenPrim i r)
-prettyPrim ppid ppr x = case x of
+prettyPrim :: PrettyIdent i -> (r -> Doc) -> (a -> Doc) -> PrettyIdent (GenPrim i r a)
+prettyPrim ppid ppr ppa x = case x of
   PrimNumber Nothing True (NDecimal i) -> mkid $ viaShow i
   PrimNumber w b n ->
     mkid $
@@ -225,13 +226,16 @@ prettyPrim ppid ppr x = case x of
   PrimReal r -> mkid $ raw r
   PrimIdent i r -> first nest $ padjWith ppid (group $ ppr r) i
   PrimConcat l -> mkid $ bcslid1 pexpr l
-  PrimMultConcat e l -> mkid $ brc $ nest $ gpadj prettyCExpr e <> bcslid1 pexpr l
-  PrimFun i a l -> (if null a then padjWith else pspWith) ppid (prettyAttr a <?=> pcslid pexpr l) i
+  PrimMultConcat e l ->
+    mkid $ brc $ nest $
+      gpadj (prettyGExpr prettyIdent (pm prettyCRangeExpr) ppa 12) e <> bcslid1 pexpr l
+  PrimFun i a l ->
+    let da = ppa a in (if nullDoc da then padjWith else pspWith) ppid (da <?=> pcslid pexpr l) i
   PrimSysFun i l -> first (\x -> nest $ "$" <> x) $ padjWith prettyBS (pcslid pexpr l) i
   PrimMinTypMax m -> mkid $ par $ padj (prettyGMTM pexpr) m
   PrimString x -> mkid $ raw x
   where
-    pexpr = prettyGExpr ppid ppr 12
+    pexpr = prettyGExpr ppid ppr ppa 12
 
 preclevel :: BinaryOperator -> Int
 preclevel b = case b of
@@ -260,35 +264,35 @@ preclevel b = case b of
   BinLAnd -> 10
   BinLOr -> 11
 
-prettyGExpr :: PrettyIdent i -> (r -> Doc) -> Int -> PrettyIdent (GenExpr i r)
-prettyGExpr ppid ppr l e = case e of
-  ExprPrim e -> first group $ prettyPrim ppid ppr e
+prettyGExpr :: PrettyIdent i -> (r -> Doc) -> (a -> Doc) -> Int -> PrettyIdent (GenExpr i r a)
+prettyGExpr ppid ppr ppa l e = case e of
+  ExprPrim e -> first group $ prettyPrim ppid ppr ppa e
   ExprUnOp op a e ->
-    first
-      (\x -> ng $ viaShow op <> (if null a then mempty else space <> prettyAttr a <> newline) <> x)
-      $ prettyPrim ppid ppr e
+    let da = ppa a
+        (x, s) = prettyPrim ppid ppr ppa e
+     in (ng $ viaShow op <> (if nullDoc da then mempty else space <> da <> newline) <> x, s)
   ExprBinOp el op a r ->
     let p = preclevel op
         x = psexpr p el <=> viaShow op
-        da = prettyAttr a
+        da = ppa a
         pp = pexpr $ p - 1
      in case compare l p of
           LT -> mkid $ ng $ par $ x <+> (da <?=> padj pp r)
           EQ -> first (\y -> x <+> (da <?=> y)) $ pp r
           GT -> first (\y -> ng $ x <+> (da <?=> y)) $ pp r
   ExprCond ec a et ef ->
-    let pc c t f = nest $ group (c <=> nest ("?" <?+> prettyAttr a)) <=> group (t <=> colon <+> f)
+    let pc c t f = nest $ group (c <=> nest ("?" <?+> ppa a)) <=> group (t <=> colon <+> f)
         pp = first (pc (psexpr 11 ec) (psexpr 12 et)) $ pexpr 12 ef
      in if l < 12 then mkid $ gpar $ uncurry (<>) $ pp else pp
   where
-    pexpr = prettyGExpr ppid ppr
+    pexpr = prettyGExpr ppid ppr ppa
     psexpr n = fst . pexpr n
 
 prettyExpr :: PrettyIdent Expr
-prettyExpr (Expr e) = prettyGExpr prettyHierIdent (pm prettyDimRange) 12 e
+prettyExpr (Expr e) = prettyGExpr prettyHierIdent (pm prettyDimRange) prettyAttr 12 e
 
 prettyCExpr :: PrettyIdent CExpr
-prettyCExpr (CExpr e) = prettyGExpr prettyIdent (pm prettyCRangeExpr) 12 e
+prettyCExpr (CExpr e) = prettyGExpr prettyIdent (pm prettyCRangeExpr) prettyAttr 12 e
 
 prettyGMTM :: PrettyIdent et -> PrettyIdent (GenMinTypMax et)
 prettyGMTM pp x = case x of
@@ -865,7 +869,8 @@ prettySpecifyItem x =
     SI'Noshowcancelled o -> prettyItemsid "noshowcancelled" prettySpecTerm o
     SI'PathDecl mpc p pol eds l ->
       ( case mpc of
-          MPCCond e -> group $ "if" <=> gpar (padj (prettyGExpr prettyIdent (const mempty) 12) e)
+          MPCCond e ->
+            group $ "if" <=> gpar (padj (prettyGExpr prettyIdent (const mempty) prettyAttr 12) e)
           MPCAlways -> mempty
           MPCNone -> "ifnone"
       )
@@ -1188,7 +1193,6 @@ prettyConfigItem (ConfigItem ci llu) =
         )
       <> semi
   where
-    catid :: PrettyIdent a -> [a] -> Doc
     catid f = foldrMap1' mempty (gpadj f) $ (<=>) . fst . f
 
 prettyVerilog2005 :: Verilog2005 -> Doc
@@ -1208,5 +1212,4 @@ prettyVerilog2005 (Verilog2005 mb pb cb) =
       cb
   where
     (<##>) = mkopt $ \a b -> a <#> mempty <#> b
-    catid :: PrettyIdent a -> [a] -> Doc
     catid f = foldrMap1' mempty (gpadj f) $ (<=>) . fst . f

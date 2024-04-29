@@ -114,7 +114,6 @@ module Verismith.Config
     gaoCurrent,
     goExpr,
     goStatement,
-    goAttributeAttenuation,
     geoAttenuation,
     gstoAttenuation,
     parseConfigFile,
@@ -353,7 +352,6 @@ uniformCP = CPBiasedUniform [] 1
 
 data GarbageOpts = GarbageOpts
   { _goSeed :: !(Maybe (VU.Vector Word32)),
-    _goAttributeAttenuation :: !GarbageAttenuationOpts,
     _goConfig :: !GarbageConfigOpts,
     _goPrimitive :: !GarbagePrimitiveOpts,
     _goModule :: !GarbageModuleOpts,
@@ -573,7 +571,6 @@ defGarbageOpts :: GarbageOpts
 defGarbageOpts =
   GarbageOpts
     { _goSeed = Nothing,
-      _goAttributeAttenuation = defAttenuationOpts,
       _goConfig = GarbageConfigOpts
         { _gcoBlocks = NPPoisson 0 1,
           _gcoDesigns = NPPoisson 0 1,
@@ -1345,7 +1342,6 @@ garbageCodec :: TomlCodec GarbageOpts
 garbageCodec =
   GarbageOpts
     <$> Toml.dioptional (Toml.read "seed") .= _goSeed
-    <*> garbageAttenuationCodec "attribute.attenuation" .= _goAttributeAttenuation
     <*> tfield _goConfig "config" garbageConfigCodec
     <*> tfield _goPrimitive "primitive" garbagePrimitiveCodec
     <*> tfield _goModule "module" garbageModuleCodec

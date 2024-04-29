@@ -13,6 +13,7 @@ module Verismith.Verilog2005.Utils
     addAttributed,
     genexprnumber,
     constifyIdent,
+    constifyMaybeRange,
     trConstifyGenExpr,
     constifyExpr,
     constifyLV,
@@ -55,7 +56,7 @@ addAttributed f (Attributed na x) (Attributed a y) =
   if a /= na then Nothing else Attributed a <$> f x y
 
 -- | Makes a Verilog2005 expression out of a number
-genexprnumber :: Natural -> GenExpr i r
+genexprnumber :: Natural -> GenExpr i r a
 genexprnumber = ExprPrim . PrimNumber Nothing False . NDecimal
 
 -- | converts HierIdent into Identifier
@@ -68,10 +69,10 @@ unconstIdent = HierIdent []
 
 -- | converts Prim into GenPrim i r
 constifyGenPrim ::
-  (HierIdent -> Maybe i) ->
+  (si -> Maybe di) ->
   (Maybe DimRange -> Maybe r) ->
-  GenPrim HierIdent (Maybe DimRange) ->
-  Maybe (GenPrim i r)
+  GenPrim si (Maybe DimRange) a ->
+  Maybe (GenPrim di r a)
 constifyGenPrim fi fr x = case x of
   PrimNumber s b n -> Just $ PrimNumber s b n
   PrimReal s -> Just $ PrimReal s
@@ -87,7 +88,7 @@ constifyGenPrim fi fr x = case x of
     ce = trConstifyGenExpr fi fr
 
 -- | the other way
-unconstPrim :: GenPrim Identifier (Maybe CRangeExpr) -> GenPrim HierIdent (Maybe DimRange)
+unconstPrim :: GenPrim Identifier (Maybe CRangeExpr) a -> GenPrim HierIdent (Maybe DimRange) a
 unconstPrim x = case x of
   PrimNumber s b n -> PrimNumber s b n
   PrimReal s -> PrimReal s
@@ -101,12 +102,12 @@ unconstPrim x = case x of
     PrimMinTypMax $ MTMFull (trUnconstExpr l) (trUnconstExpr t) (trUnconstExpr h)
   PrimString s -> PrimString s
 
--- | converts Expr's `GenExpr` into `GenExpr i r`
+-- | converts `GenExpr si (MaybeDimRange) a` into `GenExpr i r a`
 trConstifyGenExpr ::
-  (HierIdent -> Maybe i) ->
+  (si -> Maybe di) ->
   (Maybe DimRange -> Maybe r) ->
-  GenExpr HierIdent (Maybe DimRange) ->
-  Maybe (GenExpr i r)
+  GenExpr si (Maybe DimRange) a ->
+  Maybe (GenExpr di r a)
 trConstifyGenExpr fi fr x = case x of
   ExprPrim p -> ExprPrim <$> constifyGenPrim fi fr p
   ExprUnOp op a p -> ExprUnOp op a <$> constifyGenPrim fi fr p
@@ -115,15 +116,18 @@ trConstifyGenExpr fi fr x = case x of
   where
     ce = trConstifyGenExpr fi fr
 
+-- | converts Expr's `DimRange` into CExpr's `CRangeExpr`
+constifyMaybeRange :: Maybe DimRange -> Maybe (Maybe CRangeExpr)
+constifyMaybeRange =
+  maybe (Just Nothing) $ \(GenDimRange l r) -> if null l then Just <$> constifyRange r else Nothing
+
 -- | converts Expr's `GenExpr` into CExpr `GenExpr`
 trConstifyExpr ::
-  GenExpr HierIdent (Maybe DimRange) -> Maybe (GenExpr Identifier (Maybe CRangeExpr))
-trConstifyExpr = trConstifyGenExpr constifyIdent $
-  maybe (Just Nothing) $
-    \(GenDimRange l r) -> if null l then Just <$> constifyRange r else Nothing
+  GenExpr HierIdent (Maybe DimRange) a -> Maybe (GenExpr Identifier (Maybe CRangeExpr) a)
+trConstifyExpr = trConstifyGenExpr constifyIdent constifyMaybeRange
 
 -- | the other way
-trUnconstExpr :: GenExpr Identifier (Maybe CRangeExpr) -> GenExpr HierIdent (Maybe DimRange)
+trUnconstExpr :: GenExpr Identifier (Maybe CRangeExpr) a -> GenExpr HierIdent (Maybe DimRange) a
 trUnconstExpr x = case x of
   ExprPrim p -> ExprPrim (unconstPrim p)
   ExprUnOp op a p -> ExprUnOp op a (unconstPrim p)
@@ -231,8 +235,6 @@ toMGIBlockDecl x = case x of
   BDEvent d -> conv BDEvent d
   BDLocalParam t d -> conv (BDLocalParam t) d
   where
-    conv ::
-      (Compose Identity f x -> BD Identity t) -> Compose NonEmpty f x -> NonEmpty (BD Identity t)
     conv f = fmap (f . Compose . Identity) . getCompose
 
 -- | Converts one ModGenBlockedItem's `BlockDecl` into ModGenSingleItem's `BlockDecl`
@@ -246,7 +248,6 @@ fromMGIBlockDecl1 x = case x of
   BDEvent d -> conv BDEvent d
   BDLocalParam t d -> conv (BDLocalParam t) d
   where
-    conv :: (Compose NonEmpty f x -> BD NonEmpty t) -> Compose Identity f x -> BD NonEmpty t
     conv f = f . Compose . (:|[]) . runIdentity . getCompose
 
 -- | Merges one ModGenBlockedItem's `BlockDecl` with one ModGenSingleItem's `BlockDecl`
@@ -261,11 +262,6 @@ fromMGIBlockDecl_add x y = case (x, y) of
   (BDLocalParam nt d, BDLocalParam t l) | nt == t -> add (BDLocalParam t) d l
   _ -> Nothing
   where
-    add ::
-      (Compose NonEmpty f x -> BD NonEmpty t) ->
-      Compose Identity f x ->
-      Compose NonEmpty f x ->
-      Maybe (BD NonEmpty t)
     add f x l = Just $ f $ Compose $ runIdentity (getCompose x) <| getCompose l
 
 -- | Converts ModGenSingleItem like `BlockDecl` into StdBlockDecl `BlockDecl`
@@ -279,10 +275,6 @@ toStdBlockDecl x = case x of
   BDEvent d -> conv BDEvent d
   BDLocalParam t d -> conv (BDLocalParam t) d
   where
-    conv ::
-      (Identity x -> BlockDecl Identity t) ->
-      Compose NonEmpty Identified x ->
-      NonEmpty (Identified (BlockDecl Identity t))
     conv f = fmap (fmap $ f . Identity) . getCompose
 
 -- | Converts ModGenBlockedItem's `BlockDecl` into ModGenSingleItem's `BlockDecl`
@@ -315,7 +307,6 @@ toBlockedItem x = case x of
   MGIIf e t f -> [MGIIf e t f]
   MGICase e b d -> [MGICase e b d]
   where
-    conv :: (Identity x -> ModGenBlockedItem) -> NonEmpty x -> NonEmpty ModGenBlockedItem
     conv f = fmap (f . Identity)
 
 fromBlockedItem1 :: ModGenBlockedItem -> ModGenSingleItem
@@ -347,7 +338,6 @@ fromBlockedItem1 x = case x of
   MGIIf e t f -> MGIIf e t f
   MGICase e b d -> MGICase e b d
   where
-    conv :: (NonEmpty x -> ModGenSingleItem) -> Identity x -> ModGenSingleItem
     conv f = f . (:|[]) . runIdentity
 
 fromBlockedItem_add :: ModGenBlockedItem -> ModGenSingleItem -> Maybe ModGenSingleItem
@@ -384,7 +374,6 @@ fromBlockedItem_add x y = case (x, y) of
     add (MGIUnknownInst t p) i l
   _ -> Nothing
   where
-    add :: (NonEmpty x -> ModGenSingleItem) -> Identity x -> NonEmpty x -> Maybe ModGenSingleItem
     add f x y = Just $ f $ runIdentity x <| y
 
 fromBlockedItem :: NonEmpty (Attributed ModGenBlockedItem) -> NonEmpty (Attributed ModGenSingleItem)

@@ -316,15 +316,16 @@ dot1Ident = do
   s <- optionMaybe $ consume SymDot *> ident
   return $ case s of Nothing -> Dot1Ident Nothing $ Identifier f; Just s -> Dot1Ident (Just f) s
 
--- | Attribute list
-attribute :: Parser [Attribute]
-attribute =
-  enclosed SymParenAster SymAsterParen $
-    NE.toList <$> csl1 (Attribute <$> parseBS <*> optionMaybe (consume SymEq *> constExpr))
+attribute :: Parser Attribute
+attribute = do
+  attr <- parseBS
+  value <- optionMaybe $ consume SymEq
+    *> genExpr (pure . Identifier) (optionMaybe constRangeExpr) (pure ()) Just constifyMaybeRange
+  return $ Attribute attr value
 
 -- | Flattened list of attributes
 attributes :: Parser [Attribute]
-attributes = concat <$> many attribute
+attributes = concat <$> many (enclosed SymParenAster SymAsterParen $ NE.toList <$> csl1 attribute)
 
 -- | Number after base
 number :: Base -> Parser Number
@@ -337,29 +338,32 @@ number b = case b of
     _ -> Nothing
   BHex -> NHex <$> fproduce (\t -> case t of LitHex h -> Just $ NE.fromList h; _ -> Nothing)
 
-type PGenExpr g i r =
-  (B.ByteString -> Parser i) -> Parser r -> (Expr -> Maybe (GenExpr i r)) -> Parser (g i r)
+type PGenExpr g i r a =
+  (B.ByteString -> Parser i) ->
+  Parser r ->
+  Parser a ->
+  (i -> Maybe Identifier) ->
+  (Maybe DimRange -> Maybe r) ->
+  Parser (g i r a)
 
 -- | Parametric primary expression
-genPrim :: PGenExpr GenPrim i r
-genPrim pi pr constf = fpbranch $ \p t -> case t of
+genPrim :: PGenExpr GenPrim i r a
+genPrim pi pr pa ci cr = fpbranch $ \p t -> case t of
   -- try parse braceL and let that decide the path, otherwise it is wrong for constExpr
   SymBraceL -> Just $ do
-    e <- expr
+    e <- genExpr pi dimRange pa ci Just
     p2 <- getPosition
     b <- optConsume SymBraceL
     ee <- if b
-      then case constifyExpr e of
+      then case trConstifyGenExpr ci constifyMaybeRange e of
         Nothing -> hardfail "Replication takes a constant expression as multiplicity"
-        Just e ->
-          PrimMultConcat e <$> csl1 (genExpr pi pr constf) <* closeConsume p2 SymBraceL SymBraceR
-      else case constf e of
+        Just e -> PrimMultConcat e <$> csl1 parseExpr <* closeConsume p2 SymBraceL SymBraceR
+      else case trConstifyGenExpr Just cr e of
         Nothing -> hardfail "Invalid kind of expression"
-        Just e -> PrimConcat . (e :|) <$> option [] (consume SymComma *> csl (genExpr pi pr constf))
+        Just e -> PrimConcat . (e :|) <$> option [] (consume SymComma *> csl parseExpr)
     closeConsume p SymBraceL SymBraceR
     return ee
-  SymParenL ->
-    Just $ PrimMinTypMax <$> mtm (genExpr pi pr constf) <* closeConsume p SymParenL SymParenR
+  SymParenL -> Just $ PrimMinTypMax <$> mtm parseExpr <* closeConsume p SymParenL SymParenR
   LitDecimal i -> Just $
     option (PrimNumber Nothing True $ NDecimal i) $
       fbranch $ \t -> case t of
@@ -369,20 +373,18 @@ genPrim pi pr constf = fpbranch $ \p t -> case t of
   NumberBase s b -> Just $ PrimNumber Nothing s <$> number b
   LitString s -> Just $ return $ PrimString s
   IdSystem s ->
-    Just $
-      PrimSysFun s
-        <$> option [] (parens $ wempty "system function argument" $ csl $ genExpr pi pr constf)
+    Just $ PrimSysFun s <$> option [] (parens $ wempty "system function argument" $ csl parseExpr)
   IdSimple s -> Just $ idp s
   IdEscaped s -> Just $ idp s
   _ -> Nothing
   where
-    fp s =
-      PrimFun s <$> attributes <*> parens (wempty "function argument" $ csl $ genExpr pi pr constf)
+    parseExpr = genExpr pi pr pa ci cr
+    fp s = PrimFun s <$> pa <*> parens (wempty "function argument" $ csl parseExpr)
     idp s = pi s >>= \ss -> fp ss <|> PrimIdent ss <$> pr
 
 -- | Unary operator can only be applied on primary expressions
-genBase :: PGenExpr GenExpr i r
-genBase pi pr constf = do
+genBase :: PGenExpr GenExpr i r a
+genBase pi pr pa ci cr = do
   op <- optionMaybe $
     mkpair
       ( fproduce $ \t -> case t of
@@ -398,13 +400,13 @@ genBase pi pr constf = do
           SymDash -> Just UnMinus
           _ -> Nothing
       )
-      attributes
-  p <- genPrim pi pr constf
+      pa
+  p <- genPrim pi pr pa ci cr
   return $ maybe (ExprPrim p) (flip (uncurry ExprUnOp) p) op
 
 -- | Facility for expression parsing
-genExprBuildParser :: PGenExpr GenExpr i r
-genExprBuildParser pi pr constf =
+genExprBuildParser :: PGenExpr GenExpr i r a
+genExprBuildParser pi pr pa ci cr =
   buildExpressionParser
     [ infixop $ \t -> case t of BinAsterAster -> Just BinPower; _ -> Nothing,
       infixop $ \t -> case t of
@@ -437,28 +439,21 @@ genExprBuildParser pi pr constf =
       infixop $ \t -> case t of BinAmpAmp -> Just BinLAnd; _ -> Nothing,
       infixop $ \t -> case t of BinBarBar -> Just BinLOr; _ -> Nothing
     ]
-    (genBase pi pr constf)
+    (genBase pi pr pa ci cr)
   where
-    infixop ::
-      (Token -> Maybe BinaryOperator) ->
-      [Operator [PosToken] LocalCompDir (Writer [String]) (GenExpr i r)]
-    infixop fp = [Infix ((\op a l -> ExprBinOp l op a) <$> fproduce fp <*> attributes) AssocLeft]
+    infixop fp = [Infix ((\op a l -> ExprBinOp l op a) <$> fproduce fp <*> pa) AssocLeft]
 
 -- | Parametric expression
-genExpr :: PGenExpr GenExpr i r
-genExpr pi pr constf = do
-  e <- genExprBuildParser pi pr constf
+genExpr :: PGenExpr GenExpr i r a
+genExpr pi pr pa ci cr = do
+  e <- genExprBuildParser pi pr pa ci cr
   b <- optConsume SymQuestion
   if b
-    then
-      ExprCond e <$> attributes
-        <*> genExpr pi pr constf
-        <* consume SymColon
-        <*> genExpr pi pr constf
+    then ExprCond e <$> pa <*> genExpr pi pr pa ci cr <* consume SymColon <*> genExpr pi pr pa ci cr
     else return e
 
 expr :: Parser Expr
-expr = Expr <$> genExpr (trHierIdent True) dimRange (\(Expr e) -> Just e)
+expr = Expr <$> genExpr (trHierIdent True) dimRange attributes constifyIdent Just
 
 constExpr :: Parser CExpr
 constExpr =
@@ -466,7 +461,9 @@ constExpr =
     <$> genExpr
       (pure . Identifier)
       (optionMaybe constRangeExpr)
-      (fmap (\(CExpr e) -> e) . constifyExpr)
+      attributes
+      Just
+      constifyMaybeRange
 
 -- | Minimum, Typical, Maximum on a base type recognised by the argument parser
 mtm :: Parser a -> Parser (GenMinTypMax a)
@@ -1322,7 +1319,6 @@ portsimple dnt fullspec d a = do
             t
             (NetProp (_srSign sr) ((,) Nothing <$> _srRange sr) Nothing)
             (Identity $ NetDecl i [])
-      pi :: Identifier -> PortInterface
       pi i = Identified i [Identified i Nothing]
   case nt of
     Just nt -> return $ (\i -> ([pd i, MIMGI $ nd nt i], pi i)) <$> sl
@@ -1590,8 +1586,7 @@ specifyItem = fpbranch $ \p t -> case t of
   KWNoshowcancelled -> Just $ psi SINoshowcancelled
   KWIf -> Just $ do
     c <- parens $
-      genExpr (pure . Identifier) (pure ()) $
-        \(Expr e) -> trConstifyGenExpr constifyIdent (maybe (Just ()) $ const Nothing) e
+      genExpr (pure . Identifier) (pure ()) attributes Just $ maybe (Just ()) $ const Nothing
     pathDecl $ MPCCond c
   KWIfnone -> Just $ pathDecl MPCNone
   SymParenL -> Just $ trPathDecl p MPCAlways
@@ -1835,7 +1830,7 @@ compDir = fbranch $ \t -> case t of
 topDecl :: Parser Verilog2005
 topDecl =
   skipMany1 compDir *> return mempty <|> do
-    a <- concat <$> many (attribute <* skipMany compDir)
+    a <- concat <$> many (attributes <* skipMany compDir)
     st <- getState
     fpbranch $ \p t -> case (a, t) of
       (_, KWPrimitive) -> Just $ udp a <* closeConsume p KWPrimitive KWEndprimitive

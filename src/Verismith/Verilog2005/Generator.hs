@@ -93,9 +93,6 @@ applyAttenuation x = x & gaoCurrent *~ _gaoDecrease x
 tameExprRecursion :: GenM' a -> GenM' a
 tameExprRecursion = local $ _1 . goExpr . geoAttenuation %~ applyAttenuation
 
-tameAttrRecursion :: GenM' a -> GenM' a
-tameAttrRecursion = local $ _1 . goAttributeAttenuation %~ applyAttenuation
-
 tameStmtRecursion :: GenM' a -> GenM' a
 tameStmtRecursion = local $ _1 . goStatement . gstoAttenuation %~ applyAttenuation
 
@@ -191,8 +188,8 @@ garbageNumIdent =
       NIIdent <$> garbageIdent
     ]
 
-garbagePrim :: GenM' i -> GenM' r -> GenM' (GenPrim i r)
-garbagePrim ident grng =
+garbagePrim :: GenM' i -> GenM' r -> GenM' a -> GenM' (GenPrim i r a)
+garbagePrim ident grng gattr =
   sampleAttenuatedBranch
     (e _geoAttenuation)
     (e _geoPrimary)
@@ -215,9 +212,14 @@ garbagePrim ident grng =
       ),
       (0, PrimIdent <$> ident <*> tameExprRecursion grng),
       recurse $ PrimConcat <$> sampleNE (e _geoConcatenations) gexpr,
-      recurse $ PrimMultConcat <$> garbageCExpr <*> sampleNE (e _geoConcatenations) gexpr,
+      recurse $ PrimMultConcat
+        <$> garbageGenExpr
+          garbageIdent
+          (sampleMaybe (_geoDimRange . _goExpr) garbageCRangeExpr)
+          gattr
+        <*> sampleNE (e _geoConcatenations) gexpr,
       recurse $ PrimFun <$> ident
-        <*> garbageAttributes
+        <*> gattr
         <*> (toList <$> sampleNE (_ggoTaskFunPorts . _goGenerate) gexpr),
       recurse $ PrimSysFun <$> garbageSysIdent <*> sampleN (e _geoSysFunArgs) gexpr,
       recurse $ PrimMinTypMax <$> garbageGenMinTypMax gexpr
@@ -232,28 +234,25 @@ garbagePrim ident grng =
             <$> sampleBernoulli (e _geoLiteralSigned)
             <*> x
       )
-    gexpr = garbageGenExpr ident grng
+    gexpr = garbageGenExpr ident grng gattr
     recurse x = (1, tameExprRecursion x)
 
-garbageGenExpr :: GenM' i -> GenM' r -> GenM' (GenExpr i r)
-garbageGenExpr ident grng =
+garbageGenExpr :: GenM' i -> GenM' r -> GenM' a -> GenM' (GenExpr i r a)
+garbageGenExpr ident grng gattr =
   sampleAttenuatedBranch
     (e _geoAttenuation)
     (e _geoItem)
-    [ (0, ExprPrim <$> garbagePrim ident grng),
+    [ (0, ExprPrim <$> garbagePrim ident grng gattr),
       ( 0.5,
         tameExprRecursion $
-          ExprUnOp <$> sampleEnum (e _geoUnary) <*> garbageAttributes <*> garbagePrim ident grng
+          ExprUnOp <$> sampleEnum (e _geoUnary) <*> gattr <*> garbagePrim ident grng gattr
       ),
-      ( 1,
-        tameExprRecursion $
-          ExprBinOp <$> gexpr <*> sampleEnum (e _geoBinary) <*> garbageAttributes <*> gexpr
-      ),
-      (2, tameExprRecursion $ ExprCond <$> gexpr <*> garbageAttributes <*> gexpr <*> gexpr)
+      (1, tameExprRecursion $ ExprBinOp <$> gexpr <*> sampleEnum (e _geoBinary) <*> gattr <*> gexpr),
+      (2, tameExprRecursion $ ExprCond <$> gexpr <*> gattr <*> gexpr <*> gexpr)
     ]
   where
     e x = x . _goExpr
-    gexpr = garbageGenExpr ident grng
+    gexpr = garbageGenExpr ident grng gattr
 
 garbageGenMinTypMax :: GenM' e -> GenM' (GenMinTypMax e)
 garbageGenMinTypMax gexpr =
@@ -282,12 +281,16 @@ garbageGenDimRange ge =
 garbageExpr :: GenM' Expr
 garbageExpr =
   Expr <$> garbageGenExpr
-      (tameExprRecursion garbageHierIdent)
-      (sampleMaybe (_geoDimRange . _goExpr) garbageDimRange)
+    (tameExprRecursion garbageHierIdent)
+    (sampleMaybe (_geoDimRange . _goExpr) garbageDimRange)
+    garbageAttributes
 
 garbageCExpr :: GenM' CExpr
 garbageCExpr =
-  CExpr <$> garbageGenExpr garbageIdent (sampleMaybe (_geoDimRange . _goExpr) garbageCRangeExpr)
+  CExpr <$> garbageGenExpr
+    garbageIdent
+    (sampleMaybe (_geoDimRange . _goExpr) garbageCRangeExpr)
+    garbageAttributes
 
 garbageRangeExpr :: GenM' RangeExpr
 garbageRangeExpr = garbageGenRangeExpr garbageExpr
@@ -308,13 +311,14 @@ garbageCMinTypMax :: GenM' CMinTypMax
 garbageCMinTypMax = garbageGenMinTypMax garbageCExpr
 
 garbageAttributes :: GenM' [Attribute]
-garbageAttributes = do
-  gen <- asks snd
-  attrn <- asks $ _goAttributes . fst
-  att <- asks $ _gaoCurrent . _goAttributeAttenuation . fst
-  n <- sampleNumberProbability gen $ attenuateNum att attrn
-  sequence $ replicate n $ Attribute <$> garbageBS
-    <*> sampleMaybe _goAttributeOptionalValue (tameAttrRecursion garbageCExpr)
+garbageAttributes =
+  sampleN _goAttributes $ Attribute <$> garbageBS <*> sampleMaybe _goAttributeOptionalValue gattr
+  where
+    gattr =
+      garbageGenExpr
+        garbageIdent
+        (sampleMaybe (_geoDimRange . _goExpr) garbageCRangeExpr)
+        (pure ())
 
 garbageAttributed :: GenM' x -> GenM' (Attributed x)
 garbageAttributed = liftA2 Attributed garbageAttributes
@@ -726,7 +730,10 @@ garbageSpecifyItem =
       do
         cond <- sampleBranch
           (p _gspoCondition)
-          [pure MPCNone, pure MPCAlways, MPCCond <$> garbageGenExpr garbageIdent (pure ())]
+          [ pure MPCNone,
+            pure MPCAlways,
+            MPCCond <$> garbageGenExpr garbageIdent (pure ()) garbageAttributes
+          ]
         conn <- choice
           (p _gspoFull_Parallel)
           ( SPFull <$> sampleNE (p _gspoFullSources) garbageSpecTerm

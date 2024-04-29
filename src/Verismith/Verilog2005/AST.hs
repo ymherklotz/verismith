@@ -10,13 +10,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- TODO:
--- ModGenSingleItem is useless? as they are implicitely in a block except `else if`
+-- ModGenSingleItem is useless? as they are implicitely in a block except nested conditionals
 -- so one solution is GenerateBlock are (Identifier, [ModGenBlockedItem])
---   and MGIIf have a list of `if` branches
--- dangling stuff is not well handled as inserting a block changes the hierarchy of `else if`s
---   the correct solution is to add `else ;`
--- This should simplify prettyprinting and complexify parsing...
--- Also track the number of generate blocks when parsing and give the block a name when it's missing
+-- and conditional use a ConditionalConstruct which is a GenerateBlock, an MGIIf or an MGICase
+-- Dangling stuff is not well handled as inserting a block changes the hierarchy of `else if`s
+--   the correct solution is to add `else ;`, hopefully not that complicated with previous change
+-- Two previous changes should simplify prettyprinting and complexify parsing...
+-- Also number the generate blocks when parsing a generate block or module and give the block a name when it's missing
 -- Also do more grouping in pretty-printing and add flags to not group!
 -- Maybe eliminate generate blocks that have default name but that requires counting
 --   so fold or mapM with StateT
@@ -297,7 +297,7 @@ data Number
   deriving (Show, Eq, Data, Generic)
 
 -- | Parametric primary expression
-data GenPrim i r
+data GenPrim i r a
   = PrimNumber
       { _pnSize :: !(Maybe Natural),
         _pnSigned :: !Bool,
@@ -308,21 +308,21 @@ data GenPrim i r
       { _piIdent :: !i,
         _piSub :: !r
       }
-  | PrimConcat !(NonEmpty (GenExpr i r))
+  | PrimConcat !(NonEmpty (GenExpr i r a))
   | PrimMultConcat
-      { _pmcMul :: !CExpr,
-        _pmcExpr :: !(NonEmpty (GenExpr i r))
+      { _pmcMul :: !(GenExpr Identifier (Maybe CRangeExpr) a),
+        _pmcExpr :: !(NonEmpty (GenExpr i r a))
       }
   | PrimFun
       { _pfIdent :: !i,
-        _pfAttr :: ![Attribute],
-        _pfArg :: ![GenExpr i r]
+        _pfAttr :: !a,
+        _pfArg :: ![GenExpr i r a]
       }
   | PrimSysFun
       { _psfIdent :: !ByteString,
-        _psfArg :: ![GenExpr i r]
+        _psfArg :: ![GenExpr i r a]
       }
-  | PrimMinTypMax !(GenMinTypMax (GenExpr i r))
+  | PrimMinTypMax !(GenMinTypMax (GenExpr i r a))
   | PrimString !ByteString
   deriving (Show, Eq, Data, Generic)
 
@@ -339,38 +339,41 @@ type DimRange = GenDimRange Expr
 type CDimRange = GenDimRange CExpr
 
 -- | Parametric expression
-data GenExpr i r
-  = ExprPrim !(GenPrim i r)
+data GenExpr i r a
+  = ExprPrim !(GenPrim i r a)
   | ExprUnOp
       { _euOp :: !UnaryOperator,
-        _euAttr :: ![Attribute],
-        _euPrim :: !(GenPrim i r)
+        _euAttr :: !a,
+        _euPrim :: !(GenPrim i r a)
       }
   | ExprBinOp
-      { _ebLhs :: !(GenExpr i r),
+      { _ebLhs :: !(GenExpr i r a),
         _ebOp :: !BinaryOperator,
-        _ebAttr :: ![Attribute],
-        _ebRhs :: !(GenExpr i r)
+        _ebAttr :: !a,
+        _ebRhs :: !(GenExpr i r a)
       }
   | ExprCond
-      { _ecCond :: !(GenExpr i r),
-        _ecAttr :: ![Attribute],
-        _ecTrue :: !(GenExpr i r),
-        _ecFalse :: !(GenExpr i r)
+      { _ecCond :: !(GenExpr i r a),
+        _ecAttr :: !a,
+        _ecTrue :: !(GenExpr i r a),
+        _ecFalse :: !(GenExpr i r a)
       }
   deriving (Show, Eq, Data, Generic)
 
-instance (Data i, Data r) => Plated (GenExpr i r) where
+instance (Data i, Data r, Data a) => Plated (GenExpr i r a) where
   plate = uniplate
 
-newtype CExpr = CExpr (GenExpr Identifier (Maybe CRangeExpr))
+newtype CExpr = CExpr (GenExpr Identifier (Maybe CRangeExpr) [Attribute])
   deriving (Show, Eq, Data, Generic)
 
-newtype Expr = Expr (GenExpr HierIdent (Maybe DimRange))
+newtype Expr = Expr (GenExpr HierIdent (Maybe DimRange) [Attribute])
   deriving (Show, Eq, Data, Generic)
 
 -- | Attributes which can be set to various nodes in the AST.
-data Attribute = Attribute {_attrIdent :: !ByteString, _attrValue :: !(Maybe CExpr)}
+data Attribute = Attribute
+  { _attrIdent :: !ByteString,
+    _attrValue :: !(Maybe (GenExpr Identifier (Maybe CRangeExpr) ()))
+  }
   deriving (Show, Eq, Data, Generic)
 
 data Attributed t = Attributed {_attrAttr :: ![Attribute], _attrData :: !t}
@@ -834,7 +837,7 @@ data STCAddArgs = STCAddArgs
 
 -- | Module path condition
 data ModulePathCondition
-  = MPCCond !(GenExpr Identifier ())
+  = MPCCond !(GenExpr Identifier () [Attribute])
   | MPCNone
   | MPCAlways
   deriving (Show, Eq, Data, Generic)
