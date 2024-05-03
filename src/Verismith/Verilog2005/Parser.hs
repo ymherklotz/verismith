@@ -323,9 +323,12 @@ attribute = do
     *> genExpr (pure . Identifier) (optionMaybe constRangeExpr) (pure ()) Just constifyMaybeRange
   return $ Attribute attr value
 
+attributeOne :: Parser [Attribute]
+attributeOne = enclosed SymParenAster SymAsterParen $ NE.toList <$> csl1 attribute
+
 -- | Flattened list of attributes
 attributes :: Parser [Attribute]
-attributes = concat <$> many (enclosed SymParenAster SymAsterParen $ NE.toList <$> csl1 attribute)
+attributes = concat <$> many attributeOne
 
 -- | Number after base
 number :: Base -> Parser Number
@@ -689,32 +692,54 @@ driveStrength :: Parser DriveStrength
 driveStrength = option dsDefault $ try $ parens comDriveStrength
 
 -- | Best effort PATHPULSE parser
--- It parses way more than it's supposed to, I give up
 pathpulse :: Parser SpecParamDecl
 pathpulse = do
-  mid <- fproduce $ \t -> case t of TknPP s -> Just s; _ -> Nothing
-  iid <- if B.null mid then option "" parseBS else return mid
-  (ist, ost) <- if B.null iid
-    then return (SpecTerm "" Nothing, SpecTerm "" Nothing)
+  imid <- fproduce $ \t -> case t of TknPP s -> Just s; _ -> Nothing
+  iid <- if B.null imid then option "" parseBS else return imid
+  c0 <- if B.null iid
+    then return $ Left Nothing
     else do
-      irng <- optionMaybe constRangeExpr
-      oid <-
-        option "" $
-          (if isJust irng then id else optional) (consume SymDollar) *> parseBS
-            <|> fproduce (\t -> case t of IdSystem s -> Just s; _ -> Nothing)
-      orng <- optionMaybe constRangeExpr
-      return (SpecTerm (Identifier iid) irng, SpecTerm (Identifier oid) orng)
+      irng <- pMRE
+      let ist = SpecTerm (Identifier iid) irng
+      option (Right irng) $ Left . Just . (,) ist <$> fbranch
+        ( \t -> case t of
+            SymDollar -> Just $ specTerm
+            IdSystem s -> Just $ SpecTerm (Identifier s) <$> pMRE
+            _ -> Nothing
+        )
+  c1 <- case c0 of
+    Left x -> return $ Left x
+    Right irng -> case reverse $ B.split (c2w '$') iid of
+      [_] -> failure
+      h : t | B.null h && irng == Nothing ->
+        Left . Just . (,) (SpecTerm (Identifier $ restore_id t) Nothing) <$> specTerm
+          <|> pure (Right (irng, h : t))
+      l -> return $ Right (irng, l)
+  iost <- case c1 of
+    Left x -> return x
+    Right (irng, l) -> let (dollar_suffix, rest) = span B.null l in case rest of
+      not_dollar : x@(_ : _) ->
+        return $
+          Just
+            ( SpecTerm (Identifier $ restore_id $ dollar_suffix <> [not_dollar]) Nothing,
+              SpecTerm (Identifier $ restore_id x) irng
+            )
+      _ -> failure
   consume SymEq
   parens $ do
     rej <- mtm constExpr
     err <- option rej $ consume SymComma *> mtm constExpr
-    return $ SPDPathPulse ist ost rej err
+    return $ SPDPathPulse iost rej err
+  where
+    pMRE = optionMaybe constRangeExpr
+    restore_id = B.intercalate "$" . reverse
+    failure = fail "Pathpulse expects two dollar separated specify terminals"
 
 -- | Specify parameter declaration
-specParam :: Parser (NonEmpty SpecParam)
+specParam :: Parser (Maybe Range2, NonEmpty SpecParamDecl)
 specParam = do
-  rng <- optionMaybe range2
-  csl1 $ fmap (SpecParam rng) (SPDAssign <$> ident <* consume SymEq <*> mtm constExpr <|> pathpulse)
+  mkpair (optionMaybe range2) $
+    csl1 $ SPDAssign <$> ident <* consume SymEq <*> mtm constExpr <|> pathpulse
 
 -- | Event control
 eventControl :: Parser EventControl
@@ -1018,9 +1043,10 @@ comModGenItem =
        (KWGenvar, const $ MGIGenVar <$> csl1 ident <* consume SymSemi),
        ( KWIf,
          const $
-           MGIIf <$> parens constExpr
-             <*> optGenBlock
-             <*> fmap join (optionMaybe $ consume KWElse *> optGenBlock)
+           fmap MGICondItem $
+             MGCIIf <$> parens constExpr
+               <*> genCondBlock
+               <*> option GCBEmpty (consume KWElse *> genCondBlock)
        ),
        ( KWBegin,
          \pos -> do
@@ -1028,7 +1054,9 @@ comModGenItem =
            s <- option "" $ consume SymColon *> ident
            gr <- many $ parseItem id []
            closeConsume pos KWBegin KWEnd
-           return $ MGIIf (CExpr $ genexprnumber 1) (Just $ GBBlock s $ concat gr) Nothing
+           return $
+             MGICondItem $
+               MGCIIf (CExpr $ genexprnumber 1) (GCBBlock $ Identified s $ concat gr) GCBEmpty
        ),
        ( KWAssign,
          const $
@@ -1047,12 +1075,12 @@ comModGenItem =
            cond <- parens constExpr
            (d, b) <- do
              cb <- many cbranch
-             (if null cb then id else option (Nothing, cb)) $ do
+             (if null cb then id else option (GCBEmpty, cb)) $ do
                consume KWDefault
                option () $ consume SymColon
-               mkpair optGenBlock $ (cb <>) <$> many cbranch
+               mkpair genCondBlock $ (cb <>) <$> many cbranch
            closeConsume pos KWCase KWEndcase
-           return $ MGICase cond b d
+           return $ MGICondItem $ MGCICase cond b d
        ),
        ( KWFor,
          const $
@@ -1067,7 +1095,7 @@ comModGenItem =
                  <* consume SymEq
                  <*> constExpr
              )
-             <*> genBlock
+             <*> (genBlock <|> Identified "" <$> genSingle)
        ),
        ( KWTask,
          \pos -> do
@@ -1098,7 +1126,7 @@ comModGenItem =
        )
      ]
   where
-    cbranch = GenCaseItem <$> csl1 constExpr <* consume SymColon <*> optGenBlock
+    cbranch = GenCaseItem <$> csl1 constExpr <* consume SymColon <*> genCondBlock
     gateCmos r _ =
       MGICMos r <$> optionMaybe delay3
         <*> gateInst
@@ -1273,31 +1301,35 @@ parseItem f lb = do
     do {
       p <- lproduce $
         lb ++ maplproduce
-          (\p a pos -> fmap (f . Attributed a) . toBlockedItem <$> p pos)
+          (\p a pos -> fmap (f . Attributed a) . toMGBlockedItem <$> p pos)
           comModGenItem;
       p a pos
     }
-      <|> (\p a -> fmap (f . Attributed a) . toBlockedItem <$> p) modudpInst a
+      <|> (\p a -> fmap (f . Attributed a) . toMGBlockedItem <$> p) modudpInst a
 
--- | Generate block, first case cannot be merged in the lproduce because of attributes
+-- | Generate block
 genBlock :: Parser GenerateBlock
-genBlock = block <|> single
-  where
-    block = do
-      pos <- getPosition
-      consume KWBegin
-      i <- option "" $ consume SymColon *> ident
-      b <- many $ parseItem id []
-      closeConsume pos KWBegin KWEnd
-      return $ GBBlock i $ concat b
-    single = do
-      a <- attributes
-      pos <- getPosition
-      b <- (lproduce comModGenItem >>= \p -> p pos) <|> modudpInst
-      return $ GBSingle $ Attributed a b
+genBlock = do
+  pos <- getPosition
+  consume KWBegin
+  i <- option "" $ consume SymColon *> ident
+  b <- many $ parseItem id []
+  closeConsume pos KWBegin KWEnd
+  return $ Identified i $ concat b
 
-optGenBlock :: Parser (Maybe GenerateBlock)
-optGenBlock = Just <$> genBlock <|> consume SymSemi *> return Nothing
+genSingle ::  Parser [Attributed ModGenBlockedItem]
+genSingle = do
+  a <- attributes
+  pos <- getPosition
+  b <- (lproduce comModGenItem >>= \p -> p pos) <|> modudpInst
+  return $ Attributed a <$> toList (toMGBlockedItem b)
+
+genCondBlock :: Parser GenerateCondBlock
+genCondBlock = consume SymSemi *> return GCBEmpty <|> GCBBlock <$> genBlock <|> do
+  gb <- genSingle
+  return $ case gb of
+    [Attributed a (MGICondItem ci)] -> GCBConditional $ Attributed a ci
+    _ -> GCBBlock $ Identified "" gb
 
 type PortInterface = Identified [Identified (Maybe CRangeExpr)]
 
@@ -1378,7 +1410,7 @@ portExpr = option [] $ (: []) <$> pp <|> NE.toList <$> bcsl1 pp
     pp = Identified <$> ident <*> optionMaybe constRangeExpr
 
 -- | Path declaration
-trPathDecl :: SourcePos -> ModulePathCondition -> Parser (NonEmpty SpecifyItem)
+trPathDecl :: SourcePos -> ModulePathCondition -> Parser (NonEmpty SpecifyBlockedItem)
 trPathDecl pos cond = do
   edge <- optionMaybe $
     fproduce $ \t -> case t of
@@ -1423,11 +1455,16 @@ trPathDecl pos cond = do
   closeConsume pos SymParenL SymParenR
   consume SymEq
   vals <- try (csl1 $ mtm constExpr) <|> pcsl1 (mtm constExpr) -- cancer optional parentheses
-  if elem (length vals) ([1, 2, 3, 6, 12] :: [Int])
-    then return [SIPathDeclaration cond co pol eds vals]
-    else hardfail "Wrong number of argument"
+  (:|[]) . SIPathDeclaration cond co pol eds <$> case vals of
+    [e] -> return $ PDV1 e
+    [e1, e2] -> return $ PDV2 e1 e2
+    [e1, e2, e3] -> return $ PDV3 e1 e2 e3
+    [e1, e2, e3, e4, e5, e6] -> return $ PDV6 e1 e2 e3 e4 e5 e6
+    [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12] ->
+      return $ PDV12 e1 e2 e3 e4 e5 e6 e7 e8 e9 e10 e11 e12
+    _ -> hardfail "Wrong number of argument"
 
-pathDecl :: ModulePathCondition -> Parser (NonEmpty SpecifyItem)
+pathDecl :: ModulePathCondition -> Parser (NonEmpty SpecifyBlockedItem)
 pathDecl mpc = getPosition >>= \p -> consume SymParenL *> trPathDecl p mpc
 
 -- | Timing check event
@@ -1524,7 +1561,7 @@ skewStcArgs = do
   return (n, eb, ra)
 
 -- | System timing check functions
-stcfMap :: HashMap.HashMap B.ByteString (Parser SpecifyItem)
+stcfMap :: HashMap.HashMap B.ByteString (Parser SpecifyBlockedItem)
 stcfMap =
   HashMap.fromList
     [ ("setup", SISetup . (\(STCArgs d r e n) -> STCArgs r d e n) <$> stdStcArgs),
@@ -1577,9 +1614,9 @@ stcfMap =
     ]
 
 -- | Specify block item
-specifyItem :: Parser (NonEmpty SpecifyItem)
+specifyItem :: Parser (NonEmpty SpecifyBlockedItem)
 specifyItem = fpbranch $ \p t -> case t of
-  KWSpecparam -> Just $ fmap SISpecParam <$> specParam
+  KWSpecparam -> Just $ (\(rng, l) -> SISpecParam rng . Identity <$> l) <$> specParam
   KWPulsestyleonevent -> Just $ psi SIPulsestyleOnevent
   KWPulsestyleondetect -> Just $ psi SIPulsestyleOndetect
   KWShowcancelled -> Just $ psi SIShowcancelled
@@ -1593,13 +1630,13 @@ specifyItem = fpbranch $ \p t -> case t of
   IdSystem s -> fmap (:| []) . parens <$> HashMap.lookup s stcfMap
   _ -> Nothing
   where
-    psi f = csl1 (f <$> specTerm)
+    psi f = csl1 (f . Identity <$> specTerm)
 
 -- | Non port declaration module item
 npmodItem :: LAPBranch (NonEmpty ModuleItem)
 npmodItem =
   (KWParameter, \a _ -> fmap (\(i, x) -> MIParameter $ AttrIded a i x) <$> paramDecl False) :
-  [ (KWSpecparam, \a _ -> fmap (MISpecParam . Attributed a) <$> specParam <* consume SymSemi),
+  [ (KWSpecparam, \a _ -> (\(rng, l) -> MISpecParam a rng <$> l) <$> specParam <* consume SymSemi),
     ( KWGenerate,
       \a pos -> if null a
         then (:|[]) . MIGenReg . concat <$> many (parseItem id [])
@@ -1830,13 +1867,13 @@ compDir = fbranch $ \t -> case t of
 topDecl :: Parser Verilog2005
 topDecl =
   skipMany1 compDir *> return mempty <|> do
-    a <- concat <$> many (attributes <* skipMany compDir)
+    a <- concat <$> many (attributeOne <* skipMany compDir)
     st <- getState
-    fpbranch $ \p t -> case (a, t) of
-      (_, KWPrimitive) -> Just $ udp a <* closeConsume p KWPrimitive KWEndprimitive
-      (_, KWModule) -> Just $ parseModule st a <* closeConsume p KWModule KWEndmodule
-      (_, KWMacromodule) -> Just $ parseModule st a <* closeConsume p KWMacromodule KWEndmodule
-      ([], KWConfig) -> Just $ config <* closeConsume p KWConfig KWEndconfig
+    fpbranch $ \p t -> case t of
+      KWPrimitive -> Just $ udp a <* closeConsume p KWPrimitive KWEndprimitive
+      KWModule -> Just $ parseModule st a <* closeConsume p KWModule KWEndmodule
+      KWMacromodule -> Just $ parseModule st a <* closeConsume p KWMacromodule KWEndmodule
+      KWConfig | null a -> Just $ config <* closeConsume p KWConfig KWEndconfig
       _ -> Nothing
 
 -- | Parses a verilog file by accumulating top-level declarations

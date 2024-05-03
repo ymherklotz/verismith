@@ -26,10 +26,12 @@ module Verismith.Verilog2005.Utils
     fromMGIBlockDecl1,
     fromMGIBlockDecl_add,
     toStdBlockDecl,
-    toBlockedItem,
-    fromBlockedItem1,
-    fromBlockedItem_add,
-    fromBlockedItem,
+    toSpecBlockedItem,
+    fromSpecBlockedItem,
+    toMGBlockedItem,
+    fromMGBlockedItem1,
+    fromMGBlockedItem_add,
+    fromMGBlockedItem,
   )
 where
 
@@ -38,10 +40,10 @@ import Data.Functor.Compose
 import Data.Functor.Identity
 import qualified Data.ByteString as BS
 import qualified Data.HashSet as HS
-import Data.List.NonEmpty (NonEmpty (..), (<|))
+import Data.List.NonEmpty (NonEmpty (..), (<|), toList)
 import qualified Data.List.NonEmpty as NE
 import Verismith.Verilog2005.AST
-import Verismith.Utils (foldrMap1)
+import Verismith.Utils (nonEmpty, foldrMap1)
 
 
 -- AST utils
@@ -277,9 +279,71 @@ toStdBlockDecl x = case x of
   where
     conv f = fmap (fmap $ f . Identity) . getCompose
 
--- | Converts ModGenBlockedItem's `BlockDecl` into ModGenSingleItem's `BlockDecl`
-toBlockedItem :: ModGenSingleItem -> NonEmpty ModGenBlockedItem
-toBlockedItem x = case x of
+-- | Converts `SpecifySingleItem` into `SpecifyBlockedItem`s
+toSpecBlockedItem :: SpecifySingleItem -> NonEmpty SpecifyBlockedItem
+toSpecBlockedItem x = case x of
+  SISpecParam rng d -> conv (SISpecParam rng) d
+  SIPulsestyleOnevent st -> conv SIPulsestyleOnevent st
+  SIPulsestyleOndetect st -> conv SIPulsestyleOndetect st
+  SIShowcancelled st -> conv SIShowcancelled st
+  SINoshowcancelled st -> conv SINoshowcancelled st
+  SIPathDeclaration mpc con pol eds v -> [SIPathDeclaration mpc con pol eds v]
+  SISetup a -> [SISetup a]
+  SIHold a -> [SIHold a]
+  SISetupHold a aa -> [SISetupHold a aa]
+  SIRecovery a -> [SIRecovery a]
+  SIRemoval a -> [SIRemoval a]
+  SIRecrem a aa -> [SIRecrem a aa]
+  SISkew a -> [SISkew a]
+  SITimeSkew a ev rem -> [SITimeSkew a ev rem]
+  SIFullSkew a tcl ev rem -> [SIFullSkew a tcl ev rem]
+  SIPeriod ref tcl s -> [SIPeriod ref tcl s]
+  SIWidth ref tcl t s -> [SIWidth ref tcl t s]
+  SINoChange ref dat st en s -> [SINoChange ref dat st en s]
+  where
+    conv f = fmap (f . Identity)
+
+fromSpecBlockedItem1 :: SpecifyBlockedItem -> SpecifySingleItem
+fromSpecBlockedItem1 x = case x of
+  SISpecParam rng d -> conv (SISpecParam rng) d
+  SIPulsestyleOnevent st -> conv SIPulsestyleOnevent st
+  SIPulsestyleOndetect st -> conv SIPulsestyleOndetect st
+  SIShowcancelled st -> conv SIShowcancelled st
+  SINoshowcancelled st -> conv SINoshowcancelled st
+  SIPathDeclaration mpc con pol eds v -> SIPathDeclaration mpc con pol eds v
+  SISetup a -> SISetup a
+  SIHold a -> SIHold a
+  SISetupHold a aa -> SISetupHold a aa
+  SIRecovery a -> SIRecovery a
+  SIRemoval a -> SIRemoval a
+  SIRecrem a aa -> SIRecrem a aa
+  SISkew a -> SISkew a
+  SITimeSkew a ev rem -> SITimeSkew a ev rem
+  SIFullSkew a tcl ev rem -> SIFullSkew a tcl ev rem
+  SIPeriod ref tcl s -> SIPeriod ref tcl s
+  SIWidth ref tcl t s -> SIWidth ref tcl t s
+  SINoChange ref dat st en s -> SINoChange ref dat st en s
+  where
+    conv f = f . (:|[]) . runIdentity
+
+fromSpecBlockedItem_add :: SpecifyBlockedItem -> SpecifySingleItem -> Maybe SpecifySingleItem
+fromSpecBlockedItem_add x y = case (x, y) of
+  (SISpecParam nrng d, SISpecParam rng l) | nrng == rng-> add (SISpecParam rng) d l
+  (SIPulsestyleOnevent st, SIPulsestyleOnevent l) -> add SIPulsestyleOnevent st l
+  (SIPulsestyleOndetect st, SIPulsestyleOndetect l) -> add SIPulsestyleOndetect st l
+  (SIShowcancelled st, SIShowcancelled l) -> add SIShowcancelled st l
+  (SINoshowcancelled st, SINoshowcancelled l) -> add SINoshowcancelled st l
+  _ -> Nothing
+  where
+    add f x y = Just $ f $ runIdentity x <| y
+
+-- | Converts `SpecifyBlockedItem`s into `SpecifySingleItem`s
+fromSpecBlockedItem :: [SpecifyBlockedItem] -> [SpecifySingleItem]
+fromSpecBlockedItem = nonEmpty [] $ toList . regroup fromSpecBlockedItem1 fromSpecBlockedItem_add
+
+-- | Converts `ModGenSingleItem` into `ModGenBlockedItem`s
+toMGBlockedItem :: ModGenSingleItem -> NonEmpty ModGenBlockedItem
+toMGBlockedItem x = case x of
   MGINetInit nt ds np ni -> conv (MGINetInit nt ds np) ni
   MGINetDecl nt np nd -> conv (MGINetDecl nt np) nd
   MGITriD ds np ni -> conv (MGITriD ds np) ni
@@ -304,13 +368,12 @@ toBlockedItem x = case x of
   MGIInitial s -> [MGIInitial s]
   MGIAlways s -> [MGIAlways s]
   MGILoopGen ii iv c ui uv b -> [MGILoopGen ii iv c ui uv b]
-  MGIIf e t f -> [MGIIf e t f]
-  MGICase e b d -> [MGICase e b d]
+  MGICondItem ci -> [MGICondItem ci]
   where
     conv f = fmap (f . Identity)
 
-fromBlockedItem1 :: ModGenBlockedItem -> ModGenSingleItem
-fromBlockedItem1 x = case x of
+fromMGBlockedItem1 :: ModGenBlockedItem -> ModGenSingleItem
+fromMGBlockedItem1 x = case x of
   MGINetInit nt ds np ni -> conv (MGINetInit nt ds np) ni
   MGINetDecl nt np nd -> conv (MGINetDecl nt np) nd
   MGITriD ds np ni -> conv (MGITriD ds np) ni
@@ -335,13 +398,12 @@ fromBlockedItem1 x = case x of
   MGIInitial s -> MGIInitial s
   MGIAlways s -> MGIAlways s
   MGILoopGen ii iv c ui uv b -> MGILoopGen ii iv c ui uv b
-  MGIIf e t f -> MGIIf e t f
-  MGICase e b d -> MGICase e b d
+  MGICondItem ci -> MGICondItem ci
   where
     conv f = f . (:|[]) . runIdentity
 
-fromBlockedItem_add :: ModGenBlockedItem -> ModGenSingleItem -> Maybe ModGenSingleItem
-fromBlockedItem_add x y = case (x, y) of
+fromMGBlockedItem_add :: ModGenBlockedItem -> ModGenSingleItem -> Maybe ModGenSingleItem
+fromMGBlockedItem_add x y = case (x, y) of
   (MGINetInit nnt nds nnp ni, MGINetInit nt ds np l) | nnt == nt && nds == ds && nnp == np ->
     add (MGINetInit nt ds np) ni l
   (MGINetDecl nnt nnp nd, MGINetDecl nt np l) | nnt == nt && nnp == np ->
@@ -376,5 +438,7 @@ fromBlockedItem_add x y = case (x, y) of
   where
     add f x y = Just $ f $ runIdentity x <| y
 
-fromBlockedItem :: NonEmpty (Attributed ModGenBlockedItem) -> NonEmpty (Attributed ModGenSingleItem)
-fromBlockedItem = regroup (fmap fromBlockedItem1) (addAttributed fromBlockedItem_add)
+-- | Converts `ModGenBlockedItem`s into `ModGenSingleItem`s
+fromMGBlockedItem :: [Attributed ModGenBlockedItem] -> [Attributed ModGenSingleItem]
+fromMGBlockedItem =
+  nonEmpty [] $ toList . regroup (fmap fromMGBlockedItem1) (addAttributed fromMGBlockedItem_add)

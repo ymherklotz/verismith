@@ -9,19 +9,6 @@
 {-# LANGUAGE UndecidableInstances, FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- TODO:
--- ModGenSingleItem is useless? as they are implicitely in a block except nested conditionals
--- so one solution is GenerateBlock are (Identifier, [ModGenBlockedItem])
--- and conditional use a ConditionalConstruct which is a GenerateBlock, an MGIIf or an MGICase
--- Dangling stuff is not well handled as inserting a block changes the hierarchy of `else if`s
---   the correct solution is to add `else ;`, hopefully not that complicated with previous change
--- Two previous changes should simplify prettyprinting and complexify parsing...
--- Also number the generate blocks when parsing a generate block or module and give the block a name when it's missing
--- Also do more grouping in pretty-printing and add flags to not group!
--- Maybe eliminate generate blocks that have default name but that requires counting
---   so fold or mapM with StateT
--- Also the method to detect dangling else is wrong if `else ;` is equivalent to nothing
---   so maybe pass-in/return a boolean in the printer/parser to detect these cases
 module Verismith.Verilog2005.AST
   ( GenMinTypMax (..),
     CMinTypMax,
@@ -101,9 +88,11 @@ module Verismith.Verilog2005.AST
     STCAddArgs (..),
     ModulePathCondition (..),
     SpecPath (..),
+    PathDelayValue (..),
     SpecifyItem (..),
+    SpecifySingleItem,
+    SpecifyBlockedItem,
     SpecParamDecl (..),
-    SpecParam (..),
     NetProp (..),
     NetDecl (..),
     NetInit (..),
@@ -114,11 +103,13 @@ module Verismith.Verilog2005.AST
     UDPInst (..),
     ModInst (..),
     UknInst (..),
+    ModGenCondItem (..),
+    GenerateCondBlock (..),
     ModGenItem (..),
     ModGenBlockedItem,
     ModGenSingleItem,
     ModuleItem (..),
-    GenerateBlock (..),
+    GenerateBlock,
     ModuleBlock (..),
     SigLevel (..),
     ZOX (..),
@@ -854,19 +845,35 @@ data SpecPath
       }
   deriving (Show, Eq, Data, Generic)
 
+-- | Specify Item path delcaration delay value list
+data PathDelayValue
+  = PDV1 !CMinTypMax
+  | PDV2 !CMinTypMax !CMinTypMax
+  | PDV3 !CMinTypMax !CMinTypMax !CMinTypMax
+  | PDV6 !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax
+  | PDV12
+    !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax
+    !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax
+  deriving (Show, Eq, Data, Generic)
+
 -- | Specify block item
-data SpecifyItem
-  = SISpecParam !SpecParam
-  | SIPulsestyleOnevent !SpecTerm
-  | SIPulsestyleOndetect !SpecTerm
-  | SIShowcancelled !SpecTerm
-  | SINoshowcancelled !SpecTerm
+-- | f is either Identity or NonEmpty
+-- | it is used to abstract between several specify items in a block and a single comma separated one
+data SpecifyItem f
+  = SISpecParam
+    { _sipcRange :: !(Maybe Range2),
+      _sipcDecl :: !(f SpecParamDecl)
+    }
+  | SIPulsestyleOnevent !(f SpecTerm)
+  | SIPulsestyleOndetect !(f SpecTerm)
+  | SIShowcancelled !(f SpecTerm)
+  | SINoshowcancelled !(f SpecTerm)
   | SIPathDeclaration
       { _sipdCond :: !ModulePathCondition,
         _sipdConn :: !SpecPath,
         _sipdPolarity :: !(Maybe Bool),
         _sipdEDS :: !(Maybe (Expr, Maybe Bool)),
-        _sipdValue :: !(NonEmpty CMinTypMax) -- length 1, 2, 3, 6 or 12
+        _sipdValue :: !PathDelayValue
       }
   | SISetup !STCArgs
   | SIHold !STCArgs
@@ -910,7 +917,14 @@ data SpecifyItem
         _sincEndEdgeOff :: !MinTypMax,
         _sincNotif :: !Identifier
       }
-  deriving (Show, Eq, Data, Generic)
+
+deriving instance (Show1 f, forall a. Show a => Show (f a)) => Show (SpecifyItem f)
+deriving instance (Eq1 f, forall a. Eq a => Eq (f a)) => Eq (SpecifyItem f)
+deriving instance (Typeable f, forall a. Data a => Data (f a)) => Data (SpecifyItem f)
+deriving instance (forall a. Generic a => Generic (f a)) => Generic (SpecifyItem f)
+
+type SpecifySingleItem = SpecifyItem NonEmpty
+type SpecifyBlockedItem = SpecifyItem Identity
 
 -- | Specparam declaration
 data SpecParamDecl
@@ -918,16 +932,11 @@ data SpecParamDecl
     { _spdaIdent :: !Identifier,
       _spdaValue :: !CMinTypMax
     }
-  | SPDPathPulse -- Not accurate input/output as it is ambiguous
-      { _spdpInput :: !SpecTerm,
-        _spdpOutput :: !SpecTerm,
+  | SPDPathPulse -- Not completely accurate input/output as it is ambiguous
+      { _spdpInOut :: !(Maybe (SpecTerm, SpecTerm)),
         _spdpReject :: !CMinTypMax,
         _spdpError :: !CMinTypMax
       }
-  deriving (Show, Eq, Data, Generic)
-
--- | Module or Generate specify parameters
-data SpecParam = SpecParam {_spRange :: !(Maybe Range2), _spParam :: !SpecParamDecl}
   deriving (Show, Eq, Data, Generic)
 
 -- | Net common properties
@@ -985,7 +994,7 @@ data TFBlockDecl t
   deriving (Show, Eq, Data, Generic)
 
 -- | Case generate branch
-data GenCaseItem = GenCaseItem {_gciPat :: !(NonEmpty CExpr), _gciVal :: !(Maybe GenerateBlock)}
+data GenCaseItem = GenCaseItem {_gciPat :: !(NonEmpty CExpr), _gciVal :: !GenerateCondBlock}
   deriving (Show, Eq, Data, Generic)
 
 -- | UDP named instantiation
@@ -1012,6 +1021,27 @@ data UknInst = UknInst
     _uiArg0 :: !NetLValue,
     _uiArgs :: !(NonEmpty Expr)
   }
+  deriving (Show, Eq, Data, Generic)
+
+-- | Module or Generate conditional item because scoping rules are special
+data ModGenCondItem
+  = MGCIIf
+      { _mgiiExpr :: !CExpr,
+        _mgiiTrue :: !GenerateCondBlock,
+        _mgiiFalse :: !GenerateCondBlock
+      }
+  | MGCICase
+      { _mgicExpr :: !CExpr,
+        _mgicBranch :: ![GenCaseItem],
+        _mgicDefault :: !GenerateCondBlock
+      }
+  deriving (Show, Eq, Data, Generic)
+
+-- | Generate Block or Conditional Item or nothing because scoping rules are special
+data GenerateCondBlock
+  = GCBEmpty
+  | GCBBlock !GenerateBlock
+  | GCBConditional !(Attributed ModGenCondItem)
   deriving (Show, Eq, Data, Generic)
 
 -- | Module or Generate item
@@ -1132,16 +1162,7 @@ data ModGenItem f
         _mgilgUpdValue :: !CExpr,
         _mgilgBody :: !GenerateBlock
       }
-  | MGIIf
-      { _mgiiExpr :: !CExpr,
-        _mgiiTrue :: !(Maybe GenerateBlock),
-        _mgiiFalse :: !(Maybe GenerateBlock)
-      }
-  | MGICase
-      { _mgicExpr :: !CExpr,
-        _mgicBranch :: ![GenCaseItem],
-        _mgicDefault :: !(Maybe GenerateBlock)
-      }
+  | MGICondItem !ModGenCondItem
 
 deriving instance (Show1 f, forall a. Show a => Show (f a)) => Show (ModGenItem f)
 deriving instance (Eq1 f, forall a. Eq a => Eq (f a)) => Eq (ModGenItem f)
@@ -1161,21 +1182,15 @@ data ModuleItem
   | MIPort !(AttrIded (Dir, SignRange))
   | MIParameter !(AttrIded Parameter)
   | MIGenReg ![Attributed ModGenBlockedItem]
-  | MISpecParam !(Attributed SpecParam)
-  | MISpecBlock ![SpecifyItem]
-  deriving (Show, Eq, Data, Generic)
-
--- | GenerateBlock
-data GenerateBlock
-  = GBSingle !(Attributed ModGenSingleItem)
-  | GBBlock
-    { _gbbIdent :: !Identifier,
-      _gbbItem  :: ![Attributed ModGenBlockedItem]
+  | MISpecParam
+    { _mispAttribute :: ![Attribute],
+      _mispRange :: !(Maybe Range2),
+      _mispDecl :: !SpecParamDecl
     }
+  | MISpecBlock ![SpecifyBlockedItem]
   deriving (Show, Eq, Data, Generic)
 
-instance Plated GenerateBlock where
-  plate = uniplate
+type GenerateBlock = Identified [Attributed ModGenBlockedItem]
 
 -- | Module block
 data ModuleBlock = ModuleBlock

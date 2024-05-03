@@ -270,7 +270,7 @@ prettyGExpr ppid ppr ppa l e = case e of
   ExprUnOp op a e ->
     let da = ppa a
         (x, s) = prettyPrim ppid ppr ppa e
-     in (ng $ viaShow op <> (if nullDoc da then mempty else space <> da <> newline) <> x, s)
+     in (ng $ viaShow op <> piff (space <> da <> newline) (nullDoc da) <> x, s)
   ExprBinOp el op a r ->
     let p = preclevel op
         x = psexpr p el <=> viaShow op
@@ -515,8 +515,8 @@ prettyTFBlockDecls f =
           TFBDStd sbd -> fromStdBlockDecl (AttrIded a i sbd)
       )
 
-prettyStatement :: Statement -> Doc
-prettyStatement x = case x of
+prettyStatement :: Bool -> Statement -> Doc
+prettyStatement protect x = case x of
   SBlockAssign b (Assign lv v) dec ->
     let delevctl x = case x of
           DECRepeat e ev ->
@@ -536,20 +536,19 @@ prettyStatement x = case x of
       "endcase"
       $ pl
         (<#>)
-        (\(CaseItem p v) -> gpadj (cslid1 prettyExpr) p <> colon <+> ng (prettyMybStmt v))
+        (\(CaseItem p v) -> gpadj (cslid1 prettyExpr) p <> colon <+> ng (prettyMybStmt False v))
         b
-        <?#> piff (nest $ "default:" <=> prettyMybStmt s) (s == Attributed [] Nothing)
+        <?#> piff (nest $ "default:" <=> prettyMybStmt False s) (s == Attributed [] Nothing)
   SIf c t f ->
     let head = "if" <=> gpar (padj prettyExpr c)
-        truebranch = prettyRMybStmt t
      in case f of
-          Attributed [] Nothing -> ng head <> truebranch
+          Attributed [] Nothing | protect == False -> ng head <> prettyRMybStmt False t
           -- `else` and `begin`/`fork` at same indentation level
           Attributed [] (Just x@(SBlock _ _ _)) ->
-            ng (group head <> truebranch) <#> "else" <=> prettyStatement x
+            ng (group head <> prettyRMybStmt True t) <#> "else" <=> prettyStatement False x
           Attributed [] (Just x@(SIf _ _ _)) -> -- `if` and `else if` at same indentation level
-            ng (group head <> truebranch) <#> "else" <=> prettyStatement x
-          _ -> ng (group head <> truebranch) <#> nest ("else" <> prettyRMybStmt f)
+            ng (group head <> prettyRMybStmt True t) <#> "else" <=> prettyStatement protect x
+          _ -> ng (group head <> prettyRMybStmt True t) <#> nest ("else" <> prettyRMybStmt protect f)
   SDisable hi -> group $ "disable" <=> padj prettyHierIdent hi <> semi
   SEventTrigger hi e ->
     group $
@@ -563,7 +562,7 @@ prettyStatement x = case x of
           LSRepeat e -> "repeat" <=> gpar (padj prettyExpr e)
           LSWhile e -> "while" <=> gpar (padj prettyExpr e)
           LSFor i c u -> "for" <=> gpar (pva i <> semi <+> gpadj prettyExpr c <> semi <+> pva u)
-     in ng head <=> prettyAttrStmt s
+     in nest $ ng head <=> prettyAttrStmt protect s
   SProcContAssign pca ->
     (<> semi) $ group $ case pca of
       PCAAssign va -> "assign" <=> padj prettyVarAssign va
@@ -571,29 +570,29 @@ prettyStatement x = case x of
       PCAForce lv -> "force" <=> either (padj prettyVarAssign) (padj prettyNetAssign) lv
       PCARelease lv -> "release" <=> either (padj prettyVarLV) (padj prettyNetLV) lv
   SProcTimingControl dec s ->
-    group (fst $ either prettyDelay1 prettyEventControl dec) <=> prettyMybStmt s
+    group (fst $ either prettyDelay1 prettyEventControl dec) <=> prettyMybStmt protect s
   SBlock h ps s ->
     block
       (nest $ (if ps then "fork" else "begin") <?/> pm (\(s, _) -> colon <+> rawId s) h)
       (if ps then "join" else "end")
-      $ maybe mempty (prettyStdBlockDecls . snd) h <?#> pl (<#>) prettyAttrStmt s
+      $ maybe mempty (prettyStdBlockDecls . snd) h <?#> pl (<#>) (prettyAttrStmt False) s
   SSysTaskEnable s a ->
     group ("$" <> padj prettyBS s <> pcslid (maybe (mkid mempty) prettyExpr) a) <> semi
   STaskEnable hi a -> group (padj prettyHierIdent hi <> pcslid prettyExpr a) <> semi
-  SWait e s -> ng ("wait" <=> gpar (padj prettyExpr e)) <> prettyRMybStmt s
+  SWait e s -> ng ("wait" <=> gpar (padj prettyExpr e)) <> prettyRMybStmt protect s
 
-prettyAttrStmt :: AttrStmt -> Doc
-prettyAttrStmt (Attributed a s) = prettyAttr a <?=> nest (prettyStatement s)
+prettyAttrStmt :: Bool -> AttrStmt -> Doc
+prettyAttrStmt protect (Attributed a s) = prettyAttr a <?=> nest (prettyStatement protect s)
 
-prettyMybStmt :: MybStmt -> Doc
-prettyMybStmt (Attributed a s) = case s of
+prettyMybStmt :: Bool -> MybStmt -> Doc
+prettyMybStmt protect (Attributed a s) = case s of
   Nothing -> prettyAttr a <> semi
-  Just s -> prettyAttr a <?=> prettyStatement s
+  Just s -> prettyAttr a <?=> prettyStatement protect s
 
-prettyRMybStmt :: MybStmt -> Doc
-prettyRMybStmt (Attributed a s) =
+prettyRMybStmt :: Bool -> MybStmt -> Doc
+prettyRMybStmt protect (Attributed a s) =
   case a of {[] -> mempty; _ -> newline <> prettyAttr a}
-    <> maybe semi (\x -> newline <> prettyStatement x) s
+    <> maybe semi (\x -> newline <> prettyStatement protect x) s
 
 prettyPortAssign :: PortAssign -> Doc
 prettyPortAssign x = case x of
@@ -615,8 +614,8 @@ prettyPortAssign x = case x of
       )
       l
 
-prettyModGenSingleItem :: ModGenSingleItem -> Doc
-prettyModGenSingleItem x = case x of
+prettyModGenSingleItem :: ModGenSingleItem -> Bool -> Doc
+prettyModGenSingleItem x protect = case x of
   MGINetInit nt ds np l -> prettyItemsid (viaShow nt <?=> prettyDriveStrength ds <?=> com np) pide l
   MGINetDecl nt np l -> prettyItemsid (viaShow nt <?=> com np) pidd l
   MGITriD ds np l -> prettyItemsid ("trireg" <?=> prettyDriveStrength ds <?=> com np) pide l
@@ -628,7 +627,7 @@ prettyModGenSingleItem x = case x of
     block
       (ng $ group ("task" <?=> mauto aut) <=> padj prettyIdent s <> semi)
       "endtask"
-      (prettyTFBlockDecls id d <?#> nest (prettyMybStmt b))
+      (prettyTFBlockDecls id d <?#> nest (prettyMybStmt False b))
   MGIFunc aut t s d b ->
     block
       ( ng $
@@ -637,7 +636,7 @@ prettyModGenSingleItem x = case x of
             <> semi
       )
       "endfunction"
-      (prettyTFBlockDecls (const DirIn) d <?#> nest (prettyStatement $ toStatement b))
+      (prettyTFBlockDecls (const DirIn) d <?#> nest (prettyStatement False $ toStatement b))
   MGIDefParam l ->
     prettyItemsid
       "defparam"
@@ -740,43 +739,16 @@ prettyModGenSingleItem x = case x of
           pidr s rng <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
       )
       l
-  MGIInitial s -> "initial" <=> prettyAttrStmt s
-  MGIAlways s -> "always" <=> prettyAttrStmt s
-  MGILoopGen si vi cond su vu s ->
+  MGIInitial s -> "initial" <=> prettyAttrStmt protect s
+  MGIAlways s -> "always" <=> prettyAttrStmt protect s
+  MGILoopGen si vi cond su vu (Identified (Identifier s) i) ->
     let pas i = gpadj $ prettyEq (rawId i) . prettyCExpr
         head = "for" <=> gpar (pas si vi <> semi <+> ngpadj prettyCExpr cond <> semi <+> pas su vu)
-     in case s of
-          GBSingle (Attributed a x) ->
-            ng $ group head <=> prettyAttr a <?=> prettyModGenSingleItem x
-          GBBlock s r -> ng head <=> prettyGBlock s r
-  MGIIf c t f ->
-    let head = "if" <=> gpar (padj prettyCExpr c)
-     in ( case t of
-            Nothing -> head <> semi
-            Just t -> case t of
-              GBSingle (Attributed a x) ->
-                ng $ group head <=> prettyAttr a <?=> prettyModGenSingleItem x
-              GBBlock s r -> ng head <=> prettyGBlock s r
-        )
-        <?#> case f of
-          Nothing -> mempty
-          -- `else` and `begin` at same indentation level
-          Just (GBBlock s r) -> "else" <=> prettyGBlock s r
-          -- `if` and `else if` at same indentation level
-          Just (GBSingle (Attributed [] x@(MGIIf _ _ _))) -> "else" <=> prettyModGenSingleItem x
-          Just (GBSingle (Attributed a x)) ->
-            nest $ "else" <=> prettyAttr a <?=> prettyModGenSingleItem x
-  MGICase c b md ->
-    block
-      (ng $ "case" <=> gpar (padj prettyCExpr c))
-      "endcase"
-      $ pl
-        (<#>)
-        ( \(GenCaseItem p v) ->
-            gpadj (cslid1 prettyCExpr) p <> colon <+> ng (maybe semi prettyGenerateBlock v)
-        )
-        b
-        <?#> pm (\d -> nest $ "default:" <=> prettyGenerateBlock d) md
+     in case fromMGBlockedItem i of
+          [Attributed a x] | B.null s ->
+            ng $ group head <=> prettyAttr a <?=> prettyModGenSingleItem x protect
+          r -> ng head <=> prettyGBlock (Identifier s) r
+  MGICondItem ci -> prettyModGenCondItem ci protect -- protect should never be True in practice
   where
     pidr (Identifier i) r =
       piff (gpadj (padjWith prettyBS $ pm prettyRange2 r) i) $ B.null i
@@ -793,51 +765,51 @@ prettyModGenSingleItem x = case x of
         vs
         <?=> pm (fst . prettyDelay3) d3
 
+-- | Nested conditionals with dangling else support
+prettyModGenCondItem :: ModGenCondItem -> Bool -> Doc
+prettyModGenCondItem ci protect = case ci of
+  MGCIIf c t f -> let head = "if" <=> gpar (padj prettyCExpr c) in case f of
+    GCBEmpty -> pGCB head protect t <?#> pift "else;" protect
+    _ -> pGCB head True t <#> pGCB "else" protect f
+  MGCICase c b md ->
+    block
+      (ng $ "case" <=> gpar (padj prettyCExpr c))
+      "endcase"
+      $ pl (<#>) (\(GenCaseItem p v) -> pGCB (gpadj (cslid1 prettyCExpr) p <> colon) False v) b
+        <?#> case md of GCBEmpty -> mempty; _ -> nest $ pGCB "default:" False md
+  where
+    isNotCond x = case x of MGICondItem _ -> False; _ -> True
+    pGCB head p b = case b of
+      GCBEmpty -> head <> semi
+      GCBConditional (Attributed a ci) ->
+        ng $ group head <=> prettyAttr a <?=> prettyModGenCondItem ci p
+      GCBBlock (Identified (Identifier s) r) -> case fromMGBlockedItem r of
+        [Attributed a x] | B.null s && isNotCond x ->
+          ng $ group head <=> prettyAttr a <?=> prettyModGenSingleItem x protect
+        r -> ng head <=> prettyGBlock (Identifier s) r
+
+-- | Generate block
+prettyGBlock :: Identifier -> [Attributed ModGenSingleItem] -> Doc
+prettyGBlock (Identifier s) =
+  block ("begin" <> piff (colon <=> raw s) (B.null s)) "end"
+    . pl (<#>) (\(Attributed a x) -> prettyAttr a <?=> prettyModGenSingleItem x False)
+
+prettyGenerateBlock :: GenerateBlock -> Doc
+prettyGenerateBlock (Identified s x) = prettyGBlock s $ fromMGBlockedItem x
+
 prettySpecParams :: Maybe Range2 -> NonEmpty SpecParamDecl -> Doc
 prettySpecParams rng =
   prettyItemsid
     ("specparam" <?=> pm prettyRange2 rng)
     $ \d -> case d of
       SPDAssign i v -> prettyEq (rawId i) $ prettyCMTM v
-      SPDPathPulse i o r e ->
+      SPDPathPulse io r e ->
         prettyEq
-          (pathpulse i o)
+          ("PATHPULSE$" <> pm pPP io)
           (mkid $ par $ ngpadj prettyCMTM r <> piff (comma <+> ngpadj prettyCMTM e) (r == e))
   where
-    pathpulse i@(SpecTerm (Identifier j) m) o@(SpecTerm (Identifier k) _) =
-      -- The ambiguous junk known as `PATHPULSE$` or `PATHPULSE$j[m]$k[e]`
-      -- The decision to print the middle `$` depends on whether there is a `k`
-      -- and whether `j$k` got lexed as a single identifier
-      -- This second part is impossible when `[m]` exists or `j` is escaped
-      "PATHPULSE$" <> ngpadj prettySpecTerm i
-        <> piff "$" (B.null k || (m == Nothing && maybe True ((c2w '\\' /=) . fst) (B.uncons j)))
-        <> ng (fst $ prettySpecTerm o)
-
--- Damn, the choice to inline the old SISystemTimingCheck was bad
-data SpecifyItem'
-  = SI'SpecParam (Maybe Range2) (NonEmpty SpecParamDecl)
-  | SI'PulsestyleOnevent (NonEmpty SpecTerm)
-  | SI'PulsestyleOndetect (NonEmpty SpecTerm)
-  | SI'Showcancelled (NonEmpty SpecTerm)
-  | SI'Noshowcancelled (NonEmpty SpecTerm)
-  | SI'PathDecl
-    ModulePathCondition
-    SpecPath
-    (Maybe Bool)
-    (Maybe (Expr, Maybe Bool))
-    (NonEmpty CMinTypMax)
-  | SI'Setup STCArgs
-  | SI'Hold STCArgs
-  | SI'SetupHold STCArgs STCAddArgs
-  | SI'Recovery STCArgs
-  | SI'Removal STCArgs
-  | SI'Recrem STCArgs STCAddArgs
-  | SI'Skew STCArgs
-  | SI'TimeSkew STCArgs (Maybe CExpr) (Maybe CExpr)
-  | SI'FullSkew STCArgs Expr (Maybe CExpr) (Maybe CExpr)
-  | SI'Period ControlledTimingCheckEvent Expr Identifier
-  | SI'Width ControlledTimingCheckEvent Expr (Maybe CExpr) Identifier
-  | SI'NoChange TimingCheckEvent TimingCheckEvent MinTypMax MinTypMax Identifier
+    -- Change to a spaced layout if tools allow it
+    pPP (i, o) = ngpadj prettySpecTerm i <> "$" <> fst (prettySpecTerm o)
 
 prettyPathDecl :: SpecPath -> Maybe Bool -> Maybe (Expr, Maybe Bool) -> Doc
 prettyPathDecl p pol eds =
@@ -859,48 +831,48 @@ prettyPathDecl p pol eds =
       SPParallel i o -> (True, prettySpecTerm i, fne $ prettySpecTerm o)
       SPFull i o -> (False, ppSTs i, fne $ ppSTs o)
 
-prettySpecifyItem :: SpecifyItem' -> Doc
+prettySpecifyItem :: SpecifySingleItem -> Doc
 prettySpecifyItem x =
   nest $ case x of
-    SI'SpecParam r l -> prettySpecParams r l
-    SI'PulsestyleOnevent o -> prettyItemsid "pulsestyle_onevent" prettySpecTerm o
-    SI'PulsestyleOndetect o -> prettyItemsid "pulsestyle_ondetect" prettySpecTerm o
-    SI'Showcancelled o -> prettyItemsid "showcancelled" prettySpecTerm o
-    SI'Noshowcancelled o -> prettyItemsid "noshowcancelled" prettySpecTerm o
-    SI'PathDecl mpc p pol eds l ->
+    SISpecParam r l -> prettySpecParams r l
+    SIPulsestyleOnevent o -> prettyItemsid "pulsestyle_onevent" prettySpecTerm o
+    SIPulsestyleOndetect o -> prettyItemsid "pulsestyle_ondetect" prettySpecTerm o
+    SIShowcancelled o -> prettyItemsid "showcancelled" prettySpecTerm o
+    SINoshowcancelled o -> prettyItemsid "noshowcancelled" prettySpecTerm o
+    SIPathDeclaration mpc p pol eds l ->
       ( case mpc of
           MPCCond e ->
             group $ "if" <=> gpar (padj (prettyGExpr prettyIdent (const mempty) prettyAttr 12) e)
           MPCAlways -> mempty
           MPCNone -> "ifnone"
       )
-        <?=> padj (prettyEq (prettyPathDecl p pol eds) . cslid1 (mkng prettyCMTM)) l
+        <?=> padj (prettyEq (prettyPathDecl p pol eds) . cslid1 prettyCMTM . cPDV) l
         <> semi
-    SI'Setup (STCArgs d r e n) -> "$setup" </> ppA (STCArgs r d e n) <> semi
-    SI'Hold a -> "$hold" </> ppA a <> semi
-    SI'SetupHold a aa -> "$setuphold" </> ppAA a aa <> semi
-    SI'Recovery a -> "$recovery" </> ppA a <> semi
-    SI'Removal a -> "$removal" </> ppA a <> semi
-    SI'Recrem a aa -> "$recrem" </> ppAA a aa <> semi
-    SI'Skew a -> "$skew" </> ppA a <> semi
-    SI'TimeSkew (STCArgs de re tcl n) meb mra ->
+    SISetup (STCArgs d r e n) -> "$setup" </> ppA (STCArgs r d e n) <> semi
+    SIHold a -> "$hold" </> ppA a <> semi
+    SISetupHold a aa -> "$setuphold" </> ppAA a aa <> semi
+    SIRecovery a -> "$recovery" </> ppA a <> semi
+    SIRemoval a -> "$removal" </> ppA a <> semi
+    SIRecrem a aa -> "$recrem" </> ppAA a aa <> semi
+    SISkew a -> "$skew" </> ppA a <> semi
+    SITimeSkew (STCArgs de re tcl n) meb mra ->
       "$timeskew"
         </> gpar
           ( pTCE re <.> pTCE de
               <.> toc [pexpr tcl, pid n, pm (gpadj prettyCExpr) meb, pm (gpadj prettyCExpr) mra]
           )
         <> semi
-    SI'FullSkew (STCArgs de re tcl0 n) tcl1 meb mra ->
+    SIFullSkew (STCArgs de re tcl0 n) tcl1 meb mra ->
       "$fullskew"
         </> gpar
           ( pTCE re <.> pTCE de <.> pexpr tcl0
               <.> toc [pexpr tcl1, pid n, pm (gpadj prettyCExpr) meb, pm (gpadj prettyCExpr) mra]
           )
         <> semi
-    SI'Period re tcl n -> "$period" </> par (pCTCE re <.> pexpr tcl <> prid n) <> semi
-    SI'Width re tcl mt n ->
+    SIPeriod re tcl n -> "$period" </> par (pCTCE re <.> pexpr tcl <> prid n) <> semi
+    SIWidth re tcl mt n ->
       "$width" </> gpar (pCTCE re <.> toc [pexpr tcl, pm (gpadj prettyCExpr) mt, pid n]) <> semi
-    SI'NoChange re de so eo n ->
+    SINoChange re de so eo n ->
       "$nochange"
         </> gpar (pTCE re <.> pTCE de <.> ngpadj prettyMTM so <.> ngpadj prettyMTM eo <> prid n)
         <> semi
@@ -930,6 +902,13 @@ prettySpecifyItem x =
               pIMTM mdr,
               pIMTM mdd
             ]
+    cPDV x = case x of
+      PDV1 e -> e :|[]
+      PDV2 e1 e2 -> [e1, e2]
+      PDV3 e1 e2 e3 -> [e1, e2, e3]
+      PDV6 e1 e2 e3 e4 e5 e6 -> [e1, e2, e3, e4, e5, e6]
+      PDV12 e1 e2 e3 e4 e5 e6 e7 e8 e9 e10 e11 e12 ->
+        [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12]
 
 data ModuleItem'
   = MI'MGI (Attributed ModGenSingleItem)
@@ -937,7 +916,7 @@ data ModuleItem'
   | MI'Parameter [Attribute] (ComType ()) (NonEmpty (Identified CMinTypMax))
   | MI'GenReg [Attributed ModGenSingleItem]
   | MI'SpecParam [Attribute] (Maybe Range2) (NonEmpty SpecParamDecl)
-  | MI'SpecBlock [SpecifyItem']
+  | MI'SpecBlock [SpecifySingleItem]
 
 prettyModuleItems :: [ModuleItem] -> Doc
 prettyModuleItems =
@@ -945,75 +924,34 @@ prettyModuleItems =
     prettyregroup
       (<#>)
       ( \x -> case x of
-        MI'MGI (Attributed a i) -> prettyAttr a <?=> prettyModGenSingleItem i
+        MI'MGI (Attributed a i) -> prettyAttr a <?=> prettyModGenSingleItem i False
         MI'Port a d sr l ->
           prettyAttrng a $ prettyItemsid (viaShow d <?=> prettySignRange sr) prettyIdent l
         MI'Parameter a t l -> prettyAttrng a $ prettyXparam "parameter" t l
         MI'GenReg l ->
           block "generate" "endgenerate" $
-            pl (<#>) (\(Attributed a i) -> prettyAttr a <?=> prettyModGenSingleItem i) l
+            pl (<#>) (\(Attributed a i) -> prettyAttr a <?=> prettyModGenSingleItem i False) l
         MI'SpecParam a r l -> prettyAttrng a $ prettySpecParams r l
         MI'SpecBlock l -> block "specify" "endspecify" $ pl (<#>) prettySpecifyItem l
       )
       ( \x -> case x of
-        MIMGI i -> MI'MGI $ fromBlockedItem1 <$> i
+        MIMGI i -> MI'MGI $ fromMGBlockedItem1 <$> i
         MIPort (AttrIded a i (d, sr)) -> MI'Port a d sr [i]
         MIParameter (AttrIded a i (Parameter t v)) -> MI'Parameter a t [Identified i v]
-        MIGenReg l -> MI'GenReg $ nonEmpty [] (toList . fromBlockedItem) l
-        MISpecParam (Attributed a (SpecParam r spd)) -> MI'SpecParam a r [spd]
-        MISpecBlock l -> MI'SpecBlock $ flip (nonEmpty []) l $ toList . regroup
-          ( \x -> case x of
-            SISpecParam (SpecParam r spd) -> SI'SpecParam r [spd]
-            SIPulsestyleOnevent s -> SI'PulsestyleOnevent [s]
-            SIPulsestyleOndetect s -> SI'PulsestyleOndetect [s]
-            SIShowcancelled s -> SI'Showcancelled [s]
-            SINoshowcancelled s -> SI'Noshowcancelled [s]
-            SIPathDeclaration mpc p b eds l -> SI'PathDecl mpc p b eds l
-            SISetup a -> SI'Setup a
-            SIHold a -> SI'Hold a
-            SISetupHold a aa -> SI'SetupHold a aa
-            SIRecovery a -> SI'Recovery a
-            SIRemoval a -> SI'Removal a
-            SIRecrem a aa -> SI'Recrem a aa
-            SISkew a -> SI'Skew a
-            SITimeSkew a eb ra -> SI'TimeSkew a eb ra
-            SIFullSkew a tcl eb ra -> SI'FullSkew a tcl eb ra
-            SIPeriod ctce tcl n -> SI'Period ctce tcl n
-            SIWidth ctce tcl t n -> SI'Width ctce tcl t n
-            SINoChange re de se ee n -> SI'NoChange re de se ee n
-          )
-          (\x y -> case (x, y) of
-            (SISpecParam (SpecParam nr spd), SI'SpecParam r l) | nr == r ->
-              Just $ SI'SpecParam r $ spd <| l
-            (SIPulsestyleOnevent s, SI'PulsestyleOnevent l) -> Just $ SI'PulsestyleOnevent $ s <| l
-            (SIPulsestyleOndetect s, SI'PulsestyleOndetect l) ->
-              Just $ SI'PulsestyleOndetect $ s <| l
-            (SIShowcancelled s, SI'Showcancelled l) -> Just $ SI'Showcancelled $ s <| l
-            (SINoshowcancelled s, SI'Noshowcancelled l) -> Just $ SI'Noshowcancelled $ s <| l
-            _ -> Nothing
-          )
+        MIGenReg l -> MI'GenReg $ fromMGBlockedItem l
+        MISpecParam a r spd -> MI'SpecParam a r [spd]
+        MISpecBlock l -> MI'SpecBlock $ fromSpecBlockedItem l
       )
       ( \mi mi' -> case (mi, mi') of
-        (MIMGI mgi, MI'MGI l) -> MI'MGI <$> (addAttributed fromBlockedItem_add) mgi l
+        (MIMGI mgi, MI'MGI l) -> MI'MGI <$> (addAttributed fromMGBlockedItem_add) mgi l
         (MIPort (AttrIded na i (nd, nsr)), MI'Port a d sr l) | na == a && nd == d && nsr == sr ->
           Just $ MI'Port a d sr $ i <| l
         (MIParameter (AttrIded na i (Parameter nt v)), MI'Parameter a t l) | na == a && nt == t ->
           Just $ MI'Parameter a t $ Identified i v <| l
-        (MISpecParam (Attributed na (SpecParam nr spd)), MI'SpecParam a r l) | na == a && nr == r ->
+        (MISpecParam na nr spd, MI'SpecParam a r l) | na == a && nr == r ->
           Just $ MI'SpecParam a r $ spd <| l
         _ -> Nothing
       )
-
-prettyGBlock :: Identifier -> [Attributed ModGenBlockedItem] -> Doc
-prettyGBlock (Identifier s) r =
-  block ("begin" <> piff (colon <=> raw s) (B.null s)) "end" $
-    pl (<#>) (\(Attributed a x) -> prettyAttr a <?=> prettyModGenSingleItem x) $
-      nonEmpty [] (toList . fromBlockedItem) r
-
-prettyGenerateBlock :: GenerateBlock -> Doc
-prettyGenerateBlock x = case x of
-  GBSingle (Attributed a x) -> prettyAttr a <?=> prettyModGenSingleItem x
-  GBBlock s r -> prettyGBlock s r
 
 prettyPortInter :: [Identified [Identified (Maybe CRangeExpr)]] -> Doc
 prettyPortInter =
