@@ -1132,18 +1132,18 @@ garbageModuleCodec :: TomlCodec GarbageModuleOpts
 garbageModuleCodec =
   GarbageModuleOpts
     <$> tfield _gmoBlocks "blocks" numProbCodec
-    <*> dfield _gmoNamed_Positional "instance.named_or_positional"
-    <*> tfield _gmoParameters "instance.parameters" numProbCodec
-    <*> dfield _gmoOptionalParameter "instance.optparam"
-    <*> tfield _gmoPorts "port.amount" numProbCodec
-    <*> tfield _gmoPortLValues "port.lvalues" numProbCodec
-    <*> dfield _gmoPortRange "port.range"
-    <*> tfield _gmoPortDir "port.dir" catProbCodec
-    <*> dfield _gmoOptionalPort "port.optional"
+    <*> dfield _gmoNamed_Positional "instance_named_or_positional"
+    <*> tfield _gmoParameters "instance_parameters" numProbCodec
+    <*> dfield _gmoOptionalParameter "instance_optparam"
+    <*> tfield _gmoPorts "port_count" numProbCodec
+    <*> tfield _gmoPortLValues "port_lvalues" numProbCodec
+    <*> dfield _gmoPortRange "port_range"
+    <*> tfield _gmoPortDir "port_dir" catProbCodec
+    <*> dfield _gmoOptionalPort "port_optional"
     <*> tfield _gmoItems "items" numProbCodec
     <*> tfield _gmoItem "item" catProbCodec
-    <*> dfield _gmoTimeScale "timescale.optional"
-    <*> tfield _gmoTimeMagnitude "timescale.magnitude" catProbCodec
+    <*> dfield _gmoTimeScale "timescale_optional"
+    <*> tfield _gmoTimeMagnitude "timescale_magnitude" catProbCodec
     <*> dfield _gmoCell "cell"
     <*> tfield _gmoUnconnectedDrive "unconnectedDrive" catProbCodec
     <*> tfield _gmoDefaultNetType "defaultNetType" catProbCodec
@@ -1159,8 +1159,8 @@ garbageSpecifyPathCodec =
     <$> tfield _gspoCondition "condition" catProbCodec
     <*> dfield _gspoFull_Parallel "full_or_parallel"
     <*> dfield _gspoEdgeSensitive "edgeSensitive"
-    <*> tfield _gspoFullSources "full.sources" numProbCodec
-    <*> tfield _gspoFullDestinations "full.destinations" numProbCodec
+    <*> tfield _gspoFullSources "full_sources" numProbCodec
+    <*> tfield _gspoFullDestinations "full_destinations" numProbCodec
     <*> tfield _gspoPolarity "polarity" catProbCodec
     <*> tfield _gspoEdgeSensitivity "edgeSensitivity" catProbCodec
     <*> tfield _gspoDelayKind "delayKind" catProbCodec
@@ -1180,10 +1180,10 @@ garbageSpecifyTimingCheckCodec :: TomlCodec GarbageSpecifyTimingCheckOpts
 garbageSpecifyTimingCheckCodec =
   GarbageSpecifyTimingCheckOpts
     <$> dfield _gstcoOptionalArg "optarg"
-    <*> dfield _gstcoEvent "event.optional"
-    <*> dfield _gstcoEventEdge "event.edge"
-    <*> dfield _gstcoCondition "condition.optional"
-    <*> dfield _gstcoCondNeg_Pos "condition.neg_or_pos"
+    <*> dfield _gstcoEvent "event_optional"
+    <*> dfield _gstcoEventEdge "event_edge"
+    <*> dfield _gstcoCondition "condition_optional"
+    <*> dfield _gstcoCondNeg_Pos "condition_neg_or_pos"
     <*> dfield _gstcoDelayedMinTypMax "delayedMinTypMax"
   where
     dfield p n =
@@ -1200,8 +1200,8 @@ garbageSpecifyCodec =
     <*> tfield _gsyoItems "items" numProbCodec
     <*> tfield _gsyoItem "item" catProbCodec
     <*> dfield _gsyoTermRange "termRange"
-    <*> dfield _gsyoParamRange "parameter.range"
-    <*> tfield _gsyoParamKind "parameter.item" catProbCodec
+    <*> dfield _gsyoParamRange "parameter_range"
+    <*> tfield _gsyoParamKind "parameter" catProbCodec
   where
     tfield p n c =
       defaultValue (p $ _goSpecify $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
@@ -1214,29 +1214,29 @@ garbageGenerateCodec =
     <$> tfield _ggoItems "items" numProbCodec
     <*> tfield _ggoItem "item" catProbCodec
     <*> dfield _ggoOptionalBlock "optionalBlock"
-    <*> dfield _ggoInstOptionalDelay "instance.optionalDelay"
-    <*> dfield _ggoInstOptionalRange "instance.optionalRange"
+    <*> dfield _ggoInstOptionalDelay "instance_optional_delay"
+    <*> dfield _ggoInstOptionalRange "instance_optional_range"
     <*> tfield _ggoCondBlock "nested_condition" catProbCodec
-    <*> tfield _ggoNetType "net.type" catProbCodec
-    <*> dfield _ggoNetRange "net.range"
-    <*> tfield _ggoNetVectoring "net.vectoring" catProbCodec
-    <*> tfield _ggoDeclItem "declaration.item" catProbCodec
-    <*> dfield _ggoDeclDim_Init "declaration.dim_or_init"
+    <*> tfield _ggoNetType "net_type" catProbCodec
+    <*> dfield _ggoNetRange "net_range"
+    <*> tfield _ggoNetVectoring "net_vectoring" catProbCodec
+    <*> tfield _ggoDeclItem "declaration" catProbCodec
+    <*> dfield _ggoDeclDim_Init "declaration_dim_or_init"
     <*> tfield _ggoChargeStrength "chargeStrength" catProbCodec
-    <*> dfield _ggoTaskFunAutomatic "taskFun.automatic"
-    <*> tfield _ggoTaskFunDecl "taskFun.declaration" catProbCodec
-    <*> dfield _ggoTaskFunRegister "taskFun.register"
-    <*> tfield _ggoTaskFunPorts "taskFun.ports" numProbCodec
-    <*> tfield _ggoTaskFunPortType "taskFun.portType" catProbCodec
+    <*> dfield _ggoTaskFunAutomatic "taskFun_automatic"
+    <*> tfield _ggoTaskFunDecl "taskFun_declaration" catProbCodec
+    <*> dfield _ggoTaskFunRegister "taskFun_register"
+    <*> tfield _ggoTaskFunPorts "taskFun_ports" numProbCodec
+    <*> tfield _ggoTaskFunPortType "taskFun_portType" catProbCodec
     <*> tfield _ggoTaskPortDirection "taskPortDir" catProbCodec
     <*> dfield _ggoFunRetType "funReturnType"
-    <*> dfield _ggoGateReverse "gate.reverse"
-    <*> dfield _ggoGate1_0 "gate.1_or_0"
-    <*> tfield _ggoGateNInputType "gate.ninput" catProbCodec
-    <*> tfield _ggoGateInputs "gate.ninputs" numProbCodec
-    <*> tfield _ggoGateOutputs "gate.noutputs" numProbCodec
-    <*> tfield _ggoCaseBranches "case.branches" numProbCodec
-    <*> tfield _ggoCaseBranchPatterns "case.patterns" numProbCodec
+    <*> dfield _ggoGateReverse "gate_reverse"
+    <*> dfield _ggoGate1_0 "gate_1_or_0"
+    <*> tfield _ggoGateNInputType "gate_ninput" catProbCodec
+    <*> tfield _ggoGateInputs "gate_ninputs" numProbCodec
+    <*> tfield _ggoGateOutputs "gate_noutputs" numProbCodec
+    <*> tfield _ggoCaseBranches "case_branches" numProbCodec
+    <*> tfield _ggoCaseBranchPatterns "case_patterns" numProbCodec
   where
     tfield p n c =
       defaultValue (p $ _goGenerate $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
@@ -1248,8 +1248,8 @@ garbageTypeCodec =
   GarbageTypeOpts
     <$> dfield _gtoAbstract_Concrete "abstract_or_concrete"
     <*> tfield _gtoAbstract "abstract" catProbCodec
-    <*> dfield _gtoConcreteSignedness "concrete.signedness"
-    <*> dfield _gtoConcreteBitRange "concrete.bitRange"
+    <*> dfield _gtoConcreteSignedness "concrete_signedness"
+    <*> dfield _gtoConcreteBitRange "concrete_bitRange"
     <*> tfield _gtoDimensions "dimensions" numProbCodec
   where
     tfield p n c =
@@ -1266,22 +1266,22 @@ garbageStatementCodec =
     <*> tfield _gstoItems "items" numProbCodec
     <*> dfield _gstoOptionalDelEvCtl "optionalDelayEventControl"
     <*> dfield _gstoAssignmentBlocking "assignmentBlocking"
-    <*> tfield _gstoCase "case.kind" catProbCodec
-    <*> tfield _gstoCaseBranches "case.branches" numProbCodec
-    <*> tfield _gstoCaseBranchPatterns "case.patterns" numProbCodec
+    <*> tfield _gstoCase "case_kind" catProbCodec
+    <*> tfield _gstoCaseBranches "case_branches" numProbCodec
+    <*> tfield _gstoCaseBranchPatterns "case_patterns" numProbCodec
     <*> tfield _gstoLoop "loop" catProbCodec
-    <*> dfield _gstoBlockPar_Seq "block.par_or_seq"
-    <*> dfield _gstoBlockHeader "block.header"
-    <*> tfield _gstoBlockDecls "block.declarations" numProbCodec
-    <*> tfield _gstoBlockDecl "block.declaration" catProbCodec
-    <*> tfield _gstoProcContAssign "procContAss.assDeassForceRel" catProbCodec
-    <*> dfield _gstoPCAVar_Net "procContAss.var_or_net"
+    <*> dfield _gstoBlockPar_Seq "block_par_or_seq"
+    <*> dfield _gstoBlockHeader "block_header"
+    <*> tfield _gstoBlockDecls "block_declarations" numProbCodec
+    <*> tfield _gstoBlockDecl "block_declaration" catProbCodec
+    <*> tfield _gstoProcContAssign "procContAss_assDeassForceRel" catProbCodec
+    <*> dfield _gstoPCAVar_Net "procContAss_var_or_net"
     <*> tfield _gstoDelayEventRepeat "delayEventRepeat" catProbCodec
-    <*> tfield _gstoEvent "event.kind" catProbCodec
-    <*> tfield _gstoEvents "event.exprs" numProbCodec
-    <*> tfield _gstoEventPrefix "event.prefix" catProbCodec
-    <*> tfield _gstoSysTaskPorts "sysTask.ports" numProbCodec
-    <*> dfield _gstoSysTaskOptionalPort "sysTask.optionalPort"
+    <*> tfield _gstoEvent "event" catProbCodec
+    <*> tfield _gstoEvents "event_exprs" numProbCodec
+    <*> tfield _gstoEventPrefix "event_prefix" catProbCodec
+    <*> tfield _gstoSysTaskPorts "sysTask_ports" numProbCodec
+    <*> dfield _gstoSysTaskOptionalPort "sysTask_optionalPort"
   where
     tfield p n c =
       defaultValue (p $ _goStatement $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
@@ -1294,29 +1294,29 @@ garbageExprCodec =
     <$> garbageAttenuationCodec "attenuation" .= _geoAttenuation
     <*> tfield _geoItem "item" catProbCodec
     <*> tfield _geoPrimary "primary" catProbCodec
-    <*> tfield _geoUnary "op.unary" catProbCodec
-    <*> tfield _geoBinary "op.binary" catProbCodec
+    <*> tfield _geoUnary "op_unary" catProbCodec
+    <*> tfield _geoBinary "op_binary" catProbCodec
     <*> dfield _geoMinTypMax "minTypMax"
     <*> dfield _geoDimRange "dimRange"
-    <*> tfield _geoRange "range.kind" catProbCodec
-    <*> dfield _geoRangeOffsetPos_Neg "range.offset_pos_or_neg"
+    <*> tfield _geoRange "range_kind" catProbCodec
+    <*> dfield _geoRangeOffsetPos_Neg "range_offset_pos_or_neg"
     <*> tfield _geoConcatenations "concatenations" numProbCodec
     <*> tfield _geoSysFunArgs "sysFunArgs" numProbCodec
-    <*> tfield _geoLiteralWidth "literal.width" catProbCodec
-    <*> dfield _geoLiteralSigned "literal.signed"
-    <*> tfield _geoStringCharacters "string.characters" numProbCodec
-    <*> tfield _geoStringCharacter "string.character" catProbCodec
+    <*> tfield _geoLiteralWidth "literal_width" catProbCodec
+    <*> dfield _geoLiteralSigned "literal_signed"
+    <*> tfield _geoStringCharacters "string_characters" numProbCodec
+    <*> tfield _geoStringCharacter "string_character" catProbCodec
     <*> dfield _geoFixed_Floating "fixed_or_float"
     <*> tfield _geoExponentSign "exponentSign" catProbCodec
     <*> dfield _geoX_Z "X_or_Z"
-    <*> tfield _geoBinarySymbols "binary.digits" numProbCodec
-    <*> tfield _geoBinarySymbol "binary.digit" catProbCodec
-    <*> tfield _geoOctalSymbols "octal.digits" numProbCodec
-    <*> tfield _geoOctalSymbol "octal.digit" catProbCodec
-    <*> tfield _geoDecimalSymbols "decimal.digits" numProbCodec
-    <*> tfield _geoDecimalSymbol "decimal.digit" catProbCodec
-    <*> tfield _geoHexadecimalSymbols "hex.digits" numProbCodec
-    <*> tfield _geoHexadecimalSymbol "hex.digit" catProbCodec
+    <*> tfield _geoBinarySymbols "binary_digits" numProbCodec
+    <*> tfield _geoBinarySymbol "binary_digit" catProbCodec
+    <*> tfield _geoOctalSymbols "octal_digits" numProbCodec
+    <*> tfield _geoOctalSymbol "octal_digit" catProbCodec
+    <*> tfield _geoDecimalSymbols "decimal_digits" numProbCodec
+    <*> tfield _geoDecimalSymbol "decimal_digit" catProbCodec
+    <*> tfield _geoHexadecimalSymbols "hex_digits" numProbCodec
+    <*> tfield _geoHexadecimalSymbol "hex_digit" catProbCodec
   where
     tfield p n c =
       defaultValue (p $ _goExpr $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
@@ -1327,10 +1327,10 @@ garbageIdentifierCodec :: TomlCodec GarbageIdentifierOpts
 garbageIdentifierCodec =
   GarbageIdentifierOpts
     <$> dfield _gioEscaped_Simple "escaped_or_simple"
-    <*> tfield _gioSimpleLetters "simple.length" numProbCodec
-    <*> tfield _gioSimpleLetter "simple.letter" catProbCodec
-    <*> tfield _gioEscapedLetters "escaped.length" numProbCodec
-    <*> tfield _gioEscapedLetter "escaped.letter" catProbCodec
+    <*> tfield _gioSimpleLetters "simple_length" numProbCodec
+    <*> tfield _gioSimpleLetter "simple_letter" catProbCodec
+    <*> tfield _gioEscapedLetters "escaped_length" numProbCodec
+    <*> tfield _gioEscapedLetter "escaped_letter" catProbCodec
     <*> tfield _gioSystemLetters "systemLength" numProbCodec
   where
     tfield p n c =
@@ -1352,12 +1352,12 @@ garbageCodec =
     <*> tfield _goExpr "expr" garbageExprCodec
     <*> tfield _goIdentifier "identifier" garbageIdentifierCodec
     <*> tfield _goDriveStrength "driveStrength" catProbCodec
-    <*> tfield _goLValues "lvalue.items" numProbCodec
-    <*> dfield _goOptionalLValue "lvalue.optional"
-    <*> tfield _goAttributes "attribute.items" numProbCodec
-    <*> dfield _goAttributeOptionalValue "attribute.optional_value"
-    <*> tfield _goDelay "delay.items" catProbCodec
-    <*> tfield _goIntRealIdent "delay.base" catProbCodec
+    <*> tfield _goLValues "lvalue_items" numProbCodec
+    <*> dfield _goOptionalLValue "lvalue_optional"
+    <*> tfield _goAttributes "attribute_items" numProbCodec
+    <*> dfield _goAttributeOptionalValue "attribute_optional_value"
+    <*> tfield _goDelay "delay_items" catProbCodec
+    <*> tfield _goIntRealIdent "delay_base" catProbCodec
     <*> tfield _goPathDepth "path_depth" numProbCodec
   where
     tfield p n c = defaultValue (p $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
