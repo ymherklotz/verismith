@@ -65,7 +65,7 @@ uniq f m =
 
 clean :: Int -> [(Double, Int)] -> [(Double, Int)]
 clean t =
-  map (\(x, y) -> (x, max 0 y))
+  map (\(x, y) -> (max 0 x, y))
     . uniq snd (\(x1, y1) (x2, y2) -> (x1 + x2, y1))
     . filter ((<= t) . snd)
 
