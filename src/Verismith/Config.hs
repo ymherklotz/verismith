@@ -368,7 +368,8 @@ data GarbageOpts = GarbageOpts
     _goAttributeOptionalValue :: !Double,
     _goDelay :: !CategoricalProbability,
     _goIntRealIdent :: !CategoricalProbability,
-    _goPathDepth :: !NumberProbability
+    _goPathDepth :: !NumberProbability,
+    _goBareMinTypMax :: !Double
   }
   deriving (Eq, Show)
 
@@ -416,7 +417,8 @@ data GarbageModuleOpts = GarbageModuleOpts
     _gmoTimeMagnitude :: !CategoricalProbability,
     _gmoCell :: !Double,
     _gmoUnconnectedDrive :: !CategoricalProbability,
-    _gmoDefaultNetType :: !CategoricalProbability
+    _gmoDefaultNetType :: !CategoricalProbability,
+    _gmoNonAsciiHeader :: !Bool
   }
   deriving (Eq, Show)
 
@@ -427,7 +429,8 @@ data GarbageSpecifyOpts = GarbageSpecifyOpts
     _gsyoItem :: !CategoricalProbability,
     _gsyoTermRange :: !Double,
     _gsyoParamRange :: !Double,
-    _gsyoParamKind :: !CategoricalProbability
+    _gsyoPathPulseEscaped_Simple :: !Double,
+    _gsyoPathPulseRange :: !Double
   }
   deriving (Eq, Show)
 
@@ -473,8 +476,7 @@ data GarbageGenerateOpts = GarbageGenerateOpts
     _ggoTaskFunPortType :: !CategoricalProbability,
     _ggoTaskPortDirection :: !CategoricalProbability,
     _ggoFunRetType :: !Double,
-    _ggoGateReverse :: !Double,
-    _ggoGate1_0 :: !Double,
+    _ggoGateInst :: !CategoricalProbability,
     _ggoGateNInputType :: !CategoricalProbability,
     _ggoGateInputs :: !NumberProbability,
     _ggoGateOutputs :: !NumberProbability,
@@ -560,7 +562,8 @@ data GarbageIdentifierOpts = GarbageIdentifierOpts
     _gioSimpleLetter :: !CategoricalProbability,
     _gioEscapedLetters :: !NumberProbability,
     _gioEscapedLetter :: !CategoricalProbability,
-    _gioSystemLetters :: !NumberProbability
+    _gioSystemLetters :: !NumberProbability,
+    _gioSystemFirstLetter :: !CategoricalProbability
   }
   deriving (Eq, Show)
 
@@ -611,7 +614,8 @@ defGarbageOpts =
           _gmoTimeMagnitude = uniformCP,
           _gmoCell = 0.5,
           _gmoUnconnectedDrive = uniformCP,
-          _gmoDefaultNetType = uniformCP
+          _gmoDefaultNetType = uniformCP,
+          _gmoNonAsciiHeader = True
         },
       _goSpecify = GarbageSpecifyOpts
         { _gsyoPath = GarbageSpecifyPathOpts
@@ -636,7 +640,8 @@ defGarbageOpts =
           _gsyoItem = uniformCP,
           _gsyoTermRange = 0.5,
           _gsyoParamRange = 0.5,
-          _gsyoParamKind = uniformCP
+          _gsyoPathPulseEscaped_Simple = 0.5,
+          _gsyoPathPulseRange = 0.5
         },
       _goGenerate = GarbageGenerateOpts
         { _ggoItems = NPPoisson 0 3,
@@ -658,8 +663,7 @@ defGarbageOpts =
           _ggoTaskFunPortType = uniformCP,
           _ggoTaskPortDirection = uniformCP,
           _ggoFunRetType = 0.5,
-          _ggoGateReverse = 0.5,
-          _ggoGate1_0 = 0.5,
+          _ggoGateInst = uniformCP,
           _ggoGateNInputType = uniformCP,
           _ggoGateInputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
           _ggoGateOutputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
@@ -734,7 +738,8 @@ defGarbageOpts =
           _gioSimpleLetter = uniformCP,
           _gioEscapedLetters = NPNegativeBinomial 0 0.125 1,
           _gioEscapedLetter = uniformCP,
-          _gioSystemLetters = NPNegativeBinomial 0 0.125 1
+          _gioSystemLetters = NPNegativeBinomial 0 0.125 1,
+          _gioSystemFirstLetter = uniformCP
         },
       _goDriveStrength = uniformCP,
       _goLValues = NPNegativeBinomial 0 0.5 1,
@@ -743,7 +748,8 @@ defGarbageOpts =
       _goAttributeOptionalValue = 0.5,
       _goDelay = CPDiscrete [1, 1, 2, 4],
       _goIntRealIdent = uniformCP,
-      _goPathDepth = NPNegativeBinomial 0 0.75 1
+      _goPathDepth = NPNegativeBinomial 0 0.75 1,
+      _goBareMinTypMax = 0.5
     }
 
 data Info = Info
@@ -1147,11 +1153,14 @@ garbageModuleCodec =
     <*> dfield _gmoCell "cell"
     <*> tfield _gmoUnconnectedDrive "unconnectedDrive" catProbCodec
     <*> tfield _gmoDefaultNetType "defaultNetType" catProbCodec
+    <*> bfield _gmoNonAsciiHeader "nonAsciiHeader"
   where
     tfield p n c =
       defaultValue (p $ _goModule $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
     dfield p n =
       defaultValue (p $ _goModule $ _configGarbageGenerator defaultConfig) (Toml.double n) .= p
+    bfield p n =
+      defaultValue (p $ _goModule $ _configGarbageGenerator defaultConfig) (Toml.bool n) .= p
 
 garbageSpecifyPathCodec :: TomlCodec GarbageSpecifyPathOpts
 garbageSpecifyPathCodec =
@@ -1201,7 +1210,8 @@ garbageSpecifyCodec =
     <*> tfield _gsyoItem "item" catProbCodec
     <*> dfield _gsyoTermRange "termRange"
     <*> dfield _gsyoParamRange "parameter_range"
-    <*> tfield _gsyoParamKind "parameter" catProbCodec
+    <*> dfield _gsyoPathPulseEscaped_Simple "pathpulse_escaped_or_simple"
+    <*> dfield _gsyoPathPulseRange "pathpulse_term_range"
   where
     tfield p n c =
       defaultValue (p $ _goSpecify $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
@@ -1230,8 +1240,7 @@ garbageGenerateCodec =
     <*> tfield _ggoTaskFunPortType "taskFun_portType" catProbCodec
     <*> tfield _ggoTaskPortDirection "taskPortDir" catProbCodec
     <*> dfield _ggoFunRetType "funReturnType"
-    <*> dfield _ggoGateReverse "gate_reverse"
-    <*> dfield _ggoGate1_0 "gate_1_or_0"
+    <*> tfield _ggoGateInst "gate" catProbCodec
     <*> tfield _ggoGateNInputType "gate_ninput" catProbCodec
     <*> tfield _ggoGateInputs "gate_ninputs" numProbCodec
     <*> tfield _ggoGateOutputs "gate_noutputs" numProbCodec
@@ -1331,7 +1340,8 @@ garbageIdentifierCodec =
     <*> tfield _gioSimpleLetter "simple_letter" catProbCodec
     <*> tfield _gioEscapedLetters "escaped_length" numProbCodec
     <*> tfield _gioEscapedLetter "escaped_letter" catProbCodec
-    <*> tfield _gioSystemLetters "systemLength" numProbCodec
+    <*> tfield _gioSystemLetters "system_length" numProbCodec
+    <*> tfield _gioSystemFirstLetter "system_first_letter" catProbCodec
   where
     tfield p n c =
       defaultValue (p $ _goIdentifier $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
@@ -1359,6 +1369,7 @@ garbageCodec =
     <*> tfield _goDelay "delay_items" catProbCodec
     <*> tfield _goIntRealIdent "delay_base" catProbCodec
     <*> tfield _goPathDepth "path_depth" numProbCodec
+    <*> dfield _goBareMinTypMax "parameter_mintypmax_or_single"
   where
     tfield p n c = defaultValue (p $ _configGarbageGenerator defaultConfig) (Toml.table c n) .= p
     dfield p n = defaultValue (p $ _configGarbageGenerator defaultConfig) (Toml.double n) .= p
