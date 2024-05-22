@@ -117,17 +117,10 @@ digitCharacter = "0123456789"
 
 -- Start of actual generation
 
-garbageBS :: GenM' B.ByteString
-garbageBS =
-  choice
-    (i _gioEscaped_Simple)
-    ( B.pack . (c2w '\\' :) <$> sampleN
-        (i _gioEscapedLetters)
-        (toEnum <$> sampleSegment (i _gioEscapedLetter) 33 126)
-    )
-    ( avoidKW <$> sampleFromString (i _gioSimpleLetter) (B.take 53 idSimpleLetter)
-        <.> sampleString (i _gioSimpleLetters) (i _gioSimpleLetter) idSimpleLetter
-    )
+garbageSimpleBS :: GenM' B.ByteString
+garbageSimpleBS =
+  avoidKW <$> sampleFromString (i _gioSimpleLetter) (B.take 53 idSimpleLetter)
+    <.> sampleString (i _gioSimpleLetters) (i _gioSimpleLetter) idSimpleLetter
   where
     i x = x . _goIdentifier
     avoidKW fl t =
@@ -138,6 +131,15 @@ garbageBS =
               avoidKW fl $ B.cons x t
             else return s
 
+garbageEscapedBS :: GenM' B.ByteString
+garbageEscapedBS =
+  fmap (B.pack . (c2w '\\' :)) $
+    sampleN (i _gioEscapedLetters) (toEnum <$> sampleSegment (i _gioEscapedLetter) 33 126)
+  where i x = x . _goIdentifier
+
+garbageBS :: GenM' B.ByteString
+garbageBS = choice (_gioEscaped_Simple . _goIdentifier) garbageEscapedBS garbageSimpleBS
+
 garbageIdent :: GenM' Identifier
 garbageIdent = Identifier <$> garbageBS
 
@@ -145,7 +147,9 @@ garbageIdentified :: GenM' x -> GenM' (Identified x)
 garbageIdentified = liftA2 Identified garbageIdent
 
 garbageSysIdent :: GenM' B.ByteString
-garbageSysIdent = sampleNEString (i _gioSystemLetters) (i _gioSimpleLetter) idSimpleLetter
+garbageSysIdent =
+  B.cons <$> sampleFromString (i _gioSystemFirstLetter) idSimpleLetter
+    <*> sampleString (i _gioSystemLetters) (i _gioSimpleLetter) idSimpleLetter
   where i x = x . _goIdentifier
 
 garbageHierIdent :: GenM' HierIdent
@@ -200,15 +204,8 @@ garbagePrim ident grng gattr =
       mknum $ NHex <$> sampleNE (e _geoHexadecimalSymbols) (sampleEnum $ e _geoHexadecimalSymbol),
       (0, PrimReal <$> garbageReal),
       ( 0,
-        do
-          s <- sampleN (e _geoStringCharacters) $ sampleEnum $ e _geoStringCharacter
-          let
-            w = concatMap (\x -> case w2c x of
-              '"' -> "\\\""
-              '\\' -> "\\\\"
-              '\n' -> "\\n"
-              x -> [x]) s
-          return $ PrimString $ B.pack $ map c2w $ "\"" ++ w ++ "\""
+        PrimString . makeString
+          <$> sampleN (e _geoStringCharacters) (sampleEnum $ e _geoStringCharacter)
       ),
       (0, PrimIdent <$> ident <*> tameExprRecursion grng),
       recurse $ PrimConcat <$> sampleNE (e _geoConcatenations) gexpr,
@@ -309,6 +306,13 @@ garbageMinTypMax = garbageGenMinTypMax garbageExpr
 
 garbageCMinTypMax :: GenM' CMinTypMax
 garbageCMinTypMax = garbageGenMinTypMax garbageCExpr
+
+garbageBareCMTM :: GenM' CMinTypMax
+garbageBareCMTM =
+  choice
+    (_goBareMinTypMax)
+    (MTMFull <$> garbageCExpr <*> garbageCExpr <*> garbageCExpr)
+    (MTMSingle <$> garbageCExpr)
 
 garbageAttributes :: GenM' [Attribute]
 garbageAttributes =
@@ -522,7 +526,7 @@ garbageComType m =
   where t x = x . _goType
 
 garbageParameter :: GenM' Parameter
-garbageParameter = Parameter <$> (garbageComType $ pure ()) <*> garbageCMinTypMax
+garbageParameter = Parameter <$> (garbageComType $ pure ()) <*> garbageBareCMTM
 
 blockDeclList :: (forall x. GenM' x -> GenM' (f x)) -> GenM' t -> [GenM' (BlockDecl f t)]
 blockDeclList f m =
@@ -532,7 +536,7 @@ blockDeclList f m =
     BDTime <$> f m,
     BDRealTime <$> f m,
     BDEvent <$> f garbageDims,
-    BDLocalParam <$> (garbageComType $ pure ()) <*> f garbageCMinTypMax
+    BDLocalParam <$> (garbageComType $ pure ()) <*> f garbageBareCMTM
   ]
 
 stdBlockDeclList :: [GenM' StdBlockDecl]
@@ -556,6 +560,120 @@ garbageTFBlockDecl m =
   sampleBranch (g _ggoTaskFunDecl) $ map (fmap TFBDStd) stdBlockDeclList ++
     [TFBDPort <$> m <*> garbageComType (sampleBernoulli $ g _ggoTaskFunRegister)]
   where g x = x . _goGenerate
+
+garbageGateInst :: (forall x. GenM' x -> GenM' (f x)) -> GenM' (ModGenItem f)
+garbageGateInst f =
+  sampleBranch
+    (g _ggoGateInst)
+    [ mkf (MGICMos False <$> optd3) $
+        GICMos <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageExpr
+          <*> garbageExpr
+          <*> garbageExpr,
+      mkf (MGICMos True <$> optd3) $
+        GICMos <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageExpr
+          <*> garbageExpr
+          <*> garbageExpr,
+      mkf (MGIEnable False False <$> garbageDriveStrength <*> optd3) $
+        GIEnable <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageExpr
+          <*> garbageExpr,
+      mkf (MGIEnable False True <$> garbageDriveStrength <*> optd3) $
+        GIEnable <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageExpr
+          <*> garbageExpr,
+      mkf (MGIEnable True False <$> garbageDriveStrength <*> optd3) $
+        GIEnable <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageExpr
+          <*> garbageExpr,
+      mkf (MGIEnable True True <$> garbageDriveStrength <*> optd3) $
+        GIEnable <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageExpr
+          <*> garbageExpr,
+      mkf (MGIMos False False <$> optd3) $
+        GIMos <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageExpr <*> garbageExpr,
+      mkf (MGIMos False True <$> optd3) $
+        GIMos <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageExpr <*> garbageExpr,
+      mkf (MGIMos True False <$> optd3) $
+        GIMos <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageExpr <*> garbageExpr,
+      mkf (MGIMos True True <$> optd3) $
+        GIMos <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageExpr <*> garbageExpr,
+      mkf
+        (flip MGINIn False <$> sampleEnum (g _ggoGateNInputType) <*> garbageDriveStrength <*> optd2)
+        ( GINIn <$> garbageIdent
+            <*> optr2
+            <*> garbageNetLV
+            <*> sampleNE (g _ggoGateInputs) garbageExpr
+        ),
+      mkf
+        (flip MGINIn True <$> sampleEnum (g _ggoGateNInputType) <*> garbageDriveStrength <*> optd2)
+        ( GINIn <$> garbageIdent
+            <*> optr2
+            <*> garbageNetLV
+            <*> sampleNE (g _ggoGateInputs) garbageExpr
+        ),
+      mkf (MGINOut False <$> garbageDriveStrength <*> optd2) $
+        GINOut <$> garbageIdent
+          <*> optr2
+          <*> sampleNE (g _ggoGateOutputs) garbageNetLV
+          <*> garbageExpr,
+      mkf (MGINOut True <$> garbageDriveStrength <*> optd2) $
+        GINOut <$> garbageIdent
+          <*> optr2
+          <*> sampleNE (g _ggoGateOutputs) garbageNetLV
+          <*> garbageExpr,
+      mkf (MGIPassEn False False <$> optd2) $
+        GIPassEn <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageNetLV
+          <*> garbageExpr,
+      mkf (MGIPassEn False True <$> optd2) $
+        GIPassEn <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageNetLV
+          <*> garbageExpr,
+      mkf (MGIPassEn True False <$> optd2) $
+        GIPassEn <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageNetLV
+          <*> garbageExpr,
+      mkf (MGIPassEn True True <$> optd2) $
+        GIPassEn <$> garbageIdent
+          <*> optr2
+          <*> garbageNetLV
+          <*> garbageNetLV
+          <*> garbageExpr,
+      mkf (pure $ MGIPass False) $
+        GIPass <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageNetLV,
+      mkf (pure $ MGIPass True) $
+        GIPass <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageNetLV,
+      mkf (MGIPull False <$> garbageDriveStrength) $
+        GIPull <$> garbageIdent <*> optr2 <*> garbageNetLV,
+      mkf (MGIPull True <$> garbageDriveStrength) $
+        GIPull <$> garbageIdent <*> optr2 <*> garbageNetLV
+    ]
+  where
+    g x = x . _goGenerate
+    mkf c m = c <*> f m
+    optd3 = sampleMaybe (g _ggoInstOptionalDelay) garbageDelay3
+    optd2 = sampleMaybe (g _ggoInstOptionalDelay) garbageDelay2
+    optr2 = sampleMaybe (g _ggoInstOptionalRange) garbageRange2
 
 garbageGenIf :: GenM' ModGenCondItem
 garbageGenIf = MGCIIf <$> garbageCExpr <*> garbageGenCondBlock <*> garbageGenCondBlock
@@ -597,56 +715,10 @@ garbageModGenItem f =
         <*> (toList
           <$> sampleNE (g _ggoTaskFunPorts) (garbageAttrIded $ garbageTFBlockDecl $ pure ()))
         <*> garbageFunctionStatement,
+-- TODO MAYBE: make a BareCMinTypMax and use it here
       MGIDefParam <$> f (ParamOver <$> garbageHierIdent <*> garbageCMinTypMax),
       MGIContAss <$> garbageDriveStrength <*> optd3 <*> f garbageNetAssign,
-      MGICMos <$> grev
-        <*> optd3
-        <*> f (GICMos <$> garbageIdent
-          <*> optr2
-          <*> garbageNetLV
-          <*> garbageExpr
-          <*> garbageExpr
-          <*> garbageExpr),
-      MGIEnable <$> grev
-        <*> g1_0
-        <*> garbageDriveStrength
-        <*> optd3
-        <*> f (GIEnable <$> garbageIdent
-          <*> optr2
-          <*> garbageNetLV
-          <*> garbageExpr
-          <*> garbageExpr),
-      MGIMos <$> grev
-        <*> g1_0
-        <*> optd3
-        <*> f (GIMos <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageExpr <*> garbageExpr),
-      MGINIn <$> sampleEnum (g _ggoGateNInputType)
-        <*> grev
-        <*> garbageDriveStrength
-        <*> optd2
-        <*> f (GINIn <$> garbageIdent
-          <*> optr2
-          <*> garbageNetLV
-          <*> sampleNE (g _ggoGateInputs) garbageExpr),
-      MGINOut <$> grev
-        <*> garbageDriveStrength
-        <*> optd2
-        <*> f (GINOut <$> garbageIdent
-          <*> optr2
-          <*> sampleNE (g _ggoGateOutputs) garbageNetLV
-          <*> garbageExpr),
-      MGIPassEn <$> grev
-        <*> g1_0
-        <*> optd2
-        <*> f (GIPassEn <$> garbageIdent
-          <*> optr2
-          <*> garbageNetLV
-          <*> garbageNetLV
-          <*> garbageExpr),
-      MGIPass <$> grev <*> f (GIPass <$> garbageIdent <*> optr2 <*> garbageNetLV <*> garbageNetLV),
-      MGIPull <$> grev
-        <*> garbageDriveStrength
-        <*> f (GIPull <$> garbageIdent <*> optr2 <*> garbageNetLV),
+      garbageGateInst f,
       MGIUDPInst <$> garbageIdent
         <*> garbageDriveStrength
         <*> optd2
@@ -659,6 +731,7 @@ garbageModGenItem f =
           (m _gmoNamed_Positional)
           ( ParamNamed <$> sampleN
                 (m _gmoParameters)
+-- TODO MAYBE: make a BareCMinTypMax and use it here
                 (garbageIdentified $ sampleMaybe (m _gmoOptionalParameter) garbageMinTypMax)
           )
           (ParamPositional <$> sampleN (m _gmoParameters) garbageExpr)
@@ -682,8 +755,6 @@ garbageModGenItem f =
   where
     g x = x . _goGenerate
     m x = x . _goModule
-    grev = sampleBernoulli $ g _ggoGateReverse
-    g1_0 = sampleBernoulli $ g _ggoGate1_0
     optd3 = sampleMaybe (g _ggoInstOptionalDelay) garbageDelay3
     optd2 = sampleMaybe (g _ggoInstOptionalDelay) garbageDelay2
     optr2 = sampleMaybe (g _ggoInstOptionalRange) garbageRange2
@@ -718,24 +789,37 @@ garbageSpecTerm :: GenM' SpecTerm
 garbageSpecTerm =
   SpecTerm <$> garbageIdent <*> sampleMaybe (_gsyoTermRange . _goSpecify) garbageCRangeExpr
 
-garbageSpecParam :: GenM' (Maybe Range2, SpecParamDecl)
-garbageSpecParam =
-  (,) <$> sampleMaybe (s _gsyoParamRange) garbageRange2
-    <*> sampleBranch
-      (s _gsyoParamKind)
-      [ SPDAssign <$> garbageIdent <*> garbageCMinTypMax,
-        SPDPathPulse Nothing <$> garbageCMinTypMax <*> garbageCMinTypMax,
-        SPDPathPulse . Just <$> mkpair garbageSpecTerm garbageSpecTerm
-          <*> garbageCMinTypMax
-          <*> garbageCMinTypMax
-      ]
-  where s x = x . _goSpecify
+garbagePPIdentifier :: GenM' Identifier
+garbagePPIdentifier =
+  Identifier <$> choice (_gsyoPathPulseEscaped_Simple . _goSpecify) garbageEscapedBS garbageSimpleBS
+
+garbagePPTerm :: GenM' SpecTerm
+garbagePPTerm =
+  SpecTerm <$> garbagePPIdentifier
+    <*> sampleMaybe (_gsyoPathPulseRange . _goSpecify) garbageCRangeExpr
+
+garbageSPRange :: GenM' (Maybe Range2)
+garbageSPRange = sampleMaybe (_gsyoParamRange . _goSpecify) garbageRange2
+
+garbageSpecParamAssign :: GenM' SpecParamDecl
+garbageSpecParamAssign = SPDAssign <$> garbageIdent <*> garbageCMinTypMax
+
+garbageNoPathPulse :: GenM' SpecParamDecl
+garbageNoPathPulse = SPDPathPulse Nothing <$> garbageCMinTypMax <*> garbageCMinTypMax
+
+garbagePathPulse :: GenM' SpecParamDecl
+garbagePathPulse =
+  SPDPathPulse . Just <$> mkpair garbagePPTerm garbagePPTerm
+    <*> garbageCMinTypMax
+    <*> garbageCMinTypMax
 
 garbageSpecifyItem :: GenM' SpecifyBlockedItem
 garbageSpecifyItem =
   sampleBranch
     (s _gsyoItem)
-    [ (\(a, b) -> SISpecParam a $ Identity b) <$> garbageSpecParam,
+    [ SISpecParam <$> garbageSPRange <*> fmap Identity garbageSpecParamAssign,
+      SISpecParam <$> garbageSPRange <*> fmap Identity garbageNoPathPulse,
+      SISpecParam <$> garbageSPRange <*> fmap Identity garbagePathPulse,
       SIPulsestyleOnevent <$> gst,
       SIPulsestyleOndetect <$> gst,
       SIShowcancelled <$> gst,
@@ -824,14 +908,17 @@ garbageSpecifyItem =
 
 garbageModuleBlock :: Bool -> GenM' ModuleBlock
 garbageModuleBlock ts = do
+  nah <- asks $ m _gmoNonAsciiHeader . fst
+  header <- sampleN (m _gmoPorts) $
+    if nah
+    then 
+      garbageIdentified $
+        sampleN (m _gmoPortLValues) $
+          garbageIdentified $ sampleMaybe (m _gmoPortRange) garbageCRangeExpr
+    else (\i -> Identified i [Identified i Nothing]) <$> garbageIdent
   ModuleBlock <$> garbageAttributes
     <*> garbageIdent
-    <*> sampleN
-      (m _gmoPorts)
-      ( garbageIdentified $
-          sampleN (m _gmoPortLValues) $
-            garbageIdentified $
-              sampleMaybe (m _gmoPortRange) garbageCRangeExpr)
+    <*> pure header
     <*> sampleN
       (m _gmoItems)
       ( sampleBranch
@@ -840,7 +927,9 @@ garbageModuleBlock ts = do
             MIPort <$> garbageAttrIded (mkpair (sampleEnum $ m _gmoPortDir) garbageSR),
             MIParameter <$> garbageAttrIded garbageParameter,
             MIGenReg <$> sampleN (_ggoItems . _goGenerate) garbageModGenBlockedItem,
-            (\a (b, c) -> MISpecParam a b c) <$> garbageAttributes <*> garbageSpecParam,
+            MISpecParam <$> garbageAttributes <*> garbageSPRange <*> garbageSpecParamAssign,
+            MISpecParam <$> garbageAttributes <*> garbageSPRange <*> garbageNoPathPulse,
+            MISpecParam <$> garbageAttributes <*> garbageSPRange <*> garbagePathPulse,
             MISpecBlock <$> sampleN (_gsyoItems . _goSpecify) garbageSpecifyItem
           ]
       )

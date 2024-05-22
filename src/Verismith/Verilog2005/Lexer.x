@@ -13,6 +13,7 @@ module Verismith.Verilog2005.Lexer
   ( scanTokens
   , parseDecimal
   , isKW
+  , makeString
   )
 where
 
@@ -28,7 +29,7 @@ import Control.Monad.Except
 import Control.Exception
 import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Lazy as LBS
-import Data.ByteString.Internal (c2w, w2c, unpackChars)
+import Data.ByteString.Internal (c2w, w2c, unpackChars, packChars)
 import qualified Data.HashMap.Strict as HashMap
 import Verismith.Verilog2005.Token
 }
@@ -388,6 +389,11 @@ escSimpleIdent s = case SBS.uncons ss of
   where
     testfirst c = (c2w 'A' <= c && c <= c2w 'Z') || (c2w 'a' <= c && c <= c2w 'z') || c == c2w '_'
     ss = SBS.tail s
+
+makeString :: String -> SBS.ByteString
+makeString s = packChars $ '"' : w s ++ "\""
+  where
+    w = concatMap $ \x -> case x of '"' -> "\\\""; '\\' -> "\\\\"; '\n' -> "\\n"; x -> [x]
 
 cdMap :: HashMap.HashMap SBS.ByteString (Position -> Alex (Maybe PosToken))
 cdMap = HashMap.fromList $
