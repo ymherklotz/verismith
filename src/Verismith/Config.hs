@@ -462,6 +462,7 @@ data GarbageGenerateOpts = GarbageGenerateOpts
     _ggoOptionalBlock :: !Double,
     _ggoInstOptionalDelay :: !Double,
     _ggoInstOptionalRange :: !Double,
+    _ggoPrimitiveOptIdent :: !Double,
     _ggoCondBlock :: !CategoricalProbability,
     _ggoNetType :: !CategoricalProbability,
     _ggoNetRange :: !Double,
@@ -477,6 +478,7 @@ data GarbageGenerateOpts = GarbageGenerateOpts
     _ggoTaskPortDirection :: !CategoricalProbability,
     _ggoFunRetType :: !Double,
     _ggoGateInst :: !CategoricalProbability,
+    _ggoGateOptIdent :: !Double,
     _ggoGateNInputType :: !CategoricalProbability,
     _ggoGateInputs :: !NumberProbability,
     _ggoGateOutputs :: !NumberProbability,
@@ -649,6 +651,7 @@ defGarbageOpts =
           _ggoOptionalBlock = 0.5,
           _ggoInstOptionalDelay = 0.5,
           _ggoInstOptionalRange = 0.5,
+          _ggoPrimitiveOptIdent = 0.5,
           _ggoCondBlock = uniformCP,
           _ggoNetType = uniformCP,
           _ggoNetRange = 0.5,
@@ -664,6 +667,7 @@ defGarbageOpts =
           _ggoTaskPortDirection = uniformCP,
           _ggoFunRetType = 0.5,
           _ggoGateInst = uniformCP,
+          _ggoGateOptIdent = 0.5,
           _ggoGateNInputType = uniformCP,
           _ggoGateInputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
           _ggoGateOutputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
@@ -1226,6 +1230,7 @@ garbageGenerateCodec =
     <*> dfield _ggoOptionalBlock "optionalBlock"
     <*> dfield _ggoInstOptionalDelay "instance_optional_delay"
     <*> dfield _ggoInstOptionalRange "instance_optional_range"
+    <*> dfield _ggoPrimitiveOptIdent "primitive_optional_name"
     <*> tfield _ggoCondBlock "nested_condition" catProbCodec
     <*> tfield _ggoNetType "net_type" catProbCodec
     <*> dfield _ggoNetRange "net_range"
@@ -1241,6 +1246,7 @@ garbageGenerateCodec =
     <*> tfield _ggoTaskPortDirection "taskPortDir" catProbCodec
     <*> dfield _ggoFunRetType "funReturnType"
     <*> tfield _ggoGateInst "gate" catProbCodec
+    <*> dfield _ggoGateOptIdent "gate_optional_name"
     <*> tfield _ggoGateNInputType "gate_ninput" catProbCodec
     <*> tfield _ggoGateInputs "gate_ninputs" numProbCodec
     <*> tfield _ggoGateOutputs "gate_noutputs" numProbCodec
