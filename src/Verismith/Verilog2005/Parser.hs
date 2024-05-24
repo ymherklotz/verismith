@@ -503,11 +503,11 @@ specTerm = SpecTerm <$> ident <*> optionMaybe constRangeExpr
 
 -- | Reference and constant minimum typical maximum
 cmtmRef :: Parser (Identified (Maybe CMinTypMax))
-cmtmRef = option defaultIdM $ Identified <$> ident <*> optionMaybe (brackets $ mtm constExpr)
+cmtmRef = Identified <$> ident <*> optionMaybe (brackets $ mtm constExpr)
 
 -- | Sized reference
-sz2Ref :: Parser (Identifier, Maybe Range2)
-sz2Ref = option ("", Nothing) $ mkpair ident $ optionMaybe range2
+instName :: Parser InstanceName
+instName = InstanceName <$> ident <*> optionMaybe range2
 
 -- | Signedness and range, both optional
 signRange :: Parser SignRange
@@ -892,16 +892,16 @@ stdBlockDecl =
       (\p a -> fmap (\(Identified i x) -> AttrIded a i $ SBDBlockDecl x) . toStdBlockDecl <$> p)
       (blockDecl $ many range2)
 
-type GIF a = Identifier -> Maybe Range2 -> NetLValue -> NonEmpty Expr -> Maybe a
+type GIF a = Maybe InstanceName -> NetLValue -> NonEmpty Expr -> Maybe a
 
 -- | Gate instantiation utility functions
 gateInst :: GIF a -> Parser (NonEmpty a)
 gateInst f = do
-  l <- csl1 $
-    sz2Ref >>= \(s, r) ->
-      parens $
-        f s r <$> netLV <* consume SymComma <*> csl1 expr
-          >>= maybe (hardfail "Unexpected arguments") pure
+  l <- csl1 $ do
+    n <- optionMaybe instName
+    mgi <- parens $
+      f n <$> netLV <* consume SymComma <*> csl1 expr
+    case mgi of Just gi -> return gi; Nothing -> hardfail "Unexpected arguments"
   consume SymSemi
   return l
 
@@ -1130,44 +1130,41 @@ comModGenItem =
     gateCmos r _ =
       MGICMos r <$> optionMaybe delay3
         <*> gateInst
-          (\s r lv args -> case args of [i, n, p] -> Just $ GICMos s r lv i n p; _ -> Nothing)
+          (\mn lv args -> case args of [i, n, p] -> Just $ GICMos mn lv i n p; _ -> Nothing)
     gateEnable r b _ =
       MGIEnable r b <$> driveStrength
         <*> optionMaybe delay3
         <*> gateInst
-          (\s r lv args -> case args of [inp, en] -> Just $ GIEnable s r lv inp en; _ -> Nothing)
+          (\n lv args -> case args of [inp, en] -> Just $ GIEnable n lv inp en; _ -> Nothing)
     gateMos r np _ =
       MGIMos r np <$> optionMaybe delay3
         <*> gateInst
-          (\s r lv args -> case args of [inp, en] -> Just $ GIMos s r lv inp en; _ -> Nothing)
+          (\n lv args -> case args of [inp, en] -> Just $ GIMos n lv inp en; _ -> Nothing)
     gateNinp t n _ =
       MGINIn t n <$> driveStrength
         <*> optionMaybe delay2
-        <*> gateInst (\s r o i -> Just $ GINIn s r o i)
+        <*> gateInst (\n o i -> Just $ GINIn n o i)
     gateNout r _ =
       MGINOut r <$> driveStrength
         <*> optionMaybe delay2
         <*> gateInst
-          ( \s r lv args ->
-              fmap (\(e, t) -> GINOut s r (lv :| t) e) $
+          ( \n lv args ->
+              fmap (\(e, t) -> GINOut n (lv :| t) e) $
                 foldrMapM1 (\x -> Just (x, [])) (\x (y, t) -> (,) y . (: t) <$> expr2netlv x) args
           )
     gatePassen r b _ =
       MGIPassEn r b <$> optionMaybe delay2
         <*> gateInst
-          ( \s r lv args -> case args of
-              [x, y] -> (flip (GIPassEn s r lv) y) <$> expr2netlv x
+          ( \n lv args -> case args of
+              [x, y] -> (flip (GIPassEn n lv) y) <$> expr2netlv x
               _ -> Nothing
           )
     gatePass r _ =
       fmap (MGIPass r) $
-        gateInst $
-          \s r lv args -> case args of
-            [x] -> GIPass s r lv <$> expr2netlv x
-            _ -> Nothing
+        gateInst $ \n lv args -> case args of [x] -> GIPass n lv <$> expr2netlv x; _ -> Nothing
     gatePull ud _ =
       MGIPull ud <$> option dsDefault (try $ parens $ pullStrength ud)
-        <*> csl1 (uncurry GIPull <$> sz2Ref <*> parens netLV)
+        <*> csl1 (GIPull <$> optionMaybe instName <*> parens netLV)
         <* consume SymSemi
 
 data MPUD
@@ -1211,7 +1208,7 @@ data MUUPayload
 -- | The actual instance of a module or user defined primive
 modudpinstance :: MPUD -> Parser MUUPayload
 modudpinstance what = do
-  (i@(Identifier s), rng) <- sz2Ref
+  mn <- optionMaybe instName
   args <- parens $ do
     a <- attributes
     do {
@@ -1219,20 +1216,19 @@ modudpinstance what = do
         PortNamed . (x :) <$> commathen (xcsl "port connections" $ attributes >>= namePort)
     }
       <|> (ordPort a >>= \x -> PortPositional . (x :) <$> commathen (csl $ attributes >>= ordPort))
-  let modinst = MUUPMod $ ModInst i rng args
-      argl = case args of
+  let argl = case args of
         PortPositional l@(_ : _ : _) ->
           traverse (\x -> case x of Attributed [] y -> y; _ -> Nothing) l
         _ -> Nothing
-  case (B.null s, argl) of
-    (False, Just (l : h : t)) | isukn what -> case expr2netlv l of
-      Just lv -> return $ MUUPUkn $ UknInst i rng lv $ h :| t
-      Nothing -> return modinst
+  case (mn, argl) of
+    (Just n, Just (l : h : t)) | isukn what -> case expr2netlv l of
+      Just lv -> return $ MUUPUkn $ UknInst n lv $ h :| t
+      Nothing -> return $ MUUPMod $ ModInst n args
     (_, Just (l : h : t)) | not (ismod what) -> case expr2netlv l of
-      Just lv -> return $ MUUPUDP $ UDPInst i rng lv $ h :| t
+      Just lv -> return $ MUUPUDP $ UDPInst mn lv $ h :| t
       Nothing -> failure
-    (False, Nothing) | isukn what -> return modinst
-    (False, _) | ismod what -> return modinst
+    (Just n, Nothing) | isukn what -> return $ MUUPMod $ ModInst n args
+    (Just n, _) | ismod what -> return $ MUUPMod $ ModInst n args
     _ -> failure
   where
     failure = hardfail "Got mixed elements of module and udp instatiation"
@@ -1280,12 +1276,12 @@ modudpInst = do
     mkmod i = case i of
       MUUPMod i -> i
       MUUPUDP _ -> unreachable
-      MUUPUkn (UknInst s r2 lv args) ->
-        ModInst s r2 $ PortPositional $ map (Attributed [] . Just) $ netlv2expr lv : NE.toList args
+      MUUPUkn (UknInst n lv args) ->
+        ModInst n $ PortPositional $ map (Attributed [] . Just) $ netlv2expr lv : NE.toList args
     mkudp i = case i of
       MUUPMod _ -> unreachable
       MUUPUDP i -> i
-      MUUPUkn (UknInst s r2 lv args) -> UDPInst s r2 lv args
+      MUUPUkn (UknInst n lv args) -> UDPInst (Just n) lv args
     mkukn i = case i of
       MUUPMod _ -> unreachable
       MUUPUDP _ -> unreachable
@@ -1470,32 +1466,24 @@ pathDecl mpc = getPosition >>= \p -> consume SymParenL *> trPathDecl p mpc
 -- | Timing check event
 edgeDesc :: Parser EdgeDesc
 edgeDesc = fbranch $ \t -> case t of
-  KWPosedge ->
-    Just $
-      return $
-        V.fromList
-          [True, True, False, False, False, False, False, True, False, False]
-  KWNegedge ->
-    Just $
-      return $
-        V.fromList
-          [False, False, False, True, True, False, True, False, False, False]
+  KWPosedge -> Just $ return $ V.fromList [True, True, False, False, False, True]
+  KWNegedge -> Just $ return $ V.fromList [False, False, True, True, True, False]
   KWEdge ->
     Just $
-      (V.replicate 10 False V.//) . NE.toList
+      (V.replicate 6 False V.//) . NE.toList
         <$> brackets
           ( csl1 $
               fproduce $ \t -> case t of
                 EdgeEdge BXZ0 BXZ1 -> Just (0, True)
                 EdgeEdge BXZ0 BXZX -> Just (1, True)
-                EdgeEdge BXZ0 BXZZ -> Just (2, True)
-                EdgeEdge BXZ1 BXZ0 -> Just (3, True)
-                EdgeEdge BXZ1 BXZX -> Just (4, True)
-                EdgeEdge BXZ1 BXZZ -> Just (5, True)
-                EdgeEdge BXZX BXZ0 -> Just (6, True)
-                EdgeEdge BXZX BXZ1 -> Just (7, True)
-                EdgeEdge BXZZ BXZ0 -> Just (8, True)
-                EdgeEdge BXZZ BXZ1 -> Just (9, True)
+                EdgeEdge BXZ0 BXZZ -> Just (1, True)
+                EdgeEdge BXZ1 BXZ0 -> Just (2, True)
+                EdgeEdge BXZ1 BXZX -> Just (3, True)
+                EdgeEdge BXZ1 BXZZ -> Just (3, True)
+                EdgeEdge BXZX BXZ0 -> Just (4, True)
+                EdgeEdge BXZX BXZ1 -> Just (5, True)
+                EdgeEdge BXZZ BXZ0 -> Just (4, True)
+                EdgeEdge BXZZ BXZ1 -> Just (5, True)
                 _ -> Nothing
           )
   _ -> Nothing
@@ -1524,40 +1512,39 @@ controlledTimingCheckEvent =
   ControlledTimingCheckEvent <$> edgeDesc <*> specTerm <*> optionMaybe timingCheckCond
 
 -- | Standard system timing check arguments
-optoptChain :: a -> b -> Parser a -> Parser b -> Parser (a, b)
-optoptChain dx dn px pn =
-  optConsume SymComma >>= \b -> if b then mkpair (option dx px) pn else return (dx, dn)
+optoptChain :: b -> Parser a -> Parser b -> Parser (Maybe a, b)
+optoptChain dn px pn =
+  optConsume SymComma >>= \b -> if b then mkpair (optionMaybe px) pn else return (Nothing, dn)
 
 comStcArgs :: Parser (TimingCheckEvent, TimingCheckEvent, Expr)
 comStcArgs =
   (,,) <$> timingCheckEvent <* consume SymComma <*> timingCheckEvent <* consume SymComma <*> expr
 
 stdStcArgs :: Parser STCArgs
-stdStcArgs =
-  comStcArgs >>= \(r, d, e) -> STCArgs d r e <$> option "" (consume SymComma *> option "" ident)
+stdStcArgs = do
+  (r, d, e) <- comStcArgs
+  STCArgs d r e <$> option Nothing (consume SymComma *> optionMaybe ident)
 
 addStcArgs :: Parser (STCArgs, STCAddArgs)
 addStcArgs = do
   (r, d, ll) <- comStcArgs
   consume SymComma
   lr <- expr
-  let def1 = (defaultIdM, defaultIdM)
+  let def1 = (Nothing, Nothing)
       def2 = (Nothing, def1)
       def3 = (Nothing, def2)
   (n, (sc, (cc, (dr, dd)))) <-
-    optoptChain "" def3 ident $
-      optoptChain Nothing def2 (optionMaybe (mtm expr)) $
-        optoptChain Nothing def1 (optionMaybe (mtm expr)) $
-          optoptChain defaultIdM defaultIdM cmtmRef $
-            option defaultIdM (consume SymComma *> option defaultIdM cmtmRef)
+    optoptChain def3 ident $
+      optoptChain def2 (mtm expr) $
+        optoptChain def1 (mtm expr) $
+          optoptChain Nothing cmtmRef $ option Nothing $ consume SymComma *> optionMaybe cmtmRef
   return (STCArgs d r ll n, STCAddArgs lr sc cc dr dd)
 
-skewStcArgs :: Parser (Identifier, Maybe CExpr, Maybe CExpr)
+skewStcArgs :: Parser (Maybe Identifier, Maybe CExpr, Maybe CExpr)
 skewStcArgs = do
   (n, (eb, ra)) <-
-    optoptChain "" (Nothing, Nothing) ident $
-      optoptChain Nothing Nothing (optionMaybe constExpr) $
-        option Nothing (consume SymComma *> optionMaybe constExpr)
+    optoptChain (Nothing, Nothing) ident $
+      optoptChain Nothing constExpr $ option Nothing $ consume SymComma *> optionMaybe constExpr
   return (n, eb, ra)
 
 -- | System timing check functions
@@ -1589,16 +1576,23 @@ stcfMap =
         SIPeriod <$> controlledTimingCheckEvent
           <* consume SymComma
           <*> expr
-          <*> option "" (consume SymComma *> option "" ident)
+          <*> option Nothing (consume SymComma *> optionMaybe ident)
       ),
       ( "width",
         do
           e <- controlledTimingCheckEvent
           consume SymComma
           tcl <- expr
-          (t, n) <- option (Nothing, "") $ do
+          (t, n) <- option (Nothing, Nothing) $ do
             consume SymComma
-            mkpair (Just <$> constExpr) (option "" $ consume SymComma *> option "" ident)
+            mkpair (Just <$> constExpr) $ option Nothing $ do
+              consume SymComma
+              pos <- getPosition
+              mid <- optionMaybe ident
+              if mid == Nothing
+                then warn pos "Optional $width notifier is a SystemVerilog feature"
+                else pure ()
+              return mid
           return $ SIWidth e tcl t n
       ),
       ( "nochange",
@@ -1609,7 +1603,7 @@ stcfMap =
           <*> mtm expr
           <* consume SymComma
           <*> mtm expr
-          <*> option "" (consume SymComma *> option "" ident)
+          <*> option Nothing (consume SymComma *> optionMaybe ident)
       )
     ]
 

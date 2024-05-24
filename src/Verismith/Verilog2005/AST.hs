@@ -15,7 +15,6 @@ module Verismith.Verilog2005.AST
     MinTypMax,
     Identifier (..),
     Identified (..),
-    defaultIdM,
     UnaryOperator (..),
     BinaryOperator (..),
     Number (..),
@@ -74,6 +73,7 @@ module Verismith.Verilog2005.AST
     MybStmt,
     NInputType (..),
     EdgeDesc (..),
+    InstanceName (..),
     GICMos (..),
     GIEnable (..),
     GIMos (..),
@@ -194,8 +194,6 @@ instance Show1 Identified where
   liftShowList fp _ = showListWith $ showHelper fp
 instance Eq1 Identified where
   liftEq f (Identified ia a) (Identified ib b) = ia == ib && f a b
-
-defaultIdM = Identified (Identifier "") Nothing
 
 -- | Unary operators
 data UnaryOperator
@@ -720,10 +718,13 @@ data NInputType = NITAnd | NITOr | NITXor
 instance Show NInputType where
   show x = case x of NITAnd -> "and"; NITOr -> "or"; NITXor -> "xor"
 
+-- | Instance name
+data InstanceName = InstanceName { _INIdent :: !Identifier, _INRange :: !(Maybe Range2) }
+  deriving (Show, Eq, Data, Generic)
+
 -- | Gate instances
 data GICMos = GICMos
-  { _gicmIdent :: !Identifier,
-    _gicmRange :: !(Maybe Range2),
+  { _gicmName :: !(Maybe InstanceName),
     _gicmOutput :: !NetLValue,
     _gicmInput :: !Expr,
     _gicmNControl :: !Expr,
@@ -732,8 +733,7 @@ data GICMos = GICMos
   deriving (Show, Eq, Data, Generic)
 
 data GIEnable = GIEnable
-  { _gieIdent :: !Identifier,
-    _gieRange :: !(Maybe Range2),
+  { _gieName :: !(Maybe InstanceName),
     _gieOutput :: !NetLValue,
     _gieInput :: !Expr,
     _gieEnable :: !Expr
@@ -741,8 +741,7 @@ data GIEnable = GIEnable
   deriving (Show, Eq, Data, Generic)
 
 data GIMos = GIMos
-  { _gimIdent :: !Identifier,
-    _gimRange :: !(Maybe Range2),
+  { _gimName :: !(Maybe InstanceName),
     _gimOutput :: !NetLValue,
     _gimInput :: !Expr,
     _gimEnable :: !Expr
@@ -750,24 +749,21 @@ data GIMos = GIMos
   deriving (Show, Eq, Data, Generic)
 
 data GINIn = GINIn
-  { _giniIdent :: !Identifier,
-    _giniRange :: !(Maybe Range2),
+  { _giniName :: !(Maybe InstanceName),
     _giniOutput :: !NetLValue,
     _giniInput :: !(NonEmpty Expr)
   }
   deriving (Show, Eq, Data, Generic)
 
 data GINOut = GINOut
-  { _ginoIdent :: !Identifier,
-    _ginoRange :: !(Maybe Range2),
+  { _ginoName :: !(Maybe InstanceName),
     _ginoOutput :: !(NonEmpty NetLValue),
     _ginoInput :: !Expr
   }
   deriving (Show, Eq, Data, Generic)
 
 data GIPassEn = GIPassEn
-  { _gipeIdent :: !Identifier,
-    _gipeRange :: !(Maybe Range2),
+  { _gipeName :: !(Maybe InstanceName),
     _gipeLhs :: !NetLValue,
     _gipeRhs :: !NetLValue,
     _gipeEnable :: !Expr
@@ -775,21 +771,19 @@ data GIPassEn = GIPassEn
   deriving (Show, Eq, Data, Generic)
 
 data GIPass = GIPass
-  { _gipsIdent :: !Identifier,
-    _gipsRange :: !(Maybe Range2),
+  { _gipsName :: !(Maybe InstanceName),
     _gipsLhs :: !NetLValue,
     _gipsRhs :: !NetLValue
   }
   deriving (Show, Eq, Data, Generic)
 
 data GIPull = GIPull
-  { _giplIdent :: !Identifier,
-    _giplRange :: !(Maybe Range2),
+  { _giplName :: !(Maybe InstanceName),
     _giplOutput :: !NetLValue
   }
   deriving (Show, Eq, Data, Generic)
 
--- | Edge descriptor, a 10 Bool array (01, 0x, 0z, 10, 1x, 1z, x0, x1, z0, z1)
+-- | Edge descriptor, a 6 Bool array (01, 0x, 10, 1x, x0, x1)
 type EdgeDesc = V.Vector Bool
 
 -- | Timing check (controlled) event
@@ -812,7 +806,7 @@ data STCArgs = STCArgs
   { _stcaDataEvent :: !TimingCheckEvent,
     _stcaRefEvent :: !TimingCheckEvent,
     _stcaTimChkLim :: !Expr,
-    _stcaNotifier :: !Identifier
+    _stcaNotifier :: !(Maybe Identifier)
   }
   deriving (Show, Eq, Data, Generic)
 
@@ -821,8 +815,8 @@ data STCAddArgs = STCAddArgs
   { _stcaaTimChkLim :: !Expr,
     _stcaaStampCond :: !(Maybe MinTypMax),
     _stcaaChkTimCond :: !(Maybe MinTypMax),
-    _stcaaDelayedRef :: !(Identified (Maybe CMinTypMax)),
-    _stcaaDelayedData :: !(Identified (Maybe CMinTypMax))
+    _stcaaDelayedRef :: !(Maybe (Identified (Maybe CMinTypMax))),
+    _stcaaDelayedData :: !(Maybe (Identified (Maybe CMinTypMax)))
   }
   deriving (Show, Eq, Data, Generic)
 
@@ -902,20 +896,20 @@ data SpecifyItem f
   | SIPeriod
       { _sipCRefEvent :: !ControlledTimingCheckEvent,
         _sipTimCtlLim :: !Expr,
-        _sipNotif :: !Identifier
+        _sipNotif :: !(Maybe Identifier)
       }
   | SIWidth
       { _siwRefEvent :: !ControlledTimingCheckEvent,
         _siwTimCtlLim :: !Expr,
         _siwThresh :: !(Maybe CExpr),
-        _siwNotif :: !Identifier
+        _siwNotif :: !(Maybe Identifier)
       }
   | SINoChange
       { _sincRefEvent :: !TimingCheckEvent,
         _sincDataEvent :: !TimingCheckEvent,
         _sincStartEdgeOff :: !MinTypMax,
         _sincEndEdgeOff :: !MinTypMax,
-        _sincNotif :: !Identifier
+        _sincNotif :: !(Maybe Identifier)
       }
 
 deriving instance (Show1 f, forall a. Show a => Show (f a)) => Show (SpecifyItem f)
@@ -999,25 +993,19 @@ data GenCaseItem = GenCaseItem {_gciPat :: !(NonEmpty CExpr), _gciVal :: !Genera
 
 -- | UDP named instantiation
 data UDPInst = UDPInst
-  { _udpiIdent :: !Identifier,
-    _udpiRange :: !(Maybe Range2),
+  { _udpiName :: !(Maybe InstanceName),
     _udpiLValue :: !NetLValue,
     _udpiArgs :: !(NonEmpty Expr)
   }
   deriving (Show, Eq, Data, Generic)
 
 -- | Module named instantiation
-data ModInst = ModInst
-  { _miIdent :: !Identifier,
-    _miRange :: !(Maybe Range2),
-    _miPort :: !PortAssign
-  }
+data ModInst = ModInst { _miName :: !InstanceName, _miPort :: !PortAssign }
   deriving (Show, Eq, Data, Generic)
 
 -- | Unknown named instantiation
 data UknInst = UknInst
-  { _uiIdent :: !Identifier,
-    _uiRange :: !(Maybe Range2),
+  { _uiName :: !InstanceName,
     _uiArg0 :: !NetLValue,
     _uiArgs :: !(NonEmpty Expr)
   }
@@ -1228,7 +1216,8 @@ data Edge
 instance Show Edge where
   show x = case x of
     EdgePos_neg b -> if b then "p" else "n"
-    EdgeDesc {_edFrom = f, _edTo = t} -> '(' : show f ++ show t ++ ")"
+    EdgeDesc LQ LQ -> "*"
+    EdgeDesc f t -> '(' : show f ++ show t ++ ")"
 
 -- | Seqential table inputs: a list of input levels with at most 1 edge specifier
 data SeqIn

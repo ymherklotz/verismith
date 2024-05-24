@@ -401,10 +401,10 @@ prettyEventControl x =
 
 prettyEdgeDesc :: EdgeDesc -> Doc
 prettyEdgeDesc x =
-  if x == V.fromList [True, True, False, False, False, False, False, True, False, False]
+  if x == V.fromList [True, True, False, False, False, True]
     then "posedge"
     else
-      if x == V.fromList [False, False, False, True, True, False, True, False, False, False]
+      if x == V.fromList [False, False, True, True, True, False]
         then "negedge"
         else group $ "edge" <=> brk (csl mempty mempty raw $ V.ifoldr pED [] x)
   where
@@ -412,15 +412,11 @@ prettyEdgeDesc x =
       if b
         then (:) $ case i of
           0 -> "01"
-          1 -> "0x"
-          2 -> "0z"
-          3 -> "10"
-          4 -> "1x"
-          5 -> "1z"
-          6 -> "x0"
-          7 -> "x1"
-          8 -> "z0"
-          9 -> "z1"
+          1 -> "0x" -- or 0z
+          2 -> "10"
+          3 -> "1x" -- or 1z
+          4 -> "x0" -- or z0
+          5 -> "x1" -- or z1
         else id
 
 prettyXparam :: Doc -> ComType () -> NonEmpty (Identified CMinTypMax) -> Doc
@@ -647,8 +643,8 @@ prettyModGenSingleItem x protect = case x of
   MGICMos r d3 l ->
     prettyItems
       (pift "r" r <> "cmos" <?=> pm (fst . prettyDelay3) d3)
-      ( \(GICMos s rng lv inp nc pc) ->
-          pidr s rng
+      ( \(GICMos n lv inp nc pc) ->
+          pm pname n
             <> gpar
               ( ngpadj prettyNetLV lv
                   <.> ngpadj prettyExpr inp
@@ -663,15 +659,15 @@ prettyModGenSingleItem x protect = case x of
           <?=> prettyDriveStrength ds
           <?=> pm (fst . prettyDelay3) d3
       )
-      ( \(GIEnable s r lv inp e) ->
-          pidr s r <> gpar (ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr e)
+      ( \(GIEnable n lv inp e) ->
+          pm pname n <> gpar (ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr e)
       )
       l
   MGIMos r np d3 l ->
     prettyItems
       (pift "r" r <> (if np then "n" else "p") <> "mos" <?=> pm (fst . prettyDelay3) d3)
-      ( \(GIMos s r lv inp e) ->
-          pidr s r <> gpar (ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr e)
+      ( \(GIMos n lv inp e) ->
+          pm pname n <> gpar (ngpadj prettyNetLV lv <.> ngpadj prettyExpr inp <.> ngpadj prettyExpr e)
       )
       l
   MGINIn nin n ds d2 l ->
@@ -680,39 +676,39 @@ prettyModGenSingleItem x protect = case x of
           <?=> prettyDriveStrength ds
           <?=> pm (fst . prettyDelay2) d2
       )
-      ( \(GINIn s rng lv inp) ->
-          pidr s rng <> gpar (ngpadj prettyNetLV lv <.> padj (cslid1 $ mkng prettyExpr) inp)
+      ( \(GINIn n lv inp) ->
+          pm pname n <> gpar (ngpadj prettyNetLV lv <.> padj (cslid1 $ mkng prettyExpr) inp)
       )
       l
   MGINOut r ds d2 l ->
     prettyItems
       ((if r then "not" else "buf") <?=> prettyDriveStrength ds <?=> pm (fst . prettyDelay2) d2)
-      ( \(GINOut s rng lv inp) ->
-          pidr s rng <> gpar (padj (cslid1 $ mkng prettyNetLV) lv <.> ngpadj prettyExpr inp)
+      ( \(GINOut n lv inp) ->
+          pm pname n <> gpar (padj (cslid1 $ mkng prettyNetLV) lv <.> ngpadj prettyExpr inp)
       )
       l
   MGIPassEn r oz d2 l ->
     prettyItems
       (pift "r" r <> "tranif" <> (if oz then "1" else "0") <?=> pm (fst . prettyDelay2) d2)
-      ( \(GIPassEn s r ll rl e) ->
-          pidr s r <> gpar (ngpadj prettyNetLV ll <.> ngpadj prettyNetLV rl <.> ngpadj prettyExpr e)
+      ( \(GIPassEn n ll rl e) ->
+          pm pname n <> gpar (ngpadj prettyNetLV ll <.> ngpadj prettyNetLV rl <.> ngpadj prettyExpr e)
       )
       l
   MGIPass r l ->
     prettyItems
       (pift "r" r <> "tran")
-      (\(GIPass s r ll rl) -> pidr s r <> gpar (ngpadj prettyNetLV ll <.> ngpadj prettyNetLV rl))
+      (\(GIPass n ll rl) -> pm pname n <> gpar (ngpadj prettyNetLV ll <.> ngpadj prettyNetLV rl))
       l
   MGIPull ud ds l ->
     prettyItems
       ("pull" <> (if ud then "up" else "down") <?=> prettyDriveStrength ds)
-      (\(GIPull s rng lv) -> pidr s rng <> gpar (gpadj prettyNetLV lv))
+      (\(GIPull n lv) -> pm pname n <> gpar (gpadj prettyNetLV lv))
       l
   MGIUDPInst kind ds d2 l ->
     prettyItems
       (rawId kind <?=> prettyDriveStrength ds <?=> pm (fst . prettyDelay2) d2)
-      ( \(UDPInst s rng lv args) ->
-          pidr s rng <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
+      ( \(UDPInst n lv args) ->
+          pm pname n <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
       )
       l
   MGIModInst kind param l ->
@@ -726,7 +722,7 @@ prettyModGenSingleItem x protect = case x of
               (\(Identified i e) -> ng $ dot <> padj prettyIdent i <> gpar (pm (padj prettyMTM) e))
               l
       )
-      (\(ModInst s rng args) -> pidr s rng <> gpar (prettyPortAssign args))
+      (\(ModInst n args) -> pname n <> gpar (prettyPortAssign args))
       l
   MGIUnknownInst kind param l ->
     prettyItems
@@ -735,8 +731,8 @@ prettyModGenSingleItem x protect = case x of
           Just (Left e) -> "#" <> par (padj prettyExpr e)
           Just (Right (e0, e1)) -> "#" <> par (gpadj prettyExpr e0 <.> gpadj prettyExpr e1)
       )
-      ( \(UknInst s rng lv args) ->
-          pidr s rng <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
+      ( \(UknInst n lv args) ->
+          pname n <> gpar (gpadj prettyNetLV lv <.> padj (cslid1 $ mkg prettyExpr) args)
       )
       l
   MGIInitial s -> "initial" <=> prettyAttrStmt protect s
@@ -750,8 +746,7 @@ prettyModGenSingleItem x protect = case x of
           r -> ng head <=> prettyGBlock (Identifier s) r
   MGICondItem ci -> prettyModGenCondItem ci protect -- protect should never be True in practice
   where
-    pidr (Identifier i) r =
-      piff (gpadj (padjWith prettyBS $ pm prettyRange2 r) i) $ B.null i
+    pname (InstanceName i r) = gpadj (padjWith prettyIdent $ pm prettyRange2 r) i
     mauto b = pift "automatic" b
     pidd (NetDecl i d) = padjWith prettyIdent (prettyR2s d) i
     pide (NetInit i e) = prettyEq (rawId i) $ prettyExpr e
@@ -879,8 +874,8 @@ prettySpecifyItem x =
   where
     toc :: [Doc] -> Doc
     toc = trailoptcat (<.>)
-    prid (Identifier s) = piff (comma <+> padj prettyBS s) $ B.null s
-    pid (Identifier s) = piff (padj prettyBS s) $ B.null s
+    prid = pm $ \s -> comma <+> padj prettyIdent s
+    pid = pm $ padj prettyIdent
     pexpr = gpadj prettyExpr
     pTCC st mbe = case mbe of
       Nothing -> gpadj prettySpecTerm st
@@ -889,8 +884,8 @@ prettySpecifyItem x =
     pTCE (TimingCheckEvent ev st tc) = ng $ pm prettyEdgeDesc ev <?=> pTCC st tc
     pCTCE (ControlledTimingCheckEvent ev st tc) = ng $ prettyEdgeDesc ev <?=> pTCC st tc
     ppA (STCArgs de re tcl n) = gpar $ pTCE re <.> pTCE de <.> pexpr tcl <> prid n
-    pIMTM (Identified i mr) =
-      ngpadj (padjWith prettyIdent $ pm (group . brk . padj prettyCMTM) mr) i
+    pIMTM = pm $
+      \(Identified i mr) -> ngpadj (padjWith prettyIdent $ pm (group . brk . padj prettyCMTM) mr) i
     ppAA (STCArgs de re tcl0 n) (STCAddArgs tcl1 msc mtc mdr mdd) =
       gpar $
         pTCE re <.> pTCE de <.> pexpr tcl0
