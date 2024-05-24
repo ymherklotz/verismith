@@ -9,7 +9,8 @@
 {-# LANGUAGE OverloadedLists #-}
 
 module Verismith.Verilog2005.Utils
-  ( regroup,
+  ( makeIdent,
+    regroup,
     addAttributed,
     genexprnumber,
     constifyIdent,
@@ -36,17 +37,29 @@ module Verismith.Verilog2005.Utils
 where
 
 import Numeric.Natural
+import Text.Printf (printf)
 import Data.Functor.Compose
 import Data.Functor.Identity
 import qualified Data.ByteString as BS
+import Data.ByteString.Internal (c2w, packChars)
 import qualified Data.HashSet as HS
 import Data.List.NonEmpty (NonEmpty (..), (<|), toList)
 import qualified Data.List.NonEmpty as NE
+import Verismith.Verilog2005.Lexer (VerilogVersion (..), isIdentSimple)
 import Verismith.Verilog2005.AST
 import Verismith.Utils (nonEmpty, foldrMap1)
 
-
 -- AST utils
+
+makeIdent :: BS.ByteString -> Identifier
+makeIdent s =
+  Identifier $
+    if isIdentSimple s
+      then s
+      else BS.cons (c2w '\\') $
+        BS.concatMap
+          (\w -> if 33 <= w && w <= 127 then BS.pack [w] else packChars $ printf "\\%02x" w)
+          s
 
 -- | Groups `x`s into `y`s by converting a single `x` and merging previous `x`s to the result
 regroup :: (x -> y) -> (x -> y -> Maybe y) -> NonEmpty x -> NonEmpty y

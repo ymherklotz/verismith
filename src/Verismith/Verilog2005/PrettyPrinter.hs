@@ -233,7 +233,7 @@ prettyPrim ppid ppr ppa x = case x of
     let da = ppa a in (if nullDoc da then padjWith else pspWith) ppid (da <?=> pcslid pexpr l) i
   PrimSysFun i l -> first (\x -> nest $ "$" <> x) $ padjWith prettyBS (pcslid pexpr l) i
   PrimMinTypMax m -> mkid $ par $ padj (prettyGMTM pexpr) m
-  PrimString x -> mkid $ raw x
+  PrimString x -> mkid $ raw $ let dq = c2w '\"' in B.cons dq $ B.snoc x dq
   where
     pexpr = prettyGExpr ppid ppr ppa 12
 

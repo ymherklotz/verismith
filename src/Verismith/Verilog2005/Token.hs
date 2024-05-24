@@ -35,7 +35,7 @@ import Text.Printf (printf)
 import Verismith.Utils
 
 data PosToken = PosToken
-  { _ptPos :: ![Position],
+  { _ptPos :: !(NonEmpty Position),
     _ptToken :: !Token
   }
   deriving (Eq)
@@ -61,12 +61,12 @@ data PSource
 
 instance Show PSource where
   show x = case x of
-    PSFile f -> " of file " ++ f
-    PSDefine t -> " of a macro replacement \"" ++ map w2c (LBS.unpack t) ++ "\""
-    PSLine f _ -> " of file " ++ f
+    PSFile f -> "file " ++ f
+    PSDefine t -> "macro replacement \"" ++ map w2c (LBS.unpack t) ++ "\""
+    PSLine f _ -> "file " ++ f
 
 instance Show Position where
-  show (Position l c s) = printf "line %d, column %d" l c ++ show s
+  show (Position l c s) = printf "line %d, column %d of " l c ++ show s
 
 helperShowPositions :: NonEmpty Position -> String
 helperShowPositions =
@@ -78,10 +78,7 @@ helperShowPositions =
         ++ b
 
 showWithPosition :: PosToken -> String
-showWithPosition (PosToken p t) =
-  show t ++ case p of
-    [] -> ""
-    h : t -> " at " ++ helperShowPositions (h :| t)
+showWithPosition (PosToken p t) = show t ++ " at " ++ helperShowPositions p
 
 data AFRNP = AFRNPA | AFRNPF | AFRNPR | AFRNPN | AFRNPP
   deriving (Eq, Ord, Data, Generic, NFData)
@@ -244,6 +241,10 @@ data Token
   | CDTSInt !Int
   | CDTSUnit !Int
   | CDUnconnecteddrive
+  | CDBeginKeywords
+  | CDEndKeywords
+-- | CDPragma
+-- | CDEndPragma
   | KWAlways
   | KWAnd
   | KWAssign
@@ -368,7 +369,7 @@ data Token
   | KWWor
   | KWXnor
   | KWXor
-  | TokEof
+  | TokSVKeyword !B.ByteString
   deriving (Eq, Data)
 
 instance Show Token where
@@ -377,7 +378,7 @@ instance Show Token where
     IdEscaped s -> unpackChars s
     IdSystem s -> '$' : unpackChars s
     LitReal s -> unpackChars s
-    LitString s -> unpackChars s
+    LitString s -> '"' : unpackChars s ++ "\""
     NumberBase s b -> '\'' : if s then 's' : show b else show b
     LitXZ b -> if b then "x" else "z"
     LitBinary l -> concatMap show l
@@ -443,6 +444,7 @@ instance Show Token where
     CDCelldefine -> "`celldefine"
     CDDefaultnettype -> "`default_nettype"
     CDEndcelldefine -> "`endcelldefine"
+    CDInclude -> "`include"
     CDNounconnecteddrive -> "`nounconnected_drive"
     CDResetall -> "`resetall"
     CDTimescale -> "`timescale"
@@ -450,6 +452,10 @@ instance Show Token where
     CDTSUnit i ->
       case i of { 0 -> ""; -1 -> "m"; -2 -> "u"; -3 -> "n"; -4 -> "p"; -5 -> "f" } ++ "s"
     CDUnconnecteddrive -> "`unconnected_drive"
+    CDBeginKeywords -> "`begin_keywords"
+    CDEndKeywords -> "`end_keywords"
+-- CDPragma
+-- CDEndPragma
     KWAlways -> "always"
     KWAnd -> "and"
     KWAssign -> "assign"
@@ -574,4 +580,4 @@ instance Show Token where
     KWWor -> "wor"
     KWXnor -> "xnor"
     KWXor -> "xor"
-    TokEof -> "end of file"
+    TokSVKeyword kw -> unpackChars kw

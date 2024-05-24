@@ -13,6 +13,8 @@ module Verismith.Verilog2005.Lexer
   ( scanTokens
   , parseDecimal
   , isKW
+  , isIdentSimple
+  , VerilogVersion (..)
   , makeString
   )
 where
@@ -96,7 +98,7 @@ tokens :-
 
   <0> {
     @real   { to LitReal   }
-    @string { to LitString }
+    @string { to (LitString . SBS.tail . SBS.init) }
     @simpleIdentifier  { toa kwident }
     @escapedIdentifier { to escSimpleIdent }
     @systemIdentifier  { to (IdSystem . SBS.tail) }
@@ -212,9 +214,24 @@ alexInputPrevChar = _aiPrevChar
 
 -- above was mandatory declarations for alex, below is the interesting stuff
 
+data VerilogVersion = SV2023 | SV2017 | SV2012 | SV2009 | SV2005 | V2005 | V2001 | V2001_nc | V1995
+
+instance Show VerilogVersion where
+  show x = case x of
+    SV2023 -> "1800-2023"
+    SV2017 -> "1800-2017"
+    SV2012 -> "1800-2012"
+    SV2009 -> "1800-2009"
+    SV2005 -> "1800-2005"
+    V2005 -> "1364-2005"
+    V2001 -> "1364-2001"
+    V2001_nc -> "1364-2001-noconfig"
+    V1995 -> "1364-1995"
+
 data AlexState = AlexState
   { _asStartCode  :: !Int,
     _asInput      :: !AlexInput,
+    _asKeywords   :: ![(NonEmpty Position, VerilogVersion)],
     -- LATER: User defined compiler directives support, the value (as in key/value) type is wrong
     _asDefines    :: !(HashMap.HashMap SBS.ByteString LBS.ByteString),
     _asSavedInput :: ![(Position, LBS.ByteString)]
@@ -223,10 +240,15 @@ data AlexState = AlexState
 type Alex = StateT AlexState (ExceptT String IO)
 
 scan :: Alex (Maybe PosToken)
-scan = get >>= \(AlexState sc inp d si) -> case alexScan inp sc of
+scan = get >>= \(AlexState sc inp kw d si) -> case alexScan inp sc of
   AlexEOF -> case si of
-    [] -> return Nothing
-    (p, i) : t -> put (AlexState sc (AlexInput p (_aiPrevChar inp) i) d t) >> scan
+    (p, i) : t -> put (AlexState sc (AlexInput p (_aiPrevChar inp) i) kw d t) >> scan
+    [] -> case kw of
+      [] -> return Nothing
+      (p, vv) : _ ->
+        throwError $
+          printf "Missing `end_keywords to match `begin_keywords %s at %s" (show vv) $
+            helperShowPositions p
   AlexError (AlexInput p pc i) ->
     throwError $
       printf
@@ -243,14 +265,14 @@ scanTokens f = do
   inp <- LBS.readFile f
   runExceptT $
     evalStateT loop $
-      AlexState 0 (AlexInput (Position 1 1 $ PSFile f) '\n' inp) HashMap.empty []
+      AlexState 0 (AlexInput (Position 1 1 $ PSFile f) '\n' inp) [] HashMap.empty []
   where
     loop = scan >>= maybe (pure []) (\x -> (x :) <$> loop)
 
 type AlexAction = Position -> SBS.ByteString -> Alex (Maybe PosToken)
 
 mkPos :: Position -> Token -> Alex (Maybe PosToken)
-mkPos p t = (\l -> Just $ PosToken (p : map fst l) t) <$> gets _asSavedInput
+mkPos p t = (\l -> Just $ PosToken (p :| map fst l) t) <$> gets _asSavedInput
 
 tok :: Token -> AlexAction
 tok t p _ = mkPos p t
@@ -267,10 +289,12 @@ sc n = modify' $ \s -> s { _asStartCode = n }
 startcode :: Int -> AlexAction -> AlexAction
 startcode n f p s = sc n >> f p s
 
+alexPosError :: (NonEmpty Position) -> String -> Alex a
+alexPosError p s =
+  throwError $ s ++ " at " ++ helperShowPositions p
+
 alexError :: Position -> String -> Alex a
-alexError p s = do
-  si <- gets _asSavedInput
-  throwError $ s ++ " at " ++ helperShowPositions (p :| map fst si)
+alexError p s = gets _asSavedInput >>= flip alexPosError s . (p :|) . map fst
 
 -- Lexer actions
 
@@ -376,33 +400,55 @@ cdcident p s = case HashMap.lookup (SBS.tail s) cdMap of
 kwident :: SBS.ByteString -> Alex Token
 kwident s = case SBS.stripPrefix "PATHPULSE$" s of
   Just ss -> return $ TknPP ss
-  Nothing -> HashMap.findWithDefault (return $ IdSimple s) s kwMap
+  Nothing -> do
+    vv <- gets _asKeywords
+    let m = HashMap.lookup s $ case vv of
+          (_, V1995) : _ -> kwV1995Map
+          (_, V2001) : _ -> kwV2001Map
+          (_, V2001_nc) : _ -> kwV2001NCMap
+          (_, SV2005) : _ -> kwSV2005Map
+          (_, SV2009) : _ -> kwSV2009Map
+          (_, SV2012) : _ -> kwSV2012Map
+          (_, SV2017) : _ -> kwSV2012Map
+          (_, SV2023) : _ -> kwSV2012Map
+          _ -> kwV2005Map
+    case m of
+      Nothing -> return $ if isKW s then IdEscaped $ SBS.cons (c2w '\\') s else IdSimple s
+      Just act -> act
 
-escSimpleIdent :: SBS.ByteString -> Token
-escSimpleIdent s = case SBS.uncons ss of
+isIdentSimple :: SBS.ByteString -> Bool
+isIdentSimple s = case SBS.uncons s of
   Just (c, t)
     | testfirst c
-      && not (isKW ss)
+      && not (isKW s)
       && SBS.all (\c -> testfirst c || (c2w '0' <= c && c <= c2w '9') || c == c2w '$') t
-    -> IdSimple ss
-  _ -> IdEscaped s
+    -> True
+  _ -> False
   where
     testfirst c = (c2w 'A' <= c && c <= c2w 'Z') || (c2w 'a' <= c && c <= c2w 'z') || c == c2w '_'
-    ss = SBS.tail s
+
+escSimpleIdent :: SBS.ByteString -> Token
+escSimpleIdent s = if isIdentSimple ss then IdSimple ss else IdEscaped s
+  where ss = SBS.tail s
 
 makeString :: String -> SBS.ByteString
-makeString s = packChars $ '"' : w s ++ "\""
-  where
-    w = concatMap $ \x -> case x of '"' -> "\\\""; '\\' -> "\\\\"; '\n' -> "\\n"; x -> [x]
+makeString s = packChars $ concatMap esc s
+  where esc c = case w2c $ c2w c of '"' -> "\\\""; '\\' -> "\\\\"; '\n' -> "\\n"; x -> [x]
 
 cdMap :: HashMap.HashMap SBS.ByteString (Position -> Alex (Maybe PosToken))
 cdMap = HashMap.fromList $
   ("include", includecompdir)
   -- LATER: `define would go here and change state to store input as is in _asDefines
   : ("line", linecompdir)
+  : ("begin_keywords", beginkwcompdir)
+  : ("end_keywords", endkwcompdir)
+  : ("undefineall", \_ -> modify' (\s -> s { _asDefines = HashMap.empty }) >> scan)
+  : ("__LINE__", \p -> mkPos p $ LitString $ packChars $ show $ _posLine p)
+  : ("__FILE__", \p -> mkPos p $ LitString $ makeString $ show $ _posSource p)
   : map (\(x, y) -> (x, \p -> y >>= mkPos p))
     ( ("timescale", sc ts0 >> return CDTimescale)
       : ("resetall", modify' (\s -> s { _asDefines = HashMap.empty }) >> return CDResetall)
+      -- , ("pragma", >> return CDPragma) -- TODO: Another layer of hell
       : map (\(x, y) -> (x, return y))
         [ ("celldefine", CDCelldefine)
         , ("default_nettype", CDDefaultnettype)
@@ -414,30 +460,29 @@ cdMap = HashMap.fromList $
         -- , ("delay_mode_zero", CDUnknown)
         , ("endcelldefine", CDEndcelldefine)
         , ("nounconnected_drive", CDNounconnecteddrive)
-        -- , ("pragma", CDPragma) -- Another layer of hell
         , ("unconnected_drive", CDUnconnecteddrive)
         ]
     )
 
 includecompdir :: Position -> Alex (Maybe PosToken)
 includecompdir _ = do
-  AlexState oldsc (AlexInput oldp _ _) _ _ <- get
+  oldsc <- gets _asStartCode
   sc 0
   t <- scan
   case t of
     Nothing -> return Nothing
     Just (PosToken _ (LitString s)) -> do
-      let f = tail $ unpackChars $ SBS.init s
+      let f = unpackChars s
       -- LATER: search for file
       i <- liftIO $ LBS.readFile f
-      modify' $ \(AlexState _ (AlexInput p pc bs) d si) ->
-        AlexState oldsc (AlexInput (Position 1 1 $ PSFile f) pc i) d $ (p, bs) : si
+      modify' $ \(AlexState _ (AlexInput p pc bs) kw d si) ->
+        AlexState oldsc (AlexInput (Position 1 1 $ PSFile f) pc i) kw d $ (p, bs) : si
       scan
-    _ -> alexError oldp "Expected a filename to include"
+    Just (PosToken p _) -> alexPosError p "Expected a filename to include"
 
 linecompdir :: Position -> Alex (Maybe PosToken)
 linecompdir _ = do
-  AlexState oldsc (AlexInput oldp _ _) _ _ <- get
+  oldsc <- gets _asStartCode
   sc 0
   l <- scan
   f <- scan
@@ -446,152 +491,363 @@ linecompdir _ = do
     Nothing -> return Nothing
     Just (PosToken _ (LitDecimal l), PosToken _ (LitString s), PosToken _ (LitDecimal n))
       | n < 3 -> do
-        modify' $ \(AlexState _ (AlexInput p pc bs) d si) ->
+        modify' $ \(AlexState _ (AlexInput p pc bs) kw d si) ->
           AlexState
             oldsc
             (AlexInput (Position (naturalToWord l - 1) 1 $ PSLine (unpackChars s) (n == 1)) pc bs)
+            kw
             d
             ((p, "") : if n /= 2 then si else smashline si)
         scan
-    _ -> alexError
-      oldp
-      "Expected a number, a filename and a number between 0 and 2 to override position"
+    Just (PosToken _ (LitDecimal _), PosToken _ (LitString _), PosToken p _) ->
+      alexPosError p "Expected a number between 0 and 2 to override position"
+    Just (PosToken _ (LitDecimal _), PosToken p _, _) ->
+      alexPosError p "Expected a filename and a number between 0 and 2 to override position"
+    Just (PosToken p _, _, _) ->
+      alexPosError
+        p
+        "Expected a number, a filename and a number between 0 and 2 to override position"
   where
     smashline l =
       case dropWhile (\(p, _) -> case _posSource p of PSLine _ b -> not b; _ -> False) l of
         (Position _ _ (PSLine _ True), _) : t -> t
         ll -> ll
 
-isKW :: SBS.ByteString -> Bool
-isKW s = HashMap.member s kwMap
+beginkwcompdir :: Position -> Alex (Maybe PosToken)
+beginkwcompdir _ = do
+  oldsc <- gets _asStartCode
+  sc 0
+  t <- scan
+  case t of
+    Nothing -> return Nothing
+    Just (PosToken p (LitString s)) -> case versionFromString s of
+      Nothing -> alexPosError p "Expected a standard number string (ex. 1364-2005)"
+      Just vv -> do
+        modify' $ \(AlexState _ i kw d si) -> AlexState oldsc i ((p, vv) : kw) d si
+        return $ Just $ PosToken p CDBeginKeywords
+    Just (PosToken p _) -> alexPosError p "Expected a standard number string (ex. 1364-2005)"
+  where
+    versionFromString s = case splitAt 5 $ unpackChars s of
+      ("1800-", '2' : '0' : year) -> case year of
+        "05" -> Just SV2005
+        "09" -> Just SV2009
+        "12" -> Just SV2012
+        "17" -> Just SV2017
+        "23" -> Just SV2023
+        _ -> Nothing
+      ("1364-", year) -> case year of
+        "1995" -> Just V1995
+        "2001" -> Just V2001
+        "2001-noconfig" -> Just V2001_nc
+        "2005" -> Just V2005
+        _ -> Nothing
+      _ -> Nothing
 
-kwMap :: HashMap.HashMap SBS.ByteString (Alex Token)
-kwMap = HashMap.fromList
-  $ ("edge", sc edge >> return KWEdge)
-  : ("endtable", sc 0 >> return KWEndtable)
-  : ("table", sc table >> return KWTable)
-  : map (\(x, y) -> (x, return y))
-  [ ("always", KWAlways)
-  , ("and", KWAnd)
-  , ("assign", KWAssign)
-  , ("automatic", KWAutomatic)
-  , ("begin", KWBegin)
-  , ("buf", KWBuf)
-  , ("bufif0", KWBufif0)
-  , ("bufif1", KWBufif1)
-  , ("case", KWCase)
-  , ("casex", KWCasex)
-  , ("casez", KWCasez)
-  , ("cell", KWCell)
-  , ("cmos", KWCmos)
-  , ("config", KWConfig)
-  , ("deassign", KWDeassign)
-  , ("default", KWDefault)
-  , ("defparam", KWDefparam)
-  , ("design", KWDesign)
-  , ("disable", KWDisable)
-  , ("else", KWElse)
-  , ("end", KWEnd)
-  , ("endcase", KWEndcase)
-  , ("endconfig", KWEndconfig)
-  , ("endfunction", KWEndfunction)
-  , ("endgenerate", KWEndgenerate)
-  , ("endmodule", KWEndmodule)
-  , ("endprimitive", KWEndprimitive)
-  , ("endspecify", KWEndspecify)
-  , ("endtask", KWEndtask)
-  , ("event", KWEvent)
-  , ("for", KWFor)
-  , ("force", KWForce)
-  , ("forever", KWForever)
-  , ("fork", KWFork)
-  , ("function", KWFunction)
-  , ("generate", KWGenerate)
-  , ("genvar", KWGenvar)
-  , ("highz0", KWHighz0)
-  , ("highz1", KWHighz1)
-  , ("if", KWIf)
-  , ("ifnone", KWIfnone)
-  , ("incdir", KWIncdir)
-  , ("include", KWInclude)
-  , ("initial", KWInitial)
-  , ("inout", KWInout)
-  , ("input", KWInput)
-  , ("instance", KWInstance)
-  , ("integer", KWInteger)
-  , ("join", KWJoin)
-  , ("large", KWLarge)
-  , ("liblist", KWLiblist)
-  , ("library", KWLibrary)
-  , ("localparam", KWLocalparam)
-  , ("macromodule", KWMacromodule)
-  , ("medium", KWMedium)
-  , ("module", KWModule)
-  , ("nand", KWNand)
-  , ("negedge", KWNegedge)
-  , ("nmos", KWNmos)
-  , ("nor", KWNor)
-  , ("noshowcancelled", KWNoshowcancelled)
-  , ("not", KWNot)
-  , ("notif0", KWNotif0)
-  , ("notif1", KWNotif1)
-  , ("or", KWOr)
-  , ("output", KWOutput)
-  , ("parameter", KWParameter)
-  , ("pmos", KWPmos)
-  , ("posedge", KWPosedge)
-  , ("primitive", KWPrimitive)
-  , ("pull0", KWPull0)
-  , ("pull1", KWPull1)
-  , ("pulldown", KWPulldown)
-  , ("pullup", KWPullup)
-  , ("pulsestyle_onevent", KWPulsestyleonevent)
-  , ("pulsestyle_ondetect", KWPulsestyleondetect)
-  , ("rcmos", KWRcmos)
-  , ("real", KWReal)
-  , ("realtime", KWRealtime)
-  , ("reg", KWReg)
-  , ("release", KWRelease)
-  , ("repeat", KWRepeat)
-  , ("rnmos", KWRnmos)
-  , ("rpmos", KWRpmos)
-  , ("rtran", KWRtran)
-  , ("rtranif0", KWRtranif0)
-  , ("rtranif1", KWRtranif1)
-  , ("scalared", KWScalared)
-  , ("showcancelled", KWShowcancelled)
-  , ("signed", KWSigned)
-  , ("small", KWSmall)
-  , ("specify", KWSpecify)
-  , ("specparam", KWSpecparam)
-  , ("strong0", KWStrong0)
-  , ("strong1", KWStrong1)
-  , ("supply0", KWSupply0)
-  , ("supply1", KWSupply1)
-  , ("task", KWTask)
-  , ("time", KWTime)
-  , ("tran", KWTran)
-  , ("tranif0", KWTranif0)
-  , ("tranif1", KWTranif1)
-  , ("tri", KWTri)
-  , ("tri0", KWTri0)
-  , ("tri1", KWTri1)
-  , ("triand", KWTriand)
-  , ("trior", KWTrior)
-  , ("trireg", KWTrireg)
-  , ("unsigned", KWUnsigned)
-  , ("use", KWUse)
-  , ("uwire", KWUwire)
-  , ("vectored", KWVectored)
-  , ("wait", KWWait)
-  , ("wand", KWWand)
-  , ("weak0", KWWeak0)
-  , ("weak1", KWWeak1)
-  , ("while", KWWhile)
-  , ("wire", KWWire)
-  , ("wor", KWWor)
-  , ("xnor", KWXnor)
-  , ("xor", KWXor)
+endkwcompdir :: Position -> Alex (Maybe PosToken)
+endkwcompdir p = do
+  mkw <- gets _asKeywords
+  case mkw of
+    [] -> alexError p "`end_kewords encountered without a previous matching `begin_keywords"
+    _ : kw -> modify' (\s -> s { _asKeywords = kw }) >> mkPos p CDEndKeywords
+
+isKW :: SBS.ByteString -> Bool
+isKW s = HashMap.member s kwSV2012Map
+
+kwV1995 :: [(SBS.ByteString, Alex Token)]
+kwV1995 =
+  [ ("always", pure KWAlways),
+    ("and", pure KWAnd),
+    ("assign", pure KWAssign),
+    ("begin", pure KWBegin),
+    ("buf", pure KWBuf),
+    ("bufif0", pure KWBufif0),
+    ("bufif1", pure KWBufif1),
+    ("case", pure KWCase),
+    ("casex", pure KWCasex),
+    ("casez", pure KWCasez),
+    ("cmos", pure KWCmos),
+    ("deassign", pure KWDeassign),
+    ("default", pure KWDefault),
+    ("defparam", pure KWDefparam),
+    ("disable", pure KWDisable),
+    ("edge", sc edge >> pure KWEdge),
+    ("else", pure KWElse),
+    ("end", pure KWEnd),
+    ("endcase", pure KWEndcase),
+    ("endfunction", pure KWEndfunction),
+    ("endmodule", pure KWEndmodule),
+    ("endprimitive", pure KWEndprimitive),
+    ("endspecify", pure KWEndspecify),
+    ("endtable", sc 0 >> pure KWEndtable),
+    ("endtask", pure KWEndtask),
+    ("event", pure KWEvent),
+    ("for", pure KWFor),
+    ("force", pure KWForce),
+    ("forever", pure KWForever),
+    ("fork", pure KWFork),
+    ("function", pure KWFunction),
+    ("highz0", pure KWHighz0),
+    ("highz1", pure KWHighz1),
+    ("if", pure KWIf),
+    ("ifnone", pure KWIfnone),
+    ("initial", pure KWInitial),
+    ("inout", pure KWInout),
+    ("input", pure KWInput),
+    ("integer", pure KWInteger),
+    ("join", pure KWJoin),
+    ("large", pure KWLarge),
+    ("macromodule", pure KWMacromodule),
+    ("medium", pure KWMedium),
+    ("module", pure KWModule),
+    ("nand", pure KWNand),
+    ("negedge", pure KWNegedge),
+    ("nmos", pure KWNmos),
+    ("nor", pure KWNor),
+    ("not", pure KWNot),
+    ("notif0", pure KWNotif0),
+    ("notif1", pure KWNotif1),
+    ("or", pure KWOr),
+    ("output", pure KWOutput),
+    ("parameter", pure KWParameter),
+    ("pmos", pure KWPmos),
+    ("posedge", pure KWPosedge),
+    ("primitive", pure KWPrimitive),
+    ("pull0", pure KWPull0),
+    ("pull1", pure KWPull1),
+    ("pulldown", pure KWPulldown),
+    ("pullup", pure KWPullup),
+    ("rcmos", pure KWRcmos),
+    ("real", pure KWReal),
+    ("realtime", pure KWRealtime),
+    ("reg", pure KWReg),
+    ("release", pure KWRelease),
+    ("repeat", pure KWRepeat),
+    ("rnmos", pure KWRnmos),
+    ("rpmos", pure KWRpmos),
+    ("rtran", pure KWRtran),
+    ("rtranif0", pure KWRtranif0),
+    ("rtranif1", pure KWRtranif1),
+    ("scalared", pure KWScalared),
+    ("small", pure KWSmall),
+    ("specify", pure KWSpecify),
+    ("specparam", pure KWSpecparam),
+    ("strong0", pure KWStrong0),
+    ("strong1", pure KWStrong1),
+    ("supply0", pure KWSupply0),
+    ("supply1", pure KWSupply1),
+    ("table", sc table >> pure KWTable),
+    ("task", pure KWTask),
+    ("time", pure KWTime),
+    ("tran", pure KWTran),
+    ("tranif0", pure KWTranif0),
+    ("tranif1", pure KWTranif1),
+    ("tri", pure KWTri),
+    ("tri0", pure KWTri0),
+    ("tri1", pure KWTri1),
+    ("triand", pure KWTriand),
+    ("trior", pure KWTrior),
+    ("trireg", pure KWTrireg),
+    ("vectored", pure KWVectored),
+    ("wait", pure KWWait),
+    ("wand", pure KWWand),
+    ("weak0", pure KWWeak0),
+    ("weak1", pure KWWeak1),
+    ("while", pure KWWhile),
+    ("wire", pure KWWire),
+    ("wor", pure KWWor),
+    ("xnor", pure KWXnor),
+    ("xor", pure KWXor)
   ]
+
+kwV2001_nc :: [(SBS.ByteString, Alex Token)]
+kwV2001_nc =
+  ("automatic", pure KWAutomatic)
+  : ("endgenerate", pure KWEndgenerate)
+  : ("generate", pure KWGenerate)
+  : ("genvar", pure KWGenvar)
+  : ("localparam", pure KWLocalparam)
+  : ("noshowcancelled", pure KWNoshowcancelled)
+  : ("pulsestyle_ondetect", pure KWPulsestyleondetect)
+  : ("pulsestyle_onevent", pure KWPulsestyleonevent)
+  : ("showcancelled", pure KWShowcancelled)
+  : ("signed", pure KWSigned)
+  : ("unsigned", pure KWUnsigned)
+  : kwV1995
+
+kwV2001 :: [(SBS.ByteString, Alex Token)]
+kwV2001 =
+  ("cell", pure KWCell)
+  : ("config", pure KWConfig)
+  : ("design", pure KWDesign)
+  : ("endconfig", pure KWEndconfig)
+  : ("incdir", pure KWIncdir)
+  : ("include", pure KWInclude)
+  : ("instance", pure KWInstance)
+  : ("liblist", pure KWLiblist)
+  : ("library", pure KWLibrary)
+  : ("use", pure KWUse)
+  : kwV2001_nc
+
+kwV2005 :: [(SBS.ByteString, Alex Token)]
+kwV2005 =
+  ("uwire", pure KWUwire)
+  : kwV2001
+
+kwSV2005 :: [(SBS.ByteString, Alex Token)]
+kwSV2005 =
+  ("alias", pure $ TokSVKeyword "alias")
+  : ("always_comb", pure $ TokSVKeyword "always_comb")
+  : ("always_ff", pure $ TokSVKeyword "always_ff")
+  : ("always_latch", pure $ TokSVKeyword "always_latch")
+  : ("assert", pure $ TokSVKeyword "assert")
+  : ("assume", pure $ TokSVKeyword "assume")
+  : ("before", pure $ TokSVKeyword "before")
+  : ("bind", pure $ TokSVKeyword "bind")
+  : ("bins", pure $ TokSVKeyword "bins")
+  : ("binsof", pure $ TokSVKeyword "binsof")
+  : ("bit", pure $ TokSVKeyword "bit")
+  : ("break", pure $ TokSVKeyword "break")
+  : ("byte", pure $ TokSVKeyword "byte")
+  : ("chandle", pure $ TokSVKeyword "chandle")
+  : ("class", pure $ TokSVKeyword "class")
+  : ("clocking", pure $ TokSVKeyword "clocking")
+  : ("const", pure $ TokSVKeyword "const")
+  : ("constraint", pure $ TokSVKeyword "constraint")
+  : ("context", pure $ TokSVKeyword "context")
+  : ("continue", pure $ TokSVKeyword "continue")
+  : ("cover", pure $ TokSVKeyword "cover")
+  : ("covergroup", pure $ TokSVKeyword "covergroup")
+  : ("coverpoint", pure $ TokSVKeyword "coverpoint")
+  : ("cross", pure $ TokSVKeyword "cross")
+  : ("dist", pure $ TokSVKeyword "dist")
+  : ("do", pure $ TokSVKeyword "do")
+  : ("endclass", pure $ TokSVKeyword "endclass")
+  : ("endclocking", pure $ TokSVKeyword "endclocking")
+  : ("endgroup", pure $ TokSVKeyword "endgroup")
+  : ("endinterface", pure $ TokSVKeyword "endinterface")
+  : ("endpackage", pure $ TokSVKeyword "endpackage")
+  : ("endprogram", pure $ TokSVKeyword "endprogram")
+  : ("endproperty", pure $ TokSVKeyword "endproperty")
+  : ("endsequence", pure $ TokSVKeyword "endsequence")
+  : ("enum", pure $ TokSVKeyword "enum")
+  : ("expect", pure $ TokSVKeyword "expect")
+  : ("export", pure $ TokSVKeyword "export")
+  : ("extends", pure $ TokSVKeyword "extends")
+  : ("extern", pure $ TokSVKeyword "extern")
+  : ("final", pure $ TokSVKeyword "final")
+  : ("first_match", pure $ TokSVKeyword "first_match")
+  : ("foreach", pure $ TokSVKeyword "foreach")
+  : ("forkjoin", pure $ TokSVKeyword "forkjoin")
+  : ("iff", pure $ TokSVKeyword "iff")
+  : ("ignore_bins", pure $ TokSVKeyword "ignore_bins")
+  : ("illegal_bins", pure $ TokSVKeyword "illegal_bins")
+  : ("import", pure $ TokSVKeyword "import")
+  : ("inside", pure $ TokSVKeyword "inside")
+  : ("int", pure $ TokSVKeyword "int")
+  : ("interface", pure $ TokSVKeyword "interface")
+  : ("intersect", pure $ TokSVKeyword "intersect")
+  : ("join_any", pure $ TokSVKeyword "join_any")
+  : ("join_none", pure $ TokSVKeyword "join_none")
+  : ("local", pure $ TokSVKeyword "local")
+  : ("logic", pure $ TokSVKeyword "logic")
+  : ("longint", pure $ TokSVKeyword "longint")
+  : ("matches", pure $ TokSVKeyword "matches")
+  : ("modport", pure $ TokSVKeyword "modport")
+  : ("new", pure $ TokSVKeyword "new")
+  : ("null", pure $ TokSVKeyword "null")
+  : ("package", pure $ TokSVKeyword "package")
+  : ("packed", pure $ TokSVKeyword "packed")
+  : ("priority", pure $ TokSVKeyword "priority")
+  : ("program", pure $ TokSVKeyword "program")
+  : ("property", pure $ TokSVKeyword "property")
+  : ("protected", pure $ TokSVKeyword "protected")
+  : ("pure", pure $ TokSVKeyword "pure")
+  : ("rand", pure $ TokSVKeyword "rand")
+  : ("randc", pure $ TokSVKeyword "randc")
+  : ("randcase", pure $ TokSVKeyword "randcase")
+  : ("randsequence", pure $ TokSVKeyword "randsequence")
+  : ("ref", pure $ TokSVKeyword "ref")
+  : ("return", pure $ TokSVKeyword "return")
+  : ("sequence", pure $ TokSVKeyword "sequence")
+  : ("shortint", pure $ TokSVKeyword "shortint")
+  : ("shortreal", pure $ TokSVKeyword "shortreal")
+  : ("solve", pure $ TokSVKeyword "solve")
+  : ("static", pure $ TokSVKeyword "static")
+  : ("string", pure $ TokSVKeyword "string")
+  : ("struct", pure $ TokSVKeyword "struct")
+  : ("super", pure $ TokSVKeyword "super")
+  : ("tagged", pure $ TokSVKeyword "tagged")
+  : ("this", pure $ TokSVKeyword "this")
+  : ("throughout", pure $ TokSVKeyword "throughout")
+  : ("timeprecision", pure $ TokSVKeyword "timeprecision")
+  : ("timeunit", pure $ TokSVKeyword "timeunit")
+  : ("type", pure $ TokSVKeyword "type")
+  : ("typedef", pure $ TokSVKeyword "typedef")
+  : ("union", pure $ TokSVKeyword "union")
+  : ("unique", pure $ TokSVKeyword "unique")
+  : ("var", pure $ TokSVKeyword "var")
+  : ("virtual", pure $ TokSVKeyword "virtual")
+  : ("void", pure $ TokSVKeyword "void")
+  : ("wait_order", pure $ TokSVKeyword "wait_order")
+  : ("wildcard", pure $ TokSVKeyword "wildcard")
+  : ("with", pure $ TokSVKeyword "with")
+  : ("within", pure $ TokSVKeyword "within")
+  : kwV2005
+
+kwSV2009 :: [(SBS.ByteString, Alex Token)]
+kwSV2009 =
+  ("accept_on", pure $ TokSVKeyword "accept_on")
+  : ("checker", pure $ TokSVKeyword "checker")
+  : ("endchecker", pure $ TokSVKeyword "endchecker")
+  : ("eventually", pure $ TokSVKeyword "eventually")
+  : ("global", pure $ TokSVKeyword "global")
+  : ("implies", pure $ TokSVKeyword "implies")
+  : ("let", pure $ TokSVKeyword "let")
+  : ("nexttime", pure $ TokSVKeyword "nexttime")
+  : ("reject_on", pure $ TokSVKeyword "reject_on")
+  : ("restrict", pure $ TokSVKeyword "restrict")
+  : ("s_always", pure $ TokSVKeyword "s_always")
+  : ("s_eventually", pure $ TokSVKeyword "s_eventually")
+  : ("s_nexttime", pure $ TokSVKeyword "s_nexttime")
+  : ("s_until", pure $ TokSVKeyword "s_until")
+  : ("s_until_with", pure $ TokSVKeyword "s_until_with")
+  : ("strong", pure $ TokSVKeyword "strong")
+  : ("sync_accept_on", pure $ TokSVKeyword "sync_accept_on")
+  : ("sync_reject_on", pure $ TokSVKeyword "sync_reject_on")
+  : ("unique0", pure $ TokSVKeyword "unique0")
+  : ("until", pure $ TokSVKeyword "until")
+  : ("until_with", pure $ TokSVKeyword "until_with")
+  : ("untyped", pure $ TokSVKeyword "untyped")
+  : ("weak", pure $ TokSVKeyword "weak")
+  : kwSV2005
+
+kwSV2012 :: [(SBS.ByteString, Alex Token)]
+kwSV2012 =
+  ("implements", pure $ TokSVKeyword "implements")
+  : ("interconnect", pure $ TokSVKeyword "interconnect")
+  : ("nettype", pure $ TokSVKeyword "nettype")
+  : ("soft", pure $ TokSVKeyword "soft")
+  : kwSV2009
+
+kwV1995Map :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwV1995Map = HashMap.fromList kwV1995
+
+kwV2001Map :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwV2001Map = HashMap.fromList kwV2001
+
+kwV2001NCMap :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwV2001NCMap = HashMap.fromList kwV2001_nc
+
+kwV2005Map :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwV2005Map = HashMap.fromList kwV2005
+
+kwSV2005Map :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwSV2005Map = HashMap.fromList kwSV2005
+
+kwSV2009Map :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwSV2009Map = HashMap.fromList kwSV2009
+
+kwSV2012Map :: HashMap.HashMap SBS.ByteString (Alex Token)
+kwSV2012Map = HashMap.fromList kwSV2012
 
 }
