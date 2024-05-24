@@ -204,7 +204,7 @@ garbagePrim ident grng gattr =
       mknum $ NHex <$> sampleNE (e _geoHexadecimalSymbols) (sampleEnum $ e _geoHexadecimalSymbol),
       (0, PrimReal <$> garbageReal),
       ( 0,
-        PrimString . makeString
+        PrimString . makeString . map w2c
           <$> sampleN (e _geoStringCharacters) (sampleEnum $ e _geoStringCharacter)
       ),
       (0, PrimIdent <$> ident <*> tameExprRecursion grng),

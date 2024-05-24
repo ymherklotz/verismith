@@ -93,11 +93,11 @@ mkActionMap =
 -- | Updates the position information
 nextPos :: SourcePos -> PosToken -> [PosToken] -> SourcePos
 nextPos pos _ ptl = case ptl of
-  PosToken (Position l c (PSDefine _) : _) _ : _ ->
+  PosToken (Position l c (PSDefine _) :| _) _ : _ ->
     setSourceColumn (setSourceLine pos $ fromEnum l) $ fromEnum c
-  PosToken (Position l c (PSFile f) : _) _ : _ -> newPos f (fromEnum l) (fromEnum c)
-  PosToken (Position l c (PSLine f _) : _) _ : _ -> newPos f (fromEnum l) (fromEnum c)
-  _ -> pos
+  PosToken (Position l c (PSFile f) :| _) _ : _ -> newPos f (fromEnum l) (fromEnum c)
+  PosToken (Position l c (PSLine f _) :| _) _ : _ -> newPos f (fromEnum l) (fromEnum c)
+  [] -> pos
 
 -- | Parse exactly one token and produce a value
 producePrim :: (Token -> Maybe a) -> Parser a
@@ -1855,12 +1855,15 @@ compDir = fbranch $ \t -> case t of
     poff <- fproduce $ \t -> case t of CDTSInt i -> Just i; _ -> Nothing
     pbase <- fproduce $ \t -> case t of CDTSUnit i -> Just i; _ -> Nothing
     modifyState $ lcdTimescale .~ Just (ubase + uoff, pbase + poff)
+  CDBeginKeywords -> Just $ pure () -- handled at lexing, this makes sure it is used outside modules
+  CDEndKeywords -> Just $ pure () -- same as above
   _ -> Nothing
 
 -- | Parses a top-level declaration: config, module or primitive block
 topDecl :: Parser Verilog2005
 topDecl =
   skipMany1 compDir *> return mempty <|> do
+    -- I'm not sure whether these compiler directives are allowed here
     a <- concat <$> many (attributeOne <* skipMany compDir)
     st <- getState
     fpbranch $ \p t -> case t of
