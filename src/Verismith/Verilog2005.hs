@@ -13,13 +13,11 @@ module Verismith.Verilog2005
     NumberProbability,
     CategoricalProbability,
     Verilog2005 (..),
-    renameTopItems,
   )
 where
 
 import Verismith.Config (CategoricalProbability (..), NumberProbability (..))
 import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.Generator
-import Verismith.Verilog2005.Mutation
 import Verismith.Verilog2005.Parser
 import Verismith.Verilog2005.PrettyPrinter
