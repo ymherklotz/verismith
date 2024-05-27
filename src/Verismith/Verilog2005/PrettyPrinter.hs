@@ -956,7 +956,7 @@ prettyPortInter =
       _ ->
         if B.null ii
           then portexpr l
-          else mkid $ dot <> padj prettyIdent i <> gpar (padj portexpr l)
+          else mkid $ ng $ dot <> padj prettyIdent i <> gpar (padj portexpr l)
   where
     pst (Identified i x) = prettySpecTerm $ SpecTerm i x
     portexpr :: PrettyIdent [Identified (Maybe CRangeExpr)]
