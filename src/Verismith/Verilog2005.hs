@@ -13,6 +13,7 @@ module Verismith.Verilog2005
     NumberProbability,
     CategoricalProbability,
     Verilog2005 (..),
+    PrintingOpts (..)
   )
 where
 

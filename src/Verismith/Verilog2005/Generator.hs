@@ -839,8 +839,8 @@ garbageSpecifyItem =
     gmce = sampleMaybe (t _gstcoOptionalArg) garbageCExpr
     gtcc = mkpair (sampleBernoulli $ t _gstcoCondNeg_Pos) garbageExpr
     ged = do
-      v <- VU.replicateM 10 (sampleBernoulli $ t _gstcoEventEdge)
-      return (if VU.or v then v else VU.replicate 10 True)
+      v <- VU.replicateM 6 (sampleBernoulli $ t _gstcoEventEdge)
+      return (if VU.or v then v else VU.replicate 6 True)
     gtce =
       TimingCheckEvent <$> sampleMaybe (t _gstcoEvent) ged
         <*> garbageSpecTerm

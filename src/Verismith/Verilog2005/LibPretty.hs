@@ -51,9 +51,6 @@ module Verismith.Verilog2005.LibPretty
     group,
     ng,
     block,
-    pm,
-    pf,
-    pl,
     layout,
   )
 where
@@ -360,22 +357,6 @@ block l r x = l <#> indent 1 x <#> r
 
 encl :: DocLength w => Doc' w -> Doc' w -> Doc' w -> Doc' w
 encl l r x = group $ l <-> x <> r
-
-pm :: (x -> Doc' w) -> Maybe x -> Doc' w
-pm = maybe emptyDoc
-
-pf ::
-  (Foldable f, DocLength w) =>
-  (Doc' w -> Doc' w -> Doc' w) ->
-  Doc' w ->
-  Doc' w ->
-  (a -> Doc' w) ->
-  f a ->
-  Doc' w
-pf g l r f = nonEmpty emptyDoc (\x -> l <> foldrMap1 f (g . f) x <> r) . toList
-
-pl :: (Foldable f, DocLength w) => (Doc' w -> Doc' w -> Doc' w) -> (a -> Doc' w) -> f a -> Doc' w
-pl g f = foldrMap1' emptyDoc f (g . f) . toList
 
 instance Enum w => Enum (Sum w) where
   toEnum = Sum . toEnum

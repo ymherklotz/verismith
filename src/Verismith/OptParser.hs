@@ -20,6 +20,7 @@ import qualified Options.Applicative as Opt
 import Shelly (FilePath (..), fromText)
 import Verismith.Config (SynthDescription (..), versionInfo)
 import Prelude hiding (FilePath (..))
+import Verismith.Verilog2005 (PrintingOpts (..))
 
 data OptTool
   = TYosys
@@ -61,12 +62,14 @@ data Opts
   | Generate
       { generateFilename :: !(Maybe FilePath),
         generateConfigFile :: !(Maybe FilePath),
-        generateValidSyntax :: !Bool
+        generateValidSyntax :: !Bool,
+        generatePrinting :: !PrintingOpts
       }
   | Parse
       { parseFilename :: !FilePath,
         parseOutput :: !(Maybe FilePath),
-        parseStrict :: !Bool
+        parseStrict :: !Bool,
+        parsePrinting :: !PrintingOpts
       }
   | Reduce
       { reduceFilename :: !FilePath,
@@ -276,6 +279,22 @@ emiOpts =
       )
     <*> Opt.strArgument (Opt.metavar "FILE" <> Opt.help "Verilog input file to pass to EMI.")
 
+printOpts :: Parser PrintingOpts
+printOpts =
+  PrintingOpts
+    <$> ( Opt.switch $
+            Opt.long "space-after-escaped"
+              <> Opt.help "Always print a space after an escaped identifier"
+        )
+    <*> ( Opt.switch $
+            Opt.long "spaces-in-primitive"
+              <> Opt.help "Always print spaces in primitives table between levels"
+        )
+    <*> ( Opt.switch $
+            Opt.long "edge-control-z"
+              <> Opt.help "Use z instead of x in edge-control specifiers"
+        )
+
 genOpts :: Parser Opts
 genOpts =
   Generate
@@ -298,6 +317,7 @@ genOpts =
               <> Opt.help
                 "Generate invalid Verilog that is only syntactically allowed."
         )
+    <*> printOpts
 
 parseOpts :: Parser Opts
 parseOpts =
@@ -318,6 +338,7 @@ parseOpts =
               <> Opt.help
                 "Makes the parser comply strictly to the Verilog 2005 standard."
         )
+    <*> printOpts
 
 shuffleOpts :: Parser Opts
 shuffleOpts =

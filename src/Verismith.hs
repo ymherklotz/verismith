@@ -233,25 +233,22 @@ handleOpts (EMIOpts o configF f k n nosim noequiv noreduction top file) = do
       defaultYosys
       (fuzzMultipleEMI gen)
   return ()
-handleOpts (Generate f c sf) = do
+handleOpts (Generate f c sf popts) = do
   config <- getConfig c
   if sf
     then do
       source <- V2.runGarbageGeneration config
-      maybe L.putStr L.writeFile f $ V2.genSource (Just 80) source
+      maybe L.putStr L.writeFile f $ V2.genSource (Just 80) popts source
     else do
       source <- proceduralIO "top" config :: IO (Verilog ())
       maybe T.putStrLn T.writeFile (T.unpack . toTextIgnore <$> f) $ genSource source
-handleOpts (Parse f o s) = do
+handleOpts (Parse f o s popts) = do
   (ast, warns) <- V2.parseVerilog2005 (T.unpack (toTextIgnore f))
   mapM_ (hPutStrLn stderr) warns
   if null warns || not s
     then pure ()
     else error "Input file does not comply strictly with the Verilog 2005 standard"
-  let s = V2.genSource (Just 80) ast
-  case o of
-    Nothing -> L.putStr s
-    Just o' -> L.writeFile o' s
+  maybe L.putStr L.writeFile o $ V2.genSource (Just 80) popts ast
 handleOpts (ShuffleOpt f t o nshuffle nrename noequiv equivdir checker) = do
   datadir <- getDataDir
   verilogSrc <- T.readFile file
