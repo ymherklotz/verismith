@@ -65,7 +65,8 @@ data Opts
       }
   | Parse
       { parseFilename :: !FilePath,
-        parseOutput :: !(Maybe FilePath)
+        parseOutput :: !(Maybe FilePath),
+        parseStrict :: !Bool
       }
   | Reduce
       { reduceFilename :: !FilePath,
@@ -311,6 +312,11 @@ parseOpts =
               <> Opt.short 'o'
               <> Opt.metavar "FILE"
               <> Opt.help "Output file to write the parsed file to."
+        )
+    <*> ( Opt.switch $
+            Opt.long "strict"
+              <> Opt.help
+                "Makes the parser comply strictly to the Verilog 2005 standard."
         )
 
 shuffleOpts :: Parser Opts
