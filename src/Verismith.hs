@@ -242,9 +242,12 @@ handleOpts (Generate f c sf) = do
     else do
       source <- proceduralIO "top" config :: IO (Verilog ())
       maybe T.putStrLn T.writeFile (T.unpack . toTextIgnore <$> f) $ genSource source
-handleOpts (Parse f o) = do
+handleOpts (Parse f o s) = do
   (ast, warns) <- V2.parseVerilog2005 (T.unpack (toTextIgnore f))
   mapM_ (hPutStrLn stderr) warns
+  if null warns || not s
+    then pure ()
+    else error "Input file does not comply strictly with the Verilog 2005 standard"
   let s = V2.genSource (Just 80) ast
   case o of
     Nothing -> L.putStr s
