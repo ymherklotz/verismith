@@ -152,7 +152,7 @@ sampleNum :: (p -> NumberProbability) -> GenM p Int
 sampleNum p = sampleWrapper p sampleNumberProbability
 
 sampleN :: (p -> NumberProbability) -> GenM p b -> GenM p [b]
-sampleN p x = sampleNum p >>= sequence . flip replicate x
+sampleN p x = sampleNum p >>= flip replicateM x
 
 sampleNE :: (p -> NumberProbability) -> GenM p b -> GenM p (NonEmpty b)
 sampleNE p x = liftA2 (:|) x $ sampleN p x

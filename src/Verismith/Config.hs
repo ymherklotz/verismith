@@ -112,8 +112,10 @@ module Verismith.Config
     propDefaultYosys,
     goSeed,
     gaoCurrent,
-    goExpr,
+    goGenerate,
     goStatement,
+    goExpr,
+    ggoAttenuation,
     geoAttenuation,
     gstoAttenuation,
     parseConfigFile,
@@ -457,7 +459,8 @@ data GarbageSpecifyTimingCheckOpts = GarbageSpecifyTimingCheckOpts
   deriving (Eq, Show)
 
 data GarbageGenerateOpts = GarbageGenerateOpts
-  { _ggoItems :: !NumberProbability,
+  { _ggoAttenuation :: !GarbageAttenuationOpts,
+    _ggoItems :: !NumberProbability,
     _ggoItem :: !CategoricalProbability,
     _ggoOptionalBlock :: !Double,
     _ggoInstOptionalDelay :: !Double,
@@ -570,7 +573,7 @@ data GarbageIdentifierOpts = GarbageIdentifierOpts
   deriving (Eq, Show)
 
 defAttenuationOpts :: GarbageAttenuationOpts
-defAttenuationOpts = GarbageAttenuationOpts 1.0 0.5
+defAttenuationOpts = GarbageAttenuationOpts 1.0 0.7
 
 defGarbageOpts :: GarbageOpts
 defGarbageOpts =
@@ -611,7 +614,7 @@ defGarbageOpts =
           _gmoPortDir = uniformCP,
           _gmoOptionalPort = 0.5,
           _gmoItems = NPPoisson 0 3,
-          _gmoItem = CPDiscrete [4, 1, 2, 1, 2, 1, 1, 1],
+          _gmoItem = CPDiscrete [6, 2, 2, 3, 2, 1, 1, 1],
           _gmoTimeScale = 0.5,
           _gmoTimeMagnitude = uniformCP,
           _gmoCell = 0.5,
@@ -646,7 +649,8 @@ defGarbageOpts =
           _gsyoPathPulseRange = 0.5
         },
       _goGenerate = GarbageGenerateOpts
-        { _ggoItems = NPPoisson 0 3,
+        { _ggoAttenuation = defAttenuationOpts,
+          _ggoItems = NPPoisson 0 3,
           _ggoItem = uniformCP,
           _ggoOptionalBlock = 0.5,
           _ggoInstOptionalDelay = 0.5,
@@ -671,7 +675,7 @@ defGarbageOpts =
           _ggoGateNInputType = uniformCP,
           _ggoGateInputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
           _ggoGateOutputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _ggoCaseBranches = NPNegativeBinomial 0 0.25 1,
+          _ggoCaseBranches = NPNegativeBinomial 0 0.75 2,
           _ggoCaseBranchPatterns = NPNegativeBinomial 0 (2.0 / 5.0) 1
         },
       _goType = GarbageTypeOpts
@@ -689,7 +693,7 @@ defGarbageOpts =
           _gstoOptionalDelEvCtl = 0.5,
           _gstoAssignmentBlocking = 0.5,
           _gstoCase = uniformCP,
-          _gstoCaseBranches = NPNegativeBinomial 0 0.25 1,
+          _gstoCaseBranches = NPNegativeBinomial 0 0.75 2,
           _gstoCaseBranchPatterns = NPNegativeBinomial 0 (2.0 / 5.0) 1,
           _gstoLoop = uniformCP,
           _gstoBlockPar_Seq = 0.5,
@@ -722,27 +726,27 @@ defGarbageOpts =
               [(1024, 1), (512, 8), (256, 16), (128, 32), (64, 64), (32, 128), (16, 256), (8, 512)]
               1,
           _geoLiteralSigned = 0.5,
-          _geoStringCharacters = NPNegativeBinomial 0 0.125 1,
+          _geoStringCharacters = NPNegativeBinomial 0 0.5 3,
           _geoStringCharacter = uniformCP,
           _geoFixed_Floating = 0.5,
           _geoExponentSign = uniformCP,
           _geoX_Z = 0.5,
-          _geoBinarySymbols = NPNegativeBinomial 0 0.125 1,
+          _geoBinarySymbols = NPNegativeBinomial 0 0.5 3,
           _geoBinarySymbol = uniformCP,
-          _geoOctalSymbols = NPNegativeBinomial 0 0.125 1,
+          _geoOctalSymbols = NPNegativeBinomial 0 0.5 3,
           _geoOctalSymbol = uniformCP,
-          _geoDecimalSymbols = NPNegativeBinomial 0 0.125 1,
+          _geoDecimalSymbols = NPNegativeBinomial 0 0.5 3,
           _geoDecimalSymbol = uniformCP,
-          _geoHexadecimalSymbols = NPNegativeBinomial 0 0.125 1,
+          _geoHexadecimalSymbols = NPNegativeBinomial 0 0.5 3,
           _geoHexadecimalSymbol = uniformCP
         },
       _goIdentifier = GarbageIdentifierOpts
         { _gioEscaped_Simple = 0.5,
-          _gioSimpleLetters = NPNegativeBinomial 0 0.125 1,
+          _gioSimpleLetters = NPNegativeBinomial 0 0.5 3,
           _gioSimpleLetter = uniformCP,
-          _gioEscapedLetters = NPNegativeBinomial 0 0.125 1,
+          _gioEscapedLetters = NPNegativeBinomial 0 0.5 3,
           _gioEscapedLetter = uniformCP,
-          _gioSystemLetters = NPNegativeBinomial 0 0.125 1,
+          _gioSystemLetters = NPNegativeBinomial 0 0.5 3,
           _gioSystemFirstLetter = uniformCP
         },
       _goDriveStrength = uniformCP,
@@ -1225,7 +1229,8 @@ garbageSpecifyCodec =
 garbageGenerateCodec :: TomlCodec GarbageGenerateOpts
 garbageGenerateCodec =
   GarbageGenerateOpts
-    <$> tfield _ggoItems "items" numProbCodec
+    <$> garbageAttenuationCodec "attenuation" .= _ggoAttenuation
+    <*> tfield _ggoItems "items" numProbCodec
     <*> tfield _ggoItem "item" catProbCodec
     <*> dfield _ggoOptionalBlock "optionalBlock"
     <*> dfield _ggoInstOptionalDelay "instance_optional_delay"

@@ -284,15 +284,15 @@ printOpts =
   PrintingOpts
     <$> ( Opt.switch $
             Opt.long "space-after-escaped"
-              <> Opt.help "Always print a space after an escaped identifier"
+              <> Opt.help "Always print a space after an escaped identifier."
         )
     <*> ( Opt.switch $
             Opt.long "spaces-in-primitive"
-              <> Opt.help "Always print spaces in primitives table between levels"
+              <> Opt.help "Always print spaces in primitives table between levels."
         )
     <*> ( Opt.switch $
             Opt.long "edge-control-z"
-              <> Opt.help "Use z instead of x in edge-control specifiers"
+              <> Opt.help "Use z instead of x in edge-control specifiers."
         )
 
 genOpts :: Parser Opts
