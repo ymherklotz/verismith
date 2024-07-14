@@ -146,11 +146,12 @@ import Control.Lens
 import Data.Functor.Compose
 import Data.Functor.Classes
 import Data.ByteString (ByteString)
-import Data.ByteString.Internal (packChars)
+import Data.ByteString.Internal (c2w, packChars)
 import Data.Data
 import Data.Data.Lens
 import Data.String (IsString (..))
 import Text.Show (showListWith)
+import Text.Printf (printf)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Vector.Unboxed as V
@@ -177,7 +178,9 @@ newtype Identifier = Identifier ByteString
   deriving (Show, Eq, Data, Generic)
 
 instance IsString Identifier where
-  fromString = Identifier . packChars
+  fromString =
+    Identifier . packChars . concatMap
+      (\c -> if ' ' < c && c <= '~' then [c] else printf "\\%02x" c)
 
 -- | Quickly add an identifier to all members of a sum type, other uses are discouraged
 data Identified t = Identified {_identIdent :: !Identifier, _identData :: !t}

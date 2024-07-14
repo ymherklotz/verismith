@@ -52,14 +52,9 @@ import Verismith.Utils (nonEmpty, foldrMap1)
 -- AST utils
 
 makeIdent :: BS.ByteString -> Identifier
-makeIdent s =
-  Identifier $
-    if isIdentSimple s
-      then s
-      else BS.cons (c2w '\\') $
-        BS.concatMap
-          (\w -> if 33 <= w && w <= 127 then BS.pack [w] else packChars $ printf "\\%02x" w)
-          s
+makeIdent =
+  Identifier . BS.concatMap
+    (\w -> if 33 <= w && w <= 126 then BS.pack [w] else packChars $ printf "\\%02x" w)
 
 -- | Groups `x`s into `y`s by converting a single `x` and merging previous `x`s to the result
 regroup :: (x -> y) -> (x -> y -> Maybe y) -> NonEmpty x -> NonEmpty y
