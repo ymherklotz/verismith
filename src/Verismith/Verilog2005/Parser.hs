@@ -12,7 +12,7 @@ module Verismith.Verilog2005.Parser
   )
 where
 
-import Control.Applicative (liftA2, liftA3)
+import Control.Applicative (liftA2)
 import Control.Lens hiding ((<|))
 import Data.Functor.Compose
 import Control.Monad (join)
@@ -695,13 +695,13 @@ driveStrength = option dsDefault $ try $ parens comDriveStrength
 pathpulse :: Parser SpecParamDecl
 pathpulse = do
   imid <- fproduce $ \t -> case t of TknPP s -> Just s; _ -> Nothing
-  iid <- if B.null imid then option "" parseBS else return imid
-  c0 <- if B.null iid
-    then return $ Left Nothing
-    else do
+  miid <- if B.null imid then optionMaybe parseBS else return $ Just imid
+  c0 <- case miid of
+    Nothing -> return $ Left Nothing
+    Just iid -> do
       irng <- pMRE
       let ist = SpecTerm (Identifier iid) irng
-      option (Right irng) $ Left . Just . (,) ist <$> fbranch
+      option (Right (iid, irng)) $ Left . Just . (,) ist <$> fbranch
         ( \t -> case t of
             SymDollar -> Just $ specTerm
             IdSystem s -> Just $ SpecTerm (Identifier s) <$> pMRE
@@ -709,7 +709,7 @@ pathpulse = do
         )
   c1 <- case c0 of
     Left x -> return $ Left x
-    Right irng -> case reverse $ B.split (c2w '$') iid of
+    Right (iid, irng) -> case reverse $ B.split (c2w '$') iid of
       [_] -> failure
       h : t | B.null h && irng == Nothing ->
         Left . Just . (,) (SpecTerm (Identifier $ restore_id t) Nothing) <$> specTerm

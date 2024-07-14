@@ -52,10 +52,10 @@ $all = [\0-\255]
 -- | Identifiers
 $identifierFirstChar = [a-z A-Z _]
 $identifierChar      = [a-z A-Z 0-9 _ \$]
-@escapedIdentifier   = \\ [$all # $white]*
+@escapedIdentifier   = \\ [\!-\~]*
 @simpleIdentifier    = $identifierFirstChar $identifierChar*
 @systemIdentifier    = \$ $identifierChar+
-@compilerDirective   = ` $identifierChar+
+@compilerDirective   = ` ( @simpleIdentifier | @escapedIdentifier )
 
 -- | Table symbols, and edges
 $tableout  = [01 xX]
@@ -100,7 +100,7 @@ tokens :-
     @real   { to LitReal   }
     @string { to (LitString . SBS.tail . SBS.init) }
     @simpleIdentifier  { toa kwident }
-    @escapedIdentifier { to escSimpleIdent }
+    @escapedIdentifier { to (escSimpleIdent . SBS.tail) }
     @systemIdentifier  { to (IdSystem . SBS.tail) }
     \'[sS]?[bB] { toa (numberBase BBin) }
     \'[sS]?[oO] { toa (numberBase BOct) }
@@ -253,8 +253,8 @@ scan = get >>= \(AlexState sc inp kw d si) -> case alexScan inp sc of
     throwError $
       printf
         "lexical error between %s and %s"
-        (show p)
-        (helperShowPositions $ _aiPosition inp :| map fst si)
+        (show $ _aiPosition inp)
+        (helperShowPositions $ p :| map fst si)
   AlexSkip inp' _ -> modify' (\s -> s { _asInput = inp' }) >> scan
   AlexToken inp' n action -> do
     modify' $ \s -> s { _asInput = inp' }
@@ -418,18 +418,16 @@ kwident s = case SBS.stripPrefix "PATHPULSE$" s of
 
 isIdentSimple :: SBS.ByteString -> Bool
 isIdentSimple s = case SBS.uncons s of
-  Just (c, t)
-    | testfirst c
+  Just (c, t) ->
+    testfirst c
       && not (isKW s)
       && SBS.all (\c -> testfirst c || (c2w '0' <= c && c <= c2w '9') || c == c2w '$') t
-    -> True
   _ -> False
   where
     testfirst c = (c2w 'A' <= c && c <= c2w 'Z') || (c2w 'a' <= c && c <= c2w 'z') || c == c2w '_'
 
 escSimpleIdent :: SBS.ByteString -> Token
-escSimpleIdent s = if isIdentSimple ss then IdSimple ss else IdEscaped s
-  where ss = SBS.tail s
+escSimpleIdent s = if isIdentSimple s then IdSimple s else IdEscaped s
 
 makeString :: String -> SBS.ByteString
 makeString s = packChars $ concatMap esc s

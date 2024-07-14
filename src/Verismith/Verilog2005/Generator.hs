@@ -92,11 +92,26 @@ applyAttenuation n x = x & gaoCurrent *~ _gaoDecrease x ** fromIntegral n
 tameExprRecursion :: Int -> GenM' a -> GenM' a
 tameExprRecursion n = local (_1 . goExpr . geoAttenuation %~ applyAttenuation n)
 
+repeatExprRecursive :: (GarbageOpts -> NumberProbability) -> GenM' a -> GenM' [a]
+repeatExprRecursive p m = do
+  n <- sampleAttenuatedNum (_geoAttenuation . _goExpr) p
+  tameExprRecursion n $ replicateM n m
+
 tameStmtRecursion :: Int -> GenM' a -> GenM' a
 tameStmtRecursion n = local (_1 . goStatement . gstoAttenuation %~ applyAttenuation n)
 
+repeatStmtRecursive :: (GarbageOpts -> NumberProbability) -> GenM' a -> GenM' [a]
+repeatStmtRecursive p m = do
+  n <- sampleAttenuatedNum (_gstoAttenuation . _goStatement) p
+  tameStmtRecursion n $ replicateM n m
+
 tameModGenRecursion :: Int -> GenM' a -> GenM' a
 tameModGenRecursion n = local (_1 . goGenerate . ggoAttenuation %~ applyAttenuation n)
+
+repeatModGenRecursive :: (GarbageOpts -> NumberProbability) -> GenM' a -> GenM' [a]
+repeatModGenRecursive p m = do
+  n <- sampleAttenuatedNum (_ggoAttenuation . _goGenerate) p
+  tameModGenRecursion n $ replicateM n m
 
 -- | Branching with attenuation
 sampleAttenuatedBranch ::
@@ -109,6 +124,15 @@ sampleAttenuatedBranch f p l = do
   d <- asks $ p . fst
   a <- asks $ _gaoCurrent . f . fst
   join $ sampleIn (toList $ NE.map snd l) gen (attenuateCat l a d)
+
+-- | Number with attenuation
+sampleAttenuatedNum ::
+  (GarbageOpts -> GarbageAttenuationOpts) -> (GarbageOpts -> NumberProbability) -> GenM' Int
+sampleAttenuatedNum f p = do
+  gen <- asks snd
+  d <- asks $ p . fst
+  a <- asks $ _gaoCurrent . f . fst
+  sampleNumberProbability gen $ attenuateNum a d
 
 -- | Letters available for simple identifiers
 idSimpleLetter :: B.ByteString -- 0-9$ are forbidden as first letters
@@ -135,8 +159,7 @@ garbageSimpleBS =
 
 garbageEscapedBS :: GenM' B.ByteString
 garbageEscapedBS =
-  fmap (B.pack . (c2w '\\' :)) $
-    sampleN (i _gioEscapedLetters) (toEnum <$> sampleSegment (i _gioEscapedLetter) 33 126)
+  B.pack <$> sampleN (i _gioEscapedLetters) (toEnum <$> sampleSegment (i _gioEscapedLetter) 33 126)
   where i x = x . _goIdentifier
 
 garbageBS :: GenM' B.ByteString
@@ -156,9 +179,8 @@ garbageSysIdent =
 
 garbageHierIdent :: GenM' HierIdent
 garbageHierIdent = do
-  n <- sampleNum _goPathDepth
-  hip <- tameExprRecursion n $
-      replicateM n $ mkpair garbageIdent $ sampleMaybe (_geoDimRange . _goExpr) garbageCExpr
+  hip <- repeatExprRecursive _goPathDepth $
+    mkpair garbageIdent $ sampleMaybe (_geoDimRange . _goExpr) garbageCExpr
   HierIdent hip <$> garbageIdent
 
 garbageInteger :: GenM' Natural
@@ -213,12 +235,12 @@ garbagePrim ident attrng grng gattr =
       (attrng, PrimIdent <$> ident <*> grng),
       ( True,
         do
-          n <- succ <$> sampleNum (e _geoConcatenations)
+          n <- succ <$> sNum (e _geoConcatenations)
           PrimConcat . NE.fromList <$> tameExprRecursion n (replicateM n gexpr)
       ),
       ( True,
         do
-          n <- succ <$> sampleNum (e _geoConcatenations)
+          n <- succ <$> sNum (e _geoConcatenations)
           tameExprRecursion (n + 1) $
             PrimMultConcat <$> garbageGenExpr
                 garbageIdent
@@ -229,18 +251,15 @@ garbagePrim ident attrng grng gattr =
       ),
       ( True,
         do
-          n <- succ <$> sampleNum (_ggoTaskFunPorts . _goGenerate)
+          n <- succ <$> sNum (_ggoTaskFunPorts . _goGenerate)
           tameExprRecursion n $ PrimFun <$> ident <*> gattr <*> replicateM n gexpr
       ),
-      ( True,
-        do
-          n <- sampleNum $ e _geoSysFunArgs
-          tameExprRecursion n $ PrimSysFun <$> garbageSysIdent <*> replicateM n gexpr
-      ),
+      (True, PrimSysFun <$> garbageSysIdent <*> repeatExprRecursive (e _geoSysFunArgs) gexpr),
       (True, PrimMinTypMax <$> garbageGenMinTypMax gexpr)
     ]
   where
     e x = x . _goExpr
+    sNum = sampleAttenuatedNum (e _geoAttenuation)
     mknum x =
       ( False,
         do
@@ -279,13 +298,13 @@ garbageRange2 :: GenM' Range2
 garbageRange2 = tameExprRecursion 2 $ Range2 <$> garbageCExpr <*> garbageCExpr
 
 garbageDims :: GenM' [Range2]
-garbageDims = sampleN (_gtoDimensions . _goType) garbageRange2
+garbageDims = repeatExprRecursive (_gtoDimensions . _goType) garbageRange2
 
 garbageGenRangeExpr :: GenM' e -> GenM' (GenRangeExpr e)
 garbageGenRangeExpr ge =
   sampleBranch
     (e _geoRange)
-    [ GRESingle <$> tameExprRecursion 1 ge,
+    [ GRESingle <$> ge,
       GREPair <$> garbageRange2,
       tameExprRecursion 2 $
         GREBaseOff <$> ge <*> sampleBernoulli (e _geoRangeOffsetPos_Neg) <*> garbageCExpr
@@ -294,8 +313,8 @@ garbageGenRangeExpr ge =
 
 garbageGenDimRange :: GenM' e -> GenM' (GenDimRange e)
 garbageGenDimRange ge = do
-  n <- sampleNum $ _gtoDimensions . _goType
-  tameExprRecursion n $ GenDimRange <$> replicateM n ge <*> garbageGenRangeExpr ge
+  n <- sampleAttenuatedNum (_geoAttenuation . _goExpr) (_gtoDimensions . _goType)
+  tameExprRecursion (n + 1) $ GenDimRange <$> replicateM n ge <*> garbageGenRangeExpr ge
 
 garbageExpr :: GenM' Expr
 garbageExpr =
@@ -340,7 +359,8 @@ garbageBareCMTM =
 
 garbageAttributes :: GenM' [Attribute]
 garbageAttributes =
-  sampleN _goAttributes $ Attribute <$> garbageBS <*> sampleMaybe _goAttributeOptionalValue gattr
+  repeatExprRecursive _goAttributes $
+    Attribute <$> garbageBS <*> sampleMaybe _goAttributeOptionalValue gattr
   where
     gattr =
       garbageGenExpr
@@ -383,8 +403,9 @@ garbageDelay3 =
     ]
 
 garbageLValue :: GenM' dr -> GenM' (LValue dr)
-garbageLValue gdr =
-  sampleN _goLValues (garbageLValue gdr) >>= \l -> case l of
+garbageLValue gdr = do
+  l <- repeatExprRecursive _goLValues $ garbageLValue gdr
+  case l of
     [] -> LVSingle <$> garbageHierIdent <*> sampleMaybe _goOptionalLValue gdr
     h : t -> return $ LVConcat $ h :| t
 
@@ -450,7 +471,7 @@ garbageFunctionStatement =
         do
           x <- sampleEnum $ s _gstoCase
           e <- garbageExpr 
-          pn <- sampleNum $ s _gstoCaseBranches
+          pn <- sampleAttenuatedNum (s _gstoAttenuation) (s _gstoCaseBranches)
           d <- tameStmtRecursion pn gmybfstmt
           let n = if d == Attributed [] Nothing then pn + 1 else pn
           c <-
@@ -463,11 +484,9 @@ garbageFunctionStatement =
       (False, FSDisable <$> garbageHierIdent),
       (True, FSLoop <$> garbageLoopStatement <*> tameStmtRecursion 1 gattrfstmt),
       ( True,
-        do
-          n <- sampleNum $ s _gstoItems
-          FSBlock <$> garbageStmtBlockHeader
-            <*> sampleBernoulli (s _gstoBlockPar_Seq)
-            <*> tameStmtRecursion n (replicateM n gattrfstmt)
+        FSBlock <$> garbageStmtBlockHeader
+          <*> sampleBernoulli (s _gstoBlockPar_Seq)
+          <*> repeatStmtRecursive (s _gstoItems) gattrfstmt
       )
     ]
   where
@@ -489,7 +508,7 @@ garbageStatement =
         do
           x <- sampleEnum $ s _gstoCase
           e <- garbageExpr 
-          pn <- sampleNum $ s _gstoCaseBranches
+          pn <- sampleAttenuatedNum (s _gstoAttenuation) (s _gstoCaseBranches)
           d <- tameStmtRecursion pn garbageMybStmt
           let n = if d == Attributed [] Nothing then pn + 1 else pn
           c <-
@@ -502,11 +521,9 @@ garbageStatement =
       (False, SDisable <$> garbageHierIdent),
       (True, SLoop <$> garbageLoopStatement <*> tameStmtRecursion 1 garbageAttrStmt),
       ( True,
-        do
-          n <- sampleNum $ s _gstoItems
-          SBlock <$> garbageStmtBlockHeader
-            <*> sampleBernoulli (s _gstoBlockPar_Seq)
-            <*> tameStmtRecursion n (replicateM n $ garbageAttrStmt)
+        SBlock <$> garbageStmtBlockHeader
+          <*> sampleBernoulli (s _gstoBlockPar_Seq)
+          <*> repeatStmtRecursive (s _gstoItems) garbageAttrStmt
       ),
       ( False,
         SEventTrigger <$> garbageHierIdent <*> sampleN (_gtoDimensions . _goType) garbageExpr
@@ -658,7 +675,7 @@ garbageGenIf =
 garbageGenCase :: GenM' ModGenCondItem
 garbageGenCase = do
   e <- garbageCExpr
-  pn <- sampleNum $ g _ggoCaseBranches
+  pn <- sampleAttenuatedNum (g _ggoAttenuation) (g _ggoCaseBranches)
   d <- tameModGenRecursion pn garbageGenCondBlock
   let n = if d == GCBEmpty then pn + 1 else pn
   c <-
@@ -765,9 +782,8 @@ garbageModGenBlockedItem :: GenM' (Attributed ModGenBlockedItem)
 garbageModGenBlockedItem = garbageAttributed $ garbageModGenItem $ fmap Identity
 
 garbageGenerateBlock :: GenM' GenerateBlock
-garbageGenerateBlock = do
-  n <- sampleNum $ _ggoItems . _goGenerate
-  tameModGenRecursion n $ garbageIdentified $ replicateM n garbageModGenBlockedItem
+garbageGenerateBlock =
+  garbageIdentified $ repeatModGenRecursive (_ggoItems . _goGenerate) $ garbageModGenBlockedItem
 
 garbageGenCondBlock :: GenM' GenerateCondBlock
 garbageGenCondBlock =

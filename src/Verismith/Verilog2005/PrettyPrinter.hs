@@ -38,6 +38,7 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.String
 import qualified Data.Vector.Unboxed as V
 import Verismith.Utils hiding (comma)
+import Verismith.Verilog2005.Lexer
 import Verismith.Verilog2005.AST
 import Verismith.Verilog2005.LibPretty
 import Verismith.Verilog2005.Utils
@@ -179,8 +180,11 @@ pcslid f = cslid (lparen <> softspace) rparen $ mkg f
 prettyBS :: PrettyIdent B.ByteString
 prettyBS i = do
   bs <- asks _poEscapedSpace
-  let es = B.head i == c2w '\\'
-  return (if bs && es then raw i <> space else raw i, if es && not bs then newline else softline)
+  let si = isIdentSimple i
+  return
+    ( if si then raw i else "\\" <> if bs then raw i <> space else raw i,
+      if si || bs then softline else newline
+    )
 
 prettyIdent :: PrettyIdent Identifier
 prettyIdent (Identifier i) = prettyBS i
@@ -188,7 +192,8 @@ prettyIdent (Identifier i) = prettyBS i
 rawId :: Identifier -> Print
 rawId (Identifier i) = do
   bs <- asks _poEscapedSpace
-  return $ if bs && B.head i == c2w '\\' then raw i <> space else raw i
+  let si = isIdentSimple i
+  return $ if si then raw i else "\\" <> if bs then raw i <> space else raw i
 
 -- | Somehow the next eight function are very common patterns
 pspWith :: PrettyIdent a -> Doc -> PrettyIdent a
@@ -218,7 +223,7 @@ prettyAttrThen = liftA2 (<?=>) . prettyAttr
 prettyAttr :: [Attribute] -> Print
 prettyAttr = nonEmpty (pure mempty) $ fmap (\x -> group $ "(* " <> fst x <=> "*)") . cslid1 pa
   where
-    pa (Attribute i e) = maybe (prettyBS i) (fmap (prettyEq $ raw i) . pca) e
+    pa (Attribute i e) = maybe (prettyBS i) (liftA2 prettyEq (rawId $ Identifier i) . pca) e
     pca = prettyGExpr prettyIdent (pm prettyCRangeExpr) (const $ pure mempty) 12
 
 prettyHierIdent :: PrettyIdent HierIdent
@@ -270,9 +275,9 @@ prettyPrim ppid ppr ppa x = case x of
     dat <- ppa a
     darg <- pcslid pexpr l
     (if nullDoc dat then padjWith else pspWith) ppid (dat <?=> darg) i
-  PrimSysFun i l -> pcslid pexpr l >>= \darg -> first (nest . ("$" <>)) <$> padjWith prettyBS darg i
+  PrimSysFun i l -> pcslid pexpr l >>= mkid . \x -> nest $ "$" <> raw i <> x
   PrimMinTypMax m -> padj (prettyGMTM pexpr) m >>= mkid . par
-  PrimString x -> mkid $ raw "\"" <> raw x <> raw "\""
+  PrimString x -> mkid $ "\"" <> raw x <> "\""
   where pexpr = prettyGExpr ppid ppr ppa 12
 
 preclevel :: BinaryOperator -> Int
@@ -654,10 +659,8 @@ prettyStatement protect x = case x of
       (nest $ (if ps then "fork" else "begin") <?/> head)
       (if ps then "join" else "end")
       <$> liftA2 (<?#>) (pm (prettyStdBlockDecls . snd) h) (pl (<#>) (prettyAttrStmt False) s)
-  SSysTaskEnable s a -> do
-    i <- padj prettyBS s
-    args <- pcslid (maybe (mkid mempty) prettyExpr) a
-    return $ group ("$" <> i <> args) <> semi
+  SSysTaskEnable s a ->
+    (\x -> ng ("$" <> raw s <> x) <> semi) <$> pcslid (maybe (mkid mempty) prettyExpr) a
   STaskEnable hi a -> do
     dhi <- padj prettyHierIdent hi
     args <- pcslid prettyExpr a
@@ -933,8 +936,9 @@ prettyModGenCondItem ci protect = case ci of
 
 -- | Generate block
 prettyGBlock :: Identifier -> [Attributed ModGenSingleItem] -> Print
-prettyGBlock (Identifier s) l =
-  block ("begin" <> piff (colon <=> raw s) (B.null s)) "end"
+prettyGBlock i l = do
+  bn <- rawId i
+  block ("begin" <> piff (colon <=> bn) (nullDoc bn)) "end"
     <$> pl
       (<#>)
       (\(Attributed a x) -> prettyAttrThen a $ prettyModGenSingleItem x False)
