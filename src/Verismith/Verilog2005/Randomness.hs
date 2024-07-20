@@ -19,6 +19,7 @@ module Verismith.Verilog2005.Randomness
     sampleSegment,
     sampleEnum,
     sampleMaybeEnum,
+    sampleWeighted,
     sampleFrom,
     sampleFromString,
     sampleBranch,
@@ -39,7 +40,6 @@ import qualified Data.ByteString as B
 import Data.List
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Vector as V
 import Control.Monad.Primitive (PrimMonad, PrimState, RealWorld)
 import Data.Word
 import System.Random.MWC.Probability
@@ -76,16 +76,16 @@ sampleCategoricalProbability t gen d = case d of
     let ll = NE.take (t + 1) l
      in case ll of
           [] -> error "Probability vector cannot be empty"
-          [x] -> return 0
+          [x] -> pure 0
           _ -> sample (categorical ll) gen
   CPBiasedUniform l b ->
     let ll = clean t l
         uw = fromIntegral (t + 1 - length ll) * b
      in nonEmpty
-          (return Nothing)
+          (pure Nothing)
           (flip sample gen . discrete . ((uw, Nothing) :) . map (\(x, y) -> (x, Just y)) . toList)
           ll
-          >>= maybe (avoid (map snd ll) <$> sample (uniformR (0, t - length ll)) gen) return
+          >>= maybe (avoid (map snd ll) <$> sample (uniformR (0, t - length ll)) gen) pure
 
 sampleNumberProbability :: PrimMonad m => Gen (PrimState m) -> NumberProbability -> m Int
 sampleNumberProbability gen d = case d of
@@ -97,7 +97,7 @@ sampleNumberProbability gen d = case d of
   NPLinearComb l -> sample (discrete l) gen >>= sampleNumberProbability gen
 
 sampleIn :: (Functor m, PrimMonad m) => [a] -> Gen (PrimState m) -> CategoricalProbability -> m a
-sampleIn l gen d = (V.fromList l V.!) <$> sampleCategoricalProbability (length l - 1) gen d
+sampleIn l gen d = (l !!) <$> sampleCategoricalProbability (length l - 1) gen d
 
 sampleInString ::
   (Functor m, PrimMonad m) =>
@@ -138,6 +138,12 @@ sampleMaybeEnum p =
   where
     mib = fromEnum (minBound :: a)
     mab = fromEnum (maxBound :: a)
+
+sampleWeighted :: [(Double, a)] -> GenM p a
+sampleWeighted l = case l of
+  [] -> error "Probability vector cannot be empty"
+  [(_, x)] -> pure x
+  _ -> asks snd >>= sample (discrete l)
 
 sampleFrom :: (p -> CategoricalProbability) -> [a] -> GenM p a
 sampleFrom p l = sampleWrapper p $ sampleIn l
@@ -198,6 +204,6 @@ sampleFiltered p t l = do
               ( avoid (merge ll $ map snd ll')
                   <$> sample (uniformR (0, t - length ll - length ll')) gen
               )
-              return
+              pure
   where
     ll = sort $ filter (<= t) l

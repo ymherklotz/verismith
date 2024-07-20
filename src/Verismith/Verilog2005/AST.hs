@@ -27,6 +27,7 @@ module Verismith.Verilog2005.AST
     CExpr (..),
     Expr (..),
     Attribute (..),
+    Attributes,
     Attributed (..),
     AttrIded (..),
     Range2 (..),
@@ -355,10 +356,10 @@ data GenExpr i r a
 instance (Data i, Data r, Data a) => Plated (GenExpr i r a) where
   plate = uniplate
 
-newtype CExpr = CExpr (GenExpr Identifier (Maybe CRangeExpr) [Attribute])
+newtype CExpr = CExpr (GenExpr Identifier (Maybe CRangeExpr) Attributes)
   deriving (Show, Eq, Data, Generic)
 
-newtype Expr = Expr (GenExpr HierIdent (Maybe DimRange) [Attribute])
+newtype Expr = Expr (GenExpr HierIdent (Maybe DimRange) Attributes)
   deriving (Show, Eq, Data, Generic)
 
 -- | Attributes which can be set to various nodes in the AST.
@@ -368,7 +369,9 @@ data Attribute = Attribute
   }
   deriving (Show, Eq, Data, Generic)
 
-data Attributed t = Attributed {_attrAttr :: ![Attribute], _attrData :: !t}
+type Attributes = [[Attribute]]
+
+data Attributed t = Attributed {_attrAttr :: !Attributes, _attrData :: !t}
   deriving (Show, Eq, Data, Generic)
 
 instance Functor Attributed where
@@ -384,7 +387,7 @@ instance Foldable Attributed where
 instance Traversable Attributed where
   sequenceA (Attributed a x) = fmap (Attributed a) x
 
-data AttrIded t = AttrIded {_aiAttr :: ![Attribute], _aiIdent :: !Identifier, _aiData :: !t}
+data AttrIded t = AttrIded {_aiAttr :: !Attributes, _aiIdent :: !Identifier, _aiData :: !t}
   deriving (Show, Eq, Data, Generic)
 
 instance Functor AttrIded where
@@ -409,6 +412,7 @@ type RangeExpr = GenRangeExpr Expr
 
 type CRangeExpr = GenRangeExpr CExpr
 
+-- TODO? this can definitely be omitted and expressed as a MTM
 -- | Number or Identifier
 data NumIdent
   = NIIdent !Identifier
@@ -416,19 +420,20 @@ data NumIdent
   | NINumber !Natural
   deriving (Show, Eq, Data, Generic)
 
+-- TODO? Base and 1 can be expressed as 3, not 2 though, option delay means delay 0
 -- | Delay3
 data Delay3
   = D3Base !NumIdent
   | D31 !MinTypMax
-  | D32 !MinTypMax !MinTypMax
-  | D33 !MinTypMax !MinTypMax !MinTypMax
+  | D32 { _d32Rise :: !MinTypMax, _d32Fall :: !MinTypMax }
+  | D33 { _d33Rise :: !MinTypMax, _d33Fall :: !MinTypMax, _d33HighZ :: !MinTypMax }
   deriving (Show, Eq, Data, Generic)
 
 -- | Delay2
 data Delay2
   = D2Base !NumIdent
   | D21 !MinTypMax
-  | D22 !MinTypMax !MinTypMax
+  | D22 { _d22Rise :: !MinTypMax, _d22Fall :: !MinTypMax }
   deriving (Show, Eq, Data, Generic)
 
 -- | Delay1
@@ -825,7 +830,7 @@ data STCAddArgs = STCAddArgs
 
 -- | Module path condition
 data ModulePathCondition
-  = MPCCond !(GenExpr Identifier () [Attribute])
+  = MPCCond !(GenExpr Identifier () Attributes)
   | MPCNone
   | MPCAlways
   deriving (Show, Eq, Data, Generic)
@@ -1174,7 +1179,7 @@ data ModuleItem
   | MIParameter !(AttrIded Parameter)
   | MIGenReg ![Attributed ModGenBlockedItem]
   | MISpecParam
-    { _mispAttribute :: ![Attribute],
+    { _mispAttribute :: !Attributes,
       _mispRange :: !(Maybe Range2),
       _mispDecl :: !SpecParamDecl
     }
@@ -1184,8 +1189,9 @@ data ModuleItem
 type GenerateBlock = Identified [Attributed ModGenBlockedItem]
 
 -- | Module block
+-- TODO: remember whether the module is a module or macromodule because implementation dependent
 data ModuleBlock = ModuleBlock
-  { _mbAttr :: ![Attribute],
+  { _mbAttr :: !Attributes,
     _mbIdent :: !Identifier,
     _mbPortInter :: ![Identified [Identified (Maybe CRangeExpr)]],
     _mbBody :: ![ModuleItem],
@@ -1260,7 +1266,7 @@ data PrimPort
 
 -- | Primitive block
 data PrimitiveBlock = PrimitiveBlock
-  { _pbAttr :: ![Attribute],
+  { _pbAttr :: !Attributes,
     _pbIdent :: !Identifier,
     _pbOutput :: !Identifier,
     _pbInput :: !(NonEmpty Identifier),
