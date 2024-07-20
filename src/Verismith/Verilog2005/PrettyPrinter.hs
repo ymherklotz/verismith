@@ -205,10 +205,10 @@ padjWith f d i = if nullDoc d then f i else (<> d) <$> padj f i >>= mkid
 prettyEq :: Doc -> (Doc, Doc) -> (Doc, Doc)
 prettyEq i = first $ \x -> ng $ group i <=> equals <+> group x
 
-prettyAttrng :: [Attribute] -> Doc -> Print
+prettyAttrng :: Attributes -> Doc -> Print
 prettyAttrng a x = (<?=> ng x) <$> prettyAttr a
 
-prettyItem :: [Attribute] -> Doc -> Print
+prettyItem :: Attributes -> Doc -> Print
 prettyItem a x = (<> semi) <$> prettyAttrng a x
 
 prettyItems :: Doc -> (a -> Print) -> NonEmpty a -> Print
@@ -217,11 +217,11 @@ prettyItems h f b = (\x -> group h <=> group x <> semi) <$> csl1 (fmap ng . f) b
 prettyItemsid :: Doc -> PrettyIdent a -> NonEmpty a -> Print
 prettyItemsid h f b = (\x -> group h <=> x <> semi) <$> gpadj (cslid1 $ mkng f) b
 
-prettyAttrThen :: [Attribute] -> Print -> Print
+prettyAttrThen :: Attributes -> Print -> Print
 prettyAttrThen = liftA2 (<?=>) . prettyAttr
 
-prettyAttr :: [Attribute] -> Print
-prettyAttr = nonEmpty (pure mempty) $ fmap (\x -> group $ "(* " <> fst x <=> "*)") . cslid1 pa
+prettyAttr :: Attributes -> Print
+prettyAttr = pl (<=>) $ nonEmpty (pure mempty) $ fmap (\x -> group $ "(* " <> fst x <=> "*)") . cslid1 pa
   where
     pa (Attribute i e) = maybe (prettyBS i) (liftA2 prettyEq (rawId $ Identifier i) . pca) e
     pca = prettyGExpr prettyIdent (pm prettyCRangeExpr) (const $ pure mempty) 12
@@ -1101,10 +1101,10 @@ prettySpecifyItem x =
 
 data ModuleItem'
   = MI'MGI (Attributed ModGenSingleItem)
-  | MI'Port [Attribute] Dir SignRange (NonEmpty Identifier)
-  | MI'Parameter [Attribute] (ComType ()) (NonEmpty (Identified CMinTypMax))
+  | MI'Port Attributes Dir SignRange (NonEmpty Identifier)
+  | MI'Parameter Attributes (ComType ()) (NonEmpty (Identified CMinTypMax))
   | MI'GenReg [Attributed ModGenSingleItem]
-  | MI'SpecParam [Attribute] (Maybe Range2) (NonEmpty SpecParamDecl)
+  | MI'SpecParam Attributes (Maybe Range2) (NonEmpty SpecParamDecl)
   | MI'SpecBlock [SpecifySingleItem]
 
 prettyModuleItems :: [ModuleItem] -> Print
@@ -1190,7 +1190,7 @@ prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a i pi b mts mc mp mdn) 
        in case v of 0 -> "1"; 1 -> "10"; 2 -> "100"
             <> case u of 0 -> "s"; -1 -> "ms"; -2 -> "us"; -3 -> "ns"; -4 -> "ps"; -5 -> "fs"
 
-prettyPrimPorts :: ([Attribute], PrimPort, NonEmpty Identifier) -> Print
+prettyPrimPorts :: (Attributes, PrimPort, NonEmpty Identifier) -> Print
 prettyPrimPorts (a, d, l) = do
   (ids, s) <- cslid1 prettyIdent l
   ports <- case d of
