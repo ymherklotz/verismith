@@ -357,10 +357,11 @@ garbageBareCMTM =
     (MTMFull <$> garbageCExpr <*> garbageCExpr <*> garbageCExpr)
     (MTMSingle <$> garbageCExpr)
 
-garbageAttributes :: GenM' [Attribute]
+garbageAttributes :: GenM' Attributes
 garbageAttributes =
   repeatExprRecursive _goAttributes $
-    Attribute <$> garbageBS <*> sampleMaybe _goAttributeOptionalValue gattr
+    repeatExprRecursive _goAttributes $
+      Attribute <$> garbageBS <*> sampleMaybe _goAttributeOptionalValue gattr
   where
     gattr =
       garbageGenExpr

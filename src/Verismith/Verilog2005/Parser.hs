@@ -59,7 +59,7 @@ type Branch a = Produce (Parser a)
 type LBranch a = [Branch a]
 
 -- | Same as above but parametrised by attributes
-type AProduce a = Produce ([Attribute] -> a)
+type AProduce a = Produce (Attributes -> a)
 
 type LAProduce a = [AProduce a]
 
@@ -67,7 +67,7 @@ type ABranch a = AProduce (Parser a)
 
 type LABranch a = [ABranch a]
 
-type APBranch a = Produce ([Attribute] -> SourcePos -> Parser a)
+type APBranch a = Produce (Attributes -> SourcePos -> Parser a)
 
 type LAPBranch a = [APBranch a]
 
@@ -323,12 +323,13 @@ attribute = do
     *> genExpr (pure . Identifier) (optionMaybe constRangeExpr) (pure ()) Just constifyMaybeRange
   return $ Attribute attr value
 
+-- TODO: this is likely incorrectly used but I leave this bug on purpose atm
 attributeOne :: Parser [Attribute]
 attributeOne = enclosed SymParenAster SymAsterParen $ NE.toList <$> csl1 attribute
 
 -- | Flattened list of attributes
-attributes :: Parser [Attribute]
-attributes = concat <$> many attributeOne
+attributes :: Parser Attributes
+attributes = many attributeOne
 
 -- | Number after base
 number :: Base -> Parser Number
@@ -864,7 +865,7 @@ statement = fpbranch $ \p t -> case t of
 attrStmt :: Parser AttrStmt
 attrStmt = Attributed <$> attributes <*> statement
 
-trOptStmt :: [Attribute] -> Parser MybStmt
+trOptStmt :: Attributes -> Parser MybStmt
 trOptStmt a = fmap (Attributed a) $ Just <$> statement <|> consume SymSemi *> return Nothing
 
 optStmt :: Parser MybStmt
@@ -1334,7 +1335,7 @@ portsimple ::
   Maybe NetType ->
   Bool ->
   Dir ->
-  [Attribute] ->
+  Attributes ->
   Parser (NonEmpty (NonEmpty ModuleItem, PortInterface))
 portsimple dnt fullspec d a = do
   nt <- optionMaybe $ lproduce netType
@@ -1359,7 +1360,7 @@ portsimple dnt fullspec d a = do
 -- | Declaration of a port with a variable type
 portvariable ::
   Bool ->
-  [Attribute] ->
+  Attributes ->
   ( Compose Identity Identified (Either [Range2] CExpr) ->
     BlockDecl (Compose Identity Identified) (Either [Range2] CExpr)
   ) ->
@@ -1646,7 +1647,7 @@ npmodItem =
   ]
 
 -- | Module
-parseModule :: LocalCompDir -> [Attribute] -> Parser Verilog2005
+parseModule :: LocalCompDir -> Attributes -> Parser Verilog2005
 parseModule (LocalCompDir ts cl pull dnt) a = do
   s <- lenientIdent
   params <- option [] $ do
@@ -1757,7 +1758,7 @@ seqRow = do
   return res
 
 -- | Parses a primitive block
-udp :: [Attribute] -> Parser Verilog2005
+udp :: Attributes -> Parser Verilog2005
 udp attr = do
   udpid <- ident
   (out, ins, mpd) <- parens udpHead
@@ -1864,7 +1865,7 @@ topDecl :: Parser Verilog2005
 topDecl =
   skipMany1 compDir *> return mempty <|> do
     -- I'm not sure whether these compiler directives are allowed here
-    a <- concat <$> many (attributeOne <* skipMany compDir)
+    a <- many (attributeOne <* skipMany compDir)
     st <- getState
     fpbranch $ \p t -> case t of
       KWPrimitive -> Just $ udp a <* closeConsume p KWPrimitive KWEndprimitive
