@@ -33,7 +33,7 @@ module Verismith.Verilog2005.Randomness
 where
 
 import Control.Applicative (liftA2)
-import Control.Monad (join)
+import Control.Monad (join, replicateM)
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import Data.List

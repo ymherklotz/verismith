@@ -19,7 +19,7 @@ where
 import Control.Applicative (liftA2, liftA3)
 import Data.Functor.Compose
 import Control.Lens hiding ((<.>))
-import Control.Monad (join)
+import Control.Monad (join, replicateM)
 import Control.Monad.Reader
 import Control.Monad.State.Lazy
 import qualified Data.ByteString as B
