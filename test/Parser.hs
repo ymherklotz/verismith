@@ -28,7 +28,6 @@ import Verismith.Utils (showT)
 import Verismith.Verilog.Lex
 import Verismith.Verilog.Parser
 import Verismith.Verilog.Preprocess (uncomment)
-import Verismith.Utils
 
 smallConfig :: Config
 smallConfig = defaultConfig & configProperty . propSize .~ 5

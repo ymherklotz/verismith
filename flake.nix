@@ -17,6 +17,7 @@
           verismith = pkgs.haskellPackages.callCabal2nix "verismith" (./.) {};
         };
         defaultPackage = self.packages.${system}.verismith;
+        devShells.default = self.packages.${system}.verismith.env;
       }
     );
 }
