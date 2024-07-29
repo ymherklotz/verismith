@@ -936,6 +936,7 @@ garbageModuleBlock ts = do
           garbageIdentified $ sampleMaybe (m _gmoPortRange) garbageCRangeExpr
     else (\i -> Identified i [Identified i Nothing]) <$> garbageIdent
   ModuleBlock <$> garbageAttributes
+    <*> sampleBernoulli (m _gmoMacro)
     <*> garbageIdent
     <*> pure header
     <*> sampleN

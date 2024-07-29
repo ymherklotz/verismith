@@ -8,7 +8,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Verismith.Verilog2005.Randomness
-  ( sampleCategoricalProbability,
+  ( shuffle,
+    sampleCategoricalProbability,
     sampleNumberProbability,
     sampleIn,
     sampleInString,
@@ -34,7 +35,7 @@ module Verismith.Verilog2005.Randomness
 where
 
 import Control.Applicative (liftA2)
-import Control.Monad (join, replicateM)
+import Control.Monad (join, replicateM, forM_)
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import Data.List
@@ -42,6 +43,8 @@ import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
 import Control.Monad.Primitive (PrimMonad, PrimState, RealWorld)
 import Data.Word
+import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector.Unboxed.Mutable as VM
 import System.Random.MWC.Probability
 import Verismith.Config (CategoricalProbability (..), NumberProbability (..), uniformCP)
 import Verismith.Utils (nonEmpty, foldrMap1)
@@ -61,13 +64,19 @@ uniq f m =
   nonEmpty [] $ toList
     . foldrMap1 (:|[]) (\e (x :| a) -> if f x == f e then (m x e) :| a else e :| x : a)
     . NE.sortWith f
-    
 
 clean :: Int -> [(Double, Int)] -> [(Double, Int)]
 clean t =
   map (\(x, y) -> (max 0 x, y))
     . uniq snd (\(x1, y1) (x2, y2) -> (x1 + x2, y1))
     . filter ((<= t) . snd)
+
+shuffle :: (PrimMonad m, VM.Unbox x) => Gen (PrimState m) -> [x] -> m [x]
+shuffle gen l = do
+  let n = length l - 1
+  v <- VU.thaw $ VU.fromList l
+  forM_ [0..n] $ \i -> sample (uniformR (i, n)) gen >>= VM.swap v i
+  VU.toList <$> VU.unsafeFreeze v
 
 sampleCategoricalProbability ::
   PrimMonad m => Int -> Gen (PrimState m) -> CategoricalProbability -> m Int

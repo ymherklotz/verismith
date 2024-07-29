@@ -1165,8 +1165,8 @@ prettyPortInter =
       _ -> cslid (lbrace <> softspace) rbrace pst l >>= mkid
 
 prettyModuleBlock :: LocalCompDir -> ModuleBlock -> Reader PrintingOpts (Doc, LocalCompDir)
-prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a i pi b mts mc mp mdn) = do
-  head <- fpadj (group . ("module" <=>)) prettyIdent i
+prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a mm i pi b mts mc mp mdn) = do
+  head <- fpadj (group . ((if mm then "macromodule" else "module") <=>)) prettyIdent i
   ports <- prettyPortInter pi
   header <- prettyItem a $ head <> gpar ports
   body <- prettyModuleItems b
