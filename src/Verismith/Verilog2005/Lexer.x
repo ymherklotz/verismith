@@ -447,7 +447,7 @@ cdMap = HashMap.fromList $
     ( ("timescale", sc ts0 *> pure CDTimescale)
       : ("resetall", modify' (\s -> s { _asDefines = HashMap.empty }) *> pure CDResetall)
       -- , ("pragma", *> pure CDPragma) -- TODO: Another layer of hell
-      : map (\(x, y) -> (x, return y))
+      : map (second pure)
         [ ("celldefine", CDCelldefine)
         , ("default_nettype", CDDefaultnettype)
         -- , ("default_decay_time", CDUnknown)
@@ -485,7 +485,7 @@ linecompdir _ = do
   l <- scan
   f <- scan
   c <- scan
-  case l >>= \ll -> f >>= \ff -> c >>= \cc -> pure (ll, ff, cc) of
+  case (,,) <$> l <*> f <*> c of
     Nothing -> return Nothing
     Just (PosToken _ (LitDecimal l), PosToken _ (LitString s), PosToken _ (LitDecimal n))
       | n < 3 -> do

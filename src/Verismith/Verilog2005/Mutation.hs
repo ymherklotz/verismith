@@ -1,6 +1,6 @@
 -- Module      : Verismith.Verilog2005.Mutation
 -- Description : AST mutation.
--- Copyright   : (c) 2023 Quentin Corradi
+-- Copyright   : (c) 2024 Quentin Corradi
 -- License     : GPL-3
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
@@ -98,7 +98,7 @@ type Mutation t = t -> Mutator t
 -- TODO
 
 mutate :: MutationVector t -> Mutation t
-mutate v x = join $ sampleWeighted $ mapMaybe (\(w, f) -> (,) w <$> f x) v
+mutate v x = join $ sampleWeighted $ mapMaybe (traverse ($ x)) v
 
 mutateWith :: (MutationStore -> MutationVector t) -> Mutation t
 mutateWith p x = asks (p . fst) >>= flip mutate x

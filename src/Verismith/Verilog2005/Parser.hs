@@ -74,7 +74,7 @@ type LAPBranch a = [APBranch a]
 -- | An error that is not merged with other errors and expected tokens
 hardfail :: String -> Parser a
 hardfail m =
-  mkPT $ \s -> return $ Consumed $ return $ Error $ newErrorMessage (Message m) (statePos s)
+  mkPT $ pure . Consumed . pure . Error . newErrorMessage (Message m) . statePos
 
 -- | Warning formatting
 warn :: SourcePos -> String -> Parser ()
@@ -127,7 +127,7 @@ fproduce f = producePrim f <* anywherecompdir
 lproduce :: LProduce a -> Parser a
 lproduce l =
   fproduce (\t -> IntMap.lookup (getConsIndex t) $ mkActionMap l)
-    `labels` map (\(d, _) -> show d) l
+    `labels` map (show . fst) l
 
 -- | Maps a function on the data given by branching on a Token without data
 maplproduce :: (a -> b) -> LProduce a -> LProduce b
@@ -1211,8 +1211,8 @@ modudpinstance what = do
   args <- parens $ do
     a <- attributes
     do {
-        x <- namePort a;
-        PortNamed . (x :) <$> commathen (xcsl "port connections" $ attributes >>= namePort)
+      x <- namePort a;
+      PortNamed . (x :) <$> commathen (xcsl "port connections" $ attributes >>= namePort)
     }
       <|> (ordPort a >>= \x -> PortPositional . (x :) <$> commathen (csl $ attributes >>= ordPort))
   let argl = case args of

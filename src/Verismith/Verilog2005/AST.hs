@@ -1,5 +1,5 @@
 -- Module      : Verismith.Verilog2005.AST
--- Description : Partial Verilog 2005 AST.
+-- Description : Verilog 2005 AST.
 -- Copyright   : (c) 2023 Quentin Corradi
 -- License     : GPL-3
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
@@ -656,7 +656,7 @@ data FunctionStatement
   | FSBlock
       { _fsbHeader :: !(Maybe (Identifier, [AttrIded StdBlockDecl])),
         _fsbPar_seq :: !Bool,
-        _fsbStmt :: ![AttrFStmt]
+        _fsbBody :: ![AttrFStmt]
       }
   deriving (Show, Eq, Data, Generic)
 
@@ -702,7 +702,7 @@ data Statement
   | SBlock
       { _sbHeader :: !(Maybe (Identifier, [AttrIded StdBlockDecl])),
         _sbPar_seq :: !Bool,
-        _sbStmt :: ![AttrStmt]
+        _sbBody :: ![AttrStmt]
       }
   | SSysTaskEnable
       { _ssteIdent :: !ByteString,

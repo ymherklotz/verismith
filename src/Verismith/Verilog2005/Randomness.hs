@@ -43,6 +43,7 @@ import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
 import Control.Monad.Primitive (PrimMonad, PrimState, RealWorld)
 import Data.Word
+import Data.Bifunctor (first, second)
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed.Mutable as VM
 import System.Random.MWC.Probability
@@ -67,7 +68,7 @@ uniq f m =
 
 clean :: Int -> [(Double, Int)] -> [(Double, Int)]
 clean t =
-  map (\(x, y) -> (max 0 x, y))
+  map (first $ max 0)
     . uniq snd (\(x1, y1) (x2, y2) -> (x1 + x2, y1))
     . filter ((<= t) . snd)
 
@@ -92,7 +93,7 @@ sampleCategoricalProbability t gen d = case d of
         uw = fromIntegral (t + 1 - length ll) * b
      in nonEmpty
           (pure Nothing)
-          (flip sample gen . discrete . ((uw, Nothing) :) . map (\(x, y) -> (x, Just y)) . toList)
+          (flip sample gen . discrete . ((uw, Nothing) :) . map (second Just) . toList)
           ll
           >>= maybe (avoid (map snd ll) <$> sample (uniformR (0, t - length ll)) gen) pure
 
@@ -208,7 +209,7 @@ sampleFiltered p t l = do
     CPBiasedUniform l' b ->
       let ll' = deleteFirstOrdered snd id (clean t l') ll
           uw = fromIntegral (t - length ll - length ll') * b
-       in sample (discrete $ (uw, Nothing) : map (\(x, y) -> (x, Just y)) ll') gen
+       in sample (discrete $ (uw, Nothing) : map (second Just) ll') gen
             >>= maybe
               ( avoid (merge ll $ map snd ll')
                   <$> sample (uniformR (0, t - length ll - length ll')) gen
