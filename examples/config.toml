@@ -1,7 +1,572 @@
 
+[emi]
+  generate_prob = 2
+  nogenerate_prob = 8
+
 [info]
-  commit = "e57b16651684e0f9e9d0a3cd6f81fccd5b8c7cb6"
-  version = "0.4.0.1"
+  commit = "866707b03e4c2346d25b77c423fbf03d29c4e26c"
+  version = "1.0.0.2"
+
+[invalid_generator]
+  attribute_optional_value = 0.5
+  lvalue_optional = 0.5
+  parameter_mintypmax_or_single = 0.5
+
+  [invalid_generator.attribute_items]
+    [[invalid_generator.attribute_items.LinearCombination]]
+      weight = 2.0
+
+      [[invalid_generator.attribute_items.LinearCombination.Discrete]]
+        value = 0
+        weight = 1.0
+
+    [[invalid_generator.attribute_items.LinearCombination]]
+      weight = 1.0
+
+      [invalid_generator.attribute_items.LinearCombination.NegativeBinomial]
+        failureRate = 0.75
+        numberOfFailures = 1
+        offset = 0
+
+  [invalid_generator.config]
+    cell_or_inst = 0.5
+    config = 0.5
+    liblist_or_use = 0.5
+    libraryScope = 0.5
+
+    [invalid_generator.config.blocks]
+      [invalid_generator.config.blocks.Poisson]
+        lambda = 1.0
+        offset = 0
+
+    [invalid_generator.config.designs]
+      [invalid_generator.config.designs.Poisson]
+        lambda = 1.0
+        offset = 0
+
+    [invalid_generator.config.items]
+      [invalid_generator.config.items.Poisson]
+        lambda = 1.0
+        offset = 0
+
+  [invalid_generator.delay_base]
+    [invalid_generator.delay_base.BiasedUniform]
+      weight = 1.0
+
+  [invalid_generator.delay_items]
+    Discrete = [1.0, 1.0, 2.0, 4.0]
+
+  [invalid_generator.driveStrength]
+    [invalid_generator.driveStrength.BiasedUniform]
+      weight = 1.0
+
+  [invalid_generator.expr]
+    X_or_Z = 0.5
+    attenuation = 0.7
+    dimRange = 0.5
+    fixed_or_float = 0.5
+    literal_signed = 0.5
+    minTypMax = 0.5
+    range_offset_pos_or_neg = 0.5
+
+    [invalid_generator.expr.binary_digit]
+      [invalid_generator.expr.binary_digit.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.binary_digits]
+      [invalid_generator.expr.binary_digits.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.expr.concatenations]
+      [invalid_generator.expr.concatenations.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.expr.decimal_digit]
+      [invalid_generator.expr.decimal_digit.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.decimal_digits]
+      [invalid_generator.expr.decimal_digits.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.expr.exponentSign]
+      [invalid_generator.expr.exponentSign.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.hex_digit]
+      [invalid_generator.expr.hex_digit.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.hex_digits]
+      [invalid_generator.expr.hex_digits.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.expr.item]
+      Discrete = [2.0, 2.0, 2.0, 1.0]
+
+    [invalid_generator.expr.literal_width]
+      [invalid_generator.expr.literal_width.BiasedUniform]
+        weight = 1.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 1
+          weight = 1024.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 8
+          weight = 512.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 16
+          weight = 256.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 32
+          weight = 128.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 64
+          weight = 64.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 128
+          weight = 32.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 256
+          weight = 16.0
+
+        [[invalid_generator.expr.literal_width.BiasedUniform.biases]]
+          value = 512
+          weight = 8.0
+
+    [invalid_generator.expr.octal_digit]
+      [invalid_generator.expr.octal_digit.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.octal_digits]
+      [invalid_generator.expr.octal_digits.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.expr.op_binary]
+      [invalid_generator.expr.op_binary.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.op_unary]
+      [invalid_generator.expr.op_unary.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.primary]
+      Discrete = [2.0, 4.0, 4.0, 4.0, 4.0, 4.0, 2.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+    [invalid_generator.expr.range_kind]
+      [invalid_generator.expr.range_kind.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.string_character]
+      [invalid_generator.expr.string_character.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.expr.string_characters]
+      [invalid_generator.expr.string_characters.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.expr.sysFunArgs]
+      [invalid_generator.expr.sysFunArgs.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+  [invalid_generator.generate]
+    attenuation = 0.7
+    declaration_dim_or_init = 0.5
+    funReturnType = 0.5
+    gate_optional_name = 0.5
+    instance_optional_delay = 0.5
+    instance_optional_range = 0.5
+    net_range = 0.5
+    optionalBlock = 0.5
+    primitive_optional_name = 0.5
+    taskFun_automatic = 0.5
+    taskFun_register = 0.5
+
+    [invalid_generator.generate.case_branches]
+      [invalid_generator.generate.case_branches.NegativeBinomial]
+        failureRate = 0.75
+        numberOfFailures = 2
+        offset = 0
+
+    [invalid_generator.generate.case_patterns]
+      [invalid_generator.generate.case_patterns.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.generate.chargeStrength]
+      [invalid_generator.generate.chargeStrength.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.declaration]
+      [invalid_generator.generate.declaration.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.gate]
+      [invalid_generator.generate.gate.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.gate_ninput]
+      [invalid_generator.generate.gate_ninput.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.gate_ninputs]
+      [invalid_generator.generate.gate_ninputs.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.generate.gate_noutputs]
+      [invalid_generator.generate.gate_noutputs.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.generate.item]
+      [invalid_generator.generate.item.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.items]
+      [invalid_generator.generate.items.Poisson]
+        lambda = 3.0
+        offset = 0
+
+    [invalid_generator.generate.nested_condition]
+      [invalid_generator.generate.nested_condition.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.net_type]
+      [invalid_generator.generate.net_type.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.net_vectoring]
+      [invalid_generator.generate.net_vectoring.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.taskFun_declaration]
+      [invalid_generator.generate.taskFun_declaration.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.taskFun_portType]
+      [invalid_generator.generate.taskFun_portType.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.generate.taskFun_ports]
+      [invalid_generator.generate.taskFun_ports.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.generate.taskPortDir]
+      [invalid_generator.generate.taskPortDir.BiasedUniform]
+        weight = 1.0
+
+  [invalid_generator.identifier]
+    escaped_or_simple = 0.5
+
+    [invalid_generator.identifier.escaped_length]
+      [invalid_generator.identifier.escaped_length.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.identifier.escaped_letter]
+      [invalid_generator.identifier.escaped_letter.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.identifier.simple_length]
+      [invalid_generator.identifier.simple_length.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+    [invalid_generator.identifier.simple_letter]
+      [invalid_generator.identifier.simple_letter.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.identifier.system_first_letter]
+      [invalid_generator.identifier.system_first_letter.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.identifier.system_length]
+      [invalid_generator.identifier.system_length.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 3
+        offset = 0
+
+  [invalid_generator.lvalue_items]
+    [invalid_generator.lvalue_items.NegativeBinomial]
+      failureRate = 0.5
+      numberOfFailures = 1
+      offset = 0
+
+  [invalid_generator.module]
+    cell = 0.5
+    instance_named_or_positional = 0.5
+    instance_optparam = 0.5
+    nonAsciiHeader = true
+    port_optional = 0.5
+    port_range = 0.5
+    timescale_optional = 0.5
+
+    [invalid_generator.module.blocks]
+      [invalid_generator.module.blocks.Poisson]
+        lambda = 2.0
+        offset = 1
+
+    [invalid_generator.module.defaultNetType]
+      [invalid_generator.module.defaultNetType.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.module.instance_parameters]
+      [invalid_generator.module.instance_parameters.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.module.item]
+      Discrete = [6.0, 2.0, 2.0, 3.0, 2.0, 1.0, 1.0, 1.0]
+
+    [invalid_generator.module.items]
+      [invalid_generator.module.items.Poisson]
+        lambda = 3.0
+        offset = 0
+
+    [invalid_generator.module.port_count]
+      [invalid_generator.module.port_count.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.module.port_dir]
+      [invalid_generator.module.port_dir.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.module.port_lvalues]
+      [invalid_generator.module.port_lvalues.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.module.timescale_magnitude]
+      [invalid_generator.module.timescale_magnitude.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.module.unconnectedDrive]
+      [invalid_generator.module.unconnectedDrive.BiasedUniform]
+        weight = 1.0
+
+  [invalid_generator.path_depth]
+    [invalid_generator.path_depth.NegativeBinomial]
+      failureRate = 0.75
+      numberOfFailures = 1
+      offset = 0
+
+  [invalid_generator.primitive]
+    edgeSensitive = 0.5
+    outputNoChange = 0.5
+    regInitNoSem = 0.5
+    seq_or_comb = 0.5
+
+    [invalid_generator.primitive.blocks]
+      [invalid_generator.primitive.blocks.Poisson]
+        lambda = 2.0
+        offset = 0
+
+    [invalid_generator.primitive.combInit]
+      [invalid_generator.primitive.combInit.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.primitive.edgeSimplePosNeg]
+      [invalid_generator.primitive.edgeSimplePosNeg.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.primitive.inLevel]
+      [invalid_generator.primitive.inLevel.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.primitive.outLevel]
+      [invalid_generator.primitive.outLevel.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.primitive.portType]
+      [invalid_generator.primitive.portType.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.primitive.ports]
+      [invalid_generator.primitive.ports.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.primitive.tableRows]
+      [invalid_generator.primitive.tableRows.Poisson]
+        lambda = 4.0
+        offset = 0
+
+  [invalid_generator.specify]
+    parameter_range = 0.5
+    pathpulse_escaped_or_simple = 0.5
+    pathpulse_term_range = 0.5
+    termRange = 0.5
+
+    [invalid_generator.specify.item]
+      [invalid_generator.specify.item.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.specify.items]
+      [invalid_generator.specify.items.Poisson]
+        lambda = 1.0
+        offset = 0
+
+    [invalid_generator.specify.path]
+      edgeSensitive = 0.5
+      full_or_parallel = 0.5
+
+      [invalid_generator.specify.path.condition]
+        [invalid_generator.specify.path.condition.BiasedUniform]
+          weight = 1.0
+
+      [invalid_generator.specify.path.delayKind]
+        [invalid_generator.specify.path.delayKind.BiasedUniform]
+          weight = 1.0
+
+      [invalid_generator.specify.path.edgeSensitivity]
+        [invalid_generator.specify.path.edgeSensitivity.BiasedUniform]
+          weight = 1.0
+
+      [invalid_generator.specify.path.full_destinations]
+        [invalid_generator.specify.path.full_destinations.Poisson]
+          lambda = 1.0
+          offset = 0
+
+      [invalid_generator.specify.path.full_sources]
+        [invalid_generator.specify.path.full_sources.Poisson]
+          lambda = 1.0
+          offset = 0
+
+      [invalid_generator.specify.path.polarity]
+        [invalid_generator.specify.path.polarity.BiasedUniform]
+          weight = 1.0
+
+    [invalid_generator.specify.timingCheck]
+      condition_neg_or_pos = 0.5
+      condition_optional = 0.5
+      delayedMinTypMax = 0.5
+      event_edge = 0.25
+      event_optional = 0.5
+      optarg = 0.5
+
+  [invalid_generator.statement]
+    assignmentBlocking = 0.5
+    attenuation = 0.7
+    block_header = 0.5
+    block_par_or_seq = 0.5
+    optional = 0.5
+    optionalDelayEventControl = 0.5
+    procContAss_var_or_net = 0.5
+    sysTask_optionalPort = 0.5
+
+    [invalid_generator.statement.block_declaration]
+      [invalid_generator.statement.block_declaration.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.block_declarations]
+      [invalid_generator.statement.block_declarations.Poisson]
+        lambda = 1.0
+        offset = 0
+
+    [invalid_generator.statement.case_branches]
+      [invalid_generator.statement.case_branches.NegativeBinomial]
+        failureRate = 0.75
+        numberOfFailures = 2
+        offset = 0
+
+    [invalid_generator.statement.case_kind]
+      [invalid_generator.statement.case_kind.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.case_patterns]
+      [invalid_generator.statement.case_patterns.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.statement.delayEventRepeat]
+      [invalid_generator.statement.delayEventRepeat.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.event]
+      [invalid_generator.statement.event.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.event_exprs]
+      [invalid_generator.statement.event_exprs.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 1
+        offset = 0
+
+    [invalid_generator.statement.event_prefix]
+      [invalid_generator.statement.event_prefix.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.item]
+      [invalid_generator.statement.item.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.items]
+      [invalid_generator.statement.items.Poisson]
+        lambda = 3.0
+        offset = 0
+
+    [invalid_generator.statement.loop]
+      [invalid_generator.statement.loop.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.procContAss_assDeassForceRel]
+      [invalid_generator.statement.procContAss_assDeassForceRel.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.statement.sysTask_ports]
+      [invalid_generator.statement.sysTask_ports.NegativeBinomial]
+        failureRate = 0.4
+        numberOfFailures = 1
+        offset = 0
+
+  [invalid_generator.type]
+    abstract_or_concrete = 0.5
+    concrete_bitRange = 0.5
+    concrete_signedness = 0.5
+
+    [invalid_generator.type.abstract]
+      [invalid_generator.type.abstract.BiasedUniform]
+        weight = 1.0
+
+    [invalid_generator.type.dimensions]
+      [invalid_generator.type.dimensions.NegativeBinomial]
+        failureRate = 0.5
+        numberOfFailures = 1
+        offset = 0
 
 [probability]
   expr.binary = 5
@@ -18,6 +583,8 @@
   moditem.combinational = 1
   moditem.instantiation = 1
   moditem.sequential = 1
+  module.drop_output = 0
+  module.keep_output = 1
   statement.blocking = 0
   statement.conditional = 1
   statement.forloop = 0
