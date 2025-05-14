@@ -6,6 +6,7 @@
 -- Stability   : experimental
 -- Portability : POSIX
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE CPP #-}
 
 module Verismith.Verilog2005.Parser
   ( parseVerilog2005,
@@ -15,7 +16,6 @@ where
 import Control.Applicative (liftA2)
 import Control.Lens hiding ((<|))
 import Data.Functor.Compose
-import qualified Data.Functor as DF
 import Control.Monad (join)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS
@@ -44,6 +44,12 @@ import Verismith.Verilog2005.Lexer
 import Verismith.Verilog2005.PrettyPrinter
 import Verismith.Verilog2005.Token
 import Verismith.Verilog2005.Utils
+
+#if MIN_VERSION_base(4,19,0)
+import qualified Data.Functor as DF (unzip)
+#else
+import qualified Data.List.NonEmpty as DF (unzip)
+#endif
 
 -- | The parser monad with LocalCompDir (local values of compiler directives) as local state
 -- | and a writer monad for the list of warnings as the base monad
