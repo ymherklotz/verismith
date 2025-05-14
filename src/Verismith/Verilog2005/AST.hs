@@ -1,39 +1,19 @@
--- Module      : Verismith.Verilog2005.AST
--- Description : Partial Verilog 2005 AST.
--- Copyright   : (c) 2023 Quentin Corradi
--- License     : GPL-3
--- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
--- Stability   : experimental
--- Portability : POSIX
 {-# LANGUAGE DeriveDataTypeable #-}
--- Module      : Verismith.Verilog2005.AST
--- Description : Partial Verilog 2005 AST.
--- Copyright   : (c) 2023 Quentin Corradi
--- License     : GPL-3
--- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
--- Stability   : experimental
--- Portability : POSIX
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
--- Module      : Verismith.Verilog2005.AST
--- Description : Partial Verilog 2005 AST.
--- Copyright   : (c) 2023 Quentin Corradi
--- License     : GPL-3
--- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
--- Stability   : experimental
--- Portability : POSIX
 {-# LANGUAGE QuantifiedConstraints #-}
--- Module      : Verismith.Verilog2005.AST
--- Description : Partial Verilog 2005 AST.
--- Copyright   : (c) 2023 Quentin Corradi
--- License     : GPL-3
--- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
--- Stability   : experimental
--- Portability : POSIX
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- |
+-- Module      : Verismith.Verilog2005.AST
+-- Description : Partial Verilog 2005 AST.
+-- Copyright   : (c) 2023 Quentin Corradi
+-- License     : GPL-3
+-- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
+-- Stability   : experimental
+-- Portability : POSIX
 module Verismith.Verilog2005.AST
   ( GenMinTypMax (..),
     CMinTypMax,
