@@ -116,11 +116,11 @@ library
                , tomland >=1.3.2 && <1.4
                , transformers >=0.5 && <0.7
                , transformers-base >=0.4.5 && <0.5
-               , containers
-               , unordered-containers
-               , mwc-probability
-               , primitive
-               , vector
+               , containers >=0.6.0.1 && <0.9
+               , unordered-containers >=0.2.9.0 && <0.2.21
+               , mwc-probability >=2.0.0 && <2.4
+               , primitive >=0.6.4.0 && <0.10
+               , vector >=0.12.0.3 && <0.14
   default-extensions: OverloadedStrings
 
 executable verismith
