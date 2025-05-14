@@ -1,5 +1,5 @@
 name: verismith
-version: 1.0.0.2
+version: 1.1.0
 synopsis: Random verilog generation and simulator testing.
 description:
   Verismith provides random verilog generation modules
@@ -9,7 +9,7 @@ license: GPL-3
 license-file: LICENSE
 author: Yann Herklotz
 maintainer: yann [at] yannherklotz [dot] com
-copyright: 2018-2020, 2024 Yann Herklotz
+copyright: 2018-2025 Yann Herklotz
 category: Hardware
 build-type: Simple
 cabal-version: >=1.10
@@ -27,7 +27,7 @@ source-repository head
 source-repository this
   type:     git
   location: https://github.com/ymherklotz/verismith
-  tag:      v1.0.0.0
+  tag:      v1.1.0
 
 library
   hs-source-dirs: src
@@ -35,6 +35,7 @@ library
   build-tools: alex >=3 && <4
   other-modules: Paths_verismith
 --  ghc-options: -ddump-simpl -ddump-to-file
+  ghc-options: -Wno-x-partial -Wno-unrecognised-warning-flags
   exposed-modules: Verismith
                  , Verismith.Circuit
                  , Verismith.Circuit.Base
@@ -91,14 +92,14 @@ library
                , blaze-html >=0.9.0.1 && <0.10
                , bytestring >=0.10 && <0.12
                , cryptonite >=0.25 && <0.31
-               , deepseq >= 1.4.3.0 && <1.5
+               , deepseq >= 1.4.3.0 && <1.6
                , exceptions >=0.10.0 && <0.11
                , fgl >=5.6 && <5.9
                , fgl-visualize >=0.1 && <0.2
                , filepath >=1.4.2 && <1.5
                , gitrev >= 1.3.1 && <1.4
-               , hedgehog >=1.0 && <1.5
-               , lens >=4.16.1 && <5.3
+               , hedgehog >=1.0 && <1.6
+               , lens >=4.16.1 && <5.4
                , lifted-base >=0.2.3 && <0.3
                , memory >=0.14 && <0.20
                , monad-control >=1.0.2 && <1.1
@@ -109,8 +110,8 @@ library
                , random >=1.1 && <1.3
                , recursion-schemes >=5.0.2 && <5.3
                , shelly >=1.8.0 && <1.13
-               , template-haskell >=2.13.0 && <2.21
-               , text >=1.2 && <2.1
+               , template-haskell >=2.13.0 && <2.24
+               , text >=1.2 && <2.2
                , time >= 1.8.0.2 && <1.13
                , tomland >=1.3.2 && <1.4
                , transformers >=0.5 && <0.7

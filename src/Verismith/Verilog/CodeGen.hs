@@ -24,7 +24,7 @@ import Data.Data (Data)
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Prettyprint.Doc
+import Prettyprinter
 import Numeric (showHex)
 import Verismith.Utils hiding (comma)
 import Verismith.Verilog.AST

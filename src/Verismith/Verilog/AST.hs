@@ -10,6 +10,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- |
 -- Module      : Verismith.Verilog.AST
@@ -739,6 +740,7 @@ instance Monoid (Verilog a) where
 
 instance Annotations Verilog where
   removeAnn (Verilog v) = Verilog $ fmap removeAnn v
+  collectAnn (Verilog v) = concatMap collectAnn v
 
 -- | Top level type which contains all the source code and associated
 -- information.
@@ -758,6 +760,7 @@ instance Monoid (SourceInfo a) where
 
 instance Annotations SourceInfo where
   removeAnn (SourceInfo t v) = SourceInfo t $ removeAnn v
+  collectAnn (SourceInfo t v) = collectAnn v
 
 -- | Attributes which can be set to various nodes in the AST.
 --

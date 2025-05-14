@@ -15,6 +15,7 @@ where
 import Control.Applicative (liftA2)
 import Control.Lens hiding ((<|))
 import Data.Functor.Compose
+import qualified Data.Functor as DF
 import Control.Monad (join)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS
@@ -1396,7 +1397,7 @@ portDecl dnt fullspec =
     )
   ]
   where
-    mk p = first join . NE.unzip <$> p <* if fullspec then pure () else consume SymSemi
+    mk p = first join . DF.unzip <$> p <* if fullspec then pure () else consume SymSemi
     ps d a = mk $ portsimple dnt fullspec d a
     pv a f = mk $ portvariable fullspec a f
 
@@ -1665,7 +1666,7 @@ parseModule (LocalCompDir ts cl pull dnt) a = do
   where
     -- Fully specified port declaration list
     fullPort =
-      bimap (Just . NE.toList . join) (NE.toList . join) . NE.unzip
+      bimap (Just . NE.toList . join) (NE.toList . join) . DF.unzip
         <$> xcsl1 "port declaration" (labranch $ portDecl dnt True)
     -- Partially specified port declaration list
     partialPort =
