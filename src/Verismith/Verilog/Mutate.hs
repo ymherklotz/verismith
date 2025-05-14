@@ -195,10 +195,10 @@ replace = (transform .) . idTrans
 nestId :: Identifier -> (ModDecl ann) -> (ModDecl ann)
 nestId i m
   | not $ inPort i m =
-    let expr = fromMaybe def . findAssign i $ m ^. modItems
-     in m & get %~ replace i expr
+      let expr = fromMaybe def . findAssign i $ m ^. modItems
+       in m & get %~ replace i expr
   | otherwise =
-    m
+      m
   where
     get = modItems . traverse . modContAssign . contAssignExpr
     def = Id i

@@ -5,7 +5,23 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
-{-# LANGUAGE DeriveAnyClass, DeriveDataTypeable, DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+-- Module      : Verismith.Verilog2005.Token
+-- Description : Tokens for Verilog 2005 lexing and parsing.
+-- Copyright   : (c) 2023 Quentin Corradi
+-- License     : GPL-3
+-- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
+-- Stability   : experimental
+-- Portability : POSIX
+{-# LANGUAGE DeriveDataTypeable #-}
+-- Module      : Verismith.Verilog2005.Token
+-- Description : Tokens for Verilog 2005 lexing and parsing.
+-- Copyright   : (c) 2023 Quentin Corradi
+-- License     : GPL-3
+-- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
+-- Stability   : experimental
+-- Portability : POSIX
+{-# LANGUAGE DeriveGeneric #-}
 
 module Verismith.Verilog2005.Token
   ( PosToken (..),
@@ -54,9 +70,9 @@ data PSource
   = PSFile !String
   | PSDefine !LBS.ByteString
   | PSLine
-    { _pslFile :: !String,
-      _pslEntering :: !Bool
-    }
+      { _pslFile :: !String,
+        _pslEntering :: !Bool
+      }
   deriving (Eq)
 
 instance Show PSource where
@@ -72,8 +88,9 @@ helperShowPositions :: NonEmpty Position -> String
 helperShowPositions =
   foldrMap1
     show
-    $ \a@(Position _ _ s) b -> show a
-        ++ case s of {PSFile _ -> " included"; PSDefine _ -> ""; PSLine _ _ -> " set"}
+    $ \a@(Position _ _ s) b ->
+      show a
+        ++ case s of PSFile _ -> " included"; PSDefine _ -> ""; PSLine _ _ -> " set"
         ++ " from "
         ++ b
 
@@ -243,9 +260,9 @@ data Token
   | CDUnconnecteddrive
   | CDBeginKeywords
   | CDEndKeywords
--- | CDPragma
--- | CDEndPragma
-  | KWAlways
+  | -- \| CDPragma
+    -- \| CDEndPragma
+    KWAlways
   | KWAnd
   | KWAssign
   | KWAutomatic
@@ -454,8 +471,8 @@ instance Show Token where
     CDUnconnecteddrive -> "`unconnected_drive"
     CDBeginKeywords -> "`begin_keywords"
     CDEndKeywords -> "`end_keywords"
--- CDPragma
--- CDEndPragma
+    -- CDPragma
+    -- CDEndPragma
     KWAlways -> "always"
     KWAnd -> "and"
     KWAssign -> "assign"

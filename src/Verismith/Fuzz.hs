@@ -135,8 +135,8 @@ runFuzz' fo yos m =
     ( FuzzEnv
         { _getSynthesisers =
             ( force $
-                defaultIdentitySynth :
-                (descriptionToSynth <$> conf ^. configSynthesisers)
+                defaultIdentitySynth
+                  : (descriptionToSynth <$> conf ^. configSynthesisers)
             ),
           _getSimulators = (force $ descriptionToSim <$> conf ^. configSimulators),
           _yosysInstance = yos,

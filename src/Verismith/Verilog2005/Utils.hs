@@ -5,7 +5,6 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
-
 {-# LANGUAGE OverloadedLists #-}
 
 module Verismith.Verilog2005.Utils
@@ -36,29 +35,30 @@ module Verismith.Verilog2005.Utils
   )
 where
 
-import Numeric.Natural
-import Text.Printf (printf)
-import Data.Functor.Compose
-import Data.Functor.Identity
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (c2w, packChars)
+import Data.Functor.Compose
+import Data.Functor.Identity
 import qualified Data.HashSet as HS
-import Data.List.NonEmpty (NonEmpty (..), (<|), toList)
+import Data.List.NonEmpty (NonEmpty (..), toList, (<|))
 import qualified Data.List.NonEmpty as NE
-import Verismith.Verilog2005.Lexer (VerilogVersion (..), isIdentSimple)
+import Numeric.Natural
+import Text.Printf (printf)
+import Verismith.Utils (foldrMap1, nonEmpty)
 import Verismith.Verilog2005.AST
-import Verismith.Utils (nonEmpty, foldrMap1)
+import Verismith.Verilog2005.Lexer (VerilogVersion (..), isIdentSimple)
 
 -- AST utils
 
 makeIdent :: BS.ByteString -> Identifier
 makeIdent =
-  Identifier . BS.concatMap
-    (\w -> if 33 <= w && w <= 126 then BS.pack [w] else packChars $ printf "\\%02x" w)
+  Identifier
+    . BS.concatMap
+      (\w -> if 33 <= w && w <= 126 then BS.pack [w] else packChars $ printf "\\%02x" w)
 
 -- | Groups `x`s into `y`s by converting a single `x` and merging previous `x`s to the result
 regroup :: (x -> y) -> (x -> y -> Maybe y) -> NonEmpty x -> NonEmpty y
-regroup mk add = foldrMap1 ((:|[]) . mk) (\e (h :| t) -> maybe (mk e :| h : t) (:| t) $ add e h)
+regroup mk add = foldrMap1 ((:| []) . mk) (\e (h :| t) -> maybe (mk e :| h : t) (:| t) $ add e h)
 
 -- | Merges `Attributed x`s if we can merge `x`s
 addAttributed :: (x -> y -> Maybe y) -> Attributed x -> Attributed y -> Maybe (Attributed y)
@@ -212,7 +212,8 @@ toStatement x = case x of
   FSDisable hi -> SDisable hi
   FSLoop ls b -> SLoop ls $ toStatement <$> b
   FSBlock h ps b -> SBlock h ps $ fmap toStatement <$> b
-  where mybf = fmap $ fmap toStatement
+  where
+    mybf = fmap $ fmap toStatement
 
 -- | the other way
 fromStatement :: Statement -> Maybe FunctionStatement
@@ -224,7 +225,8 @@ fromStatement x = case x of
   SLoop ls b -> FSLoop ls <$> traverse fromStatement b
   SBlock h ps b -> FSBlock h ps <$> traverse (traverse fromStatement) b
   _ -> Nothing
-  where mybf s = traverse (traverse fromStatement) s
+  where
+    mybf s = traverse (traverse fromStatement) s
 
 -- | Converts MybStmt to AttrStmt
 fromMybStmt :: MybStmt -> AttrStmt
@@ -258,7 +260,7 @@ fromMGIBlockDecl1 x = case x of
   BDEvent d -> conv BDEvent d
   BDLocalParam t d -> conv (BDLocalParam t) d
   where
-    conv f = f . Compose . (:|[]) . runIdentity . getCompose
+    conv f = f . Compose . (:| []) . runIdentity . getCompose
 
 -- | Merges one ModGenBlockedItem's `BlockDecl` with one ModGenSingleItem's `BlockDecl`
 fromMGIBlockDecl_add :: BD Identity t -> BD NonEmpty t -> Maybe (BD NonEmpty t)
@@ -332,11 +334,11 @@ fromSpecBlockedItem1 x = case x of
   SIWidth ref tcl t s -> SIWidth ref tcl t s
   SINoChange ref dat st en s -> SINoChange ref dat st en s
   where
-    conv f = f . (:|[]) . runIdentity
+    conv f = f . (:| []) . runIdentity
 
 fromSpecBlockedItem_add :: SpecifyBlockedItem -> SpecifySingleItem -> Maybe SpecifySingleItem
 fromSpecBlockedItem_add x y = case (x, y) of
-  (SISpecParam nrng d, SISpecParam rng l) | nrng == rng-> add (SISpecParam rng) d l
+  (SISpecParam nrng d, SISpecParam rng l) | nrng == rng -> add (SISpecParam rng) d l
   (SIPulsestyleOnevent st, SIPulsestyleOnevent l) -> add SIPulsestyleOnevent st l
   (SIPulsestyleOndetect st, SIPulsestyleOndetect l) -> add SIPulsestyleOndetect st l
   (SIShowcancelled st, SIShowcancelled l) -> add SIShowcancelled st l
@@ -408,40 +410,48 @@ fromMGBlockedItem1 x = case x of
   MGILoopGen ii iv c ui uv b -> MGILoopGen ii iv c ui uv b
   MGICondItem ci -> MGICondItem ci
   where
-    conv f = f . (:|[]) . runIdentity
+    conv f = f . (:| []) . runIdentity
 
 fromMGBlockedItem_add :: ModGenBlockedItem -> ModGenSingleItem -> Maybe ModGenSingleItem
 fromMGBlockedItem_add x y = case (x, y) of
-  (MGINetInit nnt nds nnp ni, MGINetInit nt ds np l) | nnt == nt && nds == ds && nnp == np ->
-    add (MGINetInit nt ds np) ni l
-  (MGINetDecl nnt nnp nd, MGINetDecl nt np l) | nnt == nt && nnp == np ->
-    add (MGINetDecl nt np) nd l
+  (MGINetInit nnt nds nnp ni, MGINetInit nt ds np l)
+    | nnt == nt && nds == ds && nnp == np ->
+        add (MGINetInit nt ds np) ni l
+  (MGINetDecl nnt nnp nd, MGINetDecl nt np l)
+    | nnt == nt && nnp == np ->
+        add (MGINetDecl nt np) nd l
   (MGITriD nds nnp ni, MGITriD ds np l) | nds == ds && nnp == np -> add (MGITriD ds np) ni l
   (MGITriC ncs nnp nd, MGITriC cs np l) | ncs == cs && nnp == np -> add (MGITriC cs np) nd l
   (MGIBlockDecl d, MGIBlockDecl l) -> MGIBlockDecl <$> fromMGIBlockDecl_add d l
   (MGIGenVar i, MGIGenVar l) -> add MGIGenVar i l
   (MGIDefParam po, MGIDefParam l) -> add MGIDefParam po l
-  (MGIContAss nds nd3 na, MGIContAss ds d3 l) | nds == ds && nd3 == d3 ->
-    add (MGIContAss ds d3) na l
+  (MGIContAss nds nd3 na, MGIContAss ds d3 l)
+    | nds == ds && nd3 == d3 ->
+        add (MGIContAss ds d3) na l
   (MGICMos nr nd3 i, MGICMos r d3 l) | nr == r && nd3 == d3 -> add (MGICMos r d3) i l
   (MGIEnable nr nb nds nd3 i, MGIEnable r b ds d3 l)
-   | nr == r && nb == b && nds == ds && nd3 == d3 -> add (MGIEnable r b ds d3) i l
-  (MGIMos nr nnp nd3 i, MGIMos r np d3 l) | nr == r && nnp == np && nd3 == d3 ->
-    add (MGIMos r np d3) i l
+    | nr == r && nb == b && nds == ds && nd3 == d3 -> add (MGIEnable r b ds d3) i l
+  (MGIMos nr nnp nd3 i, MGIMos r np d3 l)
+    | nr == r && nnp == np && nd3 == d3 ->
+        add (MGIMos r np d3) i l
   (MGINIn nnt nn nds nd2 i, MGINIn nt n ds d2 l)
     | nnt == nt && nn == n && nds == ds && nd2 == d2 -> add (MGINIn nt n ds d2) i l
-  (MGINOut nr nds nd2 i, MGINOut r ds d2 l) | nr == r && nds == ds && nd2 == d2 ->
-    add (MGINOut r ds d2) i l
-  (MGIPassEn nr nb nd2 i, MGIPassEn r b d2 l) | nr == r && nb == b && nd2 == d2 ->
-    add (MGIPassEn r b d2) i l
+  (MGINOut nr nds nd2 i, MGINOut r ds d2 l)
+    | nr == r && nds == ds && nd2 == d2 ->
+        add (MGINOut r ds d2) i l
+  (MGIPassEn nr nb nd2 i, MGIPassEn r b d2 l)
+    | nr == r && nb == b && nd2 == d2 ->
+        add (MGIPassEn r b d2) i l
   (MGIPass nr i, MGIPass r l) | nr == r -> add (MGIPass r) i l
   (MGIPull nb nds i, MGIPull b ds l) | nb == b && nds == ds -> add (MGIPull b ds) i l
   (MGIUDPInst nudp nds nd2 i, MGIUDPInst udp ds d2 l)
     | nudp == udp && nds == ds && nd2 == d2 -> add (MGIUDPInst udp ds d2) i l
-  (MGIModInst nmod npa i, MGIModInst mod pa l) | nmod == mod && npa == pa ->
-    add (MGIModInst mod pa) i l
-  (MGIUnknownInst nt np i, MGIUnknownInst t p l) | nt == t && np == p ->
-    add (MGIUnknownInst t p) i l
+  (MGIModInst nmod npa i, MGIModInst mod pa l)
+    | nmod == mod && npa == pa ->
+        add (MGIModInst mod pa) i l
+  (MGIUnknownInst nt np i, MGIUnknownInst t p l)
+    | nt == t && np == p ->
+        add (MGIUnknownInst t p) i l
   _ -> Nothing
   where
     add f x y = Just $ f $ runIdentity x <| y

@@ -47,7 +47,7 @@ foldrMap1' d f g = nonEmpty d (foldrMap1 f g)
 foldrMapM1 :: (Applicative m, Monad m) => (a -> m b) -> (a -> b -> m b) -> NonEmpty a -> m b
 foldrMapM1 f g (h :| t) = nonEmpty (f h) (\x -> foldrMapM1 f g x >>= g h) t
 
-mkpair :: Applicative f => f a -> f b -> f (a, b)
+mkpair :: (Applicative f) => f a -> f b -> f (a, b)
 mkpair = liftA2 (,)
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d

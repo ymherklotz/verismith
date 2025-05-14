@@ -5,9 +5,34 @@
 -- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
 -- Stability   : experimental
 -- Portability : POSIX
-{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, StandaloneDeriving, QuantifiedConstraints #-}
-{-# LANGUAGE UndecidableInstances, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+-- Module      : Verismith.Verilog2005.AST
+-- Description : Partial Verilog 2005 AST.
+-- Copyright   : (c) 2023 Quentin Corradi
+-- License     : GPL-3
+-- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
+-- Stability   : experimental
+-- Portability : POSIX
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+-- Module      : Verismith.Verilog2005.AST
+-- Description : Partial Verilog 2005 AST.
+-- Copyright   : (c) 2023 Quentin Corradi
+-- License     : GPL-3
+-- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
+-- Stability   : experimental
+-- Portability : POSIX
+{-# LANGUAGE QuantifiedConstraints #-}
+-- Module      : Verismith.Verilog2005.AST
+-- Description : Partial Verilog 2005 AST.
+-- Copyright   : (c) 2023 Quentin Corradi
+-- License     : GPL-3
+-- Maintainer  : q [dot] corradi22 [at] imperial [dot] ac [dot] uk
+-- Stability   : experimental
+-- Portability : POSIX
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Verismith.Verilog2005.AST
   ( GenMinTypMax (..),
@@ -144,20 +169,20 @@ module Verismith.Verilog2005.AST
 where
 
 import Control.Lens
-import Data.Functor.Compose
-import Data.Functor.Classes
 import Data.ByteString (ByteString)
 import Data.ByteString.Internal (c2w, packChars)
 import Data.Data
 import Data.Data.Lens
-import Data.String (IsString (..))
-import Text.Show (showListWith)
-import Text.Printf (printf)
+import Data.Functor.Classes
+import Data.Functor.Compose
 import qualified Data.HashMap.Strict as HashMap
 import Data.List.NonEmpty (NonEmpty)
+import Data.String (IsString (..))
 import qualified Data.Vector.Unboxed as V
 import GHC.Generics (Generic)
 import Numeric.Natural
+import Text.Printf (printf)
+import Text.Show (showListWith)
 import Verismith.Verilog2005.Token (BXZ (..), HXZ (..), OXZ (..), ZOX (..))
 
 -- | Minimum, Typical, Maximum
@@ -180,8 +205,10 @@ newtype Identifier = Identifier ByteString
 
 instance IsString Identifier where
   fromString =
-    Identifier . packChars . concatMap
-      (\c -> if ' ' < c && c <= '~' then [c] else printf "\\%02x" c)
+    Identifier
+      . packChars
+      . concatMap
+        (\c -> if ' ' < c && c <= '~' then [c] else printf "\\%02x" c)
 
 -- | Quickly add an identifier to all members of a sum type, other uses are discouraged
 data Identified t = Identified {_identIdent :: !Identifier, _identData :: !t}
@@ -196,6 +223,7 @@ showHelper fp (Identified i x) = showString "Identified " . shows i . showChar '
 instance Show1 Identified where
   liftShowsPrec fp _ p = showHelper fp
   liftShowList fp _ = showListWith $ showHelper fp
+
 instance Eq1 Identified where
   liftEq f (Identified ia a) (Identified ib b) = ia == ib && f a b
 
@@ -413,6 +441,7 @@ type RangeExpr = GenRangeExpr Expr
 type CRangeExpr = GenRangeExpr CExpr
 
 -- TODO? this can definitely be omitted and expressed as a MTM
+
 -- | Number or Identifier
 data NumIdent
   = NIIdent !Identifier
@@ -421,19 +450,20 @@ data NumIdent
   deriving (Show, Eq, Data, Generic)
 
 -- TODO? Base and 1 can be expressed as 3, not 2 though, option delay means delay 0
+
 -- | Delay3
 data Delay3
   = D3Base !NumIdent
   | D31 !MinTypMax
-  | D32 { _d32Rise :: !MinTypMax, _d32Fall :: !MinTypMax }
-  | D33 { _d33Rise :: !MinTypMax, _d33Fall :: !MinTypMax, _d33HighZ :: !MinTypMax }
+  | D32 {_d32Rise :: !MinTypMax, _d32Fall :: !MinTypMax}
+  | D33 {_d33Rise :: !MinTypMax, _d33Fall :: !MinTypMax, _d33HighZ :: !MinTypMax}
   deriving (Show, Eq, Data, Generic)
 
 -- | Delay2
 data Delay2
   = D2Base !NumIdent
   | D21 !MinTypMax
-  | D22 { _d22Rise :: !MinTypMax, _d22Fall :: !MinTypMax }
+  | D22 {_d22Rise :: !MinTypMax, _d22Fall :: !MinTypMax}
   deriving (Show, Eq, Data, Generic)
 
 -- | Delay1
@@ -476,9 +506,9 @@ instance Show AbsType where
 data ComType t
   = CTAbstract !AbsType
   | CTConcrete
-    { _ctcExtra :: !t,
-      _ctcSignRange :: !SignRange
-    }
+      { _ctcExtra :: !t,
+        _ctcSignRange :: !SignRange
+      }
   deriving (Show, Eq, Data, Generic)
 
 -- | Net type
@@ -559,6 +589,7 @@ data Assign dr = Assign {_aLValue :: !(LValue dr), _aValue :: !Expr}
   deriving (Show, Eq, Data, Generic)
 
 type NetAssign = Assign CDimRange
+
 type VarAssign = Assign DimRange
 
 -- | Parameter
@@ -625,6 +656,7 @@ data LoopStatement
 -- | Case item
 data FCaseItem = FCaseItem {_fciPat :: !(NonEmpty Expr), _fciVal :: !MybFStmt}
   deriving (Show, Eq, Data, Generic)
+
 data CaseItem = CaseItem {_ciPat :: !(NonEmpty Expr), _ciVal :: !MybStmt}
   deriving (Show, Eq, Data, Generic)
 
@@ -727,7 +759,7 @@ instance Show NInputType where
   show x = case x of NITAnd -> "and"; NITOr -> "or"; NITXor -> "xor"
 
 -- | Instance name
-data InstanceName = InstanceName { _INIdent :: !Identifier, _INRange :: !(Maybe Range2) }
+data InstanceName = InstanceName {_INIdent :: !Identifier, _INRange :: !(Maybe Range2)}
   deriving (Show, Eq, Data, Generic)
 
 -- | Gate instances
@@ -854,8 +886,18 @@ data PathDelayValue
   | PDV3 !CMinTypMax !CMinTypMax !CMinTypMax
   | PDV6 !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax
   | PDV12
-    !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax
-    !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
+      !CMinTypMax
   deriving (Show, Eq, Data, Generic)
 
 -- | Specify block item
@@ -863,9 +905,9 @@ data PathDelayValue
 -- | it is used to abstract between several specify items in a block and a single comma separated one
 data SpecifyItem f
   = SISpecParam
-    { _sipcRange :: !(Maybe Range2),
-      _sipcDecl :: !(f SpecParamDecl)
-    }
+      { _sipcRange :: !(Maybe Range2),
+        _sipcDecl :: !(f SpecParamDecl)
+      }
   | SIPulsestyleOnevent !(f SpecTerm)
   | SIPulsestyleOndetect !(f SpecTerm)
   | SIShowcancelled !(f SpecTerm)
@@ -920,20 +962,24 @@ data SpecifyItem f
         _sincNotif :: !(Maybe Identifier)
       }
 
-deriving instance (Show1 f, forall a. Show a => Show (f a)) => Show (SpecifyItem f)
-deriving instance (Eq1 f, forall a. Eq a => Eq (f a)) => Eq (SpecifyItem f)
-deriving instance (Typeable f, forall a. Data a => Data (f a)) => Data (SpecifyItem f)
-deriving instance (forall a. Generic a => Generic (f a)) => Generic (SpecifyItem f)
+deriving instance (Show1 f, forall a. (Show a) => Show (f a)) => Show (SpecifyItem f)
+
+deriving instance (Eq1 f, forall a. (Eq a) => Eq (f a)) => Eq (SpecifyItem f)
+
+deriving instance (Typeable f, forall a. (Data a) => Data (f a)) => Data (SpecifyItem f)
+
+deriving instance (forall a. (Generic a) => Generic (f a)) => Generic (SpecifyItem f)
 
 type SpecifySingleItem = SpecifyItem NonEmpty
+
 type SpecifyBlockedItem = SpecifyItem Identity
 
 -- | Specparam declaration
 data SpecParamDecl
   = SPDAssign
-    { _spdaIdent :: !Identifier,
-      _spdaValue :: !CMinTypMax
-    }
+      { _spdaIdent :: !Identifier,
+        _spdaValue :: !CMinTypMax
+      }
   | SPDPathPulse -- Not completely accurate input/output as it is ambiguous
       { _spdpInOut :: !(Maybe (SpecTerm, SpecTerm)),
         _spdpReject :: !CMinTypMax,
@@ -962,23 +1008,26 @@ data NetInit = NetInit {_niIdent :: !Identifier, _niValue :: !Expr}
 -- | f is used to abstract between the separated and grouped modgen_item
 data BlockDecl f t
   = BDReg
-    { _bdrgSR :: !SignRange,
-      _bdrgData :: !(f t)
-    }
+      { _bdrgSR :: !SignRange,
+        _bdrgData :: !(f t)
+      }
   | BDInt !(f t)
   | BDReal !(f t)
   | BDTime !(f t)
   | BDRealTime !(f t)
   | BDEvent !(f [Range2])
   | BDLocalParam
-    { _bdlpType :: !(ComType ()),
-      _bdlpValue :: !(f CMinTypMax)
-    }
+      { _bdlpType :: !(ComType ()),
+        _bdlpValue :: !(f CMinTypMax)
+      }
 
-deriving instance (Show t, forall a. Show a => Show (f a)) => Show (BlockDecl f t)
-deriving instance (Eq t, forall a. Eq a => Eq (f a)) => Eq (BlockDecl f t)
-deriving instance (Typeable t, Data t, Typeable f, forall a. Data a => Data (f a)) => Data (BlockDecl f t)
-deriving instance (Generic t, forall a. Generic a => Generic (f a)) => Generic (BlockDecl f t)
+deriving instance (Show t, forall a. (Show a) => Show (f a)) => Show (BlockDecl f t)
+
+deriving instance (Eq t, forall a. (Eq a) => Eq (f a)) => Eq (BlockDecl f t)
+
+deriving instance (Typeable t, Data t, Typeable f, forall a. (Data a) => Data (f a)) => Data (BlockDecl f t)
+
+deriving instance (Generic t, forall a. (Generic a) => Generic (f a)) => Generic (BlockDecl f t)
 
 -- | Block item declaration (for statement blocks [begin/fork], tasks, and functions)
 data StdBlockDecl
@@ -990,9 +1039,9 @@ data StdBlockDecl
 data TFBlockDecl t
   = TFBDStd !StdBlockDecl
   | TFBDPort
-    { _tfbdpDir :: !t,
-      _tfbdpType :: !(ComType Bool)
-    }
+      { _tfbdpDir :: !t,
+        _tfbdpType :: !(ComType Bool)
+      }
   deriving (Show, Eq, Data, Generic)
 
 -- | Case generate branch
@@ -1008,7 +1057,7 @@ data UDPInst = UDPInst
   deriving (Show, Eq, Data, Generic)
 
 -- | Module named instantiation
-data ModInst = ModInst { _miName :: !InstanceName, _miPort :: !PortAssign }
+data ModInst = ModInst {_miName :: !InstanceName, _miPort :: !PortAssign}
   deriving (Show, Eq, Data, Generic)
 
 -- | Unknown named instantiation
@@ -1160,12 +1209,16 @@ data ModGenItem f
       }
   | MGICondItem !ModGenCondItem
 
-deriving instance (Show1 f, forall a. Show a => Show (f a)) => Show (ModGenItem f)
-deriving instance (Eq1 f, forall a. Eq a => Eq (f a)) => Eq (ModGenItem f)
-deriving instance (Typeable f, forall a. Data a => Data (f a)) => Data (ModGenItem f)
-deriving instance (forall a. Generic a => Generic (f a)) => Generic (ModGenItem f)
+deriving instance (Show1 f, forall a. (Show a) => Show (f a)) => Show (ModGenItem f)
+
+deriving instance (Eq1 f, forall a. (Eq a) => Eq (f a)) => Eq (ModGenItem f)
+
+deriving instance (Typeable f, forall a. (Data a) => Data (f a)) => Data (ModGenItem f)
+
+deriving instance (forall a. (Generic a) => Generic (f a)) => Generic (ModGenItem f)
 
 type ModGenBlockedItem = ModGenItem Identity
+
 type ModGenSingleItem = ModGenItem NonEmpty
 
 instance Plated ModGenBlockedItem where
@@ -1179,10 +1232,10 @@ data ModuleItem
   | MIParameter !(AttrIded Parameter)
   | MIGenReg ![Attributed ModGenBlockedItem]
   | MISpecParam
-    { _mispAttribute :: !Attributes,
-      _mispRange :: !(Maybe Range2),
-      _mispDecl :: !SpecParamDecl
-    }
+      { _mispAttribute :: !Attributes,
+        _mispRange :: !(Maybe Range2),
+        _mispDecl :: !SpecParamDecl
+      }
   | MISpecBlock ![SpecifyBlockedItem]
   deriving (Show, Eq, Data, Generic)
 

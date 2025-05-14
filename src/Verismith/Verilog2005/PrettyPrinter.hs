@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE RankNTypes #-}
 -- Module      : Verismith.Verilog2005.PrettyPrinter
 -- Description : Pretty printer for the Verilog 2005 AST.
 -- Copyright   : (c) 2023 Quentin Corradi
@@ -6,8 +8,6 @@
 -- Stability   : experimental
 -- Portability : POSIX
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE RankNTypes #-}
 
 module Verismith.Verilog2005.PrettyPrinter
   ( genSource,
@@ -17,20 +17,20 @@ module Verismith.Verilog2005.PrettyPrinter
     lcdCell,
     lcdPull,
     lcdDefNetType,
-    PrintingOpts (..)
+    PrintingOpts (..),
   )
 where
 
+import Control.Applicative (liftA2)
 import Control.Lens.TH
-import Data.Bifunctor (first)
-import Data.Functor.Compose
-import Data.Functor.Identity
 import Control.Monad.Reader
+import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import Data.ByteString.Internal
 import qualified Data.ByteString.Lazy as LB
 import Data.Foldable
-import Control.Applicative (liftA2)
+import Data.Functor.Compose
+import Data.Functor.Identity
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty (..), (<|))
 import qualified Data.List.NonEmpty as NE
@@ -38,8 +38,8 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.String
 import qualified Data.Vector.Unboxed as V
 import Verismith.Utils hiding (comma)
-import Verismith.Verilog2005.Lexer
 import Verismith.Verilog2005.AST
+import Verismith.Verilog2005.Lexer
 import Verismith.Verilog2005.LibPretty
 import Verismith.Verilog2005.Utils
 
@@ -99,11 +99,11 @@ pm :: (x -> Print) -> Maybe x -> Print
 pm = maybe $ pure mempty
 
 -- | Print Foldable with stuff arround when not empty
-pf :: Foldable f => (Doc -> Doc -> Doc) -> Doc -> Doc -> (a -> Print) -> f a -> Print
+pf :: (Foldable f) => (Doc -> Doc -> Doc) -> Doc -> Doc -> (a -> Print) -> f a -> Print
 pf g l r f = nonEmpty (pure mempty) (fmap (\d -> l <> d <> r) . foldrMap1 f (liftA2 g . f)) . toList
 
 -- | Print Foldable
-pl :: Foldable f => (Doc -> Doc -> Doc) -> (a -> Print) -> f a -> Print
+pl :: (Foldable f) => (Doc -> Doc -> Doc) -> (a -> Print) -> f a -> Print
 pl g f = foldrMap1' (pure mempty) f (liftA2 g . f) . toList
 
 -- | Regroup and prettyprint
@@ -159,7 +159,7 @@ mkng f = fmap (first ng) . f
 -- | , b
 -- | , c
 -- | ```
-csl :: Foldable f => Doc -> Doc -> (a -> Print) -> f a -> Print
+csl :: (Foldable f) => Doc -> Doc -> (a -> Print) -> f a -> Print
 csl = pf $ \a b -> a </> comma <+> b
 
 csl1 :: (a -> Print) -> NonEmpty a -> Print
@@ -168,13 +168,13 @@ csl1 f = foldrMap1 f $ liftA2 (\a b -> a </> comma <+> b) . f
 cslid1 :: PrettyIdent a -> PrettyIdent (NonEmpty a)
 cslid1 f = foldrMap1 f $ liftA2 (\x -> first (x <.>)) . padj f
 
-cslid :: Foldable f => Doc -> Doc -> PrettyIdent a -> f a -> Print
+cslid :: (Foldable f) => Doc -> Doc -> PrettyIdent a -> f a -> Print
 cslid a b f = nonEmpty (pure mempty) (fmap (\x -> a <> x <> b) . padj (cslid1 f)) . toList
 
 bcslid1 :: PrettyIdent a -> NonEmpty a -> Print
 bcslid1 f l = brc . nest <$> padj (cslid1 $ mkg f) l
 
-pcslid :: Foldable f => PrettyIdent a -> f a -> Print
+pcslid :: (Foldable f) => PrettyIdent a -> f a -> Print
 pcslid f = cslid (lparen <> softspace) rparen $ mkg f
 
 prettyBS :: PrettyIdent B.ByteString
@@ -278,7 +278,8 @@ prettyPrim ppid ppr ppa x = case x of
   PrimSysFun i l -> pcslid pexpr l >>= mkid . \x -> nest $ "$" <> raw i <> x
   PrimMinTypMax m -> padj (prettyGMTM pexpr) m >>= mkid . par
   PrimString x -> mkid $ "\"" <> raw x <> "\""
-  where pexpr = prettyGExpr ppid ppr ppa 12
+  where
+    pexpr = prettyGExpr ppid ppr ppa 12
 
 preclevel :: BinaryOperator -> Int
 preclevel b = case b of
@@ -315,9 +316,8 @@ prettyGExpr ppid ppr ppa l e = case e of
     (x, s) <- prettyPrim ppid ppr ppa e
     return (ng $ viaShow op <> piff (space <> da <> newline) (nullDoc da) <> x, s)
   ExprBinOp el op a r -> do
-    let
-      p = preclevel op
-      pp = pexpr $ p - 1
+    let p = preclevel op
+        pp = pexpr $ p - 1
     ll <- (<=> viaShow op) <$> psexpr p el
     da <- ppa a
     case compare l p of
@@ -329,8 +329,7 @@ prettyGExpr ppid ppr ppa l e = case e of
     dt <- psexpr 12 et
     df <- pexpr 12 ef
     da <- ppa a
-    let
-      pp = first (\x -> nest $ group (dc <=> nest ("?" <?+> da)) <=> group (dt <=> colon <+> x)) df
+    let pp = first (\x -> nest $ group (dc <=> nest ("?" <?+> da)) <=> group (dt <=> colon <+> x)) df
     if l < 12 then mkid $ gpar $ uncurry (<>) pp else return pp
   where
     pexpr = prettyGExpr ppid ppr ppa
@@ -436,7 +435,7 @@ prettyDelay1 x =
 prettyLValue :: (dr -> Print) -> PrettyIdent (LValue dr)
 prettyLValue f x = case x of
   LVSingle hi r -> pm (fmap group . f) r >>= \rng -> first nest <$> padjWith prettyHierIdent rng hi
-  LVConcat l -> bcslid1 (prettyLValue f) l >>= mkid 
+  LVConcat l -> bcslid1 (prettyLValue f) l >>= mkid
 
 prettyNetLV :: PrettyIdent NetLValue
 prettyNetLV = prettyLValue prettyCDimRange
@@ -526,8 +525,8 @@ fromStdBlockDecl :: AttrIded StdBlockDecl -> Attributed AllBlockDecl
 fromStdBlockDecl (AttrIded a i sbd) =
   Attributed a $ case sbd of
     SBDParameter (Parameter t v) -> ABDParameter t [Identified i v]
-    SBDBlockDecl bd -> fromBlockDecl ((:|[]) . Identified i . runIdentity) Left bd
-    
+    SBDBlockDecl bd -> fromBlockDecl ((:| []) . Identified i . runIdentity) Left bd
+
 prettyAllBlockDecl :: AllBlockDecl -> Print
 prettyAllBlockDecl x = case x of
   ABDReg sr l -> prettySignRange sr >>= \dsr -> mkedi ("reg" <?=> dsr) l
@@ -555,17 +554,17 @@ prettyAllBlockDecls =
       (<#>)
       (\(Attributed a abd) -> prettyAllBlockDecl abd >>= prettyAttrng a)
       id
-      (addAttributed $ \x y -> case (x, y) of
-        (ABDReg nsr nl, ABDReg sr l) | nsr == sr -> Just $ ABDReg sr $ nl <> l
-        (ABDInt nl, ABDInt l) -> Just $ ABDInt $ nl <> l
-        (ABDReal nl, ABDReal l) -> Just $ ABDReal $ nl <> l
-        (ABDTime nl, ABDTime l) -> Just $ ABDTime $ nl <> l
-        (ABDRealTime nl, ABDRealTime l) -> Just $ ABDRealTime $ nl <> l
-        (ABDEvent nl, ABDEvent l) -> Just $ ABDEvent $ nl <> l
-        (ABDLocalParam nt nl, ABDLocalParam t l) | nt == t -> Just $ ABDLocalParam t $ nl <> l
-        (ABDParameter nt nl, ABDParameter t l) | nt == t -> Just $ ABDParameter t $ nl <> l
-        (ABDPort nd nt nl, ABDPort d t l) | nd == d && nt == t -> Just $ ABDPort d t $ nl <> l
-        _ -> Nothing
+      ( addAttributed $ \x y -> case (x, y) of
+          (ABDReg nsr nl, ABDReg sr l) | nsr == sr -> Just $ ABDReg sr $ nl <> l
+          (ABDInt nl, ABDInt l) -> Just $ ABDInt $ nl <> l
+          (ABDReal nl, ABDReal l) -> Just $ ABDReal $ nl <> l
+          (ABDTime nl, ABDTime l) -> Just $ ABDTime $ nl <> l
+          (ABDRealTime nl, ABDRealTime l) -> Just $ ABDRealTime $ nl <> l
+          (ABDEvent nl, ABDEvent l) -> Just $ ABDEvent $ nl <> l
+          (ABDLocalParam nt nl, ABDLocalParam t l) | nt == t -> Just $ ABDLocalParam t $ nl <> l
+          (ABDParameter nt nl, ABDParameter t l) | nt == t -> Just $ ABDParameter t $ nl <> l
+          (ABDPort nd nt nl, ABDPort d t l) | nd == d && nt == t -> Just $ ABDPort d t $ nl <> l
+          _ -> Nothing
       )
 
 prettyStdBlockDecls :: [AttrIded StdBlockDecl] -> Print
@@ -599,15 +598,14 @@ prettyStatement protect x = case x of
     dft <- case s of
       Attributed [] Nothing -> pure mempty
       _ -> nest . ("default:" <=>) <$> prettyMybStmt False s
-    let
-      pci (CaseItem p v) = do
-        pat <- gpadj (cslid1 prettyExpr) p
-        branch <- prettyMybStmt False v
-        return $ pat <> colon <+> ng branch
+    let pci (CaseItem p v) = do
+          pat <- gpadj (cslid1 prettyExpr) p
+          branch <- prettyMybStmt False v
+          return $ pat <> colon <+> ng branch
     body <- pl (<#>) pci b
     return $
       block
-        (nest $ "case" <> case zox of {ZOXZ -> "z"; ZOXO -> mempty; ZOXX -> "x"} <=> gpar ex)
+        (nest $ "case" <> case zox of { ZOXZ -> "z"; ZOXO -> mempty; ZOXX -> "x" } <=> gpar ex)
         "endcase"
         (body <?#> dft)
   SIf c t f -> do
@@ -640,7 +638,7 @@ prettyStatement protect x = case x of
       LSWhile e -> ("while" <=>) . gpar <$> padj prettyExpr e
       LSFor i c u -> do
         di <- gpadj prettyVarAssign i
-        dc <- gpadj prettyExpr c 
+        dc <- gpadj prettyExpr c
         du <- gpadj prettyVarAssign u
         return $ "for" <=> gpar (di <> semi <+> dc <> semi <+> du)
     nest . (ng head <=>) <$> prettyAttrStmt protect s
@@ -677,7 +675,7 @@ prettyMybStmt protect (Attributed a s) = case s of
 
 prettyRMybStmt :: Bool -> MybStmt -> Print
 prettyRMybStmt protect (Attributed a s) = do
-  da <- case a of {[] -> pure mempty; _ -> (newline <>) <$> prettyAttr a}
+  da <- case a of [] -> pure mempty; _ -> (newline <>) <$> prettyAttr a
   ds <- maybe (pure semi) (fmap (newline <>) . prettyStatement protect) s
   return $ da <> ds
 
@@ -757,9 +755,11 @@ prettyModGenSingleItem x protect = case x of
   MGIEnable r oz ds d3 l -> do
     d <- pm (fmap fst . prettyDelay3) d3
     prettyItems
-      ( (if r then "not" else "buf") <> "if" <> (if oz then "1" else "0")
-          <?=> prettyDriveStrength ds
-          <?=> d
+      ( (if r then "not" else "buf")
+          <> "if"
+          <> (if oz then "1" else "0")
+            <?=> prettyDriveStrength ds
+            <?=> d
       )
       ( \(GIEnable n lv inp e) -> do
           i <- pm pname n
@@ -825,7 +825,8 @@ prettyModGenSingleItem x protect = case x of
           i <- pm pname n
           dll <- ngpadj prettyNetLV ll
           drl <- ngpadj prettyNetLV rl
-          return $ i <> gpar (dll <.> drl))
+          return $ i <> gpar (dll <.> drl)
+      )
       l
   MGIPull ud ds l ->
     prettyItems
@@ -886,8 +887,9 @@ prettyModGenSingleItem x protect = case x of
     du <- gpadj (liftA2 prettyEq (rawId su) . prettyCExpr) vu
     let head = "for" <=> gpar (di <> semi <+> dc <> semi <+> du)
     case fromMGBlockedItem i of
-      [Attributed a x] | B.null s ->
-        ng . (group head <=>) <$> prettyAttrThen a (prettyModGenSingleItem x protect)
+      [Attributed a x]
+        | B.null s ->
+            ng . (group head <=>) <$> prettyAttrThen a (prettyModGenSingleItem x protect)
       r -> (ng head <=>) <$> prettyGBlock (Identifier s) r
   MGICondItem ci -> prettyModGenCondItem ci protect -- protect should never be True in practice
   where
@@ -897,13 +899,14 @@ prettyModGenSingleItem x protect = case x of
     pide (NetInit i e) = liftA2 prettyEq (rawId i) (prettyExpr e)
     com (NetProp b vs d3) = do
       let s = pift "signed" b
-      dvs <- maybe
-        (pure s)
-        ( \(vs, r2) ->
-            (\x -> maybe mempty (\b -> if b then "vectored" else "scalared") vs <?=> s <?=> x)
-              <$> prettyRange2 r2
-        )
-        vs
+      dvs <-
+        maybe
+          (pure s)
+          ( \(vs, r2) ->
+              (\x -> maybe mempty (\b -> if b then "vectored" else "scalared") vs <?=> s <?=> x)
+                <$> prettyRange2 r2
+          )
+          vs
       (dvs <?=>) <$> pm (fmap fst . prettyDelay3) d3
 
 -- | Nested conditionals with dangling else support
@@ -930,8 +933,9 @@ prettyModGenCondItem ci protect = case ci of
       GCBConditional (Attributed a ci) ->
         ng . (group head <=>) <$> prettyAttrThen a (prettyModGenCondItem ci p)
       GCBBlock (Identified (Identifier s) r) -> case fromMGBlockedItem r of
-        [Attributed a x] | B.null s && isNotCond x ->
-          ng . (group head <=>) <$> prettyAttrThen a (prettyModGenSingleItem x protect)
+        [Attributed a x]
+          | B.null s && isNotCond x ->
+              ng . (group head <=>) <$> prettyAttrThen a (prettyModGenSingleItem x protect)
         r -> (ng head <=>) <$> prettyGBlock (Identifier s) r
 
 -- | Generate block
@@ -1092,7 +1096,7 @@ prettySpecifyItem x =
       dmdd <- pIMTM mdd
       return $ gpar $ dre <.> dde <.> dtcl0 <.> toc [dtcl1, dn, dmsc, dmtc, dmdr, dmdd]
     cPDV x = case x of
-      PDV1 e -> e :|[]
+      PDV1 e -> e :| []
       PDV2 e1 e2 -> [e1, e2]
       PDV3 e1 e2 e3 -> [e1, e2, e3]
       PDV6 e1 e2 e3 e4 e5 e6 -> [e1, e2, e3, e4, e5, e6]
@@ -1113,35 +1117,38 @@ prettyModuleItems =
     prettyregroup
       (<#>)
       ( \x -> case x of
-        MI'MGI (Attributed a i) -> prettyAttrThen a $ prettyModGenSingleItem i False
-        MI'Port a d sr l -> do
-          dsr <- prettySignRange sr
-          it <- prettyItemsid (viaShow d <?=> dsr) prettyIdent l
-          prettyAttrng a it
-        MI'Parameter a t l -> prettyXparam "parameter" t l >>= prettyAttrng a
-        MI'GenReg l ->
-          block "generate" "endgenerate" <$>
-            pl (<#>) (\(Attributed a i) -> prettyAttrThen a $ prettyModGenSingleItem i False) l
-        MI'SpecParam a r l -> prettySpecParams r l >>= prettyAttrng a
-        MI'SpecBlock l -> block "specify" "endspecify" <$> pl (<#>) prettySpecifyItem l
+          MI'MGI (Attributed a i) -> prettyAttrThen a $ prettyModGenSingleItem i False
+          MI'Port a d sr l -> do
+            dsr <- prettySignRange sr
+            it <- prettyItemsid (viaShow d <?=> dsr) prettyIdent l
+            prettyAttrng a it
+          MI'Parameter a t l -> prettyXparam "parameter" t l >>= prettyAttrng a
+          MI'GenReg l ->
+            block "generate" "endgenerate"
+              <$> pl (<#>) (\(Attributed a i) -> prettyAttrThen a $ prettyModGenSingleItem i False) l
+          MI'SpecParam a r l -> prettySpecParams r l >>= prettyAttrng a
+          MI'SpecBlock l -> block "specify" "endspecify" <$> pl (<#>) prettySpecifyItem l
       )
       ( \x -> case x of
-        MIMGI i -> MI'MGI $ fromMGBlockedItem1 <$> i
-        MIPort (AttrIded a i (d, sr)) -> MI'Port a d sr [i]
-        MIParameter (AttrIded a i (Parameter t v)) -> MI'Parameter a t [Identified i v]
-        MIGenReg l -> MI'GenReg $ fromMGBlockedItem l
-        MISpecParam a r spd -> MI'SpecParam a r [spd]
-        MISpecBlock l -> MI'SpecBlock $ fromSpecBlockedItem l
+          MIMGI i -> MI'MGI $ fromMGBlockedItem1 <$> i
+          MIPort (AttrIded a i (d, sr)) -> MI'Port a d sr [i]
+          MIParameter (AttrIded a i (Parameter t v)) -> MI'Parameter a t [Identified i v]
+          MIGenReg l -> MI'GenReg $ fromMGBlockedItem l
+          MISpecParam a r spd -> MI'SpecParam a r [spd]
+          MISpecBlock l -> MI'SpecBlock $ fromSpecBlockedItem l
       )
       ( \mi mi' -> case (mi, mi') of
-        (MIMGI mgi, MI'MGI l) -> MI'MGI <$> (addAttributed fromMGBlockedItem_add) mgi l
-        (MIPort (AttrIded na i (nd, nsr)), MI'Port a d sr l) | na == a && nd == d && nsr == sr ->
-          Just $ MI'Port a d sr $ i <| l
-        (MIParameter (AttrIded na i (Parameter nt v)), MI'Parameter a t l) | na == a && nt == t ->
-          Just $ MI'Parameter a t $ Identified i v <| l
-        (MISpecParam na nr spd, MI'SpecParam a r l) | na == a && nr == r ->
-          Just $ MI'SpecParam a r $ spd <| l
-        _ -> Nothing
+          (MIMGI mgi, MI'MGI l) -> MI'MGI <$> (addAttributed fromMGBlockedItem_add) mgi l
+          (MIPort (AttrIded na i (nd, nsr)), MI'Port a d sr l)
+            | na == a && nd == d && nsr == sr ->
+                Just $ MI'Port a d sr $ i <| l
+          (MIParameter (AttrIded na i (Parameter nt v)), MI'Parameter a t l)
+            | na == a && nt == t ->
+                Just $ MI'Parameter a t $ Identified i v <| l
+          (MISpecParam na nr spd, MI'SpecParam a r l)
+            | na == a && nr == r ->
+                Just $ MI'SpecParam a r $ spd <| l
+          _ -> Nothing
       )
 
 prettyPortInter :: [Identified [Identified (Maybe CRangeExpr)]] -> Print
@@ -1170,18 +1177,17 @@ prettyModuleBlock (LocalCompDir ts c p dn) (ModuleBlock a i pi b mts mc mp mdn) 
   ports <- prettyPortInter pi
   header <- prettyItem a $ head <> gpar ports
   body <- prettyModuleItems b
-  let
-    dts =
-      piff (let (a, b) = fromJust mts in "`timescale" <+> tsval a <+> "/" <+> tsval b) (ts == mts)
-    dcd = piff (if mc then "`celldefine" else "`endcelldefine") (c == mc)
-    dud =
-      piff
-        ( case mp of
-            Nothing -> "`nounconnected_drive"
-            Just b -> "`unconnected_drive pull" <> if b then "1" else "0"
-        )
-        (p == mp)
-    ddn = piff ("`default_nettype" <+> maybe "none" viaShow mdn) (dn == mdn)
+  let dts =
+        piff (let (a, b) = fromJust mts in "`timescale" <+> tsval a <+> "/" <+> tsval b) (ts == mts)
+      dcd = piff (if mc then "`celldefine" else "`endcelldefine") (c == mc)
+      dud =
+        piff
+          ( case mp of
+              Nothing -> "`nounconnected_drive"
+              Just b -> "`unconnected_drive pull" <> if b then "1" else "0"
+          )
+          (p == mp)
+      ddn = piff ("`default_nettype" <+> maybe "none" viaShow mdn) (dn == mdn)
   return
     (dts <?#> dcd <?#> dud <?#> ddn <?#> block header "endmodule" body, LocalCompDir mts mc mp mdn)
   where
@@ -1198,25 +1204,29 @@ prettyPrimPorts (a, d, l) = do
     _ -> pure $ ids <> s
   prettyItem a $
     (case d of PPInput -> "input"; PPOutput -> "output"; PPReg -> "reg"; PPOutReg _ -> "output reg")
-    <=> ports
+      <=> ports
 
 -- | Analyses the column size of all lines and returns a list of either
 -- | number of successive non-edge columns or the width of a column that contain edges
 seqrowAlignment :: NonEmpty SeqRow -> [Either Int Int]
 seqrowAlignment =
-  maybe [] fst . foldrMapM1
-    ( \sr@(SeqRow sri _ _) -> Just (case sri of
-        SISeq l0 e l1 -> [Left $ length l0, Right $ edgeprintsize e, Left $ length l1]
-        SIComb l -> [Left $ length l],
-      totallength sr)
-    )
-    ( \sr@(SeqRow sri _ _) (sl, tl) ->
-        if totallength sr /= tl
-          then Nothing
-          else case sri of
-            SISeq l0 e l1 -> (,) <$> spliceputat (edgeprintsize e) (length l0) sl <*> pure tl
-            SIComb l -> Just (sl, tl)
-    )
+  maybe [] fst
+    . foldrMapM1
+      ( \sr@(SeqRow sri _ _) ->
+          Just
+            ( case sri of
+                SISeq l0 e l1 -> [Left $ length l0, Right $ edgeprintsize e, Left $ length l1]
+                SIComb l -> [Left $ length l],
+              totallength sr
+            )
+      )
+      ( \sr@(SeqRow sri _ _) (sl, tl) ->
+          if totallength sr /= tl
+            then Nothing
+            else case sri of
+              SISeq l0 e l1 -> (,) <$> spliceputat (edgeprintsize e) (length l0) sl <*> pure tl
+              SIComb l -> Just (sl, tl)
+      )
   where
     totallength sr =
       case _srowInput sr of SIComb l -> length l; SISeq l0 e l1 -> 1 + length l0 + length l1
@@ -1260,22 +1270,21 @@ prettySeqIn si l = do
     edgeprintsize x = case x of EdgePos_neg _ -> 1; EdgeDesc _ _ -> 4
     sp3 = raw "   "
     prettylevelwithwidth l w = viaShow l <> pift sp3 (w == 4)
-    
 
 -- | Prints a table in a singular block with aligned columns, or just prints it if not possible
 prettySeqRows :: NonEmpty SeqRow -> Print
 prettySeqRows l = do
   ts <- asks _poTableSpace
-  let
-    pp :: (Foldable t, Show x) => t x -> Doc
-    pp l =
-      raw $
-        fromString $
-          if ts then intercalate " " $ map show $ toList l
-          else concatMap show l
-    psi x = case x of
-      SIComb l -> pp l
-      SISeq l0 e l1 -> pp l0 <+> viaShow e <+> pp l1
+  let pp :: (Foldable t, Show x) => t x -> Doc
+      pp l =
+        raw $
+          fromString $
+            if ts
+              then intercalate " " $ map show $ toList l
+              else concatMap show l
+      psi x = case x of
+        SIComb l -> pp l
+        SISeq l0 e l1 -> pp l0 <+> viaShow e <+> pp l1
   pl
     (<#>)
     ( case seqrowAlignment l of
@@ -1292,10 +1301,10 @@ prettyPrimTable :: Doc -> PrimTable -> Print
 prettyPrimTable od b = case b of
   CombTable l -> do
     ts <- asks _poTableSpace
-    let
-      pp l =
-        if ts then intercalate " " $ map show $ toList l
-        else concatMap show l
+    let pp l =
+          if ts
+            then intercalate " " $ map show $ toList l
+            else concatMap show l
     return $
       block "table" "endtable" $
         (\f -> foldrMap1 f ((<#>) . f))

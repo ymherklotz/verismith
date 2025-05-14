@@ -72,29 +72,29 @@ preprocess env file content =
     pp _ _ _ [] = []
     pp on stack env_ (a : rest) = case words a of
       "`define" : name : value ->
-        "" :
-        pp
-          on
-          stack
-          ( if on
-              then (name, ppLine env_ $ unwords value) : env_
-              else env_
-          )
-          rest
+        ""
+          : pp
+            on
+            stack
+            ( if on
+                then (name, ppLine env_ $ unwords value) : env_
+                else env_
+            )
+            rest
       "`ifdef" : name : _ ->
         "" : pp (on && elem name (map fst env_)) (on : stack) env_ rest
       "`ifndef" : name : _ ->
         "" : pp (on && notElem name (map fst env_)) (on : stack) env_ rest
       "`else" : _
         | not $ null stack ->
-          "" : pp (head stack && not on) stack env_ rest
+            "" : pp (head stack && not on) stack env_ rest
         | otherwise ->
-          error $ "`else  without associated `ifdef/`ifndef: " ++ file
+            error $ "`else  without associated `ifdef/`ifndef: " ++ file
       "`endif" : _
         | not $ null stack ->
-          "" : pp (head stack) (tail stack) env_ rest
+            "" : pp (head stack) (tail stack) env_ rest
         | otherwise ->
-          error $ "`endif  without associated `ifdef/`ifndef: " ++ file
+            error $ "`endif  without associated `ifdef/`ifndef: " ++ file
       "`timescale" : _ -> pp on stack env_ rest
       _ -> (if on then ppLine env_ a else "") : pp on stack env_ rest
 

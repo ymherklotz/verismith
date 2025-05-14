@@ -35,16 +35,16 @@ where
 
 import Control.Applicative (liftA2)
 import Control.Monad (join, replicateM)
+import Control.Monad.Primitive (PrimMonad, PrimState, RealWorld)
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import Data.List
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
-import Control.Monad.Primitive (PrimMonad, PrimState, RealWorld)
 import Data.Word
 import System.Random.MWC.Probability
 import Verismith.Config (CategoricalProbability (..), NumberProbability (..), uniformCP)
-import Verismith.Utils (nonEmpty, foldrMap1)
+import Verismith.Utils (foldrMap1, nonEmpty)
 
 infixl 4 <.>
 
@@ -56,12 +56,12 @@ avoid l x = case l of
   h : t | h <= x -> avoid t $ x + 1
   _ -> x
 
-uniq :: Ord b => (a -> b) -> (a -> a -> a) -> [a] -> [a]
+uniq :: (Ord b) => (a -> b) -> (a -> a -> a) -> [a] -> [a]
 uniq f m =
-  nonEmpty [] $ toList
-    . foldrMap1 (:|[]) (\e (x :| a) -> if f x == f e then (m x e) :| a else e :| x : a)
-    . NE.sortWith f
-    
+  nonEmpty [] $
+    toList
+      . foldrMap1 (:| []) (\e (x :| a) -> if f x == f e then (m x e) :| a else e :| x : a)
+      . NE.sortWith f
 
 clean :: Int -> [(Double, Int)] -> [(Double, Int)]
 clean t =
@@ -70,7 +70,7 @@ clean t =
     . filter ((<= t) . snd)
 
 sampleCategoricalProbability ::
-  PrimMonad m => Int -> Gen (PrimState m) -> CategoricalProbability -> m Int
+  (PrimMonad m) => Int -> Gen (PrimState m) -> CategoricalProbability -> m Int
 sampleCategoricalProbability t gen d = case d of
   CPDiscrete l ->
     let ll = NE.take (t + 1) l
@@ -87,7 +87,7 @@ sampleCategoricalProbability t gen d = case d of
           ll
           >>= maybe (avoid (map snd ll) <$> sample (uniformR (0, t - length ll)) gen) pure
 
-sampleNumberProbability :: PrimMonad m => Gen (PrimState m) -> NumberProbability -> m Int
+sampleNumberProbability :: (PrimMonad m) => Gen (PrimState m) -> NumberProbability -> m Int
 sampleNumberProbability gen d = case d of
   NPUniform l h -> sample (uniformR (l, h)) gen
   NPBinomial o t f -> (o +) <$> sample (binomial t f) gen
@@ -171,7 +171,7 @@ sampleNEString ::
   (p -> NumberProbability) -> (p -> CategoricalProbability) -> B.ByteString -> GenM p B.ByteString
 sampleNEString np cp s = B.pack . toList <$> sampleNE np (sampleFromString cp s)
 
-deleteFirstOrdered :: Ord c => (a -> c) -> (b -> c) -> [a] -> [b] -> [a]
+deleteFirstOrdered :: (Ord c) => (a -> c) -> (b -> c) -> [a] -> [b] -> [a]
 deleteFirstOrdered pa pb la lb = case (la, lb) of
   (ha : ta, hb : tb) -> case compare (pa ha) (pb hb) of
     LT -> ha : deleteFirstOrdered pa pb ta lb
@@ -179,7 +179,7 @@ deleteFirstOrdered pa pb la lb = case (la, lb) of
     GT -> deleteFirstOrdered pa pb la tb
   _ -> la
 
-merge :: Ord a => [a] -> [a] -> [a]
+merge :: (Ord a) => [a] -> [a] -> [a]
 merge la lb = case (la, lb) of
   (ha : ta, hb : tb) -> case compare ha hb of
     LT -> ha : merge ta lb

@@ -5,7 +5,6 @@
 -- Maintainer  : yann [at] yannherklotz [dot] com
 -- Stability   : experimental
 -- Portability : POSIX
-
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -579,176 +578,187 @@ defGarbageOpts :: GarbageOpts
 defGarbageOpts =
   GarbageOpts
     { _goSeed = Nothing,
-      _goConfig = GarbageConfigOpts
-        { _gcoBlocks = NPPoisson 0 1,
-          _gcoDesigns = NPPoisson 0 1,
-          _gcoItems = NPPoisson 0 1,
-          _gcoLibraries = NPPoisson 0 1,
-          _gcoCell_Inst = 0.5,
-          _gcoLiblist_Use = 0.5,
-          _gcoConfig = 0.5,
-          _gcoLibraryScope = 0.5
-        },
-      _goPrimitive = GarbagePrimitiveOpts
-        { _gpoBlocks = NPPoisson 0 2,
-          _gpoPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _gpoPortType = uniformCP,
-          _gpoSeq_Comb = 0.5,
-          _gpoRegInit = 0.5,
-          _gpoCombInit = uniformCP,
-          _gpoTableRows = NPPoisson 0 4,
-          _gpoInLevel = uniformCP,
-          _gpoOutLevel = uniformCP,
-          _gpoEdgeSensitive = 0.5,
-          _gpoEdgeSimplePosNeg = uniformCP,
-          _gpoOutputNoChange = 0.5
-        },
-      _goModule = GarbageModuleOpts
-        { _gmoBlocks = NPPoisson 1 2,
-          _gmoNamed_Positional = 0.5,
-          _gmoParameters = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _gmoOptionalParameter = 0.5,
-          _gmoPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _gmoPortLValues = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _gmoPortRange = 0.5,
-          _gmoPortDir = uniformCP,
-          _gmoOptionalPort = 0.5,
-          _gmoItems = NPPoisson 0 3,
-          _gmoItem = CPDiscrete [6, 2, 2, 3, 2, 1, 1, 1],
-          _gmoTimeScale = 0.5,
-          _gmoTimeMagnitude = uniformCP,
-          _gmoCell = 0.5,
-          _gmoUnconnectedDrive = uniformCP,
-          _gmoDefaultNetType = uniformCP,
-          _gmoNonAsciiHeader = True
-        },
-      _goSpecify = GarbageSpecifyOpts
-        { _gsyoPath = GarbageSpecifyPathOpts
-            { _gspoCondition = uniformCP,
-              _gspoFull_Parallel = 0.5,
-              _gspoEdgeSensitive = 0.5,
-              _gspoFullSources = NPPoisson 0 1,
-              _gspoFullDestinations = NPPoisson 0 1,
-              _gspoPolarity = uniformCP,
-              _gspoEdgeSensitivity = uniformCP,
-              _gspoDelayKind = uniformCP
-            },
-          _gsyoTimingCheck = GarbageSpecifyTimingCheckOpts
-            { _gstcoOptionalArg = 0.5,
-              _gstcoEvent = 0.5,
-              _gstcoEventEdge = 0.25,
-              _gstcoCondition = 0.5,
-              _gstcoCondNeg_Pos = 0.5,
-              _gstcoDelayedMinTypMax = 0.5
-            },
-          _gsyoItems = NPPoisson 0 1,
-          _gsyoItem = uniformCP,
-          _gsyoTermRange = 0.5,
-          _gsyoParamRange = 0.5,
-          _gsyoPathPulseEscaped_Simple = 0.5,
-          _gsyoPathPulseRange = 0.5
-        },
-      _goGenerate = GarbageGenerateOpts
-        { _ggoAttenuation = defAttenuationOpts,
-          _ggoItems = NPPoisson 0 3,
-          _ggoItem = uniformCP,
-          _ggoOptionalBlock = 0.5,
-          _ggoInstOptionalDelay = 0.5,
-          _ggoInstOptionalRange = 0.5,
-          _ggoPrimitiveOptIdent = 0.5,
-          _ggoCondBlock = uniformCP,
-          _ggoNetType = uniformCP,
-          _ggoNetRange = 0.5,
-          _ggoNetVectoring = uniformCP,
-          _ggoDeclItem = uniformCP,
-          _ggoDeclDim_Init = 0.5,
-          _ggoChargeStrength = uniformCP,
-          _ggoTaskFunAutomatic = 0.5,
-          _ggoTaskFunDecl = uniformCP,
-          _ggoTaskFunRegister = 0.5,
-          _ggoTaskFunPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _ggoTaskFunPortType = uniformCP,
-          _ggoTaskPortDirection = uniformCP,
-          _ggoFunRetType = 0.5,
-          _ggoGateInst = uniformCP,
-          _ggoGateOptIdent = 0.5,
-          _ggoGateNInputType = uniformCP,
-          _ggoGateInputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _ggoGateOutputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _ggoCaseBranches = NPNegativeBinomial 0 0.75 2,
-          _ggoCaseBranchPatterns = NPNegativeBinomial 0 (2.0 / 5.0) 1
-        },
-      _goType = GarbageTypeOpts
-        { _gtoAbstract_Concrete = 0.5,
-          _gtoAbstract = uniformCP,
-          _gtoConcreteSignedness = 0.5,
-          _gtoConcreteBitRange = 0.5,
-          _gtoDimensions = NPNegativeBinomial 0 0.5 1
-        },
-      _goStatement = GarbageStatementOpts
-        { _gstoAttenuation = defAttenuationOpts,
-          _gstoOptional = 0.5,
-          _gstoItems = NPPoisson 0 3,
-          _gstoItem = uniformCP,
-          _gstoOptionalDelEvCtl = 0.5,
-          _gstoAssignmentBlocking = 0.5,
-          _gstoCase = uniformCP,
-          _gstoCaseBranches = NPNegativeBinomial 0 0.75 2,
-          _gstoCaseBranchPatterns = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _gstoLoop = uniformCP,
-          _gstoBlockPar_Seq = 0.5,
-          _gstoBlockHeader = 0.5,
-          _gstoBlockDecls = NPPoisson 0 1,
-          _gstoBlockDecl = uniformCP,
-          _gstoProcContAssign = uniformCP,
-          _gstoPCAVar_Net = 0.5,
-          _gstoDelayEventRepeat = uniformCP,
-          _gstoEvent = uniformCP,
-          _gstoEvents = NPNegativeBinomial 0 0.5 1,
-          _gstoEventPrefix = uniformCP,
-          _gstoSysTaskPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _gstoSysTaskOptionalPort = 0.5
-        },
-      _goExpr = GarbageExprOpts
-        { _geoAttenuation = defAttenuationOpts,
-          _geoItem = CPDiscrete [2, 2, 2, 1],
-          _geoPrimary = CPDiscrete [2, 4, 4, 4, 4, 4, 2, 4, 1, 1, 1, 1, 1],
-          _geoUnary = uniformCP,
-          _geoBinary = uniformCP,
-          _geoMinTypMax = 0.5,
-          _geoDimRange = 0.5,
-          _geoRange = uniformCP,
-          _geoRangeOffsetPos_Neg = 0.5,
-          _geoConcatenations = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _geoSysFunArgs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
-          _geoLiteralWidth =
-            CPBiasedUniform
-              [(1024, 1), (512, 8), (256, 16), (128, 32), (64, 64), (32, 128), (16, 256), (8, 512)]
-              1,
-          _geoLiteralSigned = 0.5,
-          _geoStringCharacters = NPNegativeBinomial 0 0.5 3,
-          _geoStringCharacter = uniformCP,
-          _geoFixed_Floating = 0.5,
-          _geoExponentSign = uniformCP,
-          _geoX_Z = 0.5,
-          _geoBinarySymbols = NPNegativeBinomial 0 0.5 3,
-          _geoBinarySymbol = uniformCP,
-          _geoOctalSymbols = NPNegativeBinomial 0 0.5 3,
-          _geoOctalSymbol = uniformCP,
-          _geoDecimalSymbols = NPNegativeBinomial 0 0.5 3,
-          _geoDecimalSymbol = uniformCP,
-          _geoHexadecimalSymbols = NPNegativeBinomial 0 0.5 3,
-          _geoHexadecimalSymbol = uniformCP
-        },
-      _goIdentifier = GarbageIdentifierOpts
-        { _gioEscaped_Simple = 0.5,
-          _gioSimpleLetters = NPNegativeBinomial 0 0.5 3,
-          _gioSimpleLetter = uniformCP,
-          _gioEscapedLetters = NPNegativeBinomial 0 0.5 3,
-          _gioEscapedLetter = uniformCP,
-          _gioSystemLetters = NPNegativeBinomial 0 0.5 3,
-          _gioSystemFirstLetter = uniformCP
-        },
+      _goConfig =
+        GarbageConfigOpts
+          { _gcoBlocks = NPPoisson 0 1,
+            _gcoDesigns = NPPoisson 0 1,
+            _gcoItems = NPPoisson 0 1,
+            _gcoLibraries = NPPoisson 0 1,
+            _gcoCell_Inst = 0.5,
+            _gcoLiblist_Use = 0.5,
+            _gcoConfig = 0.5,
+            _gcoLibraryScope = 0.5
+          },
+      _goPrimitive =
+        GarbagePrimitiveOpts
+          { _gpoBlocks = NPPoisson 0 2,
+            _gpoPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _gpoPortType = uniformCP,
+            _gpoSeq_Comb = 0.5,
+            _gpoRegInit = 0.5,
+            _gpoCombInit = uniformCP,
+            _gpoTableRows = NPPoisson 0 4,
+            _gpoInLevel = uniformCP,
+            _gpoOutLevel = uniformCP,
+            _gpoEdgeSensitive = 0.5,
+            _gpoEdgeSimplePosNeg = uniformCP,
+            _gpoOutputNoChange = 0.5
+          },
+      _goModule =
+        GarbageModuleOpts
+          { _gmoBlocks = NPPoisson 1 2,
+            _gmoNamed_Positional = 0.5,
+            _gmoParameters = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _gmoOptionalParameter = 0.5,
+            _gmoPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _gmoPortLValues = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _gmoPortRange = 0.5,
+            _gmoPortDir = uniformCP,
+            _gmoOptionalPort = 0.5,
+            _gmoItems = NPPoisson 0 3,
+            _gmoItem = CPDiscrete [6, 2, 2, 3, 2, 1, 1, 1],
+            _gmoTimeScale = 0.5,
+            _gmoTimeMagnitude = uniformCP,
+            _gmoCell = 0.5,
+            _gmoUnconnectedDrive = uniformCP,
+            _gmoDefaultNetType = uniformCP,
+            _gmoNonAsciiHeader = True
+          },
+      _goSpecify =
+        GarbageSpecifyOpts
+          { _gsyoPath =
+              GarbageSpecifyPathOpts
+                { _gspoCondition = uniformCP,
+                  _gspoFull_Parallel = 0.5,
+                  _gspoEdgeSensitive = 0.5,
+                  _gspoFullSources = NPPoisson 0 1,
+                  _gspoFullDestinations = NPPoisson 0 1,
+                  _gspoPolarity = uniformCP,
+                  _gspoEdgeSensitivity = uniformCP,
+                  _gspoDelayKind = uniformCP
+                },
+            _gsyoTimingCheck =
+              GarbageSpecifyTimingCheckOpts
+                { _gstcoOptionalArg = 0.5,
+                  _gstcoEvent = 0.5,
+                  _gstcoEventEdge = 0.25,
+                  _gstcoCondition = 0.5,
+                  _gstcoCondNeg_Pos = 0.5,
+                  _gstcoDelayedMinTypMax = 0.5
+                },
+            _gsyoItems = NPPoisson 0 1,
+            _gsyoItem = uniformCP,
+            _gsyoTermRange = 0.5,
+            _gsyoParamRange = 0.5,
+            _gsyoPathPulseEscaped_Simple = 0.5,
+            _gsyoPathPulseRange = 0.5
+          },
+      _goGenerate =
+        GarbageGenerateOpts
+          { _ggoAttenuation = defAttenuationOpts,
+            _ggoItems = NPPoisson 0 3,
+            _ggoItem = uniformCP,
+            _ggoOptionalBlock = 0.5,
+            _ggoInstOptionalDelay = 0.5,
+            _ggoInstOptionalRange = 0.5,
+            _ggoPrimitiveOptIdent = 0.5,
+            _ggoCondBlock = uniformCP,
+            _ggoNetType = uniformCP,
+            _ggoNetRange = 0.5,
+            _ggoNetVectoring = uniformCP,
+            _ggoDeclItem = uniformCP,
+            _ggoDeclDim_Init = 0.5,
+            _ggoChargeStrength = uniformCP,
+            _ggoTaskFunAutomatic = 0.5,
+            _ggoTaskFunDecl = uniformCP,
+            _ggoTaskFunRegister = 0.5,
+            _ggoTaskFunPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _ggoTaskFunPortType = uniformCP,
+            _ggoTaskPortDirection = uniformCP,
+            _ggoFunRetType = 0.5,
+            _ggoGateInst = uniformCP,
+            _ggoGateOptIdent = 0.5,
+            _ggoGateNInputType = uniformCP,
+            _ggoGateInputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _ggoGateOutputs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _ggoCaseBranches = NPNegativeBinomial 0 0.75 2,
+            _ggoCaseBranchPatterns = NPNegativeBinomial 0 (2.0 / 5.0) 1
+          },
+      _goType =
+        GarbageTypeOpts
+          { _gtoAbstract_Concrete = 0.5,
+            _gtoAbstract = uniformCP,
+            _gtoConcreteSignedness = 0.5,
+            _gtoConcreteBitRange = 0.5,
+            _gtoDimensions = NPNegativeBinomial 0 0.5 1
+          },
+      _goStatement =
+        GarbageStatementOpts
+          { _gstoAttenuation = defAttenuationOpts,
+            _gstoOptional = 0.5,
+            _gstoItems = NPPoisson 0 3,
+            _gstoItem = uniformCP,
+            _gstoOptionalDelEvCtl = 0.5,
+            _gstoAssignmentBlocking = 0.5,
+            _gstoCase = uniformCP,
+            _gstoCaseBranches = NPNegativeBinomial 0 0.75 2,
+            _gstoCaseBranchPatterns = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _gstoLoop = uniformCP,
+            _gstoBlockPar_Seq = 0.5,
+            _gstoBlockHeader = 0.5,
+            _gstoBlockDecls = NPPoisson 0 1,
+            _gstoBlockDecl = uniformCP,
+            _gstoProcContAssign = uniformCP,
+            _gstoPCAVar_Net = 0.5,
+            _gstoDelayEventRepeat = uniformCP,
+            _gstoEvent = uniformCP,
+            _gstoEvents = NPNegativeBinomial 0 0.5 1,
+            _gstoEventPrefix = uniformCP,
+            _gstoSysTaskPorts = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _gstoSysTaskOptionalPort = 0.5
+          },
+      _goExpr =
+        GarbageExprOpts
+          { _geoAttenuation = defAttenuationOpts,
+            _geoItem = CPDiscrete [2, 2, 2, 1],
+            _geoPrimary = CPDiscrete [2, 4, 4, 4, 4, 4, 2, 4, 1, 1, 1, 1, 1],
+            _geoUnary = uniformCP,
+            _geoBinary = uniformCP,
+            _geoMinTypMax = 0.5,
+            _geoDimRange = 0.5,
+            _geoRange = uniformCP,
+            _geoRangeOffsetPos_Neg = 0.5,
+            _geoConcatenations = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _geoSysFunArgs = NPNegativeBinomial 0 (2.0 / 5.0) 1,
+            _geoLiteralWidth =
+              CPBiasedUniform
+                [(1024, 1), (512, 8), (256, 16), (128, 32), (64, 64), (32, 128), (16, 256), (8, 512)]
+                1,
+            _geoLiteralSigned = 0.5,
+            _geoStringCharacters = NPNegativeBinomial 0 0.5 3,
+            _geoStringCharacter = uniformCP,
+            _geoFixed_Floating = 0.5,
+            _geoExponentSign = uniformCP,
+            _geoX_Z = 0.5,
+            _geoBinarySymbols = NPNegativeBinomial 0 0.5 3,
+            _geoBinarySymbol = uniformCP,
+            _geoOctalSymbols = NPNegativeBinomial 0 0.5 3,
+            _geoOctalSymbol = uniformCP,
+            _geoDecimalSymbols = NPNegativeBinomial 0 0.5 3,
+            _geoDecimalSymbol = uniformCP,
+            _geoHexadecimalSymbols = NPNegativeBinomial 0 0.5 3,
+            _geoHexadecimalSymbol = uniformCP
+          },
+      _goIdentifier =
+        GarbageIdentifierOpts
+          { _gioEscaped_Simple = 0.5,
+            _gioSimpleLetters = NPNegativeBinomial 0 0.5 3,
+            _gioSimpleLetter = uniformCP,
+            _gioEscapedLetters = NPNegativeBinomial 0 0.5 3,
+            _gioEscapedLetter = uniformCP,
+            _gioSystemLetters = NPNegativeBinomial 0 0.5 3,
+            _gioSystemFirstLetter = uniformCP
+          },
       _goDriveStrength = uniformCP,
       _goLValues = NPNegativeBinomial 0 0.5 1,
       _goOptionalLValue = 0.5,
@@ -988,25 +998,25 @@ exprCodec :: TomlCodec ProbExpr
 exprCodec =
   ProbExpr
     <$> defaultValue (defProb probExprNum) (intE "number")
-    .= _probExprNum
+      .= _probExprNum
     <*> defaultValue (defProb probExprId) (intE "variable")
-    .= _probExprId
+      .= _probExprId
     <*> defaultValue (defProb probExprRangeSelect) (intE "rangeselect")
-    .= _probExprRangeSelect
+      .= _probExprRangeSelect
     <*> defaultValue (defProb probExprUnOp) (intE "unary")
-    .= _probExprUnOp
+      .= _probExprUnOp
     <*> defaultValue (defProb probExprBinOp) (intE "binary")
-    .= _probExprBinOp
+      .= _probExprBinOp
     <*> defaultValue (defProb probExprCond) (intE "ternary")
-    .= _probExprCond
+      .= _probExprCond
     <*> defaultValue (defProb probExprConcat) (intE "concatenation")
-    .= _probExprConcat
+      .= _probExprConcat
     <*> defaultValue (defProb probExprStr) (intE "string")
-    .= _probExprStr
+      .= _probExprStr
     <*> defaultValue (defProb probExprSigned) (intE "signed")
-    .= _probExprSigned
+      .= _probExprSigned
     <*> defaultValue (defProb probExprUnsigned) (intE "unsigned")
-    .= _probExprUnsigned
+      .= _probExprUnsigned
   where
     defProb i = defaultConfig ^. configProbability . probExpr . i
     intE = int "expr"
@@ -1015,13 +1025,13 @@ stmntCodec :: TomlCodec ProbStatement
 stmntCodec =
   ProbStatement
     <$> defaultValue (defProb probStmntBlock) (intS "blocking")
-    .= _probStmntBlock
+      .= _probStmntBlock
     <*> defaultValue (defProb probStmntNonBlock) (intS "nonblocking")
-    .= _probStmntNonBlock
+      .= _probStmntNonBlock
     <*> defaultValue (defProb probStmntCond) (intS "conditional")
-    .= _probStmntCond
+      .= _probStmntCond
     <*> defaultValue (defProb probStmntFor) (intS "forloop")
-    .= _probStmntFor
+      .= _probStmntFor
   where
     defProb i = defaultConfig ^. configProbability . probStmnt . i
     intS = int "statement"
@@ -1030,13 +1040,13 @@ modItemCodec :: TomlCodec ProbModItem
 modItemCodec =
   ProbModItem
     <$> defaultValue (defProb probModItemAssign) (intM "assign")
-    .= _probModItemAssign
+      .= _probModItemAssign
     <*> defaultValue (defProb probModItemSeqAlways) (intM "sequential")
-    .= _probModItemSeqAlways
+      .= _probModItemSeqAlways
     <*> defaultValue (defProb probModItemCombAlways) (intM "combinational")
-    .= _probModItemCombAlways
+      .= _probModItemCombAlways
     <*> defaultValue (defProb probModItemInst) (intM "instantiation")
-    .= _probModItemInst
+      .= _probModItemInst
   where
     defProb i = defaultConfig ^. configProbability . probModItem . i
     intM = int "moditem"
@@ -1045,9 +1055,9 @@ modCodec :: TomlCodec ProbMod
 modCodec =
   ProbMod
     <$> defaultValue (defProb probModDropOutput) (intM "drop_output")
-    .= _probModDropOutput
+      .= _probModDropOutput
     <*> defaultValue (defProb probModKeepOutput) (intM "keep_output")
-    .= _probModKeepOutput
+      .= _probModKeepOutput
   where
     defProb i = defaultConfig ^. configProbability . probMod . i
     intM = int "module"
@@ -1056,13 +1066,13 @@ probCodec :: TomlCodec Probability
 probCodec =
   Probability
     <$> defaultValue (defProb probModItem) modItemCodec
-    .= _probModItem
+      .= _probModItem
     <*> defaultValue (defProb probStmnt) stmntCodec
-    .= _probStmnt
+      .= _probStmnt
     <*> defaultValue (defProb probExpr) exprCodec
-    .= _probExpr
+      .= _probExpr
     <*> defaultValue (defProb probMod) modCodec
-    .= _probMod
+      .= _probMod
   where
     defProb i = defaultConfig ^. configProbability . i
 
@@ -1070,39 +1080,39 @@ propCodec :: TomlCodec ConfProperty
 propCodec =
   ConfProperty
     <$> defaultValue (defProp propSize) (Toml.int "size")
-    .= _propSize
+      .= _propSize
     <*> Toml.dioptional (Toml.read "seed")
-    .= _propSeed
+      .= _propSeed
     <*> defaultValue (defProp propStmntDepth) (int "statement" "depth")
-    .= _propStmntDepth
+      .= _propStmntDepth
     <*> defaultValue (defProp propModDepth) (int "module" "depth")
-    .= _propModDepth
+      .= _propModDepth
     <*> defaultValue (defProp propMaxModules) (int "module" "max")
-    .= _propMaxModules
+      .= _propMaxModules
     <*> defaultValue
       (defProp propSampleMethod)
       (Toml.text (twoKey "sample" "method"))
-    .= _propSampleMethod
+      .= _propSampleMethod
     <*> defaultValue (defProp propSampleSize) (int "sample" "size")
-    .= _propSampleSize
+      .= _propSampleSize
     <*> defaultValue
       (defProp propCombine)
       (Toml.bool (twoKey "output" "combine"))
-    .= _propCombine
+      .= _propCombine
     <*> defaultValue (defProp propNonDeterminism) (Toml.int "nondeterminism")
-    .= _propNonDeterminism
+      .= _propNonDeterminism
     <*> defaultValue (defProp propDeterminism) (Toml.int "determinism")
-    .= _propDeterminism
+      .= _propDeterminism
     <*> Toml.dioptional (Toml.text (twoKey "default" "yosys"))
-    .= _propDefaultYosys
+      .= _propDefaultYosys
   where
     defProp i = defaultConfig ^. configProperty . i
 
 garbageAttenuationCodec :: Toml.Key -> TomlCodec GarbageAttenuationOpts
 garbageAttenuationCodec =
   Toml.dimap _gaoDecrease (GarbageAttenuationOpts 1.0)
-  . defaultValue (_gaoDecrease defAttenuationOpts)
-  . Toml.double
+    . defaultValue (_gaoDecrease defAttenuationOpts)
+    . Toml.double
 
 garbageConfigCodec :: TomlCodec GarbageConfigOpts
 garbageConfigCodec =
@@ -1186,12 +1196,12 @@ garbageSpecifyPathCodec =
       defaultValue
         (p $ _gsyoPath $ _goSpecify $ _configGarbageGenerator defaultConfig)
         (Toml.table c n)
-      .= p
+        .= p
     dfield p n =
       defaultValue
         (p $ _gsyoPath $ _goSpecify $ _configGarbageGenerator defaultConfig)
         (Toml.double n)
-      .= p
+        .= p
 
 garbageSpecifyTimingCheckCodec :: TomlCodec GarbageSpecifyTimingCheckOpts
 garbageSpecifyTimingCheckCodec =
@@ -1207,7 +1217,7 @@ garbageSpecifyTimingCheckCodec =
       defaultValue
         (p $ _gsyoTimingCheck $ _goSpecify $ _configGarbageGenerator defaultConfig)
         (Toml.double n)
-      .= p
+        .= p
 
 garbageSpecifyCodec :: TomlCodec GarbageSpecifyOpts
 garbageSpecifyCodec =
@@ -1396,13 +1406,13 @@ synthesiser :: TomlCodec SynthDescription
 synthesiser =
   SynthDescription
     <$> Toml.text "name"
-    .= synthName
+      .= synthName
     <*> Toml.dioptional (Toml.text "bin")
-    .= synthBin
+      .= synthBin
     <*> Toml.dioptional (Toml.text "description")
-    .= synthDesc
+      .= synthDesc
     <*> Toml.dioptional (Toml.text "output")
-    .= synthOut
+      .= synthOut
 
 emiCodec :: TomlCodec ConfEMI
 emiCodec =
@@ -1410,11 +1420,11 @@ emiCodec =
     <$> defaultValue
       (defaultConfig ^. configEMI . confEMIGenerateProb)
       (Toml.int "generate_prob")
-    .= _confEMIGenerateProb
+      .= _confEMIGenerateProb
     <*> defaultValue
       (defaultConfig ^. configEMI . confEMINoGenerateProb)
       (Toml.int "nogenerate_prob")
-    .= _confEMINoGenerateProb
+      .= _confEMINoGenerateProb
 
 infoCodec :: TomlCodec Info
 infoCodec =
@@ -1422,11 +1432,11 @@ infoCodec =
     <$> defaultValue
       (defaultConfig ^. configInfo . infoCommit)
       (Toml.text "commit")
-    .= _infoCommit
+      .= _infoCommit
     <*> defaultValue
       (defaultConfig ^. configInfo . infoVersion)
       (Toml.text "version")
-    .= _infoVersion
+      .= _infoVersion
 
 configCodec :: TomlCodec Config
 configCodec =
@@ -1434,31 +1444,31 @@ configCodec =
     <$> defaultValue
       (defaultConfig ^. configEMI)
       (Toml.table emiCodec "emi")
-    .= _configEMI
+      .= _configEMI
     <*> defaultValue
       (defaultConfig ^. configInfo)
       (Toml.table infoCodec "info")
-    .= _configInfo
+      .= _configInfo
     <*> defaultValue
       (defaultConfig ^. configProbability)
       (Toml.table probCodec "probability")
-    .= _configProbability
+      .= _configProbability
     <*> defaultValue
       (defaultConfig ^. configProperty)
       (Toml.table propCodec "property")
-    .= _configProperty
+      .= _configProperty
     <*> defaultValue
       (defaultConfig ^. configGarbageGenerator)
       (Toml.table garbageCodec "invalid_generator")
-    .= _configGarbageGenerator
+      .= _configGarbageGenerator
     <*> defaultValue
       (defaultConfig ^. configSimulators)
       (Toml.list simulator "simulator")
-    .= _configSimulators
+      .= _configSimulators
     <*> defaultValue
       (defaultConfig ^. configSynthesisers)
       (Toml.list synthesiser "synthesiser")
-    .= _configSynthesisers
+      .= _configSynthesisers
 
 parseConfigFile :: FilePath -> IO (Either Text Config)
 parseConfigFile fp = do

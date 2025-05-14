@@ -264,10 +264,10 @@ number = number' <$> numLit
           | "'d" `isPrefixOf` a' = read $ drop 2 a'
           | "'h" `isPrefixOf` a' = read $ "0x" ++ drop 2 a'
           | "'b" `isPrefixOf` a' =
-            foldl
-              (\n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0))
-              0
-              (drop 2 a')
+              foldl
+                (\n b' -> shiftL n 1 .|. (if b' == '1' then 1 else 0))
+                0
+                (drop 2 a')
           | otherwise = error $ "Invalid number format: " ++ a'
 
 -- toInteger' :: Decimal -> Integer

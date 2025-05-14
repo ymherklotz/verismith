@@ -126,7 +126,7 @@ nullDoc d = case d of
 linelength :: (Semigroup w, Enum w) => Word -> Line w -> w
 linelength i l = toEnum (4 * fromEnum i) <> maxLengthLine l
 
-maxLengthLine :: Enum w => Line w -> w
+maxLengthLine :: (Enum w) => Line w -> w
 maxLengthLine l = case l of
   Concat w _ _ -> w
   Token t -> toEnum $ SB.length t
@@ -156,20 +156,20 @@ instance (Semigroup w, Enum w) => Monoid (Line w) where
 instance IsString (Line w) where
   fromString = Token . fromString
 
-(<#>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<#>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<#>) a b = Lines (max (maxLengthDoc a) (maxLengthDoc b)) a b
 
-extractFirstLine :: DocLength w => Doc' w -> Doc' w -> (Word, Line w, Doc' w)
+extractFirstLine :: (DocLength w) => Doc' w -> Doc' w -> (Word, Line w, Doc' w)
 extractFirstLine a b = case a of
   Line i l -> (i, l, b)
   Lines _ l a -> extractFirstLine l $ a <#> b
 
-extractLastLine :: DocLength w => Doc' w -> Doc' w -> (Doc' w, Word, Line w)
+extractLastLine :: (DocLength w) => Doc' w -> Doc' w -> (Doc' w, Word, Line w)
 extractLastLine a b = case b of
   Line i l -> (a, i, l)
   Lines _ b l -> extractLastLine (a <#> b) l
 
-instance DocLength w => Semigroup (Doc' w) where
+instance (DocLength w) => Semigroup (Doc' w) where
   (<>) a b = case (a, b) of
     (Line ia la, Line ib lb) -> catline ia la ib lb
     (Line il l, Lines _ a b) -> let (ic, c, r) = extractFirstLine a b in catline il l ic c <#> r
@@ -181,10 +181,10 @@ instance DocLength w => Semigroup (Doc' w) where
     where
       catline ia la ib lb = if nullLine la then Line (ia + ib) lb else Line ia (la <> lb)
 
-instance DocLength w => Monoid (Doc' w) where
+instance (DocLength w) => Monoid (Doc' w) where
   mempty = emptyDoc
 
-instance DocLength w => IsString (Doc' w) where
+instance (DocLength w) => IsString (Doc' w) where
   fromString s =
     nonEmpty
       mempty
@@ -197,7 +197,8 @@ instance DocLength w => IsString (Doc' w) where
         ( \(a, b) ->
             Line (div (foldl' (\b c -> 1 + if c == '\t' then b .|. 3 else b) 0 a) 4) $ fromString b
         )
-          $ span isSpace $ NE.tail s
+          $ span isSpace
+          $ NE.tail s
 
 raw :: SB.ByteString -> Doc' w
 raw = Line 0 . Token
@@ -205,7 +206,7 @@ raw = Line 0 . Token
 alt :: SB.ByteString -> Doc' w -> Doc' w
 alt a b = Line 0 $ Alt a b
 
-viaShow :: Show a => a -> Doc' w
+viaShow :: (Show a) => a -> Doc' w
 viaShow = raw . fromString . show
 
 lparen :: Doc' w
@@ -253,19 +254,19 @@ squote = raw "'"
 space :: Doc' w
 space = raw " "
 
-hardline :: Enum w => Doc' w
+hardline :: (Enum w) => Doc' w
 hardline = Lines (toEnum 0) emptyDoc emptyDoc
 
-newline :: Enum w => Doc' w
+newline :: (Enum w) => Doc' w
 newline = alt " " hardline
 
-softline :: Enum w => Doc' w
+softline :: (Enum w) => Doc' w
 softline = alt "" hardline
 
 softspace :: Doc' w
 softspace = alt "" $ raw " "
 
-appendWith :: DocLength w => Line w -> Doc' w -> Doc' w -> Doc' w
+appendWith :: (DocLength w) => Line w -> Doc' w -> Doc' w -> Doc' w
 appendWith l a b = case (a, b) of
   (Line ia la, Line ib lb) -> Line ia $ la <> l <> lb
   (Line i ll, Lines _ a b) -> let (_, c, r) = extractFirstLine a b in Line i (ll <> l <> c) <#> r
@@ -275,34 +276,34 @@ appendWith l a b = case (a, b) of
         (_, rl, rr) = extractFirstLine c d
      in ll <#> Line i (lr <> l <> rl) <#> rr
 
-(<+>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<+>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<+>) = appendWith " "
 
-(<->) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<->) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<->) = appendWith $ Alt "" $ raw " "
 
-(<=>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<=>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<=>) = appendWith $ Alt " " hardline
 
-(</>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(</>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (</>) = appendWith $ Alt "" hardline
 
 mkopt :: (Doc' w -> Doc' w -> Doc' w) -> Doc' w -> Doc' w -> Doc' w
 mkopt f a b = if nullDoc a then b else if nullDoc b then a else f a b
 
-(<?+>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<?+>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<?+>) = mkopt (<+>)
 
-(<?#>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<?#>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<?#>) = mkopt (<#>)
 
-(<?=>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<?=>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<?=>) = mkopt (<=>)
 
-(<?/>) :: DocLength w => Doc' w -> Doc' w -> Doc' w
+(<?/>) :: (DocLength w) => Doc' w -> Doc' w -> Doc' w
 (<?/>) = mkopt (</>)
 
-trailoptcat :: Foldable f => (Doc' w -> Doc' w -> Doc' w) -> f (Doc' w) -> Doc' w
+trailoptcat :: (Foldable f) => (Doc' w -> Doc' w -> Doc' w) -> f (Doc' w) -> Doc' w
 trailoptcat f =
   fromMaybe emptyDoc
     . foldr (\a -> maybe (if nullDoc a then Nothing else Just a) $ Just . f a) Nothing
@@ -310,7 +311,7 @@ trailoptcat f =
 foldDoc :: (Word -> Line w -> a) -> (a -> a -> a) -> Doc' w -> a
 foldDoc f g d = case d of Lines _ a b -> g (foldDoc f g a) (foldDoc f g b); Line i l -> f i l
 
-mapDoc :: DocLength w => (Word -> Line v -> Doc' w) -> Doc' v -> Doc' w
+mapDoc :: (DocLength w) => (Word -> Line v -> Doc' w) -> Doc' v -> Doc' w
 mapDoc f = foldDoc f (<#>)
 
 foldLine ::
@@ -328,37 +329,37 @@ foldLine f g h i j l = case l of
   Nest _ l -> i $ foldLine f g h i j l
   Concat _ a b -> j (foldLine f g h i j a) (foldLine f g h i j b)
 
-group :: DocLength w => Doc' w -> Doc' w
+group :: (DocLength w) => Doc' w -> Doc' w
 group d = case d of
   Line i l -> Line i $ mk l
   Lines w a b -> let (il, l, r) = extractFirstLine a b in Lines w (Line il $ mk l) r
   where
     mk l = Group (maxLengthLine l) l
 
-indent :: DocLength w => Word -> Doc' w -> Doc' w
+indent :: (DocLength w) => Word -> Doc' w -> Doc' w
 indent i = mapDoc $ Line . (i +)
 
-nest :: DocLength w => Doc' w -> Doc' w
+nest :: (DocLength w) => Doc' w -> Doc' w
 nest d = case d of
   Line i l -> Line i $ mk l
   Lines _ a b -> let (il, l, r) = extractFirstLine a b in Line il (mk l) <#> indent 1 r
   where
     mk l = Nest (maxLengthLine l) l
 
-ng :: DocLength w => Doc' w -> Doc' w
+ng :: (DocLength w) => Doc' w -> Doc' w
 ng d = case d of
   Line i l -> Line i $ mk l
   Lines _ a b -> let (il, l, r) = extractFirstLine a b in Line il (mk l) <#> indent 1 r
   where
     mk l = let w = maxLengthLine l in Group w $ Nest w l
 
-block :: DocLength w => Doc' w -> Doc' w -> Doc' w -> Doc' w
+block :: (DocLength w) => Doc' w -> Doc' w -> Doc' w -> Doc' w
 block l r x = l <#> indent 1 x <#> r
 
-encl :: DocLength w => Doc' w -> Doc' w -> Doc' w -> Doc' w
+encl :: (DocLength w) => Doc' w -> Doc' w -> Doc' w -> Doc' w
 encl l r x = group $ l <-> x <> r
 
-instance Enum w => Enum (Sum w) where
+instance (Enum w) => Enum (Sum w) where
   toEnum = Sum . toEnum
   fromEnum (Sum w) = fromEnum w
   succ (Sum w) = Sum $ succ w
@@ -374,7 +375,7 @@ flatten =
     (\a b -> a <> "\n" <> b)
 
 -- | Add max line length data to the doc
-preprocess :: DocLength w => Doc' v -> (Any, Doc' w)
+preprocess :: (DocLength w) => Doc' v -> (Any, Doc' w)
 preprocess =
   foldDoc
     ( \i ->
@@ -388,7 +389,7 @@ preprocess =
     )
     $ liftA2 (<#>)
 
-breakLine :: DocLength w => Word -> Line w -> (Any, Doc' w)
+breakLine :: (DocLength w) => Word -> Line w -> (Any, Doc' w)
 breakLine i l = case l of
   Concat _ a b -> (<>) <$> breakLine i a <*> breakLine i b
   Token s -> pure $ Line i $ Token s
@@ -396,10 +397,11 @@ breakLine i l = case l of
   Group _ l -> (Any True, Line i l)
   Nest _ l -> let (b, d) = breakLine i l in (b, if getAny b then nest d else d)
 
-breakDoc :: DocLength w => w -> Doc' w -> Doc' w
+breakDoc :: (DocLength w) => w -> Doc' w -> Doc' w
 breakDoc w d = case d of
-  Line i l | w < linelength i l && toEnum (4*(fromEnum i)) < w ->
-    let (Any b, d) = breakLine i l in if b then breakDoc w d else d
+  Line i l
+    | w < linelength i l && toEnum (4 * (fromEnum i)) < w ->
+        let (Any b, d) = breakLine i l in if b then breakDoc w d else d
   Lines w' a b | w < w' -> breakDoc w a <#> breakDoc w b
   _ -> d
 

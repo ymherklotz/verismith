@@ -35,9 +35,9 @@ import Verismith.Verilog.Mutate
 fromGraph :: Gen (ModDecl ann)
 fromGraph = do
   gr <- rDupsCirc <$> Hog.resize 100 randomDAG
-  return $
-    initMod
+  return
+    $ initMod
       . head
-      $ nestUpTo 5 (generateAST gr)
-        ^.. _Wrapped
-          . traverse
+    $ nestUpTo 5 (generateAST gr)
+      ^.. _Wrapped
+        . traverse
