@@ -139,8 +139,8 @@ benchmark benchmark
   main-is: Benchmark.hs
   build-depends: base >=4 && <5
                , verismith
-               , criterion >=1.5.5 && <1.6
-               , lens >=4.16.1 && <5.2
+               , criterion >=1.5.5 && <1.7
+               , lens >=4.16.1 && <5.4
   default-extensions: OverloadedStrings
 
 test-suite test
